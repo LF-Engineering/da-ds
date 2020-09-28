@@ -24,13 +24,27 @@ func runDS(ctx *lib.Ctx) (err error) {
 	if err != nil {
 		return
 	}
+	var lastDataDt *time.Time
+	if !ctx.NoRaw {
+		lastDataDt, err = ds.FetchRaw(ctx)
+		if err != nil {
+			lib.Printf("%s: FetchRaw(%s) error: %v, allowing continue\n", ds.Info(), ctx.Info(), err)
+		}
+	}
+	if ctx.Enrich {
+		err = ds.Enrich(ctx, lastDataDt)
+		if err != nil {
+			lib.Printf("%s: Enrich(%s,%v) error: %v, allowing continue\n", ds.Info(), ctx.Info(), lastDataDt, err)
+		}
+	}
 	return
 }
 
 func main() {
-	// args --enrich --index jira-raw --index-enrich jira -e (...) --bulk-size 500 --scroll-size 500 --db-host (...) --db-sortinghat (...) --db-user (...) --db-password (...) jira https://jira.opendaylight.org --no-archive --no-ssl-verify
+	// args --only-enrich --refresh-identities --no_incremental --enrich --index jira-raw --index-enrich jira -e (...) --bulk-size 500 --scroll-size 500 --db-host (...) --db-sortinghat (...) --db-user (...) --db-password (...) jira https://jira.opendaylight.org --no-archive --no-ssl-verify
 	// prefix DA_DS_
 	// DA_DS=jira
+	// NO_RAW=1 REFRESH_AFFS=1 FORCE_FULL=1
 	// ENRICH=1 RAW_INDEX=sds-ds-raw RICH_INDEX=sds-ds-rich
 	// ES_URL=... ES_BULK_SIZE=500 ES_SCROLL_SIZE=500
 	// DB_HOST=... DB_NAME=... DB_USER=... DB_PASS=...

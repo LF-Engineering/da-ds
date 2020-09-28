@@ -165,10 +165,14 @@ func TestInit(t *testing.T) {
 		ESURL:        "",
 		ESBulkSize:   0,
 		ESScrollSize: 0,
+		ESScrollWait: "",
 		DBHost:       "",
 		DBName:       "",
 		DBUser:       "",
 		DBPass:       "",
+		NoRaw:        false,
+		RefreshAffs:  false,
+		ForceFull:    false,
 	}
 
 	// Set fake data source name to "ds" which will create prefix "DA_DS_"
@@ -269,6 +273,7 @@ func TestInit(t *testing.T) {
 				"DA_DS_ES_URL":         "elastic.co",
 				"DA_DS_ES_BULK_SIZE":   "500",
 				"DA_DS_ES_SCROLL_SIZE": "600",
+				"DA_DS_ES_SCROLL_WAIT": "10m",
 			},
 			dynamicSetFields(
 				t,
@@ -277,6 +282,7 @@ func TestInit(t *testing.T) {
 					"ESURL":        "elastic.co",
 					"ESBulkSize":   500,
 					"ESScrollSize": 600,
+					"ESScrollWait": "10m",
 				},
 			),
 		},
@@ -296,6 +302,23 @@ func TestInit(t *testing.T) {
 					"DBName": "n",
 					"DBUser": "u",
 					"DBPass": "p",
+				},
+			),
+		},
+		{
+			"Setting re affiliate params",
+			map[string]string{
+				"DA_DS_NO_RAW":       "1",
+				"DA_DS_REFRESH_AFFS": "y",
+				"DA_DS_FORCE_FULL":   "t",
+			},
+			dynamicSetFields(
+				t,
+				copyContext(&defaultContext),
+				map[string]interface{}{
+					"NoRaw":       true,
+					"RefreshAffs": true,
+					"ForceFull":   true,
 				},
 			),
 		},

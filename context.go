@@ -21,10 +21,14 @@ type Ctx struct {
 	ESURL        string  // From DA_DS_ES_URL - ElasticSearch URL
 	ESBulkSize   int     // From DA_DS_ES_BULK_SIZE - ElasticSearch bulk size
 	ESScrollSize int     // From DA_DS_ES_SCROLL_SIZE - ElasticSearch scroll size
+	ESScrollWait string  // From DA_DS_ES_SCROLL_WAIT - ElasticSearch scroll wait
 	DBHost       string  // From DA_DS_DB_HOST - affiliation DB host
 	DBName       string  // From DA_DS_DB_NAME - affiliation DB name
 	DBUser       string  // From DA_DS_DB_USER - affiliation DB user
 	DBPass       string  // From DA_DS_DB_PASS - affiliation DB pass
+	NoRaw        bool    // From DA_DS_NO_RAW - do only the enrichment
+	RefreshAffs  bool    // From DA_DS_REFRESH_AFFS - refresh affiliation data
+	ForceFull    bool    // From DA_DS_FORCE_FULL - force runnign full data source, do not attempt to detect where to start from
 }
 
 func (ctx *Ctx) env(v string) string {
@@ -100,15 +104,26 @@ func (ctx *Ctx) Init() {
 			ctx.ESScrollSize = scrollSize
 		}
 	}
+	ctx.ESScrollWait = ctx.env("ES_SCROLL_WAIT")
 
 	// Affiliation DB params
 	ctx.DBHost = ctx.env("DB_HOST")
 	ctx.DBName = ctx.env("DB_NAME")
 	ctx.DBUser = ctx.env("DB_USER")
 	ctx.DBPass = ctx.env("DB_PASS")
+
+	// Affiliations re-enrich special flags
+	ctx.NoRaw = ctx.env("NO_RAW") != ""
+	ctx.RefreshAffs = ctx.env("REFRESH_AFFS") != ""
+	ctx.ForceFull = ctx.env("FORCE_FULL") != ""
 }
 
 // Print context contents
 func (ctx *Ctx) Print() {
 	fmt.Printf("Environment Context Dump\n%+v\n", ctx)
+}
+
+// Info - return context in human readable form
+func (ctx Ctx) Info() string {
+	return fmt.Sprintf("%+v", ctx)
 }

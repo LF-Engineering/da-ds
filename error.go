@@ -11,7 +11,7 @@ import (
 func FatalOnError(err error) string {
 	if err != nil {
 		tm := time.Now()
-		msg := fmt.Sprintf("Error(time=%+v):\nError: '%s'\nStacktrace:\n%s\n", tm, err.Error(), string(debug.Stack()))
+		msg := fmt.Sprintf("DA_DS_ERROR(time=%+v):\nError: '%s'\nStacktrace:\n%s\n", tm, err.Error(), string(debug.Stack()))
 		Printf("%s", msg)
 		fmt.Fprintf(os.Stderr, "%s", msg)
 		panic("stacktrace")
