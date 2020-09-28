@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -160,7 +161,18 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[stri
 		issueFields[k] = v
 	}
 
-  // TODO: contrinue: fetch rest of issue data: comments and then send to ES
+	sID, ok := issue.(map[string]interface{})["id"].(string)
+	if !ok {
+		err = fmt.Errorf("unable to unmarshal id from issue %+v", issue)
+		return
+	}
+	iID, err := strconv.Atoi(sID)
+	if err != nil {
+		err = fmt.Errorf("unable to unmarshal id from string %s", sID)
+		return
+	}
+	fmt.Printf("Issue ID: %d\n", iID)
+	// TODO: contrinue: fetch rest of issue data: comments and then send to ES
 	return
 }
 
