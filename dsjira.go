@@ -17,10 +17,18 @@ type DSJira struct {
 	DS          string
 	APIRoot     string
 	APISearch   string
+	APIFields   string
 	URL         string // From DA_JIRA_URL - Jira URL
 	NoSSLVerify bool   // From DA_JIRA_NO_SSL_VERIFY
 	User        string // From DA_JIRA_USER
 	Pass        string // From DA_JIRA_PASS
+}
+
+// JiraField - informatin about fields present in issues
+type JiraField struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Custom bool   `json:"custom"`
 }
 
 // ParseArgs - parse jira specific environment variables
@@ -34,6 +42,7 @@ func (j *DSJira) ParseArgs(ctx *Ctx) (err error) {
 	j.Pass = os.Getenv("DA_JIRA_PASS")
 	j.APIRoot = "/rest/api/2"
 	j.APISearch = "/search"
+	j.APIFields = "/field"
 	return
 }
 
@@ -80,8 +89,46 @@ func (j *DSJira) Enrich(ctx *Ctx) (err error) {
 	return
 }
 
-// FetchItems - implement enrich data for jira datasource
+// GetFields - implement get fields for jira datasource
+func (j *DSJira) GetFields(ctx *Ctx) (fields []JiraField, err error) {
+	url := j.URL + j.APIRoot + j.APIFields
+	method := Get
+	var req *http.Request
+	req, err = http.NewRequest(method, url, nil)
+	if err != nil {
+		Printf("New request error: %+v for %s url: %s\n", err, method, url)
+		return
+	}
+	var resp *http.Response
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		Printf("Do request error: %+v for %s url: %s\n", err, method, url)
+		return
+	}
+	var body []byte
+	body, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		Printf("ReadAll request error: %+v for %s url: %s\n", err, method, url)
+		return
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != 200 {
+		Printf("Method:%s url:%s status:%d query:%s\n%s\n", method, url, resp.StatusCode, body)
+		return
+	}
+	var res []JiraField
+	err = jsoniter.Unmarshal(body, &res)
+	fmt.Printf("%+v\n", res)
+	return
+}
+
+// FetchItems - implement fetch items for jira datasource
 func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
+	_, err = j.GetFields(ctx)
+	if err != nil {
+		Printf("GetFields error: %+v\n", err)
+		return
+	}
 	// '{"jql":"updated > 1601281314000 order by updated asc","startAt":0,"maxResults":100,"expand":["renderedFields","transitions","operations","changelog"]}'
 	var from time.Time
 	if ctx.DateFrom != nil {
@@ -90,8 +137,8 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 		from = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
 	}
 	url := j.URL + j.APIRoot + j.APISearch
-	startAt := 0
-	maxResults := 1000
+	startAt := int64(0)
+	maxResults := int64(100)
 	jql := ""
 	epochMS := from.UnixNano() / 1e6
 	if ctx.Project != "" {
@@ -103,14 +150,14 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 	for {
 		payloadBytes := []byte(fmt.Sprintf(`{"startAt":%d,"maxResults":%d,%s,%s}`, startAt, maxResults, jql, expand))
 		payloadBody := bytes.NewReader(payloadBytes)
-		method := Get
+		method := Post
 		var req *http.Request
 		req, err = http.NewRequest(method, url, payloadBody)
-		fmt.Printf("%s/%+v\n", url, string(payloadBytes))
 		if err != nil {
 			Printf("New request error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
 			return
 		}
+		req.Header.Set("Content-Type", "application/json")
 		var resp *http.Response
 		resp, err = http.DefaultClient.Do(req)
 		if err != nil {
@@ -128,14 +175,20 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 			Printf("Method:%s url:%s status:%d query:%s\n%s\n", method, url, resp.StatusCode, string(payloadBytes), body)
 			return
 		}
-		type result struct {
-			Total int `json:"total"`
-			Max   int `json:"maxResults"`
-		}
-		var res result
+		var res interface{}
 		err = jsoniter.Unmarshal(body, &res)
-		fmt.Printf("%+v\n", res)
-		break
+		totalF, _ := res.(map[string]interface{})["total"].(float64)
+		maxResultsF, _ := res.(map[string]interface{})["maxResults"].(float64)
+		total := int64(totalF)
+		maxResults = int64(maxResultsF)
+		inc := int64(totalF)
+		if maxResultsF < totalF {
+			inc = int64(maxResultsF)
+		}
+		startAt += inc
+		if startAt >= total {
+			break
+		}
 	}
 	return
 }
