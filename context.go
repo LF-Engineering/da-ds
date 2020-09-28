@@ -30,9 +30,13 @@ type Ctx struct {
 	NoRaw        bool       // From DA_DS_NO_RAW - do only the enrichment
 	RefreshAffs  bool       // From DA_DS_REFRESH_AFFS - refresh affiliation data
 	ForceFull    bool       // From DA_DS_FORCE_FULL - force running full data source, do not attempt to detect where to start from
-	Project      string     // From DA_DS_PROJECT - set project
+	Project      string     // From DA_DS_PROJECT - set project can be for example "ONAP"
+	ProjectSlug  string     // From DA_DS_PROJECT_SLUG - set project slug - fixture slug, for example "lfn/onap"
+	Category     string     // From DA_DS_CATEGORY - set category (some DS support this), for example "issue" (github/issue, github/pull_request etc.)
 	DateFrom     *time.Time // From DA_DS_DATE_FROM
 	DateTo       *time.Time // From DA_DS_DATE_TO
+	OffsetFrom   int        // From DA_DS_OFFSET_FROM
+	OffsetTo     int        // From DA_DS_OFFSET_TO
 }
 
 func (ctx *Ctx) env(v string) string {
@@ -121,8 +125,10 @@ func (ctx *Ctx) Init() {
 	ctx.RefreshAffs = ctx.env("REFRESH_AFFS") != ""
 	ctx.ForceFull = ctx.env("FORCE_FULL") != ""
 
-	// Project
+	// Project, Project slug, Category
 	ctx.Project = ctx.env("PROJECT")
+	ctx.ProjectSlug = ctx.env("PROJECT_SLUG")
+	ctx.Category = ctx.env("CATEGORY")
 
 	// Date from/to (optional)
 	if ctx.env("DATE_FROM") != "" {
@@ -134,6 +140,26 @@ func (ctx *Ctx) Init() {
 		t, err := TimeParseAny(ctx.env("DATE_TO"))
 		FatalOnError(err)
 		ctx.DateTo = &t
+	}
+
+	// Offset from/to (optional)
+	if ctx.env("OFFSET_FROM") == "" {
+		ctx.OffsetFrom = -1
+	} else {
+		offset, err := strconv.Atoi(ctx.env("OFFSET_FROM"))
+		FatalOnError(err)
+		if offset >= 0 {
+			ctx.OffsetFrom = offset
+		}
+	}
+	if ctx.env("OFFSET_TO") == "" {
+		ctx.OffsetTo = -1
+	} else {
+		offset, err := strconv.Atoi(ctx.env("OFFSET_TO"))
+		FatalOnError(err)
+		if offset >= 0 {
+			ctx.OffsetTo = offset
+		}
 	}
 }
 

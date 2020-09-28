@@ -15,13 +15,33 @@ import (
 // Copies Ctx structure
 func copyContext(in *lib.Ctx) *lib.Ctx {
 	out := lib.Ctx{
-		DS:         in.DS,
-		DSPrefix:   in.DSPrefix,
-		Debug:      in.Debug,
-		ST:         in.ST,
-		NCPUs:      in.NCPUs,
-		NCPUsScale: in.NCPUsScale,
-		Enrich:     in.Enrich,
+		DS:           in.DS,
+		DSPrefix:     in.DSPrefix,
+		Debug:        in.Debug,
+		ST:           in.ST,
+		NCPUs:        in.NCPUs,
+		NCPUsScale:   in.NCPUsScale,
+		Enrich:       in.Enrich,
+		RawIndex:     in.RawIndex,
+		RichIndex:    in.RichIndex,
+		ESURL:        in.ESURL,
+		ESBulkSize:   in.ESBulkSize,
+		ESScrollSize: in.ESScrollSize,
+		ESScrollWait: in.ESScrollWait,
+		DBHost:       in.DBHost,
+		DBName:       in.DBName,
+		DBUser:       in.DBUser,
+		DBPass:       in.DBPass,
+		NoRaw:        in.NoRaw,
+		RefreshAffs:  in.RefreshAffs,
+		ForceFull:    in.ForceFull,
+		Project:      in.Project,
+		ProjectSlug:  in.ProjectSlug,
+		Category:     in.Category,
+		DateFrom:     in.DateFrom,
+		DateTo:       in.DateTo,
+		OffsetFrom:   in.OffsetFrom,
+		OffsetTo:     in.OffsetTo,
 	}
 	return &out
 }
@@ -184,8 +204,12 @@ func TestInit(t *testing.T) {
 		RefreshAffs:  false,
 		ForceFull:    false,
 		Project:      "",
+		ProjectSlug:  "",
+		Category:     "",
 		DateFrom:     nil,
 		DateTo:       nil,
+		OffsetFrom:   -1,
+		OffsetTo:     -1,
 	}
 
 	// Set fake data source name to "ds" which will create prefix "DA_DS_"
@@ -338,15 +362,19 @@ func TestInit(t *testing.T) {
 			),
 		},
 		{
-			"Setting project name",
+			"Setting project, project slug, category",
 			map[string]string{
-				"DA_DS_PROJECT": "proj",
+				"DA_DS_PROJECT":      "ONAP",
+				"DA_DS_PROJECT_SLUG": "lfn/onap",
+				"DA_DS_CATEGORY":     "issue",
 			},
 			dynamicSetFields(
 				t,
 				copyContext(&defaultContext),
 				map[string]interface{}{
-					"Project": "proj",
+					"Project":     "ONAP",
+					"ProjectSlug": "lfn/onap",
+					"Category":    "issue",
 				},
 			),
 		},
@@ -362,6 +390,21 @@ func TestInit(t *testing.T) {
 				map[string]interface{}{
 					"DateFrom": &dtF,
 					"DateTo":   &dtT,
+				},
+			),
+		},
+		{
+			"Setting offset range",
+			map[string]string{
+				"DA_DS_OFFSET_FROM": "100",
+				"DA_DS_OFFSET_TO":   "200",
+			},
+			dynamicSetFields(
+				t,
+				copyContext(&defaultContext),
+				map[string]interface{}{
+					"OffsetFrom": 100,
+					"OffsetTo":   200,
 				},
 			),
 		},
