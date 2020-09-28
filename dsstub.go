@@ -51,7 +51,7 @@ func (j *DSStub) Enrich(ctx *Ctx, startFrom *time.Time) (err error) {
 
 // SupportDateFrom - does DS support resuming from date?
 func (j *DSStub) SupportDateFrom() bool {
-	return true
+	return false
 }
 
 // SupportOffsetFrom - does DS support resuming from offset?
@@ -62,4 +62,9 @@ func (j *DSStub) SupportOffsetFrom() bool {
 // DateField - return date field used to detect where to restart from
 func (j *DSStub) DateField(*Ctx) string {
 	return DefaultDateField
+}
+
+// OffsetField - return offset field used to detect where to restart from
+func (j *DSStub) OffsetField(*Ctx) string {
+	return DefaultOffsetField
 }

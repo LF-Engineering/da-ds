@@ -35,8 +35,8 @@ type Ctx struct {
 	Category     string     // From DA_DS_CATEGORY - set category (some DS support this), for example "issue" (github/issue, github/pull_request etc.)
 	DateFrom     *time.Time // From DA_DS_DATE_FROM
 	DateTo       *time.Time // From DA_DS_DATE_TO
-	OffsetFrom   int        // From DA_DS_OFFSET_FROM
-	OffsetTo     int        // From DA_DS_OFFSET_TO
+	OffsetFrom   float64    // From DA_DS_OFFSET_FROM
+	OffsetTo     float64    // From DA_DS_OFFSET_TO
 }
 
 func (ctx *Ctx) env(v string) string {
@@ -144,20 +144,20 @@ func (ctx *Ctx) Init() {
 
 	// Offset from/to (optional)
 	if ctx.env("OFFSET_FROM") == "" {
-		ctx.OffsetFrom = -1
+		ctx.OffsetFrom = -1.0
 	} else {
-		offset, err := strconv.Atoi(ctx.env("OFFSET_FROM"))
+		offset, err := strconv.ParseFloat(ctx.env("OFFSET_FROM"), 64)
 		FatalOnError(err)
-		if offset >= 0 {
+		if offset >= 0.0 {
 			ctx.OffsetFrom = offset
 		}
 	}
 	if ctx.env("OFFSET_TO") == "" {
-		ctx.OffsetTo = -1
+		ctx.OffsetTo = -1.0
 	} else {
-		offset, err := strconv.Atoi(ctx.env("OFFSET_TO"))
+		offset, err := strconv.ParseFloat(ctx.env("OFFSET_TO"), 64)
 		FatalOnError(err)
-		if offset >= 0 {
+		if offset >= 0.0 {
 			ctx.OffsetTo = offset
 		}
 	}

@@ -2,7 +2,6 @@ package dads
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -18,6 +17,7 @@ type DS interface {
 	FetchRaw(*Ctx) (*time.Time, error)
 	Enrich(*Ctx, *time.Time) error
 	DateField(*Ctx) string
+	OffsetField(*Ctx) string
 	CustomFetchRaw() bool
 	CustomEnrich() bool
 	SupportDateFrom() bool
@@ -65,9 +65,7 @@ func GetLastUpdate(ctx *Ctx, ds DS) (lastUpdate *time.Time) {
 	res := resultStruct{}
 	err = jsoniter.NewDecoder(resp.Body).Decode(&res)
 	if err != nil {
-		body, err := ioutil.ReadAll(resp.Body)
 		Printf("JSON decode error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
-		Printf("Body:%s\n", body)
 		return
 	}
 	if res.Aggs.M.Str != "" {
@@ -83,8 +81,53 @@ func GetLastUpdate(ctx *Ctx, ds DS) (lastUpdate *time.Time) {
 }
 
 // GetLastOffset - get last offset from ElasticSearch
-func GetLastOffset(ctx *Ctx, ds DS) (offset int) {
-	offset = -1
+func GetLastOffset(ctx *Ctx, ds DS) (offset float64) {
+	offset = -1.0
+	// curl -s -XPOST -H 'Content-type: application/json' '${URL}/index/_search?size=0' -d '{"aggs":{"m":{"max":{"field":"offset_field"}}}}' | jq -r '.aggregations.m.value'
+	offsetField := ds.OffsetField(ctx)
+	payloadBytes := []byte(`{"aggs":{"m":{"max":{"field":"` + JSONEscape(offsetField) + `"}}}}`)
+	payloadBody := bytes.NewReader(payloadBytes)
+	method := Post
+	url := ctx.ESURL + "/" + ctx.RawIndex + "/_search?size=0"
+	req, err := http.NewRequest(method, url, payloadBody)
+	if err != nil {
+		Printf("New request error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		Printf("Do request error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
+		return
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+	if resp.StatusCode != 200 {
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			Printf("ReadAll request error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
+			return
+		}
+		Printf("Method:%s url:%s status:%d query:%s\n%s\n", method, url, resp.StatusCode, string(payloadBytes), body)
+		return
+	}
+	type resultStruct struct {
+		Aggs struct {
+			M struct {
+				Int *float64 `json:"value,omitempty"`
+			} `json:"m"`
+		} `json:"aggregations"`
+	}
+	res := resultStruct{}
+	err = jsoniter.NewDecoder(resp.Body).Decode(&res)
+	if err != nil {
+		Printf("JSON decode error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
+		return
+	}
+	if res.Aggs.M.Int != nil {
+		offset = *res.Aggs.M.Int
+	}
 	return
 }
 
@@ -93,32 +136,40 @@ func FetchRaw(ctx *Ctx, ds DS) (lastData *time.Time, err error) {
 	if ds.CustomFetchRaw() {
 		return ds.FetchRaw(ctx)
 	}
-	if ctx.DateFrom != nil && ctx.OffsetFrom >= 0 {
+	if ctx.DateFrom != nil && ctx.OffsetFrom >= 0.0 {
 		Fatalf("you cannot use both date from and offset from\n")
 	}
-	if ctx.DateTo != nil && ctx.OffsetTo >= 0 {
+	if ctx.DateTo != nil && ctx.OffsetTo >= 0.0 {
 		Fatalf("you cannot use both date to and offset to\n")
 	}
 	var (
 		lastUpdate *time.Time
-		offset     *int
+		offset     *float64
 	)
 	if ds.SupportDateFrom() {
 		lastUpdate = ctx.DateFrom
 		if lastUpdate == nil {
 			lastUpdate = GetLastUpdate(ctx, ds)
 		}
+		if lastUpdate != nil {
+			Printf("%s: staring from date: %v\n", ds.Name(), *lastUpdate)
+		}
 	}
 	if ds.SupportOffsetFrom() {
-		if ctx.OffsetFrom >= 0 {
+		if ctx.OffsetFrom >= 0.0 {
 			offset = &ctx.OffsetFrom
 		}
 		if offset == nil {
 			lastOffset := GetLastOffset(ctx, ds)
 			offset = &lastOffset
 		}
+		if offset != nil {
+			Printf("%s: staring from offset: %v\n", ds.Name(), *offset)
+		}
 	}
-	fmt.Printf("%s: from: %+v, offset: %+v\n", ds.Name(), lastUpdate, offset)
+	if lastUpdate != nil && offset != nil {
+		Fatalf("you cannot use both date from and offset from\n")
+	}
 	return
 }
 

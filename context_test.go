@@ -208,8 +208,8 @@ func TestInit(t *testing.T) {
 		Category:     "",
 		DateFrom:     nil,
 		DateTo:       nil,
-		OffsetFrom:   -1,
-		OffsetTo:     -1,
+		OffsetFrom:   -1.0,
+		OffsetTo:     -1.0,
 	}
 
 	// Set fake data source name to "ds" which will create prefix "DA_DS_"
@@ -397,14 +397,14 @@ func TestInit(t *testing.T) {
 			"Setting offset range",
 			map[string]string{
 				"DA_DS_OFFSET_FROM": "100",
-				"DA_DS_OFFSET_TO":   "200",
+				"DA_DS_OFFSET_TO":   "200.5",
 			},
 			dynamicSetFields(
 				t,
 				copyContext(&defaultContext),
 				map[string]interface{}{
-					"OffsetFrom": 100,
-					"OffsetTo":   200,
+					"OffsetFrom": 100.0,
+					"OffsetTo":   200.5,
 				},
 			),
 		},

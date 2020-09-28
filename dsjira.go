@@ -73,3 +73,8 @@ func (j *DSJira) SupportOffsetFrom() bool {
 func (j *DSJira) DateField(*Ctx) string {
 	return DefaultDateField
 }
+
+// OffsetField - return offset field used to detect where to restart from
+func (j *DSJira) OffsetField(*Ctx) string {
+	return DefaultOffsetField
+}

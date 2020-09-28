@@ -14,3 +14,6 @@ const Post string = "POST"
 
 // DefaultDateField - default date field
 const DefaultDateField string = "metadata__updated_on"
+
+// DefaultOffsetField - default offset field
+const DefaultOffsetField string = "updated_on"
