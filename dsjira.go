@@ -147,6 +147,31 @@ func (j *DSJira) GetFields(ctx *Ctx) (customFields map[string]JiraField, err err
 
 // ProcessIssue - process a single issue
 func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[string]JiraField) (err error) {
+	ch := make(chan error)
+	go func(c chan error) {
+		var e error
+		defer func() {
+			c <- e
+			if ctx.Debug > 0 {
+				Printf("Got %d custom fields\n", len(customFields))
+			}
+		}()
+		sID, ok := issue.(map[string]interface{})["id"].(string)
+		if !ok {
+			e = fmt.Errorf("unable to unmarshal id from issue %+v", issue)
+			return
+		}
+		iID, e := strconv.Atoi(sID)
+		if e != nil {
+			e = fmt.Errorf("unable to unmarshal id from string %s", sID)
+			return
+		}
+		if ctx.Debug > 1 {
+			Printf("Issue ID: %d\n", iID)
+		}
+		// TODO: continue: fetch rest of issue data: comments and then send to ES
+		// Fetch comments data in a goroutine while continue other stuff in this thread
+	}(ch)
 	issueFields, ok := issue.(map[string]interface{})["fields"].(map[string]interface{})
 	if !ok {
 		err = fmt.Errorf("unable to unmarshal fields from issue %+v", issue)
@@ -173,21 +198,10 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[stri
 		}
 		issueFields[k] = v
 	}
-
-	sID, ok := issue.(map[string]interface{})["id"].(string)
-	if !ok {
-		err = fmt.Errorf("unable to unmarshal id from issue %+v", issue)
-		return
-	}
-	iID, err := strconv.Atoi(sID)
-	if err != nil {
-		err = fmt.Errorf("unable to unmarshal id from string %s", sID)
-		return
-	}
-	if ctx.Debug > 1 {
-		Printf("Issue ID: %d\n", iID)
-	}
-	// TODO: contrinue: fetch rest of issue data: comments and then send to ES
+	// Here we don't have comments yet, but can perform other operations if needed
+	err = <-ch
+	// TODO: eventually handle this error
+	// Here we already synced with get comments code
 	return
 }
 
