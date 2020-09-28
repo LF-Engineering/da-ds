@@ -68,3 +68,8 @@ func (j *DSStub) DateField(*Ctx) string {
 func (j *DSStub) OffsetField(*Ctx) string {
 	return DefaultOffsetField
 }
+
+// Categories - return a set of configured categories
+func (j *DSStub) Categories() map[string]struct{} {
+	return map[string]struct{}{}
+}

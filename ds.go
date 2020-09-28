@@ -18,6 +18,7 @@ type DS interface {
 	Enrich(*Ctx, *time.Time) error
 	DateField(*Ctx) string
 	OffsetField(*Ctx) string
+	Categories() map[string]struct{}
 	CustomFetchRaw() bool
 	CustomEnrich() bool
 	SupportDateFrom() bool
@@ -137,10 +138,10 @@ func FetchRaw(ctx *Ctx, ds DS) (lastData *time.Time, err error) {
 		return ds.FetchRaw(ctx)
 	}
 	if ctx.DateFrom != nil && ctx.OffsetFrom >= 0.0 {
-		Fatalf("you cannot use both date from and offset from\n")
+		Fatalf(ds.Name() + ": you cannot use both date from and offset from\n")
 	}
 	if ctx.DateTo != nil && ctx.OffsetTo >= 0.0 {
-		Fatalf("you cannot use both date to and offset to\n")
+		Fatalf(ds.Name() + ": you cannot use both date to and offset to\n")
 	}
 	var (
 		lastUpdate *time.Time
@@ -168,7 +169,13 @@ func FetchRaw(ctx *Ctx, ds DS) (lastData *time.Time, err error) {
 		}
 	}
 	if lastUpdate != nil && offset != nil {
-		Fatalf("you cannot use both date from and offset from\n")
+		Fatalf(ds.Name() + ": you cannot use both date from and offset from\n")
+	}
+	if ctx.Category != "" {
+		_, ok := ds.Categories()[ctx.Category]
+		if !ok {
+			Fatalf(ds.Name() + ": category " + ctx.Category + " not supported")
+		}
 	}
 	return
 }

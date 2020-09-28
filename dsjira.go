@@ -78,3 +78,8 @@ func (j *DSJira) DateField(*Ctx) string {
 func (j *DSJira) OffsetField(*Ctx) string {
 	return DefaultOffsetField
 }
+
+//Categories - return a set of configured categories
+func (j *DSJira) Categories() map[string]struct{} {
+	return map[string]struct{}{"issue": {}}
+}
