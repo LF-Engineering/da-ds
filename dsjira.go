@@ -159,6 +159,8 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[stri
 		}
 		issueFields[k] = v
 	}
+
+  // TODO: contrinue: fetch rest of issue data: comments and then send to ES
 	return
 }
 
