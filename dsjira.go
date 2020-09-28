@@ -90,7 +90,7 @@ func (j *DSJira) Enrich(ctx *Ctx) (err error) {
 }
 
 // GetFields - implement get fields for jira datasource
-func (j *DSJira) GetFields(ctx *Ctx) (fields []JiraField, err error) {
+func (j *DSJira) GetFields(ctx *Ctx) (customFields map[string]JiraField, err error) {
 	url := j.URL + j.APIRoot + j.APIFields
 	method := Get
 	var req *http.Request
@@ -116,15 +116,56 @@ func (j *DSJira) GetFields(ctx *Ctx) (fields []JiraField, err error) {
 		Printf("Method:%s url:%s status:%d query:%s\n%s\n", method, url, resp.StatusCode, body)
 		return
 	}
-	var res []JiraField
-	err = jsoniter.Unmarshal(body, &res)
-	fmt.Printf("%+v\n", res)
+	var fields []JiraField
+	err = jsoniter.Unmarshal(body, &fields)
+	if err != nil {
+		return
+	}
+	customFields = make(map[string]JiraField)
+	for _, field := range fields {
+		if !field.Custom {
+			continue
+		}
+		customFields[field.ID] = field
+	}
+	return
+}
+
+// ProcessIssue - process a single issue
+func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[string]JiraField) (err error) {
+	issueFields, ok := issue.(map[string]interface{})["fields"].(map[string]interface{})
+	if !ok {
+		err = fmt.Errorf("unable to unmarshal fields from issue %+v", issue)
+		return
+	}
+	type mapping struct {
+		ID    string
+		Name  string
+		Value interface{}
+	}
+	m := make(map[string]mapping)
+	for k, v := range issueFields {
+		customField, ok := customFields[k]
+		if !ok {
+			continue
+		}
+		m[k] = mapping{ID: customField.ID, Name: customField.Name, Value: v}
+	}
+	// fmt.Printf("%+v\n", m)
+	for k, v := range m {
+		if ctx.Debug > 0 {
+			prev := issueFields[k]
+			fmt.Printf("%s: %+v -> %+v\n", k, prev, v)
+		}
+		issueFields[k] = v
+	}
 	return
 }
 
 // FetchItems - implement fetch items for jira datasource
 func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
-	_, err = j.GetFields(ctx)
+	var customFields map[string]JiraField
+	customFields, err = j.GetFields(ctx)
 	if err != nil {
 		Printf("GetFields error: %+v\n", err)
 		return
@@ -177,8 +218,30 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 		}
 		var res interface{}
 		err = jsoniter.Unmarshal(body, &res)
-		totalF, _ := res.(map[string]interface{})["total"].(float64)
-		maxResultsF, _ := res.(map[string]interface{})["maxResults"].(float64)
+		if err != nil {
+			return
+		}
+		issues, ok := res.(map[string]interface{})["issues"].([]interface{})
+		if !ok {
+			err = fmt.Errorf("unable to unmarshal issues from %+v", res)
+			return
+		}
+		for _, issue := range issues {
+			err = j.ProcessIssue(ctx, issue, customFields)
+			if err != nil {
+				Printf("Failed to process issue: %+v\n", issue)
+			}
+		}
+		totalF, ok := res.(map[string]interface{})["total"].(float64)
+		if !ok {
+			err = fmt.Errorf("unable to unmarshal total from %+v", res)
+			return
+		}
+		maxResultsF, ok := res.(map[string]interface{})["maxResults"].(float64)
+		if !ok {
+			err = fmt.Errorf("unable to maxResults total from %+v", res)
+			return
+		}
 		total := int64(totalF)
 		maxResults = int64(maxResultsF)
 		inc := int64(totalF)
