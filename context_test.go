@@ -20,6 +20,7 @@ func copyContext(in *lib.Ctx) *lib.Ctx {
 		ST:         in.ST,
 		NCPUs:      in.NCPUs,
 		NCPUsScale: in.NCPUsScale,
+		Enrich:     in.Enrich,
 	}
 	return &out
 }
@@ -152,15 +153,25 @@ func dynamicSetFields(t *testing.T, ctx *lib.Ctx, fields map[string]interface{})
 func TestInit(t *testing.T) {
 	// This is the expected default struct state
 	defaultContext := lib.Ctx{
-		DS:         "ds",
-		DSPrefix:   "DS_",
-		Debug:      0,
-		ST:         false,
-		NCPUs:      0,
-		NCPUsScale: 1.0,
+		DS:           "ds",
+		DSPrefix:     "DA_DS_",
+		Debug:        0,
+		ST:           false,
+		NCPUs:        0,
+		NCPUsScale:   1.0,
+		Enrich:       false,
+		RawIndex:     "",
+		RichIndex:    "",
+		ESURL:        "",
+		ESBulkSize:   0,
+		ESScrollSize: 0,
+		DBHost:       "",
+		DBName:       "",
+		DBUser:       "",
+		DBPass:       "",
 	}
 
-	// Set fake data source name to "ds" which will create prefix "DS_"
+	// Set fake data source name to "ds" which will create prefix "DA_DS_"
 	lib.FatalOnError(os.Setenv("DA_DS", "ds"))
 
 	// Test cases
@@ -176,7 +187,7 @@ func TestInit(t *testing.T) {
 		},
 		{
 			"Setting debug level",
-			map[string]string{"DS_DA_DEBUG": "2"},
+			map[string]string{"DA_DS_DEBUG": "2"},
 			dynamicSetFields(
 				t,
 				copyContext(&defaultContext),
@@ -185,7 +196,7 @@ func TestInit(t *testing.T) {
 		},
 		{
 			"Setting negative debug level",
-			map[string]string{"DS_DA_DEBUG": "-1"},
+			map[string]string{"DA_DS_DEBUG": "-1"},
 			dynamicSetFields(
 				t,
 				copyContext(&defaultContext),
@@ -194,7 +205,7 @@ func TestInit(t *testing.T) {
 		},
 		{
 			"Setting ST (singlethreading) and NCPUs",
-			map[string]string{"DS_DA_ST": "1", "DS_DA_NCPUS": "1"},
+			map[string]string{"DA_DS_ST": "1", "DA_DS_NCPUS": "1"},
 			dynamicSetFields(
 				t,
 				copyContext(&defaultContext),
@@ -203,7 +214,7 @@ func TestInit(t *testing.T) {
 		},
 		{
 			"Setting NCPUs to 2",
-			map[string]string{"DS_DA_NCPUS": "2"},
+			map[string]string{"DA_DS_NCPUS": "2"},
 			dynamicSetFields(
 				t,
 				copyContext(&defaultContext),
@@ -212,7 +223,7 @@ func TestInit(t *testing.T) {
 		},
 		{
 			"Setting NCPUs to 1 should also set ST mode",
-			map[string]string{"DS_DA_NCPUS": "1"},
+			map[string]string{"DA_DS_NCPUS": "1"},
 			dynamicSetFields(
 				t,
 				copyContext(&defaultContext),
@@ -221,11 +232,71 @@ func TestInit(t *testing.T) {
 		},
 		{
 			"Setting NCPUs Scale to 1.5",
-			map[string]string{"DS_DA_NCPUS_SCALE": "1.5"},
+			map[string]string{"DA_DS_NCPUS_SCALE": "1.5"},
 			dynamicSetFields(
 				t,
 				copyContext(&defaultContext),
 				map[string]interface{}{"ST": false, "NCPUsScale": 1.5},
+			),
+		},
+		{
+			"Setting enrich flag",
+			map[string]string{"DA_DS_ENRICH": "y"},
+			dynamicSetFields(
+				t,
+				copyContext(&defaultContext),
+				map[string]interface{}{"Enrich": true},
+			),
+		},
+		{
+			"Setting raw & rich index names",
+			map[string]string{
+				"DA_DS_RAW_INDEX":  "ds-raw",
+				"DA_DS_RICH_INDEX": "ds-rich",
+			},
+			dynamicSetFields(
+				t,
+				copyContext(&defaultContext),
+				map[string]interface{}{
+					"RawIndex":  "ds-raw",
+					"RichIndex": "ds-rich",
+				},
+			),
+		},
+		{
+			"Setting ES params",
+			map[string]string{
+				"DA_DS_ES_URL":         "elastic.co",
+				"DA_DS_ES_BULK_SIZE":   "500",
+				"DA_DS_ES_SCROLL_SIZE": "600",
+			},
+			dynamicSetFields(
+				t,
+				copyContext(&defaultContext),
+				map[string]interface{}{
+					"ESURL":        "elastic.co",
+					"ESBulkSize":   500,
+					"ESScrollSize": 600,
+				},
+			),
+		},
+		{
+			"Setting affiliation DB params",
+			map[string]string{
+				"DA_DS_DB_HOST": "h",
+				"DA_DS_DB_NAME": "n",
+				"DA_DS_DB_USER": "u",
+				"DA_DS_DB_PASS": "p",
+			},
+			dynamicSetFields(
+				t,
+				copyContext(&defaultContext),
+				map[string]interface{}{
+					"DBHost": "h",
+					"DBName": "n",
+					"DBUser": "u",
+					"DBPass": "p",
+				},
 			),
 		},
 	}
