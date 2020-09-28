@@ -1,16 +1,21 @@
 package dads
 
-import "fmt"
+import "os"
 
 // DSJira - DS implementation for Jira
 type DSJira struct {
-	DS string
+	DS          string
+	URL         string // From DA_JIRA_URL - Jira URL
+	NoSSLVerify bool   // From DA_JIRA_NO_SSL_VERIFY
 }
 
 // ParseArgs - parse jira specific environment variables
-func (j *DSJira) ParseArgs() (err error) {
+func (j *DSJira) ParseArgs(ctx *Ctx) (err error) {
 	j.DS = Jira
-	fmt.Printf("Jira's ParseArgs\n")
+
+	// Jira specific env variables
+	j.URL = os.Getenv("DA_JIRA_URL")
+	j.NoSSLVerify = os.Getenv("DA_JIRA_NO_SSL_VERIFY") != ""
 	return
 }
 

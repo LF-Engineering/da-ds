@@ -1,4 +1,4 @@
-GO_LIB_FILES=context.go error.go const.go time.go log.go threads.go json.go ds.go dsjira.go
+GO_LIB_FILES=context.go error.go const.go time.go log.go threads.go json.go ds.go dsjira.go dsstub.go
 GO_BIN_FILES=cmd/dads/dads.go
 GO_TEST_FILES=context_test.go threads_test.go
 GO_LIBTEST_FILES=test/time.go
