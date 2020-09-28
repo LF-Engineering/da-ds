@@ -9,6 +9,7 @@ import (
 	"time"
 
 	lib "github.com/LF-Engineering/da-ds"
+	testlib "github.com/LF-Engineering/da-ds/test"
 )
 
 // Copies Ctx structure
@@ -80,6 +81,15 @@ func dynamicSetFields(t *testing.T, ctx *lib.Ctx, fields map[string]interface{})
 			// Check if types match
 			fieldType := field.Type()
 			if fieldType != reflect.TypeOf(time.Now()) {
+				t.Errorf("trying to set value %v, type %T for field \"%s\", type %v", interfaceValue, interfaceValue, fieldName, fieldKind)
+				return ctx
+			}
+			field.Set(reflect.ValueOf(fieldValue))
+		case *time.Time:
+			// Check if types match
+			fieldType := field.Type()
+			now := time.Now()
+			if fieldType != reflect.TypeOf(&now) {
 				t.Errorf("trying to set value %v, type %T for field \"%s\", type %v", interfaceValue, interfaceValue, fieldName, fieldKind)
 				return ctx
 			}
@@ -173,12 +183,17 @@ func TestInit(t *testing.T) {
 		NoRaw:        false,
 		RefreshAffs:  false,
 		ForceFull:    false,
+		Project:      "",
+		DateFrom:     nil,
+		DateTo:       nil,
 	}
 
 	// Set fake data source name to "ds" which will create prefix "DA_DS_"
 	lib.FatalOnError(os.Setenv("DA_DS", "ds"))
 
 	// Test cases
+	dtF := testlib.YMDHMS(2020, 9, 28, 9, 12, 17)
+	dtT := testlib.YMDHMS(2021, 1, 1, 0, 0, 0)
 	var testCases = []struct {
 		name            string
 		environment     map[string]string
@@ -319,6 +334,34 @@ func TestInit(t *testing.T) {
 					"NoRaw":       true,
 					"RefreshAffs": true,
 					"ForceFull":   true,
+				},
+			),
+		},
+		{
+			"Setting project name",
+			map[string]string{
+				"DA_DS_PROJECT": "proj",
+			},
+			dynamicSetFields(
+				t,
+				copyContext(&defaultContext),
+				map[string]interface{}{
+					"Project": "proj",
+				},
+			),
+		},
+		{
+			"Setting date range",
+			map[string]string{
+				"DA_DS_DATE_FROM": "2020-09-28 09:12:17",
+				"DA_DS_DATE_TO":   "2021",
+			},
+			dynamicSetFields(
+				t,
+				copyContext(&defaultContext),
+				map[string]interface{}{
+					"DateFrom": &dtF,
+					"DateTo":   &dtT,
 				},
 			),
 		},

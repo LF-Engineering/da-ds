@@ -24,18 +24,26 @@ func runDS(ctx *lib.Ctx) (err error) {
 	if err != nil {
 		return
 	}
-	var lastDataDt *time.Time
+	var (
+		lastDataDt *time.Time
+		prevErr    error
+	)
 	if !ctx.NoRaw {
 		lastDataDt, err = ds.FetchRaw(ctx)
 		if err != nil {
 			lib.Printf("%s: FetchRaw(%s) error: %v, allowing continue\n", ds.Info(), ctx.Info(), err)
+			prevErr = err
 		}
 	}
 	if ctx.Enrich {
 		err = ds.Enrich(ctx, lastDataDt)
 		if err != nil {
 			lib.Printf("%s: Enrich(%s,%v) error: %v, allowing continue\n", ds.Info(), ctx.Info(), lastDataDt, err)
+			return
 		}
+	}
+	if prevErr != nil {
+		err = prevErr
 	}
 	return
 }
