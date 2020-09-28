@@ -9,6 +9,9 @@ const Jira string = "jira"
 // Stub - common constant string
 const Stub string = "stub"
 
+// Get - common constant string
+const Get string = "GET"
+
 // Post - common constant string
 const Post string = "POST"
 

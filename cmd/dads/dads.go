@@ -5,8 +5,6 @@ import (
 	"time"
 
 	lib "github.com/LF-Engineering/da-ds"
-	// jsoniter "github.com/json-iterator/go"
-	// yaml "gopkg.in/yaml.v2"
 )
 
 func runDS(ctx *lib.Ctx) (err error) {
@@ -22,23 +20,26 @@ func runDS(ctx *lib.Ctx) (err error) {
 	}
 	err = ds.ParseArgs(ctx)
 	if err != nil {
+		lib.Printf("%s: ParseArgs(%s) error: %v, allowing continue\n", ds.Info(), ctx.Info(), err)
 		return
 	}
-	var (
-		lastDataDt *time.Time
-		prevErr    error
-	)
+	err = ds.Validate()
+	if err != nil {
+		lib.Printf("%s: Validate error: %v, allowing continue\n", ds.Info(), err)
+		return
+	}
+	var prevErr error
 	if !ctx.NoRaw {
-		lastDataDt, err = lib.FetchRaw(ctx, ds)
+		err = lib.FetchRaw(ctx, ds)
 		if err != nil {
 			lib.Printf("%s: FetchRaw(%s) error: %v, allowing continue\n", ds.Info(), ctx.Info(), err)
 			prevErr = err
 		}
 	}
 	if ctx.Enrich {
-		err = lib.Enrich(ctx, ds, lastDataDt)
+		err = lib.Enrich(ctx, ds)
 		if err != nil {
-			lib.Printf("%s: Enrich(%s,%v) error: %v, allowing continue\n", ds.Info(), ctx.Info(), lastDataDt, err)
+			lib.Printf("%s: Enrich(%s) error: %v, allowing continue\n", ds.Info(), ctx.Info(), err)
 			return
 		}
 	}

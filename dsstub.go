@@ -2,7 +2,6 @@ package dads
 
 import (
 	"fmt"
-	"time"
 )
 
 // DSStub - DS implementation for stub - does nothing at all, just presents a skeleton code
@@ -14,6 +13,11 @@ type DSStub struct {
 func (j *DSStub) ParseArgs(ctx *Ctx) (err error) {
 	j.DS = Stub
 	fmt.Printf("DSStub.ParseArgs\n")
+	return
+}
+
+// Validate - is current DS configuration OK?
+func (j *DSStub) Validate() (err error) {
 	return
 }
 
@@ -33,7 +37,7 @@ func (j *DSStub) CustomFetchRaw() bool {
 }
 
 // FetchRaw - implement fetch raw data for stub datasource
-func (j *DSStub) FetchRaw(ctx *Ctx) (lastData *time.Time, err error) {
+func (j *DSStub) FetchRaw(ctx *Ctx) (err error) {
 	fmt.Printf("DSStub.FetchRaw\n")
 	return
 }
@@ -44,8 +48,14 @@ func (j *DSStub) CustomEnrich() bool {
 }
 
 // Enrich - implement enrich data for stub datasource
-func (j *DSStub) Enrich(ctx *Ctx, startFrom *time.Time) (err error) {
+func (j *DSStub) Enrich(ctx *Ctx) (err error) {
 	fmt.Printf("DSStub.Enrich\n")
+	return
+}
+
+// FetchItems - implement enrich data for stub datasource
+func (j *DSStub) FetchItems(ctx *Ctx) (err error) {
+	fmt.Printf("DSStub.FetchItems\n")
 	return
 }
 

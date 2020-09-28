@@ -14,8 +14,10 @@ type DS interface {
 	ParseArgs(*Ctx) error
 	Name() string
 	Info() string
-	FetchRaw(*Ctx) (*time.Time, error)
-	Enrich(*Ctx, *time.Time) error
+	Validate() error
+	FetchRaw(*Ctx) error
+	FetchItems(*Ctx) error
+	Enrich(*Ctx) error
 	DateField(*Ctx) string
 	OffsetField(*Ctx) string
 	Categories() map[string]struct{}
@@ -47,6 +49,9 @@ func GetLastUpdate(ctx *Ctx, ds DS) (lastUpdate *time.Time) {
 	defer func() {
 		_ = resp.Body.Close()
 	}()
+	if resp.StatusCode == 404 {
+		return
+	}
 	if resp.StatusCode != 200 {
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
@@ -104,6 +109,9 @@ func GetLastOffset(ctx *Ctx, ds DS) (offset float64) {
 	defer func() {
 		_ = resp.Body.Close()
 	}()
+	if resp.StatusCode == 404 {
+		return
+	}
 	if resp.StatusCode != 200 {
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
@@ -133,7 +141,7 @@ func GetLastOffset(ctx *Ctx, ds DS) (offset float64) {
 }
 
 // FetchRaw - implement fetch raw data (generic)
-func FetchRaw(ctx *Ctx, ds DS) (lastData *time.Time, err error) {
+func FetchRaw(ctx *Ctx, ds DS) (err error) {
 	if ds.CustomFetchRaw() {
 		return ds.FetchRaw(ctx)
 	}
@@ -154,6 +162,7 @@ func FetchRaw(ctx *Ctx, ds DS) (lastData *time.Time, err error) {
 		}
 		if lastUpdate != nil {
 			Printf("%s: staring from date: %v\n", ds.Name(), *lastUpdate)
+			ctx.DateFrom = lastUpdate
 		}
 	}
 	if ds.SupportOffsetFrom() {
@@ -166,6 +175,7 @@ func FetchRaw(ctx *Ctx, ds DS) (lastData *time.Time, err error) {
 		}
 		if offset != nil {
 			Printf("%s: staring from offset: %v\n", ds.Name(), *offset)
+			ctx.OffsetFrom = *offset
 		}
 	}
 	if lastUpdate != nil && offset != nil {
@@ -177,13 +187,14 @@ func FetchRaw(ctx *Ctx, ds DS) (lastData *time.Time, err error) {
 			Fatalf(ds.Name() + ": category " + ctx.Category + " not supported")
 		}
 	}
+	err = ds.FetchItems(ctx)
 	return
 }
 
 // Enrich - implement fetch raw data (generic)
-func Enrich(ctx *Ctx, ds DS, startFrom *time.Time) (err error) {
+func Enrich(ctx *Ctx, ds DS) (err error) {
 	if ds.CustomEnrich() {
-		return ds.Enrich(ctx, startFrom)
+		return ds.Enrich(ctx)
 	}
 	return
 }
