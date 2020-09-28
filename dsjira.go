@@ -13,16 +13,23 @@ import (
 	jsoniter "github.com/json-iterator/go"
 )
 
+const (
+	// JiraAPIRoot - main API path
+	JiraAPIRoot = "/rest/api/2"
+	// JiraAPISearch - search API subpath
+	JiraAPISearch = "/search"
+	// JiraAPIFields - fields API subpath
+	JiraAPIFields = "/field"
+)
+
 // DSJira - DS implementation for Jira
 type DSJira struct {
 	DS          string
-	APIRoot     string
-	APISearch   string
-	APIFields   string
 	URL         string // From DA_JIRA_URL - Jira URL
 	NoSSLVerify bool   // From DA_JIRA_NO_SSL_VERIFY
 	User        string // From DA_JIRA_USER
 	Pass        string // From DA_JIRA_PASS
+	PageSize    int    // From DA_JIRA_PAGE_SIZE
 }
 
 // JiraField - informatin about fields present in issues
@@ -41,9 +48,15 @@ func (j *DSJira) ParseArgs(ctx *Ctx) (err error) {
 	j.NoSSLVerify = os.Getenv("DA_JIRA_NO_SSL_VERIFY") != ""
 	j.User = os.Getenv("DA_JIRA_USER")
 	j.Pass = os.Getenv("DA_JIRA_PASS")
-	j.APIRoot = "/rest/api/2"
-	j.APISearch = "/search"
-	j.APIFields = "/field"
+	if os.Getenv("DA_JIRA_PAGE_SIZE") == "" {
+		j.PageSize = 400
+	} else {
+		pageSize, err := strconv.Atoi(os.Getenv("DA_JIRA_PAGE_SIZE"))
+		FatalOnError(err)
+		if pageSize > 0 {
+			j.PageSize = pageSize
+		}
+	}
 	return
 }
 
@@ -92,7 +105,7 @@ func (j *DSJira) Enrich(ctx *Ctx) (err error) {
 
 // GetFields - implement get fields for jira datasource
 func (j *DSJira) GetFields(ctx *Ctx) (customFields map[string]JiraField, err error) {
-	url := j.URL + j.APIRoot + j.APIFields
+	url := j.URL + JiraAPIRoot + JiraAPIFields
 	method := Get
 	var req *http.Request
 	req, err = http.NewRequest(method, url, nil)
@@ -152,11 +165,11 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[stri
 		}
 		m[k] = mapping{ID: customField.ID, Name: customField.Name, Value: v}
 	}
-	// fmt.Printf("%+v\n", m)
+	// Printf("%+v\n", m)
 	for k, v := range m {
-		if ctx.Debug > 0 {
+		if ctx.Debug > 1 {
 			prev := issueFields[k]
-			fmt.Printf("%s: %+v -> %+v\n", k, prev, v)
+			Printf("%s: %+v -> %+v\n", k, prev, v)
 		}
 		issueFields[k] = v
 	}
@@ -171,7 +184,9 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[stri
 		err = fmt.Errorf("unable to unmarshal id from string %s", sID)
 		return
 	}
-	fmt.Printf("Issue ID: %d\n", iID)
+	if ctx.Debug > 1 {
+		Printf("Issue ID: %d\n", iID)
+	}
 	// TODO: contrinue: fetch rest of issue data: comments and then send to ES
 	return
 }
@@ -179,21 +194,28 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[stri
 // FetchItems - implement fetch items for jira datasource
 func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 	var customFields map[string]JiraField
-	customFields, err = j.GetFields(ctx)
-	if err != nil {
-		Printf("GetFields error: %+v\n", err)
-		return
-	}
-	// '{"jql":"updated > 1601281314000 order by updated asc","startAt":0,"maxResults":100,"expand":["renderedFields","transitions","operations","changelog"]}'
+	fieldsFetched := false
+	chF := make(chan error)
+	go func(c chan error) {
+		var e error
+		defer func() {
+			c <- e
+			if ctx.Debug > 0 {
+				Printf("Got %d custom fields\n", len(customFields))
+			}
+		}()
+		customFields, e = j.GetFields(ctx)
+	}(chF)
+	// '{"jql":"updated > 1601281314000 order by updated asc","startAt":0,"maxResults":400,"expand":["renderedFields","transitions","operations","changelog"]}'
 	var from time.Time
 	if ctx.DateFrom != nil {
 		from = *ctx.DateFrom
 	} else {
 		from = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
 	}
-	url := j.URL + j.APIRoot + j.APISearch
+	url := j.URL + JiraAPIRoot + JiraAPISearch
 	startAt := int64(0)
-	maxResults := int64(100)
+	maxResults := int64(j.PageSize)
 	jql := ""
 	epochMS := from.UnixNano() / 1e6
 	if ctx.Project != "" {
@@ -202,6 +224,9 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 		jql = fmt.Sprintf(`"jql":"updated > %d order by updated asc"`, epochMS)
 	}
 	expand := `"expand":["renderedFields","transitions","operations","changelog"]`
+	thrN := GetThreadsNum(ctx)
+	chE := make(chan error)
+	nThreads := 0
 	for {
 		payloadBytes := []byte(fmt.Sprintf(`{"startAt":%d,"maxResults":%d,%s,%s}`, startAt, maxResults, jql, expand))
 		payloadBody := bytes.NewReader(payloadBytes)
@@ -230,21 +255,46 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 			Printf("Method:%s url:%s status:%d query:%s\n%s\n", method, url, resp.StatusCode, string(payloadBytes), body)
 			return
 		}
+		if !fieldsFetched {
+			err = <-chF
+			if err != nil {
+				Printf("GetFields error: %+v\n", err)
+				return
+			}
+			fieldsFetched = true
+		}
 		var res interface{}
 		err = jsoniter.Unmarshal(body, &res)
 		if err != nil {
 			return
 		}
-		issues, ok := res.(map[string]interface{})["issues"].([]interface{})
-		if !ok {
-			err = fmt.Errorf("unable to unmarshal issues from %+v", res)
-			return
-		}
-		for _, issue := range issues {
-			err = j.ProcessIssue(ctx, issue, customFields)
-			if err != nil {
-				Printf("Failed to process issue: %+v\n", issue)
+		go func(c chan error) {
+			var e error
+			defer func() {
+				c <- e
+			}()
+			issues, ok := res.(map[string]interface{})["issues"].([]interface{})
+			if !ok {
+				e = fmt.Errorf("unable to unmarshal issues from %+v", res)
+				return
 			}
+			if ctx.Debug > 0 {
+				Printf("Processing %d issues\n", len(issues))
+			}
+			for _, issue := range issues {
+				er := j.ProcessIssue(ctx, issue, customFields)
+				if er != nil {
+					Printf("Error %v processing issue: %+v\n", er, issue)
+				}
+			}
+		}(chE)
+		nThreads++
+		if nThreads == thrN {
+			err = <-chE
+			if err != nil {
+				return
+			}
+			nThreads--
 		}
 		totalF, ok := res.(map[string]interface{})["total"].(float64)
 		if !ok {
@@ -263,10 +313,21 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 			inc = int64(maxResultsF)
 		}
 		startAt += inc
+		if ctx.Debug > 0 {
+			Printf("Processing next page from %d/%d\n", startAt, total)
+		}
 		if startAt >= total {
 			break
 		}
 	}
+	for nThreads > 0 {
+		err = <-chE
+		nThreads--
+		if err != nil {
+			return
+		}
+	}
+	Printf("Processed %d issues\n", startAt)
 	return
 }
 
