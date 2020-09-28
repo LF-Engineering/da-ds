@@ -27,14 +27,39 @@ func (j DSStub) Info() string {
 	return fmt.Sprintf("%+v", j)
 }
 
+// CustomFetchRaw - is this datasource using custom fetch raw implementation?
+func (j *DSStub) CustomFetchRaw() bool {
+	return false
+}
+
 // FetchRaw - implement fetch raw data for stub datasource
 func (j *DSStub) FetchRaw(ctx *Ctx) (lastData *time.Time, err error) {
 	fmt.Printf("DSStub.FetchRaw\n")
 	return
 }
 
+// CustomEnrich - is this datasource using custom enrich implementation?
+func (j *DSStub) CustomEnrich() bool {
+	return false
+}
+
 // Enrich - implement enrich data for stub datasource
 func (j *DSStub) Enrich(ctx *Ctx, startFrom *time.Time) (err error) {
 	fmt.Printf("DSStub.Enrich\n")
 	return
+}
+
+// SupportDateFrom - does DS support resuming from date?
+func (j *DSStub) SupportDateFrom() bool {
+	return true
+}
+
+// SupportOffsetFrom - does DS support resuming from offset?
+func (j *DSStub) SupportOffsetFrom() bool {
+	return false
+}
+
+// DateField - return date field used to detect where to restart from
+func (j *DSStub) DateField(*Ctx) string {
+	return DefaultDateField
 }

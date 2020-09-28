@@ -29,14 +29,14 @@ func runDS(ctx *lib.Ctx) (err error) {
 		prevErr    error
 	)
 	if !ctx.NoRaw {
-		lastDataDt, err = ds.FetchRaw(ctx)
+		lastDataDt, err = lib.FetchRaw(ctx, ds)
 		if err != nil {
 			lib.Printf("%s: FetchRaw(%s) error: %v, allowing continue\n", ds.Info(), ctx.Info(), err)
 			prevErr = err
 		}
 	}
 	if ctx.Enrich {
-		err = ds.Enrich(ctx, lastDataDt)
+		err = lib.Enrich(ctx, ds, lastDataDt)
 		if err != nil {
 			lib.Printf("%s: Enrich(%s,%v) error: %v, allowing continue\n", ds.Info(), ctx.Info(), lastDataDt, err)
 			return
@@ -60,6 +60,7 @@ func main() {
 	var ctx lib.Ctx
 	dtStart := time.Now()
 	ctx.Init()
+	lib.FatalOnError(ctx.Validate())
 	lib.FatalOnError(runDS(&ctx))
 	dtEnd := time.Now()
 	lib.Printf("Took: %v\n", dtEnd.Sub(dtStart))

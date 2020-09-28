@@ -163,6 +163,23 @@ func (ctx *Ctx) Init() {
 	}
 }
 
+// Validate - check if config is correct
+func (ctx *Ctx) Validate() (err error) {
+	if ctx.ESURL == "" {
+		return fmt.Errorf("you must specify Elastic URL")
+	}
+	if strings.HasSuffix(ctx.ESURL, "/") {
+		ctx.ESURL = ctx.ESURL[:len(ctx.ESURL)-1]
+	}
+	if !ctx.NoRaw && ctx.RawIndex == "" {
+		return fmt.Errorf("you must specify raw index name unless skipping raw processing")
+	}
+	if ctx.Enrich && ctx.RichIndex == "" {
+		return fmt.Errorf("you must specify rich index name unless skipping enrichment")
+	}
+	return
+}
+
 // Print context contents
 func (ctx *Ctx) Print() {
 	fmt.Printf("Environment Context Dump\n%+v\n", ctx)
