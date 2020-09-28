@@ -1,2 +1,2 @@
-# dadsjira
-Jira data source for DevAnalytics
+# dads
+DevAnalytics data source
