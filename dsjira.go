@@ -202,7 +202,7 @@ func (j *DSJira) GenSearchFields(ctx *Ctx, issue interface{}, uuid string) (fiel
 }
 
 // ProcessIssue - process a single issue
-func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[string]JiraField, from time.Time, thrN int) (err error) {
+func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *sync.Mutex, issue interface{}, customFields map[string]JiraField, from time.Time, thrN int) (wch chan error, err error) {
 	var mtx *sync.RWMutex
 	if thrN > 1 {
 		mtx = &sync.RWMutex{}
@@ -234,9 +234,9 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[stri
 			payloadBytes := []byte(fmt.Sprintf(`{"startAt":%d,"maxResults":%d,%s}`, startAt, maxResults, jql))
 			payloadBody := bytes.NewReader(payloadBytes)
 			var req *http.Request
-			req, err = http.NewRequest(method, url, payloadBody)
-			if err != nil {
-				Printf("New request error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
+			req, e = http.NewRequest(method, url, payloadBody)
+			if e != nil {
+				Printf("New request error: %+v for %s url: %s, query: %s\n", e, method, url, string(payloadBytes))
 				return
 			}
 			req.Header.Set("Content-Type", "application/json")
@@ -244,15 +244,15 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[stri
 				req.Header.Set("Authorization", "Basic "+j.Token)
 			}
 			var resp *http.Response
-			resp, err = http.DefaultClient.Do(req)
-			if err != nil {
-				Printf("Do request error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
+			resp, e = http.DefaultClient.Do(req)
+			if e != nil {
+				Printf("Do request error: %+v for %s url: %s, query: %s\n", e, method, url, string(payloadBytes))
 				return
 			}
 			var body []byte
-			body, err = ioutil.ReadAll(resp.Body)
-			if err != nil {
-				Printf("ReadAll request error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
+			body, e = ioutil.ReadAll(resp.Body)
+			if e != nil {
+				Printf("ReadAll request error: %+v for %s url: %s, query: %s\n", e, method, url, string(payloadBytes))
 				return
 			}
 			_ = resp.Body.Close()
@@ -261,8 +261,8 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[stri
 				return
 			}
 			var res interface{}
-			err = jsoniter.Unmarshal(body, &res)
-			if err != nil {
+			e = jsoniter.Unmarshal(body, &res)
+			if e != nil {
 				return
 			}
 			comments, ok := res.(map[string]interface{})["comments"].([]interface{})
@@ -295,12 +295,12 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[stri
 			}
 			totalF, ok := res.(map[string]interface{})["total"].(float64)
 			if !ok {
-				err = fmt.Errorf("unable to unmarshal total from %+v", res)
+				e = fmt.Errorf("unable to unmarshal total from %+v", res)
 				return
 			}
 			maxResultsF, ok := res.(map[string]interface{})["maxResults"].(float64)
 			if !ok {
-				err = fmt.Errorf("unable to maxResults total from %+v", res)
+				e = fmt.Errorf("unable to maxResults total from %+v", res)
 				return
 			}
 			total := int64(totalF)
@@ -332,7 +332,7 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[stri
 	} else {
 		err = processIssue(nil)
 		if err != nil {
-			return err
+			return
 		}
 	}
 	if thrN > 1 {
@@ -394,6 +394,44 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[stri
 		mtx.Unlock()
 		err = <-ch
 	}
+	if allIssuesMtx != nil {
+		allIssuesMtx.Lock()
+	}
+	*allIssues = append(*allIssues, esItem)
+	nIssues := len(*allIssues)
+	if nIssues >= ctx.ESBulkSize {
+		sendToElastic := func(c chan error) (e error) {
+			defer func() {
+				if c != nil {
+					c <- e
+				}
+			}()
+			e = SendToElastic(ctx, j, *allIssues)
+			if e != nil {
+				Printf("Error %v sending %d issues to ElasticSearch\n", e, len(*allIssues))
+			}
+			*allIssues = []interface{}{}
+			if allIssuesMtx != nil {
+				allIssuesMtx.Unlock()
+			}
+			return
+		}
+		if thrN > 1 {
+			wch = make(chan error)
+			go func() {
+				_ = sendToElastic(wch)
+			}()
+		} else {
+			err = sendToElastic(nil)
+			if err != nil {
+				return
+			}
+		}
+	} else {
+		if allIssuesMtx != nil {
+			allIssuesMtx.Unlock()
+		}
+	}
 	return
 }
 
@@ -446,9 +484,15 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 		jql = fmt.Sprintf(`"jql":"updated > %d order by updated asc"`, epochMS)
 	}
 	expand := `"expand":["renderedFields","transitions","operations","changelog"]`
+	allIssues := []interface{}{}
+	var allIssuesMtx *sync.Mutex
+	var escha []chan error
+	var eschaMtx *sync.Mutex
 	var chE chan error
 	if thrN > 1 {
 		chE = make(chan error)
+		allIssuesMtx = &sync.Mutex{}
+		eschaMtx = &sync.Mutex{}
 	}
 	nThreads := 0
 	method := Post
@@ -511,9 +555,20 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 				Printf("Processing %d issues\n", len(issues))
 			}
 			for _, issue := range issues {
-				er := j.ProcessIssue(ctx, issue, customFields, from, thrN)
-				if er != nil {
-					Printf("Error %v processing issue: %+v\n", er, issue)
+				var esch chan error
+				esch, e = j.ProcessIssue(ctx, &allIssues, allIssuesMtx, issue, customFields, from, thrN)
+				if e != nil {
+					Printf("Error %v processing issue: %+v\n", e, issue)
+					return
+				}
+				if esch != nil {
+					if eschaMtx != nil {
+						eschaMtx.Lock()
+					}
+					escha = append(escha, esch)
+					if eschaMtx != nil {
+						eschaMtx.Unlock()
+					}
 				}
 			}
 			return
@@ -566,6 +621,22 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 		nThreads--
 		if err != nil {
 			return
+		}
+	}
+	for _, esch := range escha {
+		err = <-esch
+		if err != nil {
+			return
+		}
+	}
+	nIssues := len(allIssues)
+	if ctx.Debug > 0 {
+		Printf("Remain %d issues to send to ElasticSearch\n", nIssues)
+	}
+	if nIssues > 0 {
+		err = SendToElastic(ctx, j, allIssues)
+		if err != nil {
+			Printf("Error %v sending %d issues to ElasticSearch\n", err, len(allIssues))
 		}
 	}
 	Printf("Processed %d issues\n", startAt)

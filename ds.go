@@ -70,6 +70,12 @@ func GetUUID(ctx *Ctx, args ...string) (h string) {
 	return
 }
 
+// SendToElastic - send items to ElasticSearch
+func SendToElastic(ctx *Ctx, ds DS, items []interface{}) (err error) {
+	fmt.Printf("STUB: %s: %d items\n", ds.Name(), len(items))
+	return
+}
+
 // GetLastUpdate - get last update date from ElasticSearch
 func GetLastUpdate(ctx *Ctx, ds DS) (lastUpdate *time.Time) {
 	// curl -s -XPOST -H 'Content-type: application/json' '${URL}/index/_search?size=0' -d '{"aggs":{"m":{"max":{"field":"date_field"}}}}' | jq -r '.aggregations.m.value_as_string'

@@ -104,6 +104,8 @@ func (ctx *Ctx) Init() {
 		if bulkSize > 0 {
 			ctx.ESBulkSize = bulkSize
 		}
+	} else {
+		ctx.ESBulkSize = 1000
 	}
 	if ctx.env("ES_SCROLL_SIZE") != "" {
 		scrollSize, err := strconv.Atoi(ctx.env("ES_SCROLL_SIZE"))
@@ -111,6 +113,8 @@ func (ctx *Ctx) Init() {
 		if scrollSize > 0 {
 			ctx.ESScrollSize = scrollSize
 		}
+	} else {
+		ctx.ESScrollSize = 1000
 	}
 	ctx.ESScrollWait = ctx.env("ES_SCROLL_WAIT")
 
