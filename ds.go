@@ -36,15 +36,15 @@ type DS interface {
 	ItemUpdatedOn(interface{}) time.Time
 	ItemCategory(interface{}) string
 	SearchFields() map[string][]string
-	ElasticRawMapping() string
-	ElasticRichMapping() string
+	ElasticRawMapping() []byte
+	ElasticRichMapping() []byte
 }
 
 // GetUUID - generate UUID of string args
 func GetUUID(ctx *Ctx, args ...string) (h string) {
 	if ctx.Debug > 1 {
 		defer func() {
-			fmt.Printf("GetUUID(%v) --> %s\n", args, h)
+			Printf("GetUUID(%v) --> %s\n", args, h)
 		}()
 	}
 	stripF := func(str string) string {
@@ -74,7 +74,7 @@ func GetUUID(ctx *Ctx, args ...string) (h string) {
 
 // SendToElastic - send items to ElasticSearch
 func SendToElastic(ctx *Ctx, ds DS, items []interface{}) (err error) {
-	fmt.Printf("STUB: %s: %d items\n", ds.Name(), len(items))
+	Printf("STUB: %s: %d items\n", ds.Name(), len(items))
 	return
 }
 
@@ -201,10 +201,30 @@ func GetLastOffset(ctx *Ctx, ds DS) (offset float64) {
 	return
 }
 
+// HandleMapping - create/update mapping for raw or rich index
+func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
+	var m map[string]interface{}
+	if raw {
+		bMapping := ds.ElasticRawMapping()
+		err = jsoniter.Unmarshal(bMapping, &m)
+		if err != nil {
+			Fatalf("error unmarshalling %s", string(bMapping))
+		}
+		fmt.Printf("mapping: %+v\n", m)
+		return
+	}
+	Printf("STUB: %s: rich mapping\n", ds.Name())
+	return
+}
+
 // FetchRaw - implement fetch raw data (generic)
 func FetchRaw(ctx *Ctx, ds DS) (err error) {
 	if ds.CustomFetchRaw() {
 		return ds.FetchRaw(ctx)
+	}
+	err = HandleMapping(ctx, ds, true)
+	if err != nil {
+		Fatalf(ds.Name()+": HandleMapping error: %+v\n", err)
 	}
 	if ctx.DateFrom != nil && ctx.OffsetFrom >= 0.0 {
 		Fatalf(ds.Name() + ": you cannot use both date from and offset from\n")

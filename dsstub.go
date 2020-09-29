@@ -117,11 +117,11 @@ func (j *DSStub) SearchFields() map[string][]string {
 }
 
 // ElasticRawMapping - Raw index mapping definition
-func (j *DSStub) ElasticRawMapping() string {
-	return ""
+func (j *DSStub) ElasticRawMapping() []byte {
+	return []byte{}
 }
 
 // ElasticRichMapping - Rich index mapping definition
-func (j *DSStub) ElasticRichMapping() string {
-	return ""
+func (j *DSStub) ElasticRichMapping() []byte {
+	return []byte{}
 }

@@ -29,10 +29,6 @@ const (
 	JiraBackendVersion = "0.0.1"
 	// JiraDefaultSearchField - default search field
 	JiraDefaultSearchField = "item_id"
-	// JiraRawMapping - Jira index mapping
-	JiraRawMapping = `{"items":{"dynamic":true,"properties":{"data":{"properties":{"renderedFields":{"dynamic":false,"properties":{}},"operations":{"dynamic":false,"properties":{}},"fields":{"dynamic":true,"properties":{"description":{"type":"text","index":true},"environment":{"type":"text","index":true}}},"changelog":{"properties":{"histories":{"dynamic":false,"properties":{}}}},"comments_data":{"properties":{"body":{"type":"text","index":true}}}}}}}}`
-	// JiraRichMapping - Jira index mapping
-	JiraRichMapping = `{"items":{"properties":{"main_description_analyzed":{"type":"text","index":true},"releases":{"type":"keyword"},"body":{"type":"text","index":true}}}}`
 )
 
 var (
@@ -43,6 +39,10 @@ var (
 		"project_name": {"fields", "project", "name"},
 		"issue_key":    {"key"},
 	}
+	// JiraRawMapping - Jira index mapping
+	JiraRawMapping = []byte(`{"items":{"dynamic":true,"properties":{"data":{"properties":{"renderedFields":{"dynamic":false,"properties":{}},"operations":{"dynamic":false,"properties":{}},"fields":{"dynamic":true,"properties":{"description":{"type":"text","index":true},"environment":{"type":"text","index":true}}},"changelog":{"properties":{"histories":{"dynamic":false,"properties":{}}}},"comments_data":{"properties":{"body":{"type":"text","index":true}}}}}}}}`)
+	// JiraRichMapping - Jira index mapping
+	JiraRichMapping = []byte(`{"items":{"properties":{"main_description_analyzed":{"type":"text","index":true},"releases":{"type":"keyword"},"body":{"type":"text","index":true}}}}`)
 )
 
 // DSJira - DS implementation for Jira
@@ -730,11 +730,11 @@ func (j *DSJira) SearchFields() map[string][]string {
 }
 
 // ElasticRawMapping - Raw index mapping definition
-func (j *DSJira) ElasticRawMapping() string {
+func (j *DSJira) ElasticRawMapping() []byte {
 	return JiraRawMapping
 }
 
 // ElasticRichMapping - Rich index mapping definition
-func (j *DSJira) ElasticRichMapping() string {
+func (j *DSJira) ElasticRichMapping() []byte {
 	return JiraRichMapping
 }
