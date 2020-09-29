@@ -150,10 +150,8 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[stri
 	processIssue := func(c chan error) (e error) {
 		defer func() {
 			if c != nil {
+				// fmt.Printf("processIssue ->\n")
 				c <- e
-			}
-			if ctx.Debug > 0 {
-				Printf("Got %d custom fields\n", len(customFields))
 			}
 		}()
 		sID, ok := issue.(map[string]interface{})["id"].(string)
@@ -213,6 +211,7 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[stri
 	}
 	// Here we don't have comments yet, but can perform other operations if needed
 	if thrN > 1 {
+		// fmt.Printf("processIssue <-\n")
 		err = <-ch
 	}
 	// TODO: eventually handle this error
@@ -229,6 +228,7 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 	getFields := func(c chan error) (e error) {
 		defer func() {
 			if c != nil {
+				// fmt.Printf("getFields ->\n")
 				c <- e
 			}
 			if ctx.Debug > 0 {
@@ -270,6 +270,9 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 	}
 	expand := `"expand":["renderedFields","transitions","operations","changelog"]`
 	var chE chan error
+	if thrN > 1 {
+		chE = make(chan error)
+	}
 	nThreads := 0
 	for {
 		payloadBytes := []byte(fmt.Sprintf(`{"startAt":%d,"maxResults":%d,%s,%s}`, startAt, maxResults, jql, expand))
@@ -300,6 +303,7 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 			return
 		}
 		if !fieldsFetched {
+			// fmt.Printf("getFields <-\n")
 			err = <-chF
 			if err != nil {
 				Printf("GetFields error: %+v\n", err)
@@ -315,6 +319,7 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 		processIssues := func(c chan error) (e error) {
 			defer func() {
 				if c != nil {
+					// fmt.Printf("processIssues ->\n")
 					c <- e
 				}
 			}()
@@ -335,12 +340,12 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 			return
 		}
 		if thrN > 1 {
-			chE = make(chan error)
 			go func() {
 				_ = processIssues(chE)
 			}()
 			nThreads++
 			if nThreads == thrN {
+				// fmt.Printf("processIssues <-\n")
 				err = <-chE
 				if err != nil {
 					return
@@ -370,14 +375,15 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 			inc = int64(maxResultsF)
 		}
 		startAt += inc
-		if ctx.Debug > 0 {
-			Printf("Processing next page from %d/%d\n", startAt, total)
-		}
 		if startAt >= total {
 			break
 		}
+		if ctx.Debug > 0 {
+			Printf("Processing next page from %d/%d\n", startAt, total)
+		}
 	}
 	for thrN > 1 && nThreads > 0 {
+		// fmt.Printf("processIssues <- (final join)\n")
 		err = <-chE
 		nThreads--
 		if err != nil {
