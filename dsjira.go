@@ -160,7 +160,6 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[stri
 	processIssue := func(c chan error) (e error) {
 		defer func() {
 			if c != nil {
-				// fmt.Printf("processIssue ->\n")
 				c <- e
 			}
 		}()
@@ -337,11 +336,8 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[stri
 		issueFields[k] = v
 	}
 	if thrN > 1 {
-		// fmt.Printf("processIssue <-\n")
 		err = <-ch
 	}
-	// comms, _ := issue.(map[string]interface{})["comments_data"].([]interface{})
-	// fmt.Printf("%d\n", len(comms))
 	return
 }
 
@@ -354,7 +350,6 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 	getFields := func(c chan error) (e error) {
 		defer func() {
 			if c != nil {
-				// fmt.Printf("getFields ->\n")
 				c <- e
 			}
 			if ctx.Debug > 0 {
@@ -433,7 +428,6 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 			return
 		}
 		if !fieldsFetched {
-			// fmt.Printf("getFields <-\n")
 			err = <-chF
 			if err != nil {
 				Printf("GetFields error: %+v\n", err)
@@ -449,7 +443,6 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 		processIssues := func(c chan error) (e error) {
 			defer func() {
 				if c != nil {
-					// fmt.Printf("processIssues ->\n")
 					c <- e
 				}
 			}()
@@ -475,7 +468,6 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 			}()
 			nThreads++
 			if nThreads == thrN {
-				// fmt.Printf("processIssues <-\n")
 				err = <-chE
 				if err != nil {
 					return
@@ -514,7 +506,6 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 		}
 	}
 	for thrN > 1 && nThreads > 0 {
-		// fmt.Printf("processIssues <- (final join)\n")
 		err = <-chE
 		nThreads--
 		if err != nil {
