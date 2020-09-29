@@ -75,6 +75,7 @@ func GetUUID(ctx *Ctx, args ...string) (h string) {
 // SendToElastic - send items to ElasticSearch
 func SendToElastic(ctx *Ctx, ds DS, items []interface{}) (err error) {
 	Printf("STUB: %s: %d items\n", ds.Name(), len(items))
+	// FIXME: continue
 	return
 }
 
@@ -203,17 +204,21 @@ func GetLastOffset(ctx *Ctx, ds DS) (offset float64) {
 
 // HandleMapping - create/update mapping for raw or rich index
 func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
-	var m map[string]interface{}
+	var mapping map[string]interface{}
 	if raw {
 		bMapping := ds.ElasticRawMapping()
-		err = jsoniter.Unmarshal(bMapping, &m)
+		err = jsoniter.Unmarshal(bMapping, &mapping)
 		if err != nil {
 			Fatalf("error unmarshalling %s", string(bMapping))
 		}
-		fmt.Printf("mapping: %+v\n", m)
+		for typ, m := range mapping {
+			fmt.Printf("STUB: mapping(%s): %+v\n", typ, m)
+			// FIXME: continue
+		}
 		return
 	}
 	Printf("STUB: %s: rich mapping\n", ds.Name())
+	// FIXME: continue
 	return
 }
 
@@ -242,7 +247,7 @@ func FetchRaw(ctx *Ctx, ds DS) (err error) {
 			lastUpdate = GetLastUpdate(ctx, ds)
 		}
 		if lastUpdate != nil {
-			Printf("%s: staring from date: %v\n", ds.Name(), *lastUpdate)
+			Printf("%s: starting from date: %v\n", ds.Name(), *lastUpdate)
 			ctx.DateFrom = lastUpdate
 		}
 	}
@@ -255,7 +260,7 @@ func FetchRaw(ctx *Ctx, ds DS) (err error) {
 			offset = &lastOffset
 		}
 		if offset != nil {
-			Printf("%s: staring from offset: %v\n", ds.Name(), *offset)
+			Printf("%s: starting from offset: %v\n", ds.Name(), *offset)
 			ctx.OffsetFrom = *offset
 		}
 	}

@@ -206,7 +206,7 @@ func (j *DSJira) GenSearchFields(ctx *Ctx, issue interface{}, uuid string) (fiel
 }
 
 // ProcessIssue - process a single issue
-func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *sync.Mutex, issue interface{}, customFields map[string]JiraField, from time.Time, thrN int) (wch chan error, err error) {
+func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *sync.Mutex, issue interface{}, customFields map[string]JiraField, from time.Time, to *time.Time, thrN int) (wch chan error, err error) {
 	var mtx *sync.RWMutex
 	if thrN > 1 {
 		mtx = &sync.RWMutex{}
@@ -233,7 +233,13 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 						jql = fmt.Sprintf(`"jql":"updated > %d order by updated asc"`, epochMS)
 					}
 		*/
-		jql := fmt.Sprintf(`"jql":"updated > %d order by updated asc"`, epochMS)
+		var jql string
+		if to != nil {
+			epochToMS := (*to).UnixNano() / 1e6
+			jql = fmt.Sprintf(`"jql":"updated > %d AND updated < %d order by updated asc"`, epochMS, epochToMS)
+		} else {
+			jql = fmt.Sprintf(`"jql":"updated > %d order by updated asc"`, epochMS)
+		}
 		method := Get
 		for {
 			payloadBytes := []byte(fmt.Sprintf(`{"startAt":%d,"maxResults":%d,%s}`, startAt, maxResults, jql))
@@ -482,21 +488,34 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 		fieldsFetched = true
 	}
 	// '{"jql":"updated > 1601281314000 order by updated asc","startAt":0,"maxResults":400,"expand":["renderedFields","transitions","operations","changelog"]}'
-	var from time.Time
+	var (
+		from time.Time
+		to   *time.Time
+	)
 	if ctx.DateFrom != nil {
 		from = *ctx.DateFrom
 	} else {
 		from = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
 	}
+	to = ctx.DateTo
 	url := j.URL + JiraAPIRoot + JiraAPISearch
 	startAt := int64(0)
 	maxResults := int64(j.PageSize)
 	jql := ""
 	epochMS := from.UnixNano() / 1e6
-	if ctx.Project != "" {
-		jql = fmt.Sprintf(`"jql":"project = %s AND updated > %d order by updated asc"`, ctx.Project, epochMS)
+	if to != nil {
+		epochToMS := (*to).UnixNano() / 1e6
+		if ctx.Project != "" {
+			jql = fmt.Sprintf(`"jql":"project = %s AND updated > %d AND updated < %d order by updated asc"`, ctx.Project, epochMS, epochToMS)
+		} else {
+			jql = fmt.Sprintf(`"jql":"updated > %d AND updated < %d order by updated asc"`, epochMS, epochToMS)
+		}
 	} else {
-		jql = fmt.Sprintf(`"jql":"updated > %d order by updated asc"`, epochMS)
+		if ctx.Project != "" {
+			jql = fmt.Sprintf(`"jql":"project = %s AND updated > %d order by updated asc"`, ctx.Project, epochMS)
+		} else {
+			jql = fmt.Sprintf(`"jql":"updated > %d order by updated asc"`, epochMS)
+		}
 	}
 	expand := `"expand":["renderedFields","transitions","operations","changelog"]`
 	allIssues := []interface{}{}
@@ -571,7 +590,7 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 			}
 			for _, issue := range issues {
 				var esch chan error
-				esch, e = j.ProcessIssue(ctx, &allIssues, allIssuesMtx, issue, customFields, from, thrN)
+				esch, e = j.ProcessIssue(ctx, &allIssues, allIssuesMtx, issue, customFields, from, to, thrN)
 				if e != nil {
 					Printf("Error %v processing issue: %+v\n", e, issue)
 					return
