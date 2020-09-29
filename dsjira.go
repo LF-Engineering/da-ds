@@ -371,25 +371,27 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[stri
 	esItem := make(map[string]interface{})
 	origin := j.Origin()
 	uuid := GetUUID(ctx, origin, issueID)
+	timestamp := time.Now()
 	esItem["backend_name"] = j.DS
 	esItem["backend_version"] = JiraBackendVersion
-	esItem["timestamp"] = fmt.Sprintf("%.06f", float64(time.Now().UnixNano())/1.0e6)
+	esItem["timestamp"] = fmt.Sprintf("%.06f", float64(timestamp.UnixNano())/1.0e3)
 	esItem["origin"] = origin
 	esItem["uuid"] = uuid
 	if thrN > 1 {
 		mtx.Lock()
 	}
-	esItem["updated_on"] = j.ItemUpdatedOn(issue)
+	updatedOn := j.ItemUpdatedOn(issue)
+	esItem["updated_on"] = updatedOn
 	esItem["category"] = j.ItemCategory(issue)
 	esItem["search_fields"] = j.GenSearchFields(ctx, issue, uuid)
+	issue.(map[string]interface{})["metadata__updated_on"] = ToESDate(updatedOn)
+	issue.(map[string]interface{})["metadata__timestamp"] = ToESDate(timestamp)
 	if ctx.Project != "" {
 		issue.(map[string]interface{})["project"] = ctx.Project
 	}
 	esItem["data"] = issue
 	if thrN > 1 {
 		mtx.Unlock()
-	}
-	if thrN > 1 {
 		err = <-ch
 	}
 	return
