@@ -146,12 +146,12 @@ func (j *DSJira) GetFields(ctx *Ctx) (customFields map[string]JiraField, err err
 }
 
 // ProcessIssue - process a single issue
-func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[string]JiraField) (err error) {
-	ch := make(chan error)
-	go func(c chan error) {
-		var e error
+func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[string]JiraField, thrN int) (err error) {
+	processIssue := func(c chan error) (e error) {
 		defer func() {
-			c <- e
+			if c != nil {
+				c <- e
+			}
 			if ctx.Debug > 0 {
 				Printf("Got %d custom fields\n", len(customFields))
 			}
@@ -171,7 +171,20 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[stri
 		}
 		// TODO: continue: fetch rest of issue data: comments and then send to ES
 		// Fetch comments data in a goroutine while continue other stuff in this thread
-	}(ch)
+		return
+	}
+	var ch chan error
+	if thrN > 1 {
+		ch = make(chan error)
+		go func() {
+			_ = processIssue(ch)
+		}()
+	} else {
+		err = processIssue(nil)
+		if err != nil {
+			return err
+		}
+	}
 	issueFields, ok := issue.(map[string]interface{})["fields"].(map[string]interface{})
 	if !ok {
 		err = fmt.Errorf("unable to unmarshal fields from issue %+v", issue)
@@ -199,7 +212,9 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[stri
 		issueFields[k] = v
 	}
 	// Here we don't have comments yet, but can perform other operations if needed
-	err = <-ch
+	if thrN > 1 {
+		err = <-ch
+	}
 	// TODO: eventually handle this error
 	// Here we already synced with get comments code
 	return
@@ -207,6 +222,7 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[stri
 
 // FetchItems - implement fetch items for jira datasource
 func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
+	thrN := GetThreadsNum(ctx)
 	var customFields map[string]JiraField
 	fieldsFetched := false
 	chF := make(chan error)
@@ -238,7 +254,6 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 		jql = fmt.Sprintf(`"jql":"updated > %d order by updated asc"`, epochMS)
 	}
 	expand := `"expand":["renderedFields","transitions","operations","changelog"]`
-	thrN := GetThreadsNum(ctx)
 	chE := make(chan error)
 	nThreads := 0
 	for {
@@ -296,7 +311,7 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 				Printf("Processing %d issues\n", len(issues))
 			}
 			for _, issue := range issues {
-				er := j.ProcessIssue(ctx, issue, customFields)
+				er := j.ProcessIssue(ctx, issue, customFields, thrN)
 				if er != nil {
 					Printf("Error %v processing issue: %+v\n", er, issue)
 				}
