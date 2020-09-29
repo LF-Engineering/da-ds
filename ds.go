@@ -36,6 +36,8 @@ type DS interface {
 	ItemUpdatedOn(interface{}) time.Time
 	ItemCategory(interface{}) string
 	SearchFields() map[string][]string
+	ElasticRawMapping() string
+	ElasticRichMapping() string
 }
 
 // GetUUID - generate UUID of string args

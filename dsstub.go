@@ -115,3 +115,13 @@ func (j *DSStub) ItemCategory(item interface{}) string {
 func (j *DSStub) SearchFields() map[string][]string {
 	return map[string][]string{}
 }
+
+// ElasticRawMapping - Raw index mapping definition
+func (j *DSStub) ElasticRawMapping() string {
+	return ""
+}
+
+// ElasticRichMapping - Rich index mapping definition
+func (j *DSStub) ElasticRichMapping() string {
+	return ""
+}

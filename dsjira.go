@@ -29,6 +29,10 @@ const (
 	JiraBackendVersion = "0.0.1"
 	// JiraDefaultSearchField - default search field
 	JiraDefaultSearchField = "item_id"
+	// JiraRawMapping - Jira index mapping
+	JiraRawMapping = `{"items":{"dynamic":true,"properties":{"data":{"properties":{"renderedFields":{"dynamic":false,"properties":{}},"operations":{"dynamic":false,"properties":{}},"fields":{"dynamic":true,"properties":{"description":{"type":"text","index":true},"environment":{"type":"text","index":true}}},"changelog":{"properties":{"histories":{"dynamic":false,"properties":{}}}},"comments_data":{"properties":{"body":{"type":"text","index":true}}}}}}}}`
+	// JiraRichMapping - Jira index mapping
+	JiraRichMapping = `{"items":{"properties":{"main_description_analyzed":{"type":"text","index":true},"releases":{"type":"keyword"},"body":{"type":"text","index":true}}}}`
 )
 
 var (
@@ -218,6 +222,7 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 		startAt := int64(0)
 		maxResults := int64(j.PageSize)
 		epochMS := from.UnixNano() / 1e6
+		// FIXME: seems like original Jira was using project filter there which is not needed IMHO.
 		/*
 			    // I think we don't need project filter there, because the entire issue belongs to roject or not
 			    // So I'm only using date filter
@@ -367,6 +372,16 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 		}
 		issueFields[k] = v
 	}
+	// FIXME: drop all custom fields in ["data"]["fields"] when any starts with "customfield_"
+	// Seems like it doesn't make sense, because we just added those custom fields
+	/*
+		for k, v := range issueFields {
+			if strings.HasPrefix(k, "customfield_") {
+				fmt.Printf("deleting %v %v\n", k, v)
+				delete(issueFields, k)
+			}
+		}
+	*/
 	// Extra fields
 	esItem := make(map[string]interface{})
 	origin := j.Origin()
@@ -712,4 +727,14 @@ func (j *DSJira) ItemCategory(item interface{}) string {
 // SearchFields - define (optional) search fields to be returned
 func (j *DSJira) SearchFields() map[string][]string {
 	return JiraSearchFields
+}
+
+// ElasticRawMapping - Raw index mapping definition
+func (j *DSJira) ElasticRawMapping() string {
+	return JiraRawMapping
+}
+
+// ElasticRichMapping - Rich index mapping definition
+func (j *DSJira) ElasticRichMapping() string {
+	return JiraRichMapping
 }
