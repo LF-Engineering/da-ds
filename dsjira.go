@@ -225,17 +225,32 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 	thrN := GetThreadsNum(ctx)
 	var customFields map[string]JiraField
 	fieldsFetched := false
-	chF := make(chan error)
-	go func(c chan error) {
-		var e error
+	var chF chan error
+	getFields := func(c chan error) (e error) {
 		defer func() {
-			c <- e
+			if c != nil {
+				c <- e
+			}
 			if ctx.Debug > 0 {
 				Printf("Got %d custom fields\n", len(customFields))
 			}
 		}()
 		customFields, e = j.GetFields(ctx)
-	}(chF)
+		return
+	}
+	if thrN > 1 {
+		chF = make(chan error)
+		go func() {
+			_ = getFields(chF)
+		}()
+	} else {
+		err = getFields(nil)
+		if err != nil {
+			Printf("GetFields error: %+v\n", err)
+			return
+		}
+		fieldsFetched = true
+	}
 	// '{"jql":"updated > 1601281314000 order by updated asc","startAt":0,"maxResults":400,"expand":["renderedFields","transitions","operations","changelog"]}'
 	var from time.Time
 	if ctx.DateFrom != nil {
@@ -254,7 +269,7 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 		jql = fmt.Sprintf(`"jql":"updated > %d order by updated asc"`, epochMS)
 	}
 	expand := `"expand":["renderedFields","transitions","operations","changelog"]`
-	chE := make(chan error)
+	var chE chan error
 	nThreads := 0
 	for {
 		payloadBytes := []byte(fmt.Sprintf(`{"startAt":%d,"maxResults":%d,%s,%s}`, startAt, maxResults, jql, expand))
@@ -297,10 +312,11 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 		if err != nil {
 			return
 		}
-		go func(c chan error) {
-			var e error
+		processIssues := func(c chan error) (e error) {
 			defer func() {
-				c <- e
+				if c != nil {
+					c <- e
+				}
 			}()
 			issues, ok := res.(map[string]interface{})["issues"].([]interface{})
 			if !ok {
@@ -316,14 +332,26 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 					Printf("Error %v processing issue: %+v\n", er, issue)
 				}
 			}
-		}(chE)
-		nThreads++
-		if nThreads == thrN {
-			err = <-chE
+			return
+		}
+		if thrN > 1 {
+			chE = make(chan error)
+			go func() {
+				_ = processIssues(chE)
+			}()
+			nThreads++
+			if nThreads == thrN {
+				err = <-chE
+				if err != nil {
+					return
+				}
+				nThreads--
+			}
+		} else {
+			err = processIssues(nil)
 			if err != nil {
 				return
 			}
-			nThreads--
 		}
 		totalF, ok := res.(map[string]interface{})["total"].(float64)
 		if !ok {
@@ -349,7 +377,7 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 			break
 		}
 	}
-	for nThreads > 0 {
+	for thrN > 1 && nThreads > 0 {
 		err = <-chE
 		nThreads--
 		if err != nil {
