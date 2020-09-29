@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	jsoniter "github.com/json-iterator/go"
@@ -18,8 +19,12 @@ const (
 	JiraAPIRoot = "/rest/api/2"
 	// JiraAPISearch - search API subpath
 	JiraAPISearch = "/search"
-	// JiraAPIFields - fields API subpath
-	JiraAPIFields = "/field"
+	// JiraAPIField - field API subpath
+	JiraAPIField = "/field"
+	// JiraAPIIssue - issue API subpath
+	JiraAPIIssue = "/issue"
+	// JiraAPIComment - comments API subpath
+	JiraAPIComment = "/comment"
 )
 
 // DSJira - DS implementation for Jira
@@ -103,7 +108,7 @@ func (j *DSJira) Enrich(ctx *Ctx) (err error) {
 
 // GetFields - implement get fields for jira datasource
 func (j *DSJira) GetFields(ctx *Ctx) (customFields map[string]JiraField, err error) {
-	url := j.URL + JiraAPIRoot + JiraAPIFields
+	url := j.URL + JiraAPIRoot + JiraAPIField
 	method := Get
 	var req *http.Request
 	req, err = http.NewRequest(method, url, nil)
@@ -147,7 +152,11 @@ func (j *DSJira) GetFields(ctx *Ctx) (customFields map[string]JiraField, err err
 }
 
 // ProcessIssue - process a single issue
-func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[string]JiraField, thrN int) (err error) {
+func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[string]JiraField, from time.Time, thrN int) (err error) {
+	var mtx *sync.RWMutex
+	if thrN > 1 {
+		mtx = &sync.RWMutex{}
+	}
 	processIssue := func(c chan error) (e error) {
 		defer func() {
 			if c != nil {
@@ -155,7 +164,13 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[stri
 				c <- e
 			}
 		}()
+		if thrN > 1 {
+			mtx.RLock()
+		}
 		sID, ok := issue.(map[string]interface{})["id"].(string)
+		if thrN > 1 {
+			mtx.RUnlock()
+		}
 		if !ok {
 			e = fmt.Errorf("unable to unmarshal id from issue %+v", issue)
 			return
@@ -168,8 +183,113 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[stri
 		if ctx.Debug > 1 {
 			Printf("Issue ID: %d\n", iID)
 		}
-		// TODO: continue: fetch rest of issue data: comments and then send to ES
-		// Fetch comments data in a goroutine while continue other stuff in this thread
+		url := j.URL + JiraAPIRoot + JiraAPIIssue + "/" + sID + JiraAPIComment
+		startAt := int64(0)
+		maxResults := int64(j.PageSize)
+		epochMS := from.UnixNano() / 1e6
+		/*
+			    // I think we don't need project filter there, because the entire issue belongs to roject or not
+			    // So I'm only using date filter
+					jql := ""
+					if ctx.Project != "" {
+						jql = fmt.Sprintf(`"jql":"project = %s AND updated > %d order by updated asc"`, ctx.Project, epochMS)
+					} else {
+						jql = fmt.Sprintf(`"jql":"updated > %d order by updated asc"`, epochMS)
+					}
+		*/
+		jql := fmt.Sprintf(`"jql":"updated > %d order by updated asc"`, epochMS)
+		method := Get
+		for {
+			payloadBytes := []byte(fmt.Sprintf(`{"startAt":%d,"maxResults":%d,%s}`, startAt, maxResults, jql))
+			payloadBody := bytes.NewReader(payloadBytes)
+			var req *http.Request
+			req, err = http.NewRequest(method, url, payloadBody)
+			if err != nil {
+				Printf("New request error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
+				return
+			}
+			req.Header.Set("Content-Type", "application/json")
+			if j.Token != "" {
+				req.Header.Set("Authorization", "Basic "+j.Token)
+			}
+			var resp *http.Response
+			resp, err = http.DefaultClient.Do(req)
+			if err != nil {
+				Printf("Do request error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
+				return
+			}
+			var body []byte
+			body, err = ioutil.ReadAll(resp.Body)
+			if err != nil {
+				Printf("ReadAll request error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
+				return
+			}
+			_ = resp.Body.Close()
+			if resp.StatusCode != 200 {
+				Printf("Method:%s url:%s status:%d query:%s\n%s\n", method, url, resp.StatusCode, string(payloadBytes), body)
+				return
+			}
+			var res interface{}
+			err = jsoniter.Unmarshal(body, &res)
+			if err != nil {
+				return
+			}
+			comments, ok := res.(map[string]interface{})["comments"].([]interface{})
+			if !ok {
+				e = fmt.Errorf("unable to unmarshal comments from %+v", res)
+				return
+			}
+			if ctx.Debug > 0 {
+				nComments := len(comments)
+				if nComments > 0 {
+					Printf("Processing %d comments\n", len(comments))
+				}
+			}
+			if thrN > 1 {
+				mtx.Lock()
+			}
+			issueComments, ok := issue.(map[string]interface{})["comments_data"].([]interface{})
+			if !ok {
+				issue.(map[string]interface{})["comments_data"] = []interface{}{}
+			}
+			issueComments, _ = issue.(map[string]interface{})["comments_data"].([]interface{})
+			if !ok {
+				issueComments = comments
+			} else {
+				issueComments = append(issueComments, comments...)
+			}
+			issue.(map[string]interface{})["comments_data"] = issueComments
+			if thrN > 1 {
+				mtx.Unlock()
+			}
+			totalF, ok := res.(map[string]interface{})["total"].(float64)
+			if !ok {
+				err = fmt.Errorf("unable to unmarshal total from %+v", res)
+				return
+			}
+			maxResultsF, ok := res.(map[string]interface{})["maxResults"].(float64)
+			if !ok {
+				err = fmt.Errorf("unable to maxResults total from %+v", res)
+				return
+			}
+			total := int64(totalF)
+			maxResults = int64(maxResultsF)
+			inc := int64(totalF)
+			if maxResultsF < totalF {
+				inc = int64(maxResultsF)
+			}
+			startAt += inc
+			if startAt >= total {
+				startAt = total
+				break
+			}
+			if ctx.Debug > 0 {
+				Printf("Processing next comments page from %d/%d\n", startAt, total)
+			}
+		}
+		if ctx.Debug > 1 {
+			Printf("Processed %d comments\n", startAt)
+		}
 		return
 	}
 	var ch chan error
@@ -184,7 +304,13 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[stri
 			return err
 		}
 	}
+	if thrN > 1 {
+		mtx.RLock()
+	}
 	issueFields, ok := issue.(map[string]interface{})["fields"].(map[string]interface{})
+	if thrN > 1 {
+		mtx.RUnlock()
+	}
 	if !ok {
 		err = fmt.Errorf("unable to unmarshal fields from issue %+v", issue)
 		return
@@ -210,13 +336,12 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[stri
 		}
 		issueFields[k] = v
 	}
-	// Here we don't have comments yet, but can perform other operations if needed
 	if thrN > 1 {
 		// fmt.Printf("processIssue <-\n")
 		err = <-ch
 	}
-	// TODO: eventually handle this error
-	// Here we already synced with get comments code
+	// comms, _ := issue.(map[string]interface{})["comments_data"].([]interface{})
+	// fmt.Printf("%d\n", len(comms))
 	return
 }
 
@@ -275,10 +400,10 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 		chE = make(chan error)
 	}
 	nThreads := 0
+	method := Post
 	for {
 		payloadBytes := []byte(fmt.Sprintf(`{"startAt":%d,"maxResults":%d,%s,%s}`, startAt, maxResults, jql, expand))
 		payloadBody := bytes.NewReader(payloadBytes)
-		method := Post
 		var req *http.Request
 		req, err = http.NewRequest(method, url, payloadBody)
 		if err != nil {
@@ -337,7 +462,7 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 				Printf("Processing %d issues\n", len(issues))
 			}
 			for _, issue := range issues {
-				er := j.ProcessIssue(ctx, issue, customFields, thrN)
+				er := j.ProcessIssue(ctx, issue, customFields, from, thrN)
 				if er != nil {
 					Printf("Error %v processing issue: %+v\n", er, issue)
 				}
@@ -385,7 +510,7 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 			break
 		}
 		if ctx.Debug > 0 {
-			Printf("Processing next page from %d/%d\n", startAt, total)
+			Printf("Processing next issues page from %d/%d\n", startAt, total)
 		}
 	}
 	for thrN > 1 && nThreads > 0 {
