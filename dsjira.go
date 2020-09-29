@@ -27,8 +27,7 @@ type DSJira struct {
 	DS          string
 	URL         string // From DA_JIRA_URL - Jira URL
 	NoSSLVerify bool   // From DA_JIRA_NO_SSL_VERIFY
-	User        string // From DA_JIRA_USER
-	Pass        string // From DA_JIRA_PASS
+	Token       string // From DA_JIRA_TOKEN
 	PageSize    int    // From DA_JIRA_PAGE_SIZE
 }
 
@@ -46,8 +45,7 @@ func (j *DSJira) ParseArgs(ctx *Ctx) (err error) {
 	// Jira specific env variables
 	j.URL = os.Getenv("DA_JIRA_URL")
 	j.NoSSLVerify = os.Getenv("DA_JIRA_NO_SSL_VERIFY") != ""
-	j.User = os.Getenv("DA_JIRA_USER")
-	j.Pass = os.Getenv("DA_JIRA_PASS")
+	j.Token = os.Getenv("DA_JIRA_TOKEN")
 	if os.Getenv("DA_JIRA_PAGE_SIZE") == "" {
 		j.PageSize = 400
 	} else {
@@ -112,6 +110,9 @@ func (j *DSJira) GetFields(ctx *Ctx) (customFields map[string]JiraField, err err
 	if err != nil {
 		Printf("New request error: %+v for %s url: %s\n", err, method, url)
 		return
+	}
+	if j.Token != "" {
+		req.Header.Set("Authorization", "Basic "+j.Token)
 	}
 	var resp *http.Response
 	resp, err = http.DefaultClient.Do(req)
@@ -285,6 +286,10 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 			return
 		}
 		req.Header.Set("Content-Type", "application/json")
+		if j.Token != "" {
+			// Token should be BASE64("useremail:api_token"), see: https://developer.atlassian.com/cloud/jira/platform/basic-auth-for-rest-apis
+			req.Header.Set("Authorization", "Basic "+j.Token)
+		}
 		var resp *http.Response
 		resp, err = http.DefaultClient.Do(req)
 		if err != nil {
