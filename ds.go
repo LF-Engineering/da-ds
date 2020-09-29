@@ -25,13 +25,20 @@ type DS interface {
 	CustomEnrich() bool
 	SupportDateFrom() bool
 	SupportOffsetFrom() bool
+	ResumeNeedsOrigin() bool
+	Origin() string
 }
 
 // GetLastUpdate - get last update date from ElasticSearch
 func GetLastUpdate(ctx *Ctx, ds DS) (lastUpdate *time.Time) {
 	// curl -s -XPOST -H 'Content-type: application/json' '${URL}/index/_search?size=0' -d '{"aggs":{"m":{"max":{"field":"date_field"}}}}' | jq -r '.aggregations.m.value_as_string'
 	dateField := ds.DateField(ctx)
-	payloadBytes := []byte(`{"aggs":{"m":{"max":{"field":"` + JSONEscape(dateField) + `"}}}}`)
+	var payloadBytes []byte
+	if ds.ResumeNeedsOrigin() {
+		payloadBytes = []byte(`{"query":{"bool":{"filter":{"term":{"origin":"` + JSONEscape(ds.Origin()) + `"}}}},"aggs":{"m":{"max":{"field":"` + JSONEscape(dateField) + `"}}}}`)
+	} else {
+		payloadBytes = []byte(`{"aggs":{"m":{"max":{"field":"` + JSONEscape(dateField) + `"}}}}`)
+	}
 	payloadBody := bytes.NewReader(payloadBytes)
 	method := Post
 	url := ctx.ESURL + "/" + ctx.RawIndex + "/_search?size=0"
@@ -91,7 +98,12 @@ func GetLastOffset(ctx *Ctx, ds DS) (offset float64) {
 	offset = -1.0
 	// curl -s -XPOST -H 'Content-type: application/json' '${URL}/index/_search?size=0' -d '{"aggs":{"m":{"max":{"field":"offset_field"}}}}' | jq -r '.aggregations.m.value'
 	offsetField := ds.OffsetField(ctx)
-	payloadBytes := []byte(`{"aggs":{"m":{"max":{"field":"` + JSONEscape(offsetField) + `"}}}}`)
+	var payloadBytes []byte
+	if ds.ResumeNeedsOrigin() {
+		payloadBytes = []byte(`{"query":{"bool":{"filter":{"term":{"origin":"` + JSONEscape(ds.Origin()) + `"}}}},"aggs":{"m":{"max":{"field":"` + JSONEscape(offsetField) + `"}}}}`)
+	} else {
+		payloadBytes = []byte(`{"aggs":{"m":{"max":{"field":"` + JSONEscape(offsetField) + `"}}}}`)
+	}
 	payloadBody := bytes.NewReader(payloadBytes)
 	method := Post
 	url := ctx.ESURL + "/" + ctx.RawIndex + "/_search?size=0"

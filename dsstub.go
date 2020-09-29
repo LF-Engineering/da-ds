@@ -83,3 +83,14 @@ func (j *DSStub) OffsetField(*Ctx) string {
 func (j *DSStub) Categories() map[string]struct{} {
 	return map[string]struct{}{}
 }
+
+// ResumeNeedsOrigin - is origin field needed when resuming
+// Origin should be needed when multiple configurations save to the same index
+func (j *DSStub) ResumeNeedsOrigin() bool {
+	return false
+}
+
+// Origin - return current origin
+func (j *DSStub) Origin() string {
+	return ""
+}

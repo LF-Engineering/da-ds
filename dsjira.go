@@ -376,6 +376,7 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 		}
 		startAt += inc
 		if startAt >= total {
+			startAt = total
 			break
 		}
 		if ctx.Debug > 0 {
@@ -417,4 +418,16 @@ func (j *DSJira) OffsetField(*Ctx) string {
 //Categories - return a set of configured categories
 func (j *DSJira) Categories() map[string]struct{} {
 	return map[string]struct{}{"issue": {}}
+}
+
+// ResumeNeedsOrigin - is origin field needed when resuming
+// Origin should be needed when multiple configurations save to the same index
+// Jira usually stores only one instance per index, so we don't need to enable filtering by origin to resume
+func (j *DSJira) ResumeNeedsOrigin() bool {
+	return false
+}
+
+// Origin - return current origin
+func (j *DSJira) Origin() string {
+	return j.URL
 }
