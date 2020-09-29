@@ -110,3 +110,8 @@ func (j *DSStub) ItemUpdatedOn(item interface{}) time.Time {
 func (j *DSStub) ItemCategory(item interface{}) string {
 	return fmt.Sprintf("%d", time.Now().UnixNano())
 }
+
+// SearchFields - define (optional) search fields to be returned
+func (j *DSStub) SearchFields() map[string][]string {
+	return map[string][]string{}
+}

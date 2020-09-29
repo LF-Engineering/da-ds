@@ -27,6 +27,18 @@ const (
 	JiraAPIComment = "/comment"
 	// JiraBackendVersion - backend version
 	JiraBackendVersion = "0.0.1"
+	// JiraDefaultSearchField - default search field
+	JiraDefaultSearchField = "item_id"
+)
+
+var (
+	// JiraSearchFields - extra search fields
+	JiraSearchFields = map[string][]string{
+		"project_id":   {"fields", "project", "id"},
+		"project_key":  {"fields", "project", "key"},
+		"project_name": {"fields", "project", "name"},
+		"issue_key":    {"key"},
+	}
 )
 
 // DSJira - DS implementation for Jira
@@ -149,6 +161,42 @@ func (j *DSJira) GetFields(ctx *Ctx) (customFields map[string]JiraField, err err
 			continue
 		}
 		customFields[field.ID] = field
+	}
+	return
+}
+
+// GenSearchFields - generate extra search fields
+func (j *DSJira) GenSearchFields(ctx *Ctx, issue interface{}, uuid string) (fields map[string]interface{}) {
+	searchFields := j.SearchFields()
+	fields = make(map[string]interface{})
+	fields[JiraDefaultSearchField] = uuid
+	for field, keyAry := range searchFields {
+		item, _ := issue.(map[string]interface{})
+		var value interface{}
+		last := len(keyAry) - 1
+		miss := false
+		for i, key := range keyAry {
+			var ok bool
+			if i < last {
+				item, ok = item[key].(map[string]interface{})
+			} else {
+				value, ok = item[key]
+			}
+			if !ok {
+				Printf("%s: %+v, current: %s, %d/%d failed\n", field, keyAry, key, i+1, last+1)
+				miss = true
+				break
+			}
+		}
+		if !miss {
+			if ctx.Debug > 1 {
+				Printf("Found %s: %+v --> %+v\n", field, keyAry, value)
+			}
+			fields[field] = value
+		}
+	}
+	if ctx.Debug > 1 {
+		Printf("Returing %+v\n", fields)
 	}
 	return
 }
@@ -322,26 +370,21 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[stri
 	// Extra fields
 	esItem := make(map[string]interface{})
 	origin := j.Origin()
+	uuid := GetUUID(ctx, origin, issueID)
 	esItem["backend_name"] = j.DS
 	esItem["backend_version"] = JiraBackendVersion
 	esItem["timestamp"] = fmt.Sprintf("%.06f", float64(time.Now().UnixNano())/1.0e6)
 	esItem["origin"] = origin
-	esItem["uuid"] = GetUUID(ctx, origin, issueID)
+	esItem["uuid"] = uuid
 	if thrN > 1 {
 		mtx.Lock()
 	}
 	esItem["updated_on"] = j.ItemUpdatedOn(issue)
 	esItem["category"] = j.ItemCategory(issue)
-	// FIXME
-	/*
-		for k := range issue.(map[string]interface{}) {
-			fmt.Printf("key: %s\n", k)
-		}
-	*/
+	esItem["search_fields"] = j.GenSearchFields(ctx, issue, uuid)
 	if ctx.Project != "" {
 		issue.(map[string]interface{})["project"] = ctx.Project
 	}
-	fmt.Printf("%+v\n", esItem)
 	esItem["data"] = issue
 	if thrN > 1 {
 		mtx.Unlock()
@@ -591,4 +634,9 @@ func (j *DSJira) ItemUpdatedOn(item interface{}) time.Time {
 // ItemCategory - return unique identifier for an item
 func (j *DSJira) ItemCategory(item interface{}) string {
 	return Issue
+}
+
+// SearchFields - define (optional) search fields to be returned
+func (j *DSJira) SearchFields() map[string][]string {
+	return JiraSearchFields
 }
