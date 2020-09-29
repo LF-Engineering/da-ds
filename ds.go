@@ -2,11 +2,16 @@ package dads
 
 import (
 	"bytes"
+	"crypto/sha1"
+	"encoding/hex"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
 
 	jsoniter "github.com/json-iterator/go"
+	"golang.org/x/text/transform"
+	"golang.org/x/text/unicode/norm"
 )
 
 // DS - interface for all data source types
@@ -27,6 +32,41 @@ type DS interface {
 	SupportOffsetFrom() bool
 	ResumeNeedsOrigin() bool
 	Origin() string
+	ItemID(interface{}) string
+	ItemUpdatedOn(interface{}) time.Time
+	ItemCategory(interface{}) string
+}
+
+// GetUUID - generate UUID of string args
+func GetUUID(ctx *Ctx, args ...string) (h string) {
+	if ctx.Debug > 1 {
+		defer func() {
+			fmt.Printf("GetUUID(%v) --> %s\n", args, h)
+		}()
+	}
+	stripF := func(str string) string {
+		isOk := func(r rune) bool {
+			return r < 32 || r >= 127
+		}
+		t := transform.Chain(norm.NFKD, transform.RemoveFunc(isOk))
+		str, _, _ = transform.String(t, str)
+		return str
+	}
+	arg := ""
+	for _, a := range args {
+		if a == "" {
+			Fatalf("GetUUID(%v) - empty argument(s) not allowed", args)
+		}
+		if arg != "" {
+			arg += ":"
+		}
+		arg += stripF(a)
+	}
+	hash := sha1.New()
+	_, err := hash.Write([]byte(arg))
+	FatalOnError(err)
+	h = hex.EncodeToString(hash.Sum(nil))
+	return
 }
 
 // GetLastUpdate - get last update date from ElasticSearch

@@ -2,6 +2,7 @@ package dads
 
 import (
 	"fmt"
+	"time"
 )
 
 // DSStub - DS implementation for stub - does nothing at all, just presents a skeleton code
@@ -93,4 +94,19 @@ func (j *DSStub) ResumeNeedsOrigin() bool {
 // Origin - return current origin
 func (j *DSStub) Origin() string {
 	return ""
+}
+
+// ItemID - return unique identifier for an item
+func (j *DSStub) ItemID(item interface{}) string {
+	return fmt.Sprintf("%d", time.Now().UnixNano())
+}
+
+// ItemUpdatedOn - return updated on date for an item
+func (j *DSStub) ItemUpdatedOn(item interface{}) time.Time {
+	return time.Now()
+}
+
+// ItemCategory - return unique identifier for an item
+func (j *DSStub) ItemCategory(item interface{}) string {
+	return fmt.Sprintf("%d", time.Now().UnixNano())
 }

@@ -25,6 +25,8 @@ const (
 	JiraAPIIssue = "/issue"
 	// JiraAPIComment - comments API subpath
 	JiraAPIComment = "/comment"
+	// JiraBackendVersion - backend version
+	JiraBackendVersion = "0.0.1"
 )
 
 // DSJira - DS implementation for Jira
@@ -157,32 +159,14 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[stri
 	if thrN > 1 {
 		mtx = &sync.RWMutex{}
 	}
+	issueID := j.ItemID(issue)
 	processIssue := func(c chan error) (e error) {
 		defer func() {
 			if c != nil {
 				c <- e
 			}
 		}()
-		if thrN > 1 {
-			mtx.RLock()
-		}
-		sID, ok := issue.(map[string]interface{})["id"].(string)
-		if thrN > 1 {
-			mtx.RUnlock()
-		}
-		if !ok {
-			e = fmt.Errorf("unable to unmarshal id from issue %+v", issue)
-			return
-		}
-		iID, e := strconv.Atoi(sID)
-		if e != nil {
-			e = fmt.Errorf("unable to unmarshal id from string %s", sID)
-			return
-		}
-		if ctx.Debug > 1 {
-			Printf("Issue ID: %d\n", iID)
-		}
-		url := j.URL + JiraAPIRoot + JiraAPIIssue + "/" + sID + JiraAPIComment
+		url := j.URL + JiraAPIRoot + JiraAPIIssue + "/" + issueID + JiraAPIComment
 		startAt := int64(0)
 		maxResults := int64(j.PageSize)
 		epochMS := from.UnixNano() / 1e6
@@ -334,6 +318,33 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, issue interface{}, customFields map[stri
 			Printf("%s: %+v -> %+v\n", k, prev, v)
 		}
 		issueFields[k] = v
+	}
+	// Extra fields
+	esItem := make(map[string]interface{})
+	origin := j.Origin()
+	esItem["backend_name"] = j.DS
+	esItem["backend_version"] = JiraBackendVersion
+	esItem["timestamp"] = fmt.Sprintf("%.06f", float64(time.Now().UnixNano())/1.0e6)
+	esItem["origin"] = origin
+	esItem["uuid"] = GetUUID(ctx, origin, issueID)
+	if thrN > 1 {
+		mtx.Lock()
+	}
+	esItem["updated_on"] = j.ItemUpdatedOn(issue)
+	esItem["category"] = j.ItemCategory(issue)
+	// FIXME
+	/*
+		for k := range issue.(map[string]interface{}) {
+			fmt.Printf("key: %s\n", k)
+		}
+	*/
+	if ctx.Project != "" {
+		issue.(map[string]interface{})["project"] = ctx.Project
+	}
+	fmt.Printf("%+v\n", esItem)
+	esItem["data"] = issue
+	if thrN > 1 {
+		mtx.Unlock()
 	}
 	if thrN > 1 {
 		err = <-ch
@@ -551,4 +562,33 @@ func (j *DSJira) ResumeNeedsOrigin() bool {
 // Origin - return current origin
 func (j *DSJira) Origin() string {
 	return j.URL
+}
+
+// ItemID - return unique identifier for an item
+func (j *DSJira) ItemID(item interface{}) string {
+	id, ok := item.(map[string]interface{})["id"].(string)
+	if !ok {
+		Fatalf("%s: ItemID() - cannot extract id from %+v", j.DS, item)
+	}
+	return id
+}
+
+// ItemUpdatedOn - return updated on date for an item
+func (j *DSJira) ItemUpdatedOn(item interface{}) time.Time {
+	fields, ok := item.(map[string]interface{})["fields"].(map[string]interface{})
+	if !ok {
+		Fatalf("%s: ItemUpdatedOn() - cannot extract fields from %+v", j.DS, item)
+	}
+	sUpdated, ok := fields["updated"].(string)
+	if !ok {
+		Fatalf("%s: ItemUpdatedOn() - cannot extract updated from %+v", j.DS, fields)
+	}
+	updated, err := TimeParseES(sUpdated)
+	FatalOnError(err)
+	return updated
+}
+
+// ItemCategory - return unique identifier for an item
+func (j *DSJira) ItemCategory(item interface{}) string {
+	return Issue
 }

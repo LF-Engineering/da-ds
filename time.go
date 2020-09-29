@@ -2,6 +2,7 @@ package dads
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -56,4 +57,10 @@ func TimeParseAny(dtStr string) (time.Time, error) {
 	}
 	e := fmt.Errorf("Error:\nCannot parse date: '%v'\n", dtStr)
 	return time.Now(), e
+}
+
+// TimeParseES - parse datetime in ElasticSearch output format
+func TimeParseES(dtStr string) (time.Time, error) {
+	ary := strings.Split(dtStr, "+")
+	return time.Parse("2006-01-02T15:04:05.000", ary[0])
 }

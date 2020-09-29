@@ -20,3 +20,6 @@ const DefaultDateField string = "metadata__updated_on"
 
 // DefaultOffsetField - default offset field
 const DefaultOffsetField string = "updated_on"
+
+// Issue - common constant string
+const Issue string = "issue"
