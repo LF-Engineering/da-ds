@@ -244,7 +244,7 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 }
 
 // GetLastUpdate - get last update date from ElasticSearch
-func GetLastUpdate(ctx *Ctx, ds DS) (lastUpdate *time.Time) {
+func GetLastUpdate(ctx *Ctx, ds DS, raw bool) (lastUpdate *time.Time) {
 	// curl -s -XPOST -H 'Content-type: application/json' '${URL}/index/_search?size=0' -d '{"aggs":{"m":{"max":{"field":"date_field"}}}}' | jq -r '.aggregations.m.value_as_string'
 	dateField := ds.DateField(ctx)
 	var payloadBytes []byte
@@ -253,7 +253,12 @@ func GetLastUpdate(ctx *Ctx, ds DS) (lastUpdate *time.Time) {
 	} else {
 		payloadBytes = []byte(`{"aggs":{"m":{"max":{"field":"` + JSONEscape(dateField) + `"}}}}`)
 	}
-	url := ctx.ESURL + "/" + ctx.RawIndex + "/_search?size=0"
+	var url string
+	if raw {
+		url = ctx.ESURL + "/" + ctx.RawIndex + "/_search?size=0"
+	} else {
+		url = ctx.ESURL + "/" + ctx.RichIndex + "/_search?size=0"
+	}
 	method := Post
 	resp, _, err := Request(
 		ctx,
@@ -292,7 +297,7 @@ func GetLastUpdate(ctx *Ctx, ds DS) (lastUpdate *time.Time) {
 }
 
 // GetLastOffset - get last offset from ElasticSearch
-func GetLastOffset(ctx *Ctx, ds DS) (offset float64) {
+func GetLastOffset(ctx *Ctx, ds DS, raw bool) (offset float64) {
 	offset = -1.0
 	// curl -s -XPOST -H 'Content-type: application/json' '${URL}/index/_search?size=0' -d '{"aggs":{"m":{"max":{"field":"offset_field"}}}}' | jq -r '.aggregations.m.value'
 	offsetField := ds.OffsetField(ctx)
@@ -302,7 +307,12 @@ func GetLastOffset(ctx *Ctx, ds DS) (offset float64) {
 	} else {
 		payloadBytes = []byte(`{"aggs":{"m":{"max":{"field":"` + JSONEscape(offsetField) + `"}}}}`)
 	}
-	url := ctx.ESURL + "/" + ctx.RawIndex + "/_search?size=0"
+	var url string
+	if raw {
+		url = ctx.ESURL + "/" + ctx.RawIndex + "/_search?size=0"
+	} else {
+		url = ctx.ESURL + "/" + ctx.RichIndex + "/_search?size=0"
+	}
 	method := Post
 	resp, _, err := Request(
 		ctx,
@@ -331,6 +341,12 @@ func GetLastOffset(ctx *Ctx, ds DS) (offset float64) {
 	if res.Aggs.M.Int != nil {
 		offset = *res.Aggs.M.Int
 	}
+	return
+}
+
+// UploadIdentities - upload identities to SH DB
+func UploadIdentities(ctx *Ctx, ds DS) (err error) {
+	Printf("STUB: UploadIdentities\n")
 	return
 }
 
@@ -390,12 +406,12 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 
 // FetchRaw - implement fetch raw data (generic)
 func FetchRaw(ctx *Ctx, ds DS) (err error) {
-	if ds.CustomFetchRaw() {
-		return ds.FetchRaw(ctx)
-	}
 	err = HandleMapping(ctx, ds, true)
 	if err != nil {
 		Fatalf(ds.Name()+": HandleMapping error: %+v\n", err)
+	}
+	if ds.CustomFetchRaw() {
+		return ds.FetchRaw(ctx)
 	}
 	if ctx.DateFrom != nil && ctx.OffsetFrom >= 0.0 {
 		Fatalf(ds.Name() + ": you cannot use both date from and offset from\n")
@@ -410,11 +426,16 @@ func FetchRaw(ctx *Ctx, ds DS) (err error) {
 	if ds.SupportDateFrom() {
 		lastUpdate = ctx.DateFrom
 		if lastUpdate == nil {
-			lastUpdate = GetLastUpdate(ctx, ds)
+			lastUpdate = GetLastUpdate(ctx, ds, true)
 		}
 		if lastUpdate != nil {
-			Printf("%s: starting from date: %v\n", ds.Name(), *lastUpdate)
+			if ctx.DateFrom == nil {
+				ctx.DateFromDetected = true
+			}
+			Printf("%s: raw: starting from date: %v, detected: %v\n", ds.Name(), *lastUpdate, ctx.DateFromDetected)
 			ctx.DateFrom = lastUpdate
+		} else {
+			Printf("%s: raw: no start date detected\n", ds.Name())
 		}
 	}
 	if ds.SupportOffsetFrom() {
@@ -422,14 +443,19 @@ func FetchRaw(ctx *Ctx, ds DS) (err error) {
 			offset = &ctx.OffsetFrom
 		}
 		if offset == nil {
-			lastOffset := GetLastOffset(ctx, ds)
+			lastOffset := GetLastOffset(ctx, ds, true)
 			if lastOffset >= 0.0 {
 				offset = &lastOffset
 			}
 		}
 		if offset != nil {
-			Printf("%s: starting from offset: %v\n", ds.Name(), *offset)
+			if ctx.OffsetFrom < 0.0 {
+				ctx.OffsetFromDetected = true
+			}
+			Printf("%s: raw: starting from offset: %v, detected: %v\n", ds.Name(), *offset, ctx.OffsetFromDetected)
 			ctx.OffsetFrom = *offset
+		} else {
+			Printf("%s: raw: no start offset detected\n", ds.Name())
 		}
 	}
 	if lastUpdate != nil && offset != nil {
@@ -447,12 +473,70 @@ func FetchRaw(ctx *Ctx, ds DS) (err error) {
 
 // Enrich - implement fetch raw data (generic)
 func Enrich(ctx *Ctx, ds DS) (err error) {
-	if ds.CustomEnrich() {
-		return ds.Enrich(ctx)
-	}
 	err = HandleMapping(ctx, ds, false)
 	if err != nil {
 		Fatalf(ds.Name()+": HandleMapping error: %+v\n", err)
+	}
+	if ds.CustomEnrich() {
+		return ds.Enrich(ctx)
+	}
+	var (
+		lastUpdate *time.Time
+		offset     *float64
+		adjusted   bool
+	)
+	if ds.SupportDateFrom() {
+		if ctx.DateFromDetected {
+			lastUpdate = GetLastUpdate(ctx, ds, false)
+			if lastUpdate != nil && (*lastUpdate).After(*ctx.DateFrom) {
+				lastUpdate = ctx.DateFrom
+				adjusted = true
+			}
+		} else {
+			lastUpdate = ctx.DateFrom
+		}
+		if lastUpdate != nil {
+			Printf("%s: rich: starting from date: %v, detected: %v, adjusted: %v\n", ds.Name(), *lastUpdate, ctx.DateFromDetected, adjusted)
+			ctx.DateFrom = lastUpdate
+		} else {
+			Printf("%s: rich: no start date detected\n", ds.Name())
+		}
+	}
+	if ds.SupportOffsetFrom() {
+		adjusted = false
+		if ctx.OffsetFromDetected {
+			lastOffset := GetLastOffset(ctx, ds, false)
+			if lastOffset >= 0.0 {
+				offset = &lastOffset
+				if lastOffset > ctx.OffsetFrom {
+					offset = &ctx.OffsetFrom
+					adjusted = true
+				}
+			}
+		} else {
+			if ctx.OffsetFrom >= 0.0 {
+				offset = &ctx.OffsetFrom
+			}
+		}
+		if offset != nil {
+			Printf("%s: rich: starting from offset: %v, detected: %v, adjusted: %v\n", ds.Name(), *offset, ctx.OffsetFromDetected, adjusted)
+			ctx.OffsetFrom = *offset
+		} else {
+			Printf("%s: rich: no start offset detected\n", ds.Name())
+		}
+	}
+	if ctx.RefreshAffs {
+		Printf("STUB: refresh affiliations\n")
+		return
+	}
+	if ctx.AffsDBConfigured() {
+		err = UploadIdentities(ctx, ds)
+		if err != nil {
+			Fatalf(ds.Name()+": UploadIdentities error: %+v\n", err)
+		}
+	}
+	if ctx.OnlyIdentities {
+		return
 	}
 	return
 }

@@ -10,33 +10,36 @@ import (
 
 // Ctx - environment context packed in structure
 type Ctx struct {
-	DS           string     // From DA_DS: ds type: for example jira, gerrit, slack etc., other env variablse will use this as a prefix
-	DSPrefix     string     // uppercase(DS) + _: if DS is "slack" then prefix would be "DA_SLACK_"
-	Debug        int        // From DA_DS_DEBUG Debug level: 0-no, 1-info, 2-verbose
-	ST           bool       // From DA_DS_ST true: use single threaded version, false: use multi threaded version, default false
-	NCPUs        int        // From DA_DS_NCPUS, set to override number of CPUs to run, this overwrites DA_ST, default 0 (which means do not use it, use all CPU reported by go library)
-	NCPUsScale   float64    // From DA_DS_NCPUS_SCALE, scale number of CPUs, for example 2.0 will report number of cpus 2.0 the number of actually available CPUs
-	Enrich       bool       // From DA_DS_ENRICH, flag to run enrichment
-	RawIndex     string     // From DA_DS_RAW_INDEX - raw index name
-	RichIndex    string     // From DA_DS_RICH_INDEX - rich index name
-	ESURL        string     // From DA_DS_ES_URL - ElasticSearch URL
-	ESBulkSize   int        // From DA_DS_ES_BULK_SIZE - ElasticSearch bulk size
-	ESScrollSize int        // From DA_DS_ES_SCROLL_SIZE - ElasticSearch scroll size
-	ESScrollWait string     // From DA_DS_ES_SCROLL_WAIT - ElasticSearch scroll wait
-	DBHost       string     // From DA_DS_DB_HOST - affiliation DB host
-	DBName       string     // From DA_DS_DB_NAME - affiliation DB name
-	DBUser       string     // From DA_DS_DB_USER - affiliation DB user
-	DBPass       string     // From DA_DS_DB_PASS - affiliation DB pass
-	NoRaw        bool       // From DA_DS_NO_RAW - do only the enrichment
-	RefreshAffs  bool       // From DA_DS_REFRESH_AFFS - refresh affiliation data
-	ForceFull    bool       // From DA_DS_FORCE_FULL - force running full data source, do not attempt to detect where to start from
-	Project      string     // From DA_DS_PROJECT - set project can be for example "ONAP"
-	ProjectSlug  string     // From DA_DS_PROJECT_SLUG - set project slug - fixture slug, for example "lfn/onap"
-	Category     string     // From DA_DS_CATEGORY - set category (some DS support this), for example "issue" (github/issue, github/pull_request etc.)
-	DateFrom     *time.Time // From DA_DS_DATE_FROM
-	DateTo       *time.Time // From DA_DS_DATE_TO
-	OffsetFrom   float64    // From DA_DS_OFFSET_FROM
-	OffsetTo     float64    // From DA_DS_OFFSET_TO
+	DS                 string     // From DA_DS: ds type: for example jira, gerrit, slack etc., other env variablse will use this as a prefix
+	DSPrefix           string     // uppercase(DS) + _: if DS is "slack" then prefix would be "DA_SLACK_"
+	Debug              int        // From DA_DS_DEBUG Debug level: 0-no, 1-info, 2-verbose
+	ST                 bool       // From DA_DS_ST true: use single threaded version, false: use multi threaded version, default false
+	NCPUs              int        // From DA_DS_NCPUS, set to override number of CPUs to run, this overwrites DA_ST, default 0 (which means do not use it, use all CPU reported by go library)
+	NCPUsScale         float64    // From DA_DS_NCPUS_SCALE, scale number of CPUs, for example 2.0 will report number of cpus 2.0 the number of actually available CPUs
+	Enrich             bool       // From DA_DS_ENRICH, flag to run enrichment
+	RawIndex           string     // From DA_DS_RAW_INDEX - raw index name
+	RichIndex          string     // From DA_DS_RICH_INDEX - rich index name
+	ESURL              string     // From DA_DS_ES_URL - ElasticSearch URL
+	ESBulkSize         int        // From DA_DS_ES_BULK_SIZE - ElasticSearch bulk size
+	ESScrollSize       int        // From DA_DS_ES_SCROLL_SIZE - ElasticSearch scroll size
+	ESScrollWait       string     // From DA_DS_ES_SCROLL_WAIT - ElasticSearch scroll wait
+	DBHost             string     // From DA_DS_DB_HOST - affiliation DB host
+	DBName             string     // From DA_DS_DB_NAME - affiliation DB name
+	DBUser             string     // From DA_DS_DB_USER - affiliation DB user
+	DBPass             string     // From DA_DS_DB_PASS - affiliation DB pass
+	NoRaw              bool       // From DA_DS_NO_RAW - do only the enrichment
+	RefreshAffs        bool       // From DA_DS_REFRESH_AFFS - refresh affiliation data
+	OnlyIdentities     bool       // From DA_DS_ONLY_IDENTITIES - only add identities to affiliation database
+	ForceFull          bool       // From DA_DS_FORCE_FULL - force running full data source enrichment, do not attempt to detect where to start from
+	Project            string     // From DA_DS_PROJECT - set project can be for example "ONAP"
+	ProjectSlug        string     // From DA_DS_PROJECT_SLUG - set project slug - fixture slug, for example "lfn/onap"
+	Category           string     // From DA_DS_CATEGORY - set category (some DS support this), for example "issue" (github/issue, github/pull_request etc.)
+	DateFrom           *time.Time // From DA_DS_DATE_FROM
+	DateTo             *time.Time // From DA_DS_DATE_TO
+	OffsetFrom         float64    // From DA_DS_OFFSET_FROM
+	OffsetTo           float64    // From DA_DS_OFFSET_TO
+	DateFromDetected   bool
+	OffsetFromDetected bool
 }
 
 func (ctx *Ctx) env(v string) string {
@@ -127,6 +130,7 @@ func (ctx *Ctx) Init() {
 	// Affiliations re-enrich special flags
 	ctx.NoRaw = ctx.env("NO_RAW") != ""
 	ctx.RefreshAffs = ctx.env("REFRESH_AFFS") != ""
+	ctx.OnlyIdentities = ctx.env("ONLY_IDENTITIES") != ""
 	ctx.ForceFull = ctx.env("FORCE_FULL") != ""
 
 	// Project, Project slug, Category
@@ -192,4 +196,9 @@ func (ctx *Ctx) Print() {
 // Info - return context in human readable form
 func (ctx Ctx) Info() string {
 	return fmt.Sprintf("%+v", ctx)
+}
+
+// AffsDBConfigured - is affiliations DB configured?
+func (ctx *Ctx) AffsDBConfigured() bool {
+	return ctx.DBHost != "" || ctx.DBName != "" || ctx.DBUser != "" || ctx.DBPass != ""
 }
