@@ -362,6 +362,27 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 	}
 	attemptAt := time.Now()
 	total := 0
+	// Defer free scroll
+	defer func() {
+		if scroll == nil {
+			return
+		}
+		url := ctx.ESURL + "/_search/scroll"
+		payload := []byte(`{"scroll_id":"` + *scroll + `"}`)
+		_, _, err := Request(
+			ctx,
+			url,
+			Delete,
+			headers,
+			payload,
+			nil,
+			nil,                                 // Error statuses
+			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses
+		)
+		if err != nil {
+			Printf("Error releasing scroll %s: %+v\n", *scroll, err)
+		}
+	}()
 	for {
 		var (
 			url     string
@@ -424,7 +445,17 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 			break
 		}
 		if ctx.Debug > 0 {
-			Printf("processing %d items\n", nItems)
+			Printf("Processing %d items\n", nItems)
+		}
+		for _, item := range items {
+			doc, ok := item.(map[string]interface{})["_source"]
+			if !ok {
+				err = fmt.Errorf("Missing _source in item %+v", item)
+				return
+			}
+			if 1 == 0 {
+				Printf("%+v\n", doc)
+			}
 		}
 		total += nItems
 	}

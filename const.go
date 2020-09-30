@@ -18,6 +18,9 @@ const Post string = "POST"
 // Put - common constant string
 const Put string = "PUT"
 
+// Delete - common constant string
+const Delete string = "DELETE"
+
 // DefaultDateField - default date field
 const DefaultDateField string = "metadata__updated_on"
 
