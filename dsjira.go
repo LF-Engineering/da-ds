@@ -384,8 +384,8 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 			}
 		}
 	}
-	issue.(map[string]interface{})["metadata__updated_on"] = ToESDate(updatedOn)
-	issue.(map[string]interface{})["metadata__timestamp"] = ToESDate(timestamp)
+	esItem["metadata__updated_on"] = ToESDate(updatedOn)
+	esItem["metadata__timestamp"] = ToESDate(timestamp)
 	if ctx.Project != "" {
 		issue.(map[string]interface{})["project"] = ctx.Project
 	}
@@ -406,7 +406,7 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 					c <- e
 				}
 			}()
-			e = SendToElastic(ctx, j, *allIssues)
+			e = SendToElastic(ctx, j, true, "uuid", *allIssues)
 			if e != nil {
 				Printf("Error %v sending %d issues to ElasticSearch\n", e, len(*allIssues))
 			}
@@ -634,7 +634,7 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 		Printf("Remain %d issues to send to ElasticSearch\n", nIssues)
 	}
 	if nIssues > 0 {
-		err = SendToElastic(ctx, j, allIssues)
+		err = SendToElastic(ctx, j, true, "uuid", allIssues)
 		if err != nil {
 			Printf("Error %v sending %d issues to ElasticSearch\n", err, len(allIssues))
 		}
