@@ -35,3 +35,6 @@ const Issue string = "issue"
 
 // TooManyScrolls - this appearch in error message when too many scrolls are created
 const TooManyScrolls = "Trying to create too many scroll contexts"
+
+// Nil - common constant string
+const Nil = "<nil>"

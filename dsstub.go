@@ -125,3 +125,10 @@ func (j *DSStub) ElasticRawMapping() []byte {
 func (j *DSStub) ElasticRichMapping() []byte {
 	return []byte{}
 }
+
+// GetItemIdentities return list of item's identities, each one is [3]string
+// (name, username, email) tripples, special value Nil "<nil>" means null
+// we use string and not *string which allows nil to allow usage as a map key
+func (j *DSStub) GetItemIdentities(interface{}) (map[[3]string]struct{}, error) {
+	return map[[3]string]struct{}{}, nil
+}

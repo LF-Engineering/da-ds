@@ -723,3 +723,42 @@ func (j *DSJira) ElasticRawMapping() []byte {
 func (j *DSJira) ElasticRichMapping() []byte {
 	return JiraRichMapping
 }
+
+// GetItemIdentities return list of item's identities, each one is [3]string
+// (name, username, email) tripples, special value Nil "<nil>" means null
+// we use string and not *string which allows nil to allow usage as a map key
+func (j *DSJira) GetItemIdentities(doc interface{}) (identities map[[3]string]struct{}, err error) {
+	fields, ok := doc.(map[string]interface{})["data"].(map[string]interface{})["fields"].(map[string]interface{})
+	if !ok {
+		err = fmt.Errorf("cannot read data.fields from doc %+v", doc)
+		return
+	}
+	init := false
+	for _, field := range []string{"assignee", "reporter", "creator"} {
+		f, ok := fields[field].(map[string]interface{})
+		if !ok {
+			// Printf("field %s not found\n", field)
+			continue
+		}
+		any := false
+		identity := [3]string{}
+		for i, k := range []string{"displayName", "name", "emailAddress"} {
+			v, ok := f[k].(string)
+			// Printf("%d: (%s,%s) -> (%s, %v)\n", i, field, k, v, ok)
+			if ok {
+				identity[i] = v
+				any = true
+			} else {
+				identity[i] = Nil
+			}
+		}
+		if any {
+			if !init {
+				identities = make(map[[3]string]struct{})
+				init = true
+			}
+			identities[identity] = struct{}{}
+		}
+	}
+	return
+}

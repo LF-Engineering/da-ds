@@ -25,6 +25,7 @@ type Ctx struct {
 	ESBulkSize         int        // From DA_DS_ES_BULK_SIZE - ElasticSearch bulk size
 	ESScrollSize       int        // From DA_DS_ES_SCROLL_SIZE - ElasticSearch scroll size
 	ESScrollWait       string     // From DA_DS_ES_SCROLL_WAIT - ElasticSearch scroll wait
+	DBBulkSize         int        // From DA_DS_DB_BULK_SIZE - affiliations DB bulk size
 	DBHost             string     // From DA_DS_DB_HOST - affiliation DB host
 	DBName             string     // From DA_DS_DB_NAME - affiliation DB name
 	DBUser             string     // From DA_DS_DB_USER - affiliation DB user
@@ -144,6 +145,15 @@ func (ctx *Ctx) Init() {
 	ctx.DBPort = ctx.env("DB_PORT")
 	ctx.DBOpts = ctx.env("DB_OPTS")
 	ctx.DBConn = ctx.env("DB_CONN")
+	if ctx.env("DB_BULK_SIZE") != "" {
+		bulkSize, err := strconv.Atoi(ctx.env("DB_BULK_SIZE"))
+		FatalOnError(err)
+		if bulkSize > 0 {
+			ctx.DBBulkSize = bulkSize
+		}
+	} else {
+		ctx.DBBulkSize = 1000
+	}
 
 	// Affiliations re-enrich special flags
 	ctx.NoRaw = ctx.env("NO_RAW") != ""

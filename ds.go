@@ -47,6 +47,7 @@ type DS interface {
 	SearchFields() map[string][]string
 	ElasticRawMapping() []byte
 	ElasticRichMapping() []byte
+	GetItemIdentities(interface{}) (map[[3]string]struct{}, error)
 }
 
 // GetUUID - generate UUID of string args
@@ -453,9 +454,16 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 				err = fmt.Errorf("Missing _source in item %+v", item)
 				return
 			}
-			if 1 == 0 {
-				Printf("%+v\n", doc)
+			var identities map[[3]string]struct{}
+			identities, err = ds.GetItemIdentities(doc)
+			if err != nil {
+				err = fmt.Errorf("Cannot get identities from doc %+v", doc)
+				return
 			}
+			if identities == nil {
+				continue
+			}
+			Printf("identities: %+v\n", identities)
 		}
 		total += nItems
 	}
