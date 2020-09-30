@@ -77,140 +77,17 @@ func GetUUID(ctx *Ctx, args ...string) (h string) {
 	return
 }
 
-// SendToElastic - send items to ElasticSearch
-func SendToElastic(ctx *Ctx, ds DS, items []interface{}) (err error) {
-	Printf("STUB: %s: %d items\n", ds.Name(), len(items))
-	// FIXME: continue
-	return
-}
-
-// GetLastUpdate - get last update date from ElasticSearch
-func GetLastUpdate(ctx *Ctx, ds DS) (lastUpdate *time.Time) {
-	// curl -s -XPOST -H 'Content-type: application/json' '${URL}/index/_search?size=0' -d '{"aggs":{"m":{"max":{"field":"date_field"}}}}' | jq -r '.aggregations.m.value_as_string'
-	dateField := ds.DateField(ctx)
-	var payloadBytes []byte
-	if ds.ResumeNeedsOrigin() {
-		payloadBytes = []byte(`{"query":{"bool":{"filter":{"term":{"origin":"` + JSONEscape(ds.Origin()) + `"}}}},"aggs":{"m":{"max":{"field":"` + JSONEscape(dateField) + `"}}}}`)
-	} else {
-		payloadBytes = []byte(`{"aggs":{"m":{"max":{"field":"` + JSONEscape(dateField) + `"}}}}`)
-	}
-	payloadBody := bytes.NewReader(payloadBytes)
-	method := Post
-	url := ctx.ESURL + "/" + ctx.RawIndex + "/_search?size=0"
-	req, err := http.NewRequest(method, url, payloadBody)
-	if err != nil {
-		Printf("New request error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
-		return
-	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		Printf("Do request error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
-		return
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-	if resp.StatusCode == 404 {
-		return
-	}
-	if resp.StatusCode != 200 {
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			Printf("ReadAll request error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
-			return
-		}
-		Printf("Method:%s url:%s status:%d query:%s\n%s\n", method, url, resp.StatusCode, string(payloadBytes), body)
-		return
-	}
-	type resultStruct struct {
-		Aggs struct {
-			M struct {
-				Str string `json:"value_as_string"`
-			} `json:"m"`
-		} `json:"aggregations"`
-	}
-	res := resultStruct{}
-	err = jsoniter.NewDecoder(resp.Body).Decode(&res)
-	if err != nil {
-		Printf("JSON decode error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
-		return
-	}
-	if res.Aggs.M.Str != "" {
-		var tm time.Time
-		tm, err = TimeParseAny(res.Aggs.M.Str)
-		if err != nil {
-			Printf("Decode aggregations error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
-			return
-		}
-		lastUpdate = &tm
-	}
-	return
-}
-
-// GetLastOffset - get last offset from ElasticSearch
-func GetLastOffset(ctx *Ctx, ds DS) (offset float64) {
-	offset = -1.0
-	// curl -s -XPOST -H 'Content-type: application/json' '${URL}/index/_search?size=0' -d '{"aggs":{"m":{"max":{"field":"offset_field"}}}}' | jq -r '.aggregations.m.value'
-	offsetField := ds.OffsetField(ctx)
-	var payloadBytes []byte
-	if ds.ResumeNeedsOrigin() {
-		payloadBytes = []byte(`{"query":{"bool":{"filter":{"term":{"origin":"` + JSONEscape(ds.Origin()) + `"}}}},"aggs":{"m":{"max":{"field":"` + JSONEscape(offsetField) + `"}}}}`)
-	} else {
-		payloadBytes = []byte(`{"aggs":{"m":{"max":{"field":"` + JSONEscape(offsetField) + `"}}}}`)
-	}
-	payloadBody := bytes.NewReader(payloadBytes)
-	method := Post
-	url := ctx.ESURL + "/" + ctx.RawIndex + "/_search?size=0"
-	req, err := http.NewRequest(method, url, payloadBody)
-	if err != nil {
-		Printf("New request error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
-		return
-	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		Printf("Do request error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
-		return
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-	if resp.StatusCode == 404 {
-		return
-	}
-	if resp.StatusCode != 200 {
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			Printf("ReadAll request error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
-			return
-		}
-		Printf("Method:%s url:%s status:%d query:%s\n%s\n", method, url, resp.StatusCode, string(payloadBytes), body)
-		return
-	}
-	type resultStruct struct {
-		Aggs struct {
-			M struct {
-				Int *float64 `json:"value,omitempty"`
-			} `json:"m"`
-		} `json:"aggregations"`
-	}
-	res := resultStruct{}
-	err = jsoniter.NewDecoder(resp.Body).Decode(&res)
-	if err != nil {
-		Printf("JSON decode error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
-		return
-	}
-	if res.Aggs.M.Int != nil {
-		offset = *res.Aggs.M.Int
-	}
-	return
-}
-
-// Request  -wrapper to do any HTTP request
+// Request - wrapper to do any HTTP request
 // jsonStatuses - set of status code ranges to be parsed as JSONs
-// errorStatuses - specify status value ranges for which we shoudl return error
-func Request(ctx *Ctx, url, method string, headers map[string]string, payload []byte, jsonStatuses map[[2]int]struct{}, errorStatuses map[[2]int]struct{}) (result interface{}, status int, err error) {
+// errorStatuses - specify status value ranges for which we should return error
+// okStatuses - specify status value ranges for which we should return error (only taken into account if not empty)
+func Request(
+	ctx *Ctx,
+	url, method string,
+	headers map[string]string,
+	payload []byte,
+	jsonStatuses, errorStatuses, okStatuses map[[2]int]struct{},
+) (result interface{}, status int, err error) {
 	var (
 		payloadBody *bytes.Reader
 		req         *http.Request
@@ -268,6 +145,116 @@ func Request(ctx *Ctx, url, method string, headers map[string]string, payload []
 	if hit {
 		err = fmt.Errorf("status error:%+v for method:%s url:%s headers:%v status:%d payload:%s body:%s result:%+v", err, method, url, headers, status, string(payload), string(body), result)
 	}
+	if len(okStatuses) > 0 {
+		hit = false
+		for r := range okStatuses {
+			if status >= r[0] && status <= r[1] {
+				hit = true
+				break
+			}
+		}
+		if !hit {
+			err = fmt.Errorf("status not success:%+v for method:%s url:%s headers:%v status:%d payload:%s body:%s result:%+v", err, method, url, headers, status, string(payload), string(body), result)
+		}
+	}
+	return
+}
+
+// SendToElastic - send items to ElasticSearch
+func SendToElastic(ctx *Ctx, ds DS, items []interface{}) (err error) {
+	Printf("STUB: %s: %d items\n", ds.Name(), len(items))
+	// FIXME: continue
+	return
+}
+
+// GetLastUpdate - get last update date from ElasticSearch
+func GetLastUpdate(ctx *Ctx, ds DS) (lastUpdate *time.Time) {
+	// curl -s -XPOST -H 'Content-type: application/json' '${URL}/index/_search?size=0' -d '{"aggs":{"m":{"max":{"field":"date_field"}}}}' | jq -r '.aggregations.m.value_as_string'
+	dateField := ds.DateField(ctx)
+	var payloadBytes []byte
+	if ds.ResumeNeedsOrigin() {
+		payloadBytes = []byte(`{"query":{"bool":{"filter":{"term":{"origin":"` + JSONEscape(ds.Origin()) + `"}}}},"aggs":{"m":{"max":{"field":"` + JSONEscape(dateField) + `"}}}}`)
+	} else {
+		payloadBytes = []byte(`{"aggs":{"m":{"max":{"field":"` + JSONEscape(dateField) + `"}}}}`)
+	}
+	url := ctx.ESURL + "/" + ctx.RawIndex + "/_search?size=0"
+	method := Post
+	resp, _, err := Request(
+		ctx,
+		url,
+		method,
+		map[string]string{"Content-Type": "application/json"}, // headers
+		payloadBytes,                        // payload
+		nil,                                 // JSON statuses
+		nil,                                 // Error statuses
+		map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200, 404
+	)
+	FatalOnError(err)
+	type resultStruct struct {
+		Aggs struct {
+			M struct {
+				Str string `json:"value_as_string"`
+			} `json:"m"`
+		} `json:"aggregations"`
+	}
+	var res resultStruct
+	err = jsoniter.Unmarshal(resp.([]byte), &res)
+	if err != nil {
+		Printf("JSON decode error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
+		return
+	}
+	if res.Aggs.M.Str != "" {
+		var tm time.Time
+		tm, err = TimeParseAny(res.Aggs.M.Str)
+		if err != nil {
+			Printf("Decode aggregations error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
+			return
+		}
+		lastUpdate = &tm
+	}
+	return
+}
+
+// GetLastOffset - get last offset from ElasticSearch
+func GetLastOffset(ctx *Ctx, ds DS) (offset float64) {
+	offset = -1.0
+	// curl -s -XPOST -H 'Content-type: application/json' '${URL}/index/_search?size=0' -d '{"aggs":{"m":{"max":{"field":"offset_field"}}}}' | jq -r '.aggregations.m.value'
+	offsetField := ds.OffsetField(ctx)
+	var payloadBytes []byte
+	if ds.ResumeNeedsOrigin() {
+		payloadBytes = []byte(`{"query":{"bool":{"filter":{"term":{"origin":"` + JSONEscape(ds.Origin()) + `"}}}},"aggs":{"m":{"max":{"field":"` + JSONEscape(offsetField) + `"}}}}`)
+	} else {
+		payloadBytes = []byte(`{"aggs":{"m":{"max":{"field":"` + JSONEscape(offsetField) + `"}}}}`)
+	}
+	url := ctx.ESURL + "/" + ctx.RawIndex + "/_search?size=0"
+	method := Post
+	resp, _, err := Request(
+		ctx,
+		url,
+		method,
+		map[string]string{"Content-Type": "application/json"}, // headers
+		payloadBytes,                        // payload
+		nil,                                 // JSON statuses
+		nil,                                 // Error statuses
+		map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200, 404
+	)
+	FatalOnError(err)
+	type resultStruct struct {
+		Aggs struct {
+			M struct {
+				Int *float64 `json:"value,omitempty"`
+			} `json:"m"`
+		} `json:"aggregations"`
+	}
+	var res = resultStruct{}
+	err = jsoniter.Unmarshal(resp.([]byte), &res)
+	if err != nil {
+		Printf("JSON decode error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
+		return
+	}
+	if res.Aggs.M.Int != nil {
+		offset = *res.Aggs.M.Int
+	}
 	return
 }
 
@@ -284,6 +271,7 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 			[]byte{},                            // payload
 			nil,                                 // JSON statuses
 			map[[2]int]struct{}{{401, 599}: {}}, // error statuses: 401-599
+			nil,                                 // OK statuses
 		)
 		FatalOnError(err)
 		// DS specific raw index mapping
@@ -296,7 +284,8 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 			map[string]string{"Content-Type": "application/json"},
 			mapping,
 			nil,
-			map[[2]int]struct{}{{400, 599}: {}},
+			nil,
+			map[[2]int]struct{}{{200, 200}: {}},
 		)
 		FatalOnError(err)
 		// Global not analyze string mapping
@@ -307,7 +296,8 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 			map[string]string{"Content-Type": "application/json"},
 			MappingNotAnalyzeString,
 			nil,
-			map[[2]int]struct{}{{400, 599}: {}},
+			nil,
+			map[[2]int]struct{}{{200, 200}: {}},
 		)
 		FatalOnError(err)
 		return
@@ -352,7 +342,9 @@ func FetchRaw(ctx *Ctx, ds DS) (err error) {
 		}
 		if offset == nil {
 			lastOffset := GetLastOffset(ctx, ds)
-			offset = &lastOffset
+			if lastOffset >= 0.0 {
+				offset = &lastOffset
+			}
 		}
 		if offset != nil {
 			Printf("%s: starting from offset: %v\n", ds.Name(), *offset)
