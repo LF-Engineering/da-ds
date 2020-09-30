@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	jsoniter "github.com/json-iterator/go"
@@ -360,6 +361,7 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 		dateFrom = ToESDate(*ctx.DateFrom)
 	}
 	attemptAt := time.Now()
+	total := 0
 	for {
 		var (
 			url     string
@@ -406,7 +408,28 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 			}
 			continue
 		}
-		break
+		sScroll, ok := res.(map[string]interface{})["_scroll_id"].(string)
+		if !ok {
+			err = fmt.Errorf("Missing _scroll_id in the response")
+			return
+		}
+		scroll = &sScroll
+		items, ok := res.(map[string]interface{})["hits"].(map[string]interface{})["hits"].([]interface{})
+		if !ok {
+			err = fmt.Errorf("Missing hits.hits in the response")
+			return
+		}
+		nItems := len(items)
+		if nItems == 0 {
+			break
+		}
+		if ctx.Debug > 0 {
+			Printf("processing %d items\n", nItems)
+		}
+		total += nItems
+	}
+	if ctx.Debug > 0 {
+		Printf("Total number of items processed: %d\n", total)
 	}
 	return
 }
