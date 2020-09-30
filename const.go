@@ -38,3 +38,6 @@ const TooManyScrolls = "Trying to create too many scroll contexts"
 
 // Nil - common constant string
 const Nil = "<nil>"
+
+// None - common constant string
+const None = "None"

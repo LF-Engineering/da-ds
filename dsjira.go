@@ -362,7 +362,7 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 	// Extra fields
 	esItem := make(map[string]interface{})
 	origin := j.Origin()
-	uuid := GetUUID(ctx, origin, issueID)
+	uuid := GetUUIDNonEmpty(ctx, origin, issueID)
 	timestamp := time.Now()
 	esItem["backend_name"] = j.DS
 	esItem["backend_version"] = JiraBackendVersion

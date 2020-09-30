@@ -51,11 +51,11 @@ type DS interface {
 	GetItemIdentities(interface{}) (map[[3]string]struct{}, error)
 }
 
-// GetUUID - generate UUID of string args
-func GetUUID(ctx *Ctx, args ...string) (h string) {
+// GetUUIDNonEmpty - generate UUID of string args (all must be non-empty)
+func GetUUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
 	if ctx.Debug > 1 {
 		defer func() {
-			Printf("GetUUID(%v) --> %s\n", args, h)
+			Printf("GetUUIDNonEmpty(%v) --> %s\n", args, h)
 		}()
 	}
 	stripF := func(str string) string {
@@ -78,6 +78,43 @@ func GetUUID(ctx *Ctx, args ...string) (h string) {
 	}
 	hash := sha1.New()
 	_, err := hash.Write([]byte(arg))
+	FatalOnError(err)
+	h = hex.EncodeToString(hash.Sum(nil))
+	return
+}
+
+// GetUUIDAffs - generate UUID of string args
+// downcases arguments, all but first can be empty
+// if argument is Nil "<nil>" replaces with "None"
+func GetUUIDAffs(ctx *Ctx, args ...string) (h string) {
+	if ctx.Debug > 1 {
+		defer func() {
+			Printf("GetUUIDAffs(%v) --> %s\n", args, h)
+		}()
+	}
+	stripF := func(str string) string {
+		isOk := func(r rune) bool {
+			return r < 32 || r >= 127
+		}
+		t := transform.Chain(norm.NFKD, transform.RemoveFunc(isOk))
+		str, _, _ = transform.String(t, str)
+		return str
+	}
+	arg := ""
+	for i, a := range args {
+		if i == 0 && a == "" {
+			Fatalf("GetUUIDAffs(%v) - empty first argument not allowed", args)
+		}
+		if a == Nil {
+			a = None
+		}
+		if arg != "" {
+			arg += ":"
+		}
+		arg += stripF(a)
+	}
+	hash := sha1.New()
+	_, err := hash.Write([]byte(strings.ToLower(arg)))
 	FatalOnError(err)
 	h = hex.EncodeToString(hash.Sum(nil))
 	return
@@ -408,7 +445,69 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 		if thrN > 1 {
 			allIdentitiesMtx.Lock()
 		}
-		Printf("Bulk adding %d idents\n", len(allIdentities))
+		idents := [][3]string{}
+		for ident := range allIdentities {
+			idents = append(idents, ident)
+		}
+		nIdents := len(idents)
+		if ctx.Debug > 0 {
+			Printf("Bulk adding %d idents\n", nIdents)
+		}
+		nPacks := nIdents / ctx.DBBulkSize
+		if nIdents%ctx.DBBulkSize != 0 {
+			nPacks++
+		}
+		source := ds.Name()
+		for i := 0; i < nPacks; i++ {
+			from := i * ctx.DBBulkSize
+			to := from + ctx.DBBulkSize
+			if to > nIdents {
+				to = nIdents
+			}
+			queryU := "insert ignore into uidentities(uuid, last_modified) values"
+			argsU := []interface{}{}
+			queryI := "insert ignore into identities(id, source, name, email, username, uuid, last_modified) values"
+			argsI := []interface{}{}
+			if ctx.Debug > 0 {
+				Printf("Bulk adding pack #%d %d-%d (%d/%d)\n", i+1, from, to, to-from, nIdents)
+			}
+			for j := from; j < to; j++ {
+				ident := idents[j]
+				name := ident[0]
+				username := ident[1]
+				email := ident[2]
+				// uuid(source, email, name, username)
+				uuid := GetUUIDAffs(ctx, source, email, name, username)
+				queryU += fmt.Sprintf("(?,now()),")
+				argsU = append(argsU, uuid)
+				var (
+					pname     *string
+					pemail    *string
+					pusername *string
+				)
+				if name != Nil {
+					pname = &name
+				}
+				if email != Nil {
+					pemail = &email
+				}
+				if username != Nil {
+					pusername = &username
+				}
+				queryI += fmt.Sprintf("(?,?,?,?,?,?,now()),")
+				argsI = append(argsI, uuid, source, pname, pemail, pusername, uuid)
+			}
+			queryU = queryU[:len(queryU)-1]
+			queryI = queryI[:len(queryI)-1]
+			_, e = ExecSQL(ctx, nil, queryU, argsU...)
+			if e != nil {
+				return
+			}
+			_, e = ExecSQL(ctx, nil, queryI, argsI...)
+			if e != nil {
+				return
+			}
+		}
 		allIdentities = make(map[[3]string]struct{})
 		return
 	}

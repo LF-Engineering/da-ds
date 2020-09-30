@@ -1,7 +1,10 @@
 package dads
 
 import (
+	"database/sql"
 	"fmt"
+	"reflect"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql" // User MySQL driver
 	"github.com/jmoiron/sqlx"
@@ -44,4 +47,52 @@ func ConnectAffiliationsDB(ctx *Ctx) {
 	d, err := sqlx.Connect("mysql", connStr)
 	FatalOnError(err)
 	ctx.DB = d
+}
+
+// QueryOut - display DB query
+func QueryOut(ctx *Ctx, query string, args ...interface{}) {
+	q := query + "\n"
+	if ctx.DebugSQL > 1 && len(args) > 0 {
+		s := ""
+		for vi, vv := range args {
+			switch v := vv.(type) {
+			case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64, complex64, complex128, string, bool, time.Time:
+				s += fmt.Sprintf("%d:%+v ", vi+1, v)
+			case *int, *int8, *int16, *int32, *int64, *uint, *uint8, *uint16, *uint32, *uint64, *float32, *float64, *complex64, *complex128, *string, *bool, *time.Time:
+				s += fmt.Sprintf("%d:%+v ", vi+1, v)
+			case nil:
+				s += fmt.Sprintf("%d:(null) ", vi+1)
+			default:
+				s += fmt.Sprintf("%d:%+v ", vi+1, reflect.ValueOf(vv))
+			}
+		}
+		q += "[" + s + "]\n"
+	}
+	Printf("%s", q)
+}
+
+// ExecDB - execute DB query without transaction
+func ExecDB(ctx *Ctx, query string, args ...interface{}) (res sql.Result, err error) {
+	res, err = ctx.DB.Exec(query, args...)
+	if err != nil || ctx.DebugSQL > 0 {
+		QueryOut(ctx, query, args...)
+	}
+	return
+}
+
+// ExecTX - execute DB query with transaction
+func ExecTX(ctx *Ctx, tx *sql.Tx, query string, args ...interface{}) (res sql.Result, err error) {
+	res, err = tx.Exec(query, args...)
+	if err != nil || ctx.DebugSQL > 0 {
+		QueryOut(ctx, query, args...)
+	}
+	return
+}
+
+// ExecSQL - execute db query with transaction if provided
+func ExecSQL(ctx *Ctx, tx *sql.Tx, query string, args ...interface{}) (sql.Result, error) {
+	if tx == nil {
+		return ExecDB(ctx, query, args...)
+	}
+	return ExecTX(ctx, tx, query, args...)
 }

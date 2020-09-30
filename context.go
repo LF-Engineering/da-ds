@@ -15,6 +15,7 @@ type Ctx struct {
 	DS                 string     // From DA_DS: ds type: for example jira, gerrit, slack etc., other env variablse will use this as a prefix
 	DSPrefix           string     // uppercase(DS) + _: if DS is "slack" then prefix would be "DA_SLACK_"
 	Debug              int        // From DA_DS_DEBUG Debug level: 0-no, 1-info, 2-verbose
+	DebugSQL           int        // From DA_DS_DEBUG_SQL SQL Debug level
 	ST                 bool       // From DA_DS_ST true: use single threaded version, false: use multi threaded version, default false
 	NCPUs              int        // From DA_DS_NCPUS, set to override number of CPUs to run, this overwrites DA_ST, default 0 (which means do not use it, use all CPU reported by go library)
 	NCPUsScale         float64    // From DA_DS_NCPUS_SCALE, scale number of CPUs, for example 2.0 will report number of cpus 2.0 the number of actually available CPUs
@@ -72,6 +73,15 @@ func (ctx *Ctx) Init() {
 		FatalOnError(err)
 		if debugLevel != 0 {
 			ctx.Debug = debugLevel
+		}
+	}
+	if ctx.env("DEBUG_SQL") == "" {
+		ctx.DebugSQL = 0
+	} else {
+		debugLevel, err := strconv.Atoi(ctx.env("DEBUG_SQL"))
+		FatalOnError(err)
+		if debugLevel != 0 {
+			ctx.DebugSQL = debugLevel
 		}
 	}
 
@@ -152,7 +162,7 @@ func (ctx *Ctx) Init() {
 			ctx.DBBulkSize = bulkSize
 		}
 	} else {
-		ctx.DBBulkSize = 1000
+		ctx.DBBulkSize = 100
 	}
 
 	// Affiliations re-enrich special flags
