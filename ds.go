@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	jsoniter "github.com/json-iterator/go"
@@ -384,6 +385,33 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 			Printf("Error releasing scroll %s: %+v\n", *scroll, err)
 		}
 	}()
+	thrN := GetThreadsNum(ctx)
+	nThreads := 0
+	allIdentities := make(map[[3]string]struct{})
+	var (
+		allIdentitiesMtx *sync.Mutex
+		ch               chan error
+	)
+	if thrN > 1 {
+		allIdentitiesMtx = &sync.Mutex{}
+		ch = make(chan error)
+	}
+	uploadIdentities := func(c chan error) (e error) {
+		defer func() {
+			if thrN > 1 {
+				allIdentitiesMtx.Unlock()
+			}
+			if c != nil {
+				c <- e
+			}
+		}()
+		if thrN > 1 {
+			allIdentitiesMtx.Lock()
+		}
+		Printf("Bulk adding %d idents\n", len(allIdentities))
+		allIdentities = make(map[[3]string]struct{})
+		return
+	}
 	for {
 		var (
 			url     string
@@ -448,6 +476,9 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 		if ctx.Debug > 0 {
 			Printf("Processing %d items\n", nItems)
 		}
+		if thrN > 1 {
+			allIdentitiesMtx.Lock()
+		}
 		for _, item := range items {
 			doc, ok := item.(map[string]interface{})["_source"]
 			if !ok {
@@ -463,9 +494,71 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 			if identities == nil {
 				continue
 			}
-			Printf("identities: %+v\n", identities)
+			for identity := range identities {
+				allIdentities[identity] = struct{}{}
+			}
+		}
+		nIdentities := len(allIdentities)
+		if nIdentities >= ctx.DBBulkSize {
+			if thrN > 1 {
+				go func() {
+					_ = uploadIdentities(ch)
+				}()
+				nThreads++
+				if nThreads == thrN {
+					err = <-ch
+					if err != nil {
+						return
+					}
+					nThreads--
+				}
+			} else {
+				err = uploadIdentities(nil)
+				if err != nil {
+					Printf("uploadIdentities error: %+v\n", err)
+					return
+				}
+			}
+		}
+		if thrN > 1 {
+			allIdentitiesMtx.Unlock()
 		}
 		total += nItems
+	}
+	if thrN > 1 {
+		allIdentitiesMtx.Lock()
+	}
+	nIdentities := len(allIdentities)
+	if nIdentities > 0 {
+		if thrN > 1 {
+			go func() {
+				_ = uploadIdentities(ch)
+			}()
+			nThreads++
+			if nThreads == thrN {
+				err = <-ch
+				if err != nil {
+					return
+				}
+				nThreads--
+			}
+		} else {
+			err = uploadIdentities(nil)
+			if err != nil {
+				Printf("uploadIdentities error: %+v\n", err)
+				return
+			}
+		}
+	}
+	if thrN > 1 {
+		allIdentitiesMtx.Unlock()
+	}
+	for thrN > 1 && nThreads > 0 {
+		err = <-ch
+		nThreads--
+		if err != nil {
+			return
+		}
 	}
 	if ctx.Debug > 0 {
 		Printf("Total number of items processed: %d\n", total)
