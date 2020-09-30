@@ -1,10 +1,7 @@
 package dads
 
 import (
-	"bytes"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -70,7 +67,6 @@ type JiraField struct {
 // ParseArgs - parse jira specific environment variables
 func (j *DSJira) ParseArgs(ctx *Ctx) (err error) {
 	j.DS = Jira
-
 	// Jira specific env variables
 	j.URL = os.Getenv("DA_JIRA_URL")
 	j.NoSSLVerify = os.Getenv("DA_JIRA_NO_SSL_VERIFY") != ""
@@ -134,34 +130,17 @@ func (j *DSJira) Enrich(ctx *Ctx) (err error) {
 func (j *DSJira) GetFields(ctx *Ctx) (customFields map[string]JiraField, err error) {
 	url := j.URL + JiraAPIRoot + JiraAPIField
 	method := Get
-	var req *http.Request
-	req, err = http.NewRequest(method, url, nil)
-	if err != nil {
-		Printf("New request error: %+v for %s url: %s\n", err, method, url)
-		return
-	}
+	var headers map[string]string
 	if j.Token != "" {
-		req.Header.Set("Authorization", "Basic "+j.Token)
+		headers = map[string]string{"Authorization": "Basic " + j.Token}
 	}
-	var resp *http.Response
-	resp, err = http.DefaultClient.Do(req)
+	var resp interface{}
+	resp, _, err = Request(ctx, url, method, headers, nil, nil, nil, map[[2]int]struct{}{{200, 200}: {}})
 	if err != nil {
-		Printf("Do request error: %+v for %s url: %s\n", err, method, url)
-		return
-	}
-	var body []byte
-	body, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		Printf("ReadAll request error: %+v for %s url: %s\n", err, method, url)
-		return
-	}
-	_ = resp.Body.Close()
-	if resp.StatusCode != 200 {
-		Printf("Method:%s url:%s status:%d query:%s\n%s\n", method, url, resp.StatusCode, body)
 		return
 	}
 	var fields []JiraField
-	err = jsoniter.Unmarshal(body, &fields)
+	err = jsoniter.Unmarshal(resp.([]byte), &fields)
 	if err != nil {
 		return
 	}
@@ -218,6 +197,12 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 		mtx = &sync.RWMutex{}
 	}
 	issueID := j.ItemID(issue)
+	var headers map[string]string
+	if j.Token != "" {
+		headers = map[string]string{"Content-Type": "application/json", "Authorization": "Basic " + j.Token}
+	} else {
+		headers = map[string]string{"Content-Type": "application/json"}
+	}
 	processIssue := func(c chan error) (e error) {
 		defer func() {
 			if c != nil {
@@ -253,49 +238,20 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 				jql = fmt.Sprintf(`"jql":"updated > %d order by updated asc"`, epochMS)
 			}
 		}
-		/*
-			    // I think we don't need project filter there, because the entire issue belongs to roject or not
-			    // So I'm only using date filter
-					jql := ""
-					if ctx.Project != "" {
-						jql = fmt.Sprintf(`"jql":"project = %s AND updated > %d order by updated asc"`, ctx.Project, epochMS)
-					} else {
-						jql = fmt.Sprintf(`"jql":"updated > %d order by updated asc"`, epochMS)
-					}
-		*/
 		method := Get
 		for {
 			payloadBytes := []byte(fmt.Sprintf(`{"startAt":%d,"maxResults":%d,%s}`, startAt, maxResults, jql))
-			payloadBody := bytes.NewReader(payloadBytes)
-			var req *http.Request
-			req, e = http.NewRequest(method, url, payloadBody)
-			if e != nil {
-				Printf("New request error: %+v for %s url: %s, query: %s\n", e, method, url, string(payloadBytes))
-				return
-			}
-			req.Header.Set("Content-Type", "application/json")
-			if j.Token != "" {
-				req.Header.Set("Authorization", "Basic "+j.Token)
-			}
-			var resp *http.Response
-			resp, e = http.DefaultClient.Do(req)
-			if e != nil {
-				Printf("Do request error: %+v for %s url: %s, query: %s\n", e, method, url, string(payloadBytes))
-				return
-			}
-			var body []byte
-			body, e = ioutil.ReadAll(resp.Body)
-			if e != nil {
-				Printf("ReadAll request error: %+v for %s url: %s, query: %s\n", e, method, url, string(payloadBytes))
-				return
-			}
-			_ = resp.Body.Close()
-			if resp.StatusCode != 200 {
-				Printf("Method:%s url:%s status:%d query:%s\n%s\n", method, url, resp.StatusCode, string(payloadBytes), body)
-				return
-			}
 			var res interface{}
-			e = jsoniter.Unmarshal(body, &res)
+			res, _, e = Request(
+				ctx,
+				url,
+				method,
+				headers,
+				payloadBytes,
+				map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses
+				nil,                                 // Error statuses
+				map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200, 404
+			)
 			if e != nil {
 				return
 			}
@@ -553,35 +509,27 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 	}
 	nThreads := 0
 	method := Post
+	var headers map[string]string
+	if j.Token != "" {
+		// Token should be BASE64("useremail:api_token"), see: https://developer.atlassian.com/cloud/jira/platform/basic-auth-for-rest-apis
+		headers = map[string]string{"Content-Type": "application/json", "Authorization": "Basic " + j.Token}
+	} else {
+		headers = map[string]string{"Content-Type": "application/json"}
+	}
 	for {
 		payloadBytes := []byte(fmt.Sprintf(`{"startAt":%d,"maxResults":%d,%s,%s}`, startAt, maxResults, jql, expand))
-		payloadBody := bytes.NewReader(payloadBytes)
-		var req *http.Request
-		req, err = http.NewRequest(method, url, payloadBody)
+		var res interface{}
+		res, _, err = Request(
+			ctx,
+			url,
+			method,
+			headers,
+			payloadBytes,
+			map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses
+			nil,                                 // Error statuses
+			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200, 404
+		)
 		if err != nil {
-			Printf("New request error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
-			return
-		}
-		req.Header.Set("Content-Type", "application/json")
-		if j.Token != "" {
-			// Token should be BASE64("useremail:api_token"), see: https://developer.atlassian.com/cloud/jira/platform/basic-auth-for-rest-apis
-			req.Header.Set("Authorization", "Basic "+j.Token)
-		}
-		var resp *http.Response
-		resp, err = http.DefaultClient.Do(req)
-		if err != nil {
-			Printf("Do request error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
-			return
-		}
-		var body []byte
-		body, err = ioutil.ReadAll(resp.Body)
-		if err != nil {
-			Printf("ReadAll request error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
-			return
-		}
-		_ = resp.Body.Close()
-		if resp.StatusCode != 200 {
-			Printf("Method:%s url:%s status:%d query:%s\n%s\n", method, url, resp.StatusCode, string(payloadBytes), body)
 			return
 		}
 		if !fieldsFetched {
@@ -591,11 +539,6 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 				return
 			}
 			fieldsFetched = true
-		}
-		var res interface{}
-		err = jsoniter.Unmarshal(body, &res)
-		if err != nil {
-			return
 		}
 		processIssues := func(c chan error) (e error) {
 			defer func() {
