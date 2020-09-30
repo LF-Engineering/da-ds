@@ -260,50 +260,56 @@ func GetLastOffset(ctx *Ctx, ds DS) (offset float64) {
 
 // HandleMapping - create/update mapping for raw or rich index
 func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
+	// Create index, ignore if exists (see status 400 is not in error statuses)
+	var url string
 	if raw {
-		// Create index, ignore if exists (see status 400 is not in error statuses)
-		url := ctx.ESURL + "/" + ctx.RawIndex
-		_, _, err = Request(
-			ctx,
-			url,
-			Put,
-			nil,                                 // headers
-			[]byte{},                            // payload
-			nil,                                 // JSON statuses
-			map[[2]int]struct{}{{401, 599}: {}}, // error statuses: 401-599
-			nil,                                 // OK statuses
-		)
-		FatalOnError(err)
-		// DS specific raw index mapping
-		mapping := ds.ElasticRawMapping()
-		url = ctx.ESURL + "/" + ctx.RawIndex + "/_mapping"
-		_, _, err = Request(
-			ctx,
-			url,
-			Put,
-			map[string]string{"Content-Type": "application/json"},
-			mapping,
-			nil,
-			nil,
-			map[[2]int]struct{}{{200, 200}: {}},
-		)
-		FatalOnError(err)
-		// Global not analyze string mapping
-		_, _, err = Request(
-			ctx,
-			url,
-			Put,
-			map[string]string{"Content-Type": "application/json"},
-			MappingNotAnalyzeString,
-			nil,
-			nil,
-			map[[2]int]struct{}{{200, 200}: {}},
-		)
-		FatalOnError(err)
-		return
+		url = ctx.ESURL + "/" + ctx.RawIndex
+	} else {
+		url = ctx.ESURL + "/" + ctx.RichIndex
 	}
-	Printf("STUB: %s: rich mapping\n", ds.Name())
-	// FIXME: continue
+	fmt.Printf("HandleMapping(%v) %s\n", raw, url)
+	_, _, err = Request(
+		ctx,
+		url,
+		Put,
+		nil,                                 // headers
+		[]byte{},                            // payload
+		nil,                                 // JSON statuses
+		map[[2]int]struct{}{{401, 599}: {}}, // error statuses: 401-599
+		nil,                                 // OK statuses
+	)
+	FatalOnError(err)
+	// DS specific raw index mapping
+	var mapping []byte
+	if raw {
+		mapping = ds.ElasticRawMapping()
+	} else {
+		mapping = ds.ElasticRichMapping()
+	}
+	url += "/_mapping"
+	_, _, err = Request(
+		ctx,
+		url,
+		Put,
+		map[string]string{"Content-Type": "application/json"},
+		mapping,
+		nil,
+		nil,
+		map[[2]int]struct{}{{200, 200}: {}},
+	)
+	FatalOnError(err)
+	// Global not analyze string mapping
+	_, _, err = Request(
+		ctx,
+		url,
+		Put,
+		map[string]string{"Content-Type": "application/json"},
+		MappingNotAnalyzeString,
+		nil,
+		nil,
+		map[[2]int]struct{}{{200, 200}: {}},
+	)
+	FatalOnError(err)
 	return
 }
 
@@ -368,6 +374,10 @@ func FetchRaw(ctx *Ctx, ds DS) (err error) {
 func Enrich(ctx *Ctx, ds DS) (err error) {
 	if ds.CustomEnrich() {
 		return ds.Enrich(ctx)
+	}
+	err = HandleMapping(ctx, ds, false)
+	if err != nil {
+		Fatalf(ds.Name()+": HandleMapping error: %+v\n", err)
 	}
 	return
 }
