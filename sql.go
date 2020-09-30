@@ -3,8 +3,8 @@ package dads
 import (
 	"fmt"
 
-	_ "github.com/go-sql-driver/mysql"
-	"github.com/jmoiron/sqlx" // User MySQL driver
+	_ "github.com/go-sql-driver/mysql" // User MySQL driver
+	"github.com/jmoiron/sqlx"
 )
 
 // ConnectAffiliationsDB - connect to affilaitions DB

@@ -384,8 +384,8 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 			}
 		}
 	}
-	esItem["metadata__updated_on"] = ToESDate(updatedOn)
-	esItem["metadata__timestamp"] = ToESDate(timestamp)
+	esItem[DefaultDateField] = ToESDate(updatedOn)
+	esItem[DefaultTimestampField] = ToESDate(timestamp)
 	if ctx.Project != "" {
 		issue.(map[string]interface{})["project"] = ctx.Project
 	}

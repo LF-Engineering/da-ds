@@ -126,6 +126,9 @@ func (ctx *Ctx) Init() {
 		ctx.ESScrollSize = 1000
 	}
 	ctx.ESScrollWait = ctx.env("ES_SCROLL_WAIT")
+	if ctx.ESScrollWait == "" {
+		ctx.ESScrollWait = "10m"
+	}
 
 	// Affiliation DB params
 	ctx.DBHost = ctx.env("DB_HOST")

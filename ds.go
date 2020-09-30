@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 	"time"
 
 	jsoniter "github.com/json-iterator/go"
@@ -346,7 +347,55 @@ func GetLastOffset(ctx *Ctx, ds DS, raw bool) (offset float64) {
 
 // UploadIdentities - upload identities to SH DB
 func UploadIdentities(ctx *Ctx, ds DS) (err error) {
-	Printf("STUB: UploadIdentities\n")
+	dateField := JSONEscape(ds.DateField(ctx))
+	origin := JSONEscape(ds.Origin())
+	var (
+		scroll   *string
+		dateFrom string
+	)
+	headers := map[string]string{"Content-Type": "application/json"}
+	if ctx.DateFrom != nil {
+		dateFrom = ToESDate(*ctx.DateFrom)
+	}
+	for {
+		var (
+			url     string
+			payload []byte
+		)
+		if scroll == nil {
+			url = ctx.ESURL + "/" + ctx.RawIndex + "/_search?scroll=" + ctx.ESScrollWait + "&size=" + strconv.Itoa(ctx.ESScrollSize)
+			if ds.ResumeNeedsOrigin() {
+				if ctx.DateFrom == nil {
+					payload = []byte(`{"query":{"bool":{"filter":{"term":{"origin":"` + origin + `"}}}},"sort":{"` + dateField + `":{"order":"asc"}}}`)
+				} else {
+					payload = []byte(`{"query":{"bool":{"filter":[{"term":{"origin":"` + origin + `"}},{"range":{"` + dateField + `":{"gte":"` + dateFrom + `"}}}]}},"sort":{"` + dateField + `":{"order":"asc"}}}`)
+				}
+			} else {
+				if ctx.DateFrom == nil {
+					payload = []byte(`{"sort":{"` + dateField + `":{"order":"asc"}}}`)
+				} else {
+					payload = []byte(`{"query":{"bool":{"range":{"` + dateField + `":{"gte":"` + dateFrom + `"}}}},"sort":{"` + dateField + `":{"order":"asc"}}}`)
+					payload = []byte(`{"query":{"bool":{"filter":{"range":{"` + dateField + `":{"gte":"` + dateFrom + `"}}}}},"sort":{"` + dateField + `":{"order":"asc"}}}`)
+				}
+			}
+		} else {
+			url = ctx.ESURL + "/_search/scroll"
+			payload = []byte(`{"scroll":"` + ctx.ESScrollWait + `","scroll_id":"` + *scroll + `"}`)
+		}
+		var res interface{}
+		res, _, err = Request(
+			ctx,
+			url,
+			Post,
+			headers,
+			payload,
+			map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses
+			nil,                                 // Error statuses
+			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses
+		)
+		FatalOnError(err)
+		break
+	}
 	return
 }
 
@@ -503,10 +552,10 @@ func Enrich(ctx *Ctx, ds DS) (err error) {
 		}
 		if lastUpdate != nil {
 			Printf("%s: rich: starting from date: %v, detected: %v, adjusted: %v\n", ds.Name(), *lastUpdate, ctx.DateFromDetected, adjusted)
-			ctx.DateFrom = lastUpdate
 		} else {
 			Printf("%s: rich: no start date detected\n", ds.Name())
 		}
+		ctx.DateFrom = lastUpdate
 	}
 	if ds.SupportOffsetFrom() {
 		adjusted = false
@@ -529,6 +578,7 @@ func Enrich(ctx *Ctx, ds DS) (err error) {
 			ctx.OffsetFrom = *offset
 		} else {
 			Printf("%s: rich: no start offset detected\n", ds.Name())
+			ctx.OffsetFrom = -1.0
 		}
 	}
 	if ctx.RefreshAffs {
