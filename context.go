@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/jmoiron/sqlx"
 )
 
 // Ctx - environment context packed in structure
@@ -27,6 +29,9 @@ type Ctx struct {
 	DBName             string     // From DA_DS_DB_NAME - affiliation DB name
 	DBUser             string     // From DA_DS_DB_USER - affiliation DB user
 	DBPass             string     // From DA_DS_DB_PASS - affiliation DB pass
+	DBPort             string     // From DA_DS_DB_PORT - affiliation DB port
+	DBOpts             string     // From DA_DS_DB_OPTS - affiliation DB & separated iURL encoded options, for example "charset=utf8&parseTime=true"
+	DBConn             string     // From DA_DS_DB_CONN - affiliation DB conn (full connection string - if set no other DB params will be used)
 	NoRaw              bool       // From DA_DS_NO_RAW - do only the enrichment
 	RefreshAffs        bool       // From DA_DS_REFRESH_AFFS - refresh affiliation data
 	OnlyIdentities     bool       // From DA_DS_ONLY_IDENTITIES - only add identities to affiliation database
@@ -40,6 +45,7 @@ type Ctx struct {
 	OffsetTo           float64    // From DA_DS_OFFSET_TO
 	DateFromDetected   bool
 	OffsetFromDetected bool
+	DB                 *sqlx.DB
 }
 
 func (ctx *Ctx) env(v string) string {
@@ -126,6 +132,9 @@ func (ctx *Ctx) Init() {
 	ctx.DBName = ctx.env("DB_NAME")
 	ctx.DBUser = ctx.env("DB_USER")
 	ctx.DBPass = ctx.env("DB_PASS")
+	ctx.DBPort = ctx.env("DB_PORT")
+	ctx.DBOpts = ctx.env("DB_OPTS")
+	ctx.DBConn = ctx.env("DB_CONN")
 
 	// Affiliations re-enrich special flags
 	ctx.NoRaw = ctx.env("NO_RAW") != ""
@@ -200,5 +209,5 @@ func (ctx Ctx) Info() string {
 
 // AffsDBConfigured - is affiliations DB configured?
 func (ctx *Ctx) AffsDBConfigured() bool {
-	return ctx.DBHost != "" || ctx.DBName != "" || ctx.DBUser != "" || ctx.DBPass != ""
+	return ctx.DBHost != "" || ctx.DBName != "" || ctx.DBUser != "" || ctx.DBPass != "" || ctx.DBPort != "" || ctx.DBOpts != "" || ctx.DBConn != ""
 }

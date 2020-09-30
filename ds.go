@@ -350,6 +350,12 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 	return
 }
 
+// EnrichItems - upload identities to SH DB
+func EnrichItems(ctx *Ctx, ds DS) (err error) {
+	Printf("STUB: EnrichItems\n")
+	return
+}
+
 // HandleMapping - create/update mapping for raw or rich index
 func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 	// Create index, ignore if exists (see status 400 is not in error statuses)
@@ -530,6 +536,7 @@ func Enrich(ctx *Ctx, ds DS) (err error) {
 		return
 	}
 	if ctx.AffsDBConfigured() {
+		ConnectAffiliationsDB(ctx)
 		err = UploadIdentities(ctx, ds)
 		if err != nil {
 			Fatalf(ds.Name()+": UploadIdentities error: %+v\n", err)
@@ -537,6 +544,10 @@ func Enrich(ctx *Ctx, ds DS) (err error) {
 	}
 	if ctx.OnlyIdentities {
 		return
+	}
+	err = EnrichItems(ctx, ds)
+	if err != nil {
+		Fatalf(ds.Name()+": EnrichItems error: %+v\n", err)
 	}
 	return
 }
