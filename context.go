@@ -46,6 +46,7 @@ type Ctx struct {
 	DateFromDetected   bool
 	OffsetFromDetected bool
 	DB                 *sqlx.DB
+	ESScrollWaitSecs   float64
 }
 
 func (ctx *Ctx) env(v string) string {
@@ -128,6 +129,11 @@ func (ctx *Ctx) Init() {
 	ctx.ESScrollWait = ctx.env("ES_SCROLL_WAIT")
 	if ctx.ESScrollWait == "" {
 		ctx.ESScrollWait = "10m"
+		ctx.ESScrollWaitSecs = 600.0
+	} else {
+		dur, err := time.ParseDuration(ctx.ESScrollWait)
+		FatalOnError(err)
+		ctx.ESScrollWaitSecs = dur.Seconds()
 	}
 
 	// Affiliation DB params

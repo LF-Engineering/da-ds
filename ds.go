@@ -352,11 +352,14 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 	var (
 		scroll   *string
 		dateFrom string
+		res      interface{}
+		status   int
 	)
 	headers := map[string]string{"Content-Type": "application/json"}
 	if ctx.DateFrom != nil {
 		dateFrom = ToESDate(*ctx.DateFrom)
 	}
+	attemptAt := time.Now()
 	for {
 		var (
 			url     string
@@ -382,8 +385,7 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 			url = ctx.ESURL + "/_search/scroll"
 			payload = []byte(`{"scroll":"` + ctx.ESScrollWait + `","scroll_id":"` + *scroll + `"}`)
 		}
-		var res interface{}
-		res, _, err = Request(
+		res, status, err = Request(
 			ctx,
 			url,
 			Post,
@@ -391,9 +393,19 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 			payload,
 			map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses
 			nil,                                 // Error statuses
-			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses
+			map[[2]int]struct{}{{200, 200}: {}, {500, 500}: {}}, // OK statuses
 		)
 		FatalOnError(err)
+		if scroll == nil && status == 500 && strings.Contains(string(res.([]byte)), TooManyScrolls) {
+			time.Sleep(5)
+			now := time.Now()
+			elapsed := now.Sub(attemptAt)
+			Printf("%d Retrying scroll, first attempt at %+v, elapsed %+v/%.0fs\n", len(res.(map[string]interface{})), attemptAt, elapsed, ctx.ESScrollWaitSecs)
+			if elapsed.Seconds() > ctx.ESScrollWaitSecs {
+				Fatalf("Tried to acquire scroll too many times, first attempt at %v, elapsed %v/%.0fs", attemptAt, elapsed, ctx.ESScrollWaitSecs)
+			}
+			continue
+		}
 		break
 	}
 	return
