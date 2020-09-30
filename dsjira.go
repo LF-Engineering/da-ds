@@ -29,6 +29,12 @@ const (
 	JiraBackendVersion = "0.0.1"
 	// JiraDefaultSearchField - default search field
 	JiraDefaultSearchField = "item_id"
+	// JiraDropCustomFields - drop custom fields from raw index
+	JiraDropCustomFields = false
+	// JiraFilterByProjectInComments - filter by project when searching for comments
+	JiraFilterByProjectInComments = false
+	// JiraMapCustomFields - run custom fields mapping
+	JiraMapCustomFields = true
 )
 
 var (
@@ -222,7 +228,31 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 		startAt := int64(0)
 		maxResults := int64(j.PageSize)
 		epochMS := from.UnixNano() / 1e6
-		// FIXME: seems like original Jira was using project filter there which is not needed IMHO.
+		// Seems like original Jira was using project filter there which is not needed IMHO.
+		var jql string
+		if JiraFilterByProjectInComments {
+			if to != nil {
+				epochToMS := (*to).UnixNano() / 1e6
+				if ctx.Project != "" {
+					jql = fmt.Sprintf(`"jql":"project = %s AND updated > %d AND updated < %d order by updated asc"`, ctx.Project, epochMS, epochToMS)
+				} else {
+					jql = fmt.Sprintf(`"jql":"updated > %d AND updated < %d order by updated asc"`, epochMS, epochToMS)
+				}
+			} else {
+				if ctx.Project != "" {
+					jql = fmt.Sprintf(`"jql":"project = %s AND updated > %d order by updated asc"`, ctx.Project, epochMS)
+				} else {
+					jql = fmt.Sprintf(`"jql":"updated > %d order by updated asc"`, epochMS)
+				}
+			}
+		} else {
+			if to != nil {
+				epochToMS := (*to).UnixNano() / 1e6
+				jql = fmt.Sprintf(`"jql":"updated > %d AND updated < %d order by updated asc"`, epochMS, epochToMS)
+			} else {
+				jql = fmt.Sprintf(`"jql":"updated > %d order by updated asc"`, epochMS)
+			}
+		}
 		/*
 			    // I think we don't need project filter there, because the entire issue belongs to roject or not
 			    // So I'm only using date filter
@@ -233,13 +263,6 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 						jql = fmt.Sprintf(`"jql":"updated > %d order by updated asc"`, epochMS)
 					}
 		*/
-		var jql string
-		if to != nil {
-			epochToMS := (*to).UnixNano() / 1e6
-			jql = fmt.Sprintf(`"jql":"updated > %d AND updated < %d order by updated asc"`, epochMS, epochToMS)
-		} else {
-			jql = fmt.Sprintf(`"jql":"updated > %d order by updated asc"`, epochMS)
-		}
 		method := Get
 		for {
 			payloadBytes := []byte(fmt.Sprintf(`{"startAt":%d,"maxResults":%d,%s}`, startAt, maxResults, jql))
@@ -357,37 +380,29 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 		err = fmt.Errorf("unable to unmarshal fields from issue %+v", issue)
 		return
 	}
-	type mapping struct {
-		ID    string
-		Name  string
-		Value interface{}
-	}
-	m := make(map[string]mapping)
-	for k, v := range issueFields {
-		customField, ok := customFields[k]
-		if !ok {
-			continue
+	if JiraMapCustomFields {
+		type mapping struct {
+			ID    string
+			Name  string
+			Value interface{}
 		}
-		m[k] = mapping{ID: customField.ID, Name: customField.Name, Value: v}
-	}
-	// Printf("%+v\n", m)
-	for k, v := range m {
-		if ctx.Debug > 1 {
-			prev := issueFields[k]
-			Printf("%s: %+v -> %+v\n", k, prev, v)
-		}
-		issueFields[k] = v
-	}
-	// FIXME: drop all custom fields in ["data"]["fields"] when any starts with "customfield_"
-	// Seems like it doesn't make sense, because we just added those custom fields
-	/*
+		m := make(map[string]mapping)
 		for k, v := range issueFields {
-			if strings.HasPrefix(k, "customfield_") {
-				fmt.Printf("deleting %v %v\n", k, v)
-				delete(issueFields, k)
+			customField, ok := customFields[k]
+			if !ok {
+				continue
 			}
+			m[k] = mapping{ID: customField.ID, Name: customField.Name, Value: v}
 		}
-	*/
+		// Printf("%+v\n", m)
+		for k, v := range m {
+			if ctx.Debug > 1 {
+				prev := issueFields[k]
+				Printf("%s: %+v -> %+v\n", k, prev, v)
+			}
+			issueFields[k] = v
+		}
+	}
 	// Extra fields
 	esItem := make(map[string]interface{})
 	origin := j.Origin()
@@ -405,6 +420,14 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 	esItem["updated_on"] = updatedOn
 	esItem["category"] = j.ItemCategory(issue)
 	esItem["search_fields"] = j.GenSearchFields(ctx, issue, uuid)
+	// Seems like it doesn't make sense, because we just added those custom fields
+	if JiraDropCustomFields {
+		for k := range issueFields {
+			if strings.HasPrefix(strings.ToLower(k), "customfield_") {
+				delete(issueFields, k)
+			}
+		}
+	}
 	issue.(map[string]interface{})["metadata__updated_on"] = ToESDate(updatedOn)
 	issue.(map[string]interface{})["metadata__timestamp"] = ToESDate(timestamp)
 	if ctx.Project != "" {
