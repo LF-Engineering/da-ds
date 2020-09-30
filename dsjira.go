@@ -46,9 +46,9 @@ var (
 		"issue_key":    {"key"},
 	}
 	// JiraRawMapping - Jira index mapping
-	JiraRawMapping = []byte(`{"items":{"dynamic":true,"properties":{"data":{"properties":{"renderedFields":{"dynamic":false,"properties":{}},"operations":{"dynamic":false,"properties":{}},"fields":{"dynamic":true,"properties":{"description":{"type":"text","index":true},"environment":{"type":"text","index":true}}},"changelog":{"properties":{"histories":{"dynamic":false,"properties":{}}}},"comments_data":{"properties":{"body":{"type":"text","index":true}}}}}}}}`)
+	JiraRawMapping = []byte(`{"dynamic":true,"properties":{"data":{"properties":{"renderedFields":{"dynamic":false,"properties":{}},"operations":{"dynamic":false,"properties":{}},"fields":{"dynamic":true,"properties":{"description":{"type":"text","index":true},"environment":{"type":"text","index":true}}},"changelog":{"properties":{"histories":{"dynamic":false,"properties":{}}}},"comments_data":{"properties":{"body":{"type":"text","index":true}}}}}}}`)
 	// JiraRichMapping - Jira index mapping
-	JiraRichMapping = []byte(`{"items":{"properties":{"main_description_analyzed":{"type":"text","index":true},"releases":{"type":"keyword"},"body":{"type":"text","index":true}}}}`)
+	JiraRichMapping = []byte(`{"properties":{"main_description_analyzed":{"type":"text","index":true},"releases":{"type":"keyword"},"body":{"type":"text","index":true}}}`)
 )
 
 // DSJira - DS implementation for Jira
@@ -304,7 +304,7 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 				e = fmt.Errorf("unable to unmarshal comments from %+v", res)
 				return
 			}
-			if ctx.Debug > 0 {
+			if ctx.Debug > 1 {
 				nComments := len(comments)
 				if nComments > 0 {
 					Printf("Processing %d comments\n", len(comments))

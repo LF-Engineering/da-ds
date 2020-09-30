@@ -15,6 +15,9 @@ const Get string = "GET"
 // Post - common constant string
 const Post string = "POST"
 
+// Put - common constant string
+const Put string = "PUT"
+
 // DefaultDateField - default date field
 const DefaultDateField string = "metadata__updated_on"
 

@@ -14,6 +14,11 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
+var (
+	// MappingNotAnalyzeString - make all string keywords by default (not analyze them)
+	MappingNotAnalyzeString = []byte(`{"dynamic_templates":[{"notanalyzed":{"match":"*","match_mapping_type":"string","mapping":{"type":"keyword"}}},{"formatdate":{"match":"*","match_mapping_type":"date","mapping":{"type":"date","format":"strict_date_optional_time||epoch_millis"}}}]}`)
+)
+
 // DS - interface for all data source types
 type DS interface {
 	ParseArgs(*Ctx) error
@@ -202,19 +207,109 @@ func GetLastOffset(ctx *Ctx, ds DS) (offset float64) {
 	return
 }
 
+// Request  -wrapper to do any HTTP request
+// jsonStatuses - set of status code ranges to be parsed as JSONs
+// errorStatuses - specify status value ranges for which we shoudl return error
+func Request(ctx *Ctx, url, method string, headers map[string]string, payload []byte, jsonStatuses map[[2]int]struct{}, errorStatuses map[[2]int]struct{}) (result interface{}, status int, err error) {
+	var (
+		payloadBody *bytes.Reader
+		req         *http.Request
+	)
+	if len(payload) > 0 {
+		payloadBody = bytes.NewReader(payload)
+		req, err = http.NewRequest(method, url, payloadBody)
+	} else {
+		req, err = http.NewRequest(method, url, nil)
+	}
+	if err != nil {
+		err = fmt.Errorf("new request error:%+v for method:%s url:%s payload:%s", err, method, url, string(payload))
+		return
+	}
+	for header, value := range headers {
+		req.Header.Set(header, value)
+	}
+	var resp *http.Response
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		err = fmt.Errorf("do request error:%+v for method:%s url:%s headers:%v payload:%s", err, method, url, headers, string(payload))
+		return
+	}
+	var body []byte
+	body, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		err = fmt.Errorf("read request body error:%+v for method:%s url:%s headers:%v payload:%s", err, method, url, headers, string(payload))
+		return
+	}
+	_ = resp.Body.Close()
+	status = resp.StatusCode
+	hit := false
+	for r := range jsonStatuses {
+		if status >= r[0] && status <= r[1] {
+			hit = true
+			break
+		}
+	}
+	if hit {
+		err = jsoniter.Unmarshal(body, &result)
+		if err != nil {
+			err = fmt.Errorf("unmarshall request error:%+v for method:%s url:%s headers:%v status:%d payload:%s body:%s", err, method, url, headers, status, string(payload), string(body))
+			return
+		}
+	} else {
+		result = body
+	}
+	hit = false
+	for r := range errorStatuses {
+		if status >= r[0] && status <= r[1] {
+			hit = true
+			break
+		}
+	}
+	if hit {
+		err = fmt.Errorf("status error:%+v for method:%s url:%s headers:%v status:%d payload:%s body:%s result:%+v", err, method, url, headers, status, string(payload), string(body), result)
+	}
+	return
+}
+
 // HandleMapping - create/update mapping for raw or rich index
 func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
-	var mapping map[string]interface{}
 	if raw {
-		bMapping := ds.ElasticRawMapping()
-		err = jsoniter.Unmarshal(bMapping, &mapping)
-		if err != nil {
-			Fatalf("error unmarshalling %s", string(bMapping))
-		}
-		for typ, m := range mapping {
-			fmt.Printf("STUB: mapping(%s): %+v\n", typ, m)
-			// FIXME: continue
-		}
+		// Create index, ignore if exists (see status 400 is not in error statuses)
+		url := ctx.ESURL + "/" + ctx.RawIndex
+		_, _, err = Request(
+			ctx,
+			url,
+			Put,
+			nil,                                 // headers
+			[]byte{},                            // payload
+			nil,                                 // JSON statuses
+			map[[2]int]struct{}{{401, 599}: {}}, // error statuses: 401-599
+		)
+		FatalOnError(err)
+		// DS specific raw index mapping
+		mapping := ds.ElasticRawMapping()
+		url = ctx.ESURL + "/" + ctx.RawIndex + "/_mapping"
+		_, _, err = Request(
+			ctx,
+			url,
+			Put,
+			map[string]string{"Content-Type": "application/json"},
+			mapping,
+			nil,
+			map[[2]int]struct{}{{400, 599}: {}},
+		)
+		FatalOnError(err)
+		// Global not analyze string mapping
+		_, _, err = Request(
+			ctx,
+			url,
+			Put,
+			map[string]string{"Content-Type": "application/json"},
+			MappingNotAnalyzeString,
+			nil,
+			map[[2]int]struct{}{{400, 599}: {}},
+		)
+		FatalOnError(err)
 		return
 	}
 	Printf("STUB: %s: rich mapping\n", ds.Name())
