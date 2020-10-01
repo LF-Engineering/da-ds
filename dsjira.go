@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -47,7 +48,7 @@ var (
 		"issue_key":    {"key"},
 	}
 	// JiraRawMapping - Jira index mapping
-	JiraRawMapping = []byte(`{"dynamic":true,"properties":{"data":{"properties":{"renderedFields":{"dynamic":false,"properties":{}},"operations":{"dynamic":false,"properties":{}},"fields":{"dynamic":true,"properties":{"description":{"type":"text","index":true},"environment":{"type":"text","index":true}}},"changelog":{"properties":{"histories":{"dynamic":false,"properties":{}}}},"comments_data":{"properties":{"body":{"type":"text","index":true}}}}}}}`)
+	JiraRawMapping = []byte(`{"dynamic":true,"properties":{"metadata__updated_on":{"type": "date"},"data":{"properties":{"renderedFields":{"dynamic":false,"properties":{}},"operations":{"dynamic":false,"properties":{}},"fields":{"dynamic":true,"properties":{"description":{"type":"text","index":true},"environment":{"type":"text","index":true}}},"changelog":{"properties":{"histories":{"dynamic":false,"properties":{}}}},"comments_data":{"properties":{"body":{"type":"text","index":true}}}}}}}`)
 	// JiraRichMapping - Jira index mapping
 	JiraRichMapping = []byte(`{"properties":{"main_description_analyzed":{"type":"text","index":true},"releases":{"type":"keyword"},"body":{"type":"text","index":true}}}`)
 )
@@ -259,8 +260,9 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 				payloadBytes,
 				map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses
 				nil,                                 // Error statuses
-				map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200, 404
+				map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
 			)
+			// FIXME: can return 400 under heavy load
 			if e != nil {
 				return
 			}
@@ -529,6 +531,9 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 		headers = map[string]string{"Content-Type": "application/json", "Authorization": "Basic " + j.Token}
 	} else {
 		headers = map[string]string{"Content-Type": "application/json"}
+	}
+	if ctx.Debug > 0 {
+		Printf("requesting issues from: %s\n", from)
 	}
 	for {
 		payloadBytes := []byte(fmt.Sprintf(`{"startAt":%d,"maxResults":%d,%s,%s}`, startAt, maxResults, jql, expand))
@@ -843,7 +848,14 @@ func (j *DSJira) EnrichItem(item map[string]interface{}, author string) (rich ma
 		err = fmt.Errorf("missing data field in item %+v", DumpKeys(item))
 		return
 	}
-	rich["changes"], _ = Dig(issue, []string{"changelog", "total"}, true, false)
+	changes, ok := Dig(issue, []string{"changelog", "total"}, false, false)
+	if ok {
+		rich["channges"] = changes
+	} else {
+		// Only evil Jiras do that, for example http://jira.akraino.org
+		// Almost the same address works OK https://jira.akraino.org
+		rich["channges"] = 0
+	}
 	fields, ok := issue["fields"].(map[string]interface{})
 	if !ok {
 		err = fmt.Errorf("missing fields field in issue %+v", DumpKeys(issue))
@@ -1063,17 +1075,15 @@ func (j *DSJira) EnrichItem(item map[string]interface{}, author string) (rich ma
 			rich["sprint_start"] = strings.Split(PartitionString(s, ",startDate=")[2], ",")[0]
 			rich["sprint_end"] = strings.Split(PartitionString(s, ",endDate=")[2], ",")[0]
 			rich["sprint_complete"] = strings.Split(PartitionString(s, ",completeDate=")[2], ",")[0]
+			ks := []string{}
+			for k := range rich {
+				ks = append(ks, k)
+			}
+			sort.Strings(ks)
+			for _, k := range ks {
+				Printf("%s: %T %+v\n", k, rich[k], rich[k])
+			}
 		}
 	}
-	/*
-		ks := []string{}
-		for k := range rich {
-			ks = append(ks, k)
-		}
-		sort.Strings(ks)
-		for _, k := range ks {
-			Printf("%s: %T %+v\n", k, rich[k], rich[k])
-		}
-	*/
 	return
 }

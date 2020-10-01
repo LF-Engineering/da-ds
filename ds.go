@@ -384,6 +384,9 @@ func GetLastUpdate(ctx *Ctx, ds DS, raw bool) (lastUpdate *time.Time) {
 	} else {
 		url = ctx.ESURL + "/" + ctx.RichIndex + "/_search?size=0"
 	}
+	if ctx.Debug > 0 {
+		Printf("raw %v resume from date query: %s\n", raw, string(payloadBytes))
+	}
 	method := Post
 	resp, _, err := Request(
 		ctx,
@@ -439,6 +442,9 @@ func GetLastOffset(ctx *Ctx, ds DS, raw bool) (offset float64) {
 		url = ctx.ESURL + "/" + ctx.RawIndex + "/_search?size=0"
 	} else {
 		url = ctx.ESURL + "/" + ctx.RichIndex + "/_search?size=0"
+	}
+	if ctx.Debug > 0 {
+		Printf("raw %v resume from offset query: %s\n", raw, string(payloadBytes))
 	}
 	method := Post
 	resp, _, err := Request(
@@ -725,6 +731,9 @@ func ForEachRawItem(ctx *Ctx, ds DS, packSize int, ufunct func(*[]interface{}, *
 					payload = []byte(`{"query":{"bool":{"range":{"` + dateField + `":{"gte":"` + dateFrom + `"}}}},"sort":{"` + dateField + `":{"order":"asc"}}}`)
 					payload = []byte(`{"query":{"bool":{"filter":{"range":{"` + dateField + `":{"gte":"` + dateFrom + `"}}}}},"sort":{"` + dateField + `":{"order":"asc"}}}`)
 				}
+			}
+			if ctx.Debug > 0 {
+				Printf("processing query: %s\n", string(payload))
 			}
 		} else {
 			url = ctx.ESURL + "/_search/scroll"
