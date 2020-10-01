@@ -54,6 +54,7 @@ type DS interface {
 	ElasticRawMapping() []byte
 	ElasticRichMapping() []byte
 	GetItemIdentities(interface{}) (map[[3]string]struct{}, error)
+	EnrichItem(map[string]interface{}, string) (map[string]interface{}, error)
 }
 
 // UUIDNonEmpty - generate UUID of string args (all must be non-empty)
@@ -525,14 +526,30 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 		}
 		return
 	}
-	err = ForEachRawItem(ctx, ds, uploadFunc, itemsFunc)
+	err = ForEachRawItem(ctx, ds, ctx.DBBulkSize, uploadFunc, itemsFunc)
 	return
 }
 
 // EnrichItems - perform the enrichment
 func EnrichItems(ctx *Ctx, ds DS) (err error) {
+	// total = enrich_backend.enrich_items(ocean_backend)
+	// enrich_backend.update_items(ocean_backend, enrich_backend)
 	enrichFunc := func(docs *[]interface{}) (e error) {
-		Printf("would process %d items\n", len(*docs))
+		var rich map[string]interface{}
+		for _, doc := range *docs {
+			item, ok := doc.(map[string]interface{})
+			if !ok {
+				e = fmt.Errorf("Failed to parse document %+v\n", doc)
+				return
+			}
+			for _, author := range []string{"creator", "assignee", "reporter"} {
+				rich, e = ds.EnrichItem(item, author)
+				if e != nil {
+					return
+				}
+				Printf("rich: %d\n", len(rich))
+			}
+		}
 		*docs = []interface{}{}
 		return
 	}
@@ -547,12 +564,12 @@ func EnrichItems(ctx *Ctx, ds DS) (err error) {
 		}
 		return
 	}
-	err = ForEachRawItem(ctx, ds, enrichFunc, itemsFunc)
+	err = ForEachRawItem(ctx, ds, ctx.ESBulkSize, enrichFunc, itemsFunc)
 	return
 }
 
 // ForEachRawItem - perform specific function for all raw items
-func ForEachRawItem(ctx *Ctx, ds DS, ufunct func(*[]interface{}) error, uitems func([]interface{}, *[]interface{}) error) (err error) {
+func ForEachRawItem(ctx *Ctx, ds DS, packSize int, ufunct func(*[]interface{}) error, uitems func([]interface{}, *[]interface{}) error) (err error) {
 	dateField := JSONEscape(ds.DateField(ctx))
 	originField := JSONEscape(ds.OriginField(ctx))
 	origin := JSONEscape(ds.Origin(ctx))
@@ -688,7 +705,7 @@ func ForEachRawItem(ctx *Ctx, ds DS, ufunct func(*[]interface{}) error, uitems f
 			return
 		}
 		nDocs := len(docs)
-		if nDocs >= ctx.DBBulkSize {
+		if nDocs >= packSize {
 			if thrN > 1 {
 				go func() {
 					_ = funct(ch)

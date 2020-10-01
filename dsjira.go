@@ -824,3 +824,9 @@ func (j *DSJira) GetItemIdentities(doc interface{}) (identities map[[3]string]st
 	}
 	return
 }
+
+// EnrichItem - return rich item from raw item for a given author type
+func (j *DSJira) EnrichItem(item map[string]interface{}, author string) (rich map[string]interface{}, err error) {
+	rich = item
+	return
+}

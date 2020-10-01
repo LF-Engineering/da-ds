@@ -137,3 +137,9 @@ func (j *DSStub) ElasticRichMapping() []byte {
 func (j *DSStub) GetItemIdentities(interface{}) (map[[3]string]struct{}, error) {
 	return map[[3]string]struct{}{}, nil
 }
+
+// EnrichItem - return rich item from raw item for a given author type
+func (j *DSStub) EnrichItem(item map[string]interface{}, author string) (rich map[string]interface{}, err error) {
+	rich = item
+	return
+}
