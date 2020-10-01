@@ -491,8 +491,10 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 				to = nIdents
 			}
 			queryU := "insert ignore into uidentities(uuid, last_modified) values"
-			argsU := []interface{}{}
+			queryP := "insert ignore into profiles(uuid) values"
 			queryI := "insert ignore into identities(id, source, name, email, username, uuid, last_modified) values"
+			argsU := []interface{}{}
+			argsP := []interface{}{}
 			argsI := []interface{}{}
 			if ctx.Debug > 0 {
 				Printf("Bulk adding pack #%d %d-%d (%d/%d)\n", i+1, from, to, to-from, nIdents)
@@ -506,6 +508,8 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 				uuid := UUIDAffs(ctx, source, email, name, username)
 				queryU += fmt.Sprintf("(?,now()),")
 				argsU = append(argsU, uuid)
+				queryP += fmt.Sprintf("(?),")
+				argsP = append(argsP, uuid)
 				var (
 					pname     *string
 					pemail    *string
@@ -524,8 +528,13 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 				argsI = append(argsI, uuid, source, pname, pemail, pusername, uuid)
 			}
 			queryU = queryU[:len(queryU)-1]
+			queryP = queryP[:len(queryP)-1]
 			queryI = queryI[:len(queryI)-1]
 			_, e = ExecSQL(ctx, tx, queryU, argsU...)
+			if e != nil {
+				return
+			}
+			_, e = ExecSQL(ctx, tx, queryP, argsP...)
 			if e != nil {
 				return
 			}
@@ -564,7 +573,6 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 					payload = []byte(`{"query":{"bool":{"filter":{"range":{"` + dateField + `":{"gte":"` + dateFrom + `"}}}}},"sort":{"` + dateField + `":{"order":"asc"}}}`)
 				}
 			}
-			fmt.Printf("%s\n", string(payload))
 		} else {
 			url = ctx.ESURL + "/_search/scroll"
 			payload = []byte(`{"scroll":"` + ctx.ESScrollWait + `","scroll_id":"` + *scroll + `"}`)
