@@ -25,6 +25,7 @@ func copyContext(in *lib.Ctx) *lib.Ctx {
 		Enrich:           in.Enrich,
 		RawIndex:         in.RawIndex,
 		RichIndex:        in.RichIndex,
+		Tag:              in.Tag,
 		ESURL:            in.ESURL,
 		ESBulkSize:       in.ESBulkSize,
 		ESScrollSize:     in.ESScrollSize,
@@ -199,6 +200,7 @@ func TestInit(t *testing.T) {
 		NCPUsScale:       1.0,
 		Enrich:           false,
 		RawIndex:         "",
+		Tag:              "",
 		RichIndex:        "",
 		ESURL:            "",
 		ESBulkSize:       1000,
@@ -312,10 +314,11 @@ func TestInit(t *testing.T) {
 			),
 		},
 		{
-			"Setting raw & rich index names",
+			"Setting raw & rich index and tag",
 			map[string]string{
 				"DA_DS_RAW_INDEX":  "ds-raw",
 				"DA_DS_RICH_INDEX": "ds-rich",
+				"DA_DS_TAG":        "tag",
 			},
 			dynamicSetFields(
 				t,
@@ -323,6 +326,7 @@ func TestInit(t *testing.T) {
 				map[string]interface{}{
 					"RawIndex":  "ds-raw",
 					"RichIndex": "ds-rich",
+					"Tag":       "tag",
 				},
 			),
 		},

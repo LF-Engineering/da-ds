@@ -30,6 +30,12 @@ const DefaultOffsetField string = "updated_on"
 // DefaultTimestampField - default timestamp field
 const DefaultTimestampField string = "metadata__timestamp"
 
+// DefaultOriginField - default origin field
+const DefaultOriginField string = "origin"
+
+// DefaultTagField - default tag field
+const DefaultTagField string = "tag"
+
 // Issue - common constant string
 const Issue string = "issue"
 

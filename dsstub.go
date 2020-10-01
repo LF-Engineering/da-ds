@@ -80,6 +80,11 @@ func (j *DSStub) OffsetField(*Ctx) string {
 	return DefaultOffsetField
 }
 
+// OriginField - return origin field used to detect where to restart from
+func (j *DSStub) OriginField(*Ctx) string {
+	return DefaultOriginField
+}
+
 // Categories - return a set of configured categories
 func (j *DSStub) Categories() map[string]struct{} {
 	return map[string]struct{}{}
@@ -87,13 +92,13 @@ func (j *DSStub) Categories() map[string]struct{} {
 
 // ResumeNeedsOrigin - is origin field needed when resuming
 // Origin should be needed when multiple configurations save to the same index
-func (j *DSStub) ResumeNeedsOrigin() bool {
+func (j *DSStub) ResumeNeedsOrigin(ctx *Ctx) bool {
 	return false
 }
 
 // Origin - return current origin
-func (j *DSStub) Origin() string {
-	return ""
+func (j *DSStub) Origin(ctx *Ctx) string {
+	return ctx.Tag
 }
 
 // ItemID - return unique identifier for an item

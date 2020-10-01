@@ -55,6 +55,7 @@ type DSJira struct {
 	NoSSLVerify bool   // From DA_JIRA_NO_SSL_VERIFY
 	Token       string // From DA_JIRA_TOKEN
 	PageSize    int    // From DA_JIRA_PAGE_SIZE
+	MultiOrigin bool   // FROM DA_JIRA_MULTI_ORIGIN
 }
 
 // JiraField - informatin about fields present in issues
@@ -80,6 +81,7 @@ func (j *DSJira) ParseArgs(ctx *Ctx) (err error) {
 			j.PageSize = pageSize
 		}
 	}
+	j.MultiOrigin = os.Getenv("DA_JIRA_MULTI_ORIGIN") != ""
 	return
 }
 
@@ -361,14 +363,19 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 	}
 	// Extra fields
 	esItem := make(map[string]interface{})
-	origin := j.Origin()
+	origin := j.URL
+	tag := ctx.Tag
+	if tag == "" {
+		tag = origin
+	}
 	uuid := UUIDNonEmpty(ctx, origin, issueID)
 	timestamp := time.Now()
 	esItem["backend_name"] = j.DS
 	esItem["backend_version"] = JiraBackendVersion
 	esItem["timestamp"] = fmt.Sprintf("%.06f", float64(timestamp.UnixNano())/1.0e3)
-	esItem["origin"] = origin
 	esItem["uuid"] = uuid
+	esItem[DefaultOriginField] = origin
+	esItem[DefaultTagField] = tag
 	if thrN > 1 {
 		mtx.Lock()
 	}
@@ -668,15 +675,27 @@ func (j *DSJira) Categories() map[string]struct{} {
 	return map[string]struct{}{"issue": {}}
 }
 
+// OriginField - return origin field used to detect where to restart from
+func (j *DSJira) OriginField(ctx *Ctx) string {
+	if ctx.Tag != "" {
+		return DefaultTagField
+	}
+	return DefaultOriginField
+}
+
 // ResumeNeedsOrigin - is origin field needed when resuming
 // Origin should be needed when multiple configurations save to the same index
 // Jira usually stores only one instance per index, so we don't need to enable filtering by origin to resume
-func (j *DSJira) ResumeNeedsOrigin() bool {
-	return false
+func (j *DSJira) ResumeNeedsOrigin(ctx *Ctx) bool {
+	return j.MultiOrigin
 }
 
 // Origin - return current origin
-func (j *DSJira) Origin() string {
+// Tag gets precendence if set
+func (j *DSJira) Origin(ctx *Ctx) string {
+	if ctx.Tag != "" {
+		return ctx.Tag
+	}
 	return j.URL
 }
 

@@ -22,6 +22,7 @@ type Ctx struct {
 	Enrich             bool       // From DA_DS_ENRICH, flag to run enrichment
 	RawIndex           string     // From DA_DS_RAW_INDEX - raw index name
 	RichIndex          string     // From DA_DS_RICH_INDEX - rich index name
+	Tag                string     // From DA_DS_TAG - tag
 	ESURL              string     // From DA_DS_ES_URL - ElasticSearch URL
 	ESBulkSize         int        // From DA_DS_ES_BULK_SIZE - ElasticSearch bulk size
 	ESScrollSize       int        // From DA_DS_ES_SCROLL_SIZE - ElasticSearch scroll size
@@ -116,6 +117,9 @@ func (ctx *Ctx) Init() {
 	// Raw & Rich index names
 	ctx.RawIndex = ctx.env("RAW_INDEX")
 	ctx.RichIndex = ctx.env("RICH_INDEX")
+
+	// Tag
+	ctx.Tag = ctx.env("TAG")
 
 	// Elastic search params
 	ctx.ESURL = ctx.env("ES_URL")

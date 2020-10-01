@@ -18,6 +18,9 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
+// Typical run:
+// DA_DS=jira DA_JIRA_ENRICH=1 DA_JIRA_ES_URL=... DA_JIRA_RAW_INDEX=proj-raw DA_JIRA_RICH_INDEX=proj DA_JIRA_URL=https://jira.xyz.org DA_JIRA_DEBUG=1 DA_JIRA_PROJECT=proj DA_JIRA_DB_NAME=db DA_JIRA_DB_USER=u DA_JIRA_DB_PASS=p DA_JIRA_MULTI_ORIGIN=1 ./dads
+
 var (
 	// MappingNotAnalyzeString - make all string keywords by default (not analyze them)
 	MappingNotAnalyzeString = []byte(`{"dynamic_templates":[{"notanalyzed":{"match":"*","match_mapping_type":"string","mapping":{"type":"keyword"}}},{"formatdate":{"match":"*","match_mapping_type":"date","mapping":{"type":"date","format":"strict_date_optional_time||epoch_millis"}}}]}`)
@@ -36,13 +39,14 @@ type DS interface {
 	Enrich(*Ctx) error
 	DateField(*Ctx) string
 	OffsetField(*Ctx) string
+	OriginField(*Ctx) string
 	Categories() map[string]struct{}
 	CustomFetchRaw() bool
 	CustomEnrich() bool
 	SupportDateFrom() bool
 	SupportOffsetFrom() bool
-	ResumeNeedsOrigin() bool
-	Origin() string
+	ResumeNeedsOrigin(*Ctx) bool
+	Origin(*Ctx) string
 	ItemID(interface{}) string
 	ItemUpdatedOn(interface{}) time.Time
 	ItemCategory(interface{}) string
@@ -294,12 +298,14 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 // GetLastUpdate - get last update date from ElasticSearch
 func GetLastUpdate(ctx *Ctx, ds DS, raw bool) (lastUpdate *time.Time) {
 	// curl -s -XPOST -H 'Content-type: application/json' '${URL}/index/_search?size=0' -d '{"aggs":{"m":{"max":{"field":"date_field"}}}}' | jq -r '.aggregations.m.value_as_string'
-	dateField := ds.DateField(ctx)
+	dateField := JSONEscape(ds.DateField(ctx))
+	originField := JSONEscape(ds.OriginField(ctx))
+	origin := JSONEscape(ds.Origin(ctx))
 	var payloadBytes []byte
-	if ds.ResumeNeedsOrigin() {
-		payloadBytes = []byte(`{"query":{"bool":{"filter":{"term":{"origin":"` + JSONEscape(ds.Origin()) + `"}}}},"aggs":{"m":{"max":{"field":"` + JSONEscape(dateField) + `"}}}}`)
+	if ds.ResumeNeedsOrigin(ctx) {
+		payloadBytes = []byte(`{"query":{"bool":{"filter":{"term":{"` + originField + `":"` + origin + `"}}}},"aggs":{"m":{"max":{"field":"` + dateField + `"}}}}`)
 	} else {
-		payloadBytes = []byte(`{"aggs":{"m":{"max":{"field":"` + JSONEscape(dateField) + `"}}}}`)
+		payloadBytes = []byte(`{"aggs":{"m":{"max":{"field":"` + dateField + `"}}}}`)
 	}
 	var url string
 	if raw {
@@ -348,12 +354,14 @@ func GetLastUpdate(ctx *Ctx, ds DS, raw bool) (lastUpdate *time.Time) {
 func GetLastOffset(ctx *Ctx, ds DS, raw bool) (offset float64) {
 	offset = -1.0
 	// curl -s -XPOST -H 'Content-type: application/json' '${URL}/index/_search?size=0' -d '{"aggs":{"m":{"max":{"field":"offset_field"}}}}' | jq -r '.aggregations.m.value'
-	offsetField := ds.OffsetField(ctx)
+	offsetField := JSONEscape(ds.OffsetField(ctx))
+	originField := JSONEscape(ds.OffsetField(ctx))
+	origin := JSONEscape(ds.Origin(ctx))
 	var payloadBytes []byte
-	if ds.ResumeNeedsOrigin() {
-		payloadBytes = []byte(`{"query":{"bool":{"filter":{"term":{"origin":"` + JSONEscape(ds.Origin()) + `"}}}},"aggs":{"m":{"max":{"field":"` + JSONEscape(offsetField) + `"}}}}`)
+	if ds.ResumeNeedsOrigin(ctx) {
+		payloadBytes = []byte(`{"query":{"bool":{"filter":{"term":{"` + originField + `":"` + origin + `"}}}},"aggs":{"m":{"max":{"field":"` + offsetField + `"}}}}`)
 	} else {
-		payloadBytes = []byte(`{"aggs":{"m":{"max":{"field":"` + JSONEscape(offsetField) + `"}}}}`)
+		payloadBytes = []byte(`{"aggs":{"m":{"max":{"field":"` + offsetField + `"}}}}`)
 	}
 	var url string
 	if raw {
@@ -395,7 +403,8 @@ func GetLastOffset(ctx *Ctx, ds DS, raw bool) (offset float64) {
 // UploadIdentities - upload identities to SH DB
 func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 	dateField := JSONEscape(ds.DateField(ctx))
-	origin := JSONEscape(ds.Origin())
+	originField := JSONEscape(ds.OriginField(ctx))
+	origin := JSONEscape(ds.Origin(ctx))
 	var (
 		scroll   *string
 		dateFrom string
@@ -533,6 +542,7 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 		tx = nil
 		return
 	}
+	needsOrigin := ds.ResumeNeedsOrigin(ctx)
 	for {
 		var (
 			url     string
@@ -540,11 +550,11 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 		)
 		if scroll == nil {
 			url = ctx.ESURL + "/" + ctx.RawIndex + "/_search?scroll=" + ctx.ESScrollWait + "&size=" + strconv.Itoa(ctx.ESScrollSize)
-			if ds.ResumeNeedsOrigin() {
+			if needsOrigin {
 				if ctx.DateFrom == nil {
-					payload = []byte(`{"query":{"bool":{"filter":{"term":{"origin":"` + origin + `"}}}},"sort":{"` + dateField + `":{"order":"asc"}}}`)
+					payload = []byte(`{"query":{"bool":{"filter":{"term":{"` + originField + `":"` + origin + `"}}}},"sort":{"` + dateField + `":{"order":"asc"}}}`)
 				} else {
-					payload = []byte(`{"query":{"bool":{"filter":[{"term":{"origin":"` + origin + `"}},{"range":{"` + dateField + `":{"gte":"` + dateFrom + `"}}}]}},"sort":{"` + dateField + `":{"order":"asc"}}}`)
+					payload = []byte(`{"query":{"bool":{"filter":[{"term":{"` + originField + `":"` + origin + `"}},{"range":{"` + dateField + `":{"gte":"` + dateFrom + `"}}}]}},"sort":{"` + dateField + `":{"order":"asc"}}}`)
 				}
 			} else {
 				if ctx.DateFrom == nil {
@@ -554,6 +564,7 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 					payload = []byte(`{"query":{"bool":{"filter":{"range":{"` + dateField + `":{"gte":"` + dateFrom + `"}}}}},"sort":{"` + dateField + `":{"order":"asc"}}}`)
 				}
 			}
+			fmt.Printf("%s\n", string(payload))
 		} else {
 			url = ctx.ESURL + "/_search/scroll"
 			payload = []byte(`{"scroll":"` + ctx.ESScrollWait + `","scroll_id":"` + *scroll + `"}`)
