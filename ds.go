@@ -402,54 +402,7 @@ func GetLastOffset(ctx *Ctx, ds DS, raw bool) (offset float64) {
 
 // UploadIdentities - upload identities to SH DB
 func UploadIdentities(ctx *Ctx, ds DS) (err error) {
-	dateField := JSONEscape(ds.DateField(ctx))
-	originField := JSONEscape(ds.OriginField(ctx))
-	origin := JSONEscape(ds.Origin(ctx))
-	var (
-		scroll   *string
-		dateFrom string
-		res      interface{}
-		status   int
-	)
-	headers := map[string]string{"Content-Type": "application/json"}
-	if ctx.DateFrom != nil {
-		dateFrom = ToESDate(*ctx.DateFrom)
-	}
-	attemptAt := time.Now()
-	total := 0
-	// Defer free scroll
-	defer func() {
-		if scroll == nil {
-			return
-		}
-		url := ctx.ESURL + "/_search/scroll"
-		payload := []byte(`{"scroll_id":"` + *scroll + `"}`)
-		_, _, err := Request(
-			ctx,
-			url,
-			Delete,
-			headers,
-			payload,
-			nil,
-			nil,                                 // Error statuses
-			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses
-		)
-		if err != nil {
-			Printf("Error releasing scroll %s: %+v\n", *scroll, err)
-		}
-	}()
-	thrN := GetThreadsNum(ctx)
-	nThreads := 0
-	allIdentities := make(map[[3]string]struct{})
-	var (
-		allIdentitiesMtx *sync.Mutex
-		ch               chan error
-	)
-	if thrN > 1 {
-		allIdentitiesMtx = &sync.Mutex{}
-		ch = make(chan error)
-	}
-	uploadIdentities := func(c chan error) (e error) {
+	uploadFunc := func(docs *[]interface{}) (e error) {
 		var tx *sql.Tx
 		e = SetDBSessionOrigin(ctx)
 		if e != nil {
@@ -459,26 +412,13 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 		if e != nil {
 			return
 		}
+		nIdents := len(*docs)
 		defer func() {
 			if tx != nil {
-				Printf("Rolling back %d items\n", len(allIdentities))
+				Printf("Rolling back %d items\n", nIdents)
 				_ = tx.Rollback()
 			}
-			if thrN > 1 {
-				allIdentitiesMtx.Unlock()
-			}
-			if c != nil {
-				c <- e
-			}
 		}()
-		if thrN > 1 {
-			allIdentitiesMtx.Lock()
-		}
-		idents := [][3]string{}
-		for ident := range allIdentities {
-			idents = append(idents, ident)
-		}
-		nIdents := len(idents)
 		if ctx.Debug > 0 {
 			Printf("Bulk adding %d idents\n", nIdents)
 		}
@@ -504,7 +444,7 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 				Printf("Bulk adding pack #%d %d-%d (%d/%d)\n", i+1, from, to, to-from, nIdents)
 			}
 			for j := from; j < to; j++ {
-				ident := idents[j]
+				ident, _ := (*docs)[j].([3]string)
 				name := ident[0]
 				username := ident[1]
 				email := ident[2]
@@ -551,8 +491,128 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 		if e != nil {
 			return
 		}
-		allIdentities = make(map[[3]string]struct{})
+		*docs = []interface{}{}
 		tx = nil
+		return
+	}
+	itemsFunc := func(items []interface{}, docs *[]interface{}) (e error) {
+		idents := make(map[[3]string]struct{})
+		for _, doc := range *docs {
+			idents[doc.([3]string)] = struct{}{}
+		}
+		for _, item := range items {
+			doc, ok := item.(map[string]interface{})["_source"]
+			if !ok {
+				err = fmt.Errorf("Missing _source in item %+v", item)
+				return
+			}
+			var identities map[[3]string]struct{}
+			identities, err = ds.GetItemIdentities(doc)
+			if err != nil {
+				err = fmt.Errorf("Cannot get identities from doc %+v", doc)
+				return
+			}
+			if identities == nil {
+				continue
+			}
+			for identity := range identities {
+				idents[identity] = struct{}{}
+			}
+		}
+		*docs = []interface{}{}
+		for ident := range idents {
+			*docs = append(*docs, ident)
+		}
+		return
+	}
+	err = ForEachRawItem(ctx, ds, uploadFunc, itemsFunc)
+	return
+}
+
+// EnrichItems - perform the enrichment
+func EnrichItems(ctx *Ctx, ds DS) (err error) {
+	enrichFunc := func(docs *[]interface{}) (e error) {
+		Printf("would process %d items\n", len(*docs))
+		*docs = []interface{}{}
+		return
+	}
+	itemsFunc := func(items []interface{}, docs *[]interface{}) (e error) {
+		for _, item := range items {
+			doc, ok := item.(map[string]interface{})["_source"]
+			if !ok {
+				e = fmt.Errorf("Missing _source in item %+v", item)
+				return
+			}
+			*docs = append(*docs, doc)
+		}
+		return
+	}
+	err = ForEachRawItem(ctx, ds, enrichFunc, itemsFunc)
+	return
+}
+
+// ForEachRawItem - perform specific function for all raw items
+func ForEachRawItem(ctx *Ctx, ds DS, ufunct func(*[]interface{}) error, uitems func([]interface{}, *[]interface{}) error) (err error) {
+	dateField := JSONEscape(ds.DateField(ctx))
+	originField := JSONEscape(ds.OriginField(ctx))
+	origin := JSONEscape(ds.Origin(ctx))
+	var (
+		scroll   *string
+		dateFrom string
+		res      interface{}
+		status   int
+	)
+	headers := map[string]string{"Content-Type": "application/json"}
+	if ctx.DateFrom != nil {
+		dateFrom = ToESDate(*ctx.DateFrom)
+	}
+	attemptAt := time.Now()
+	total := 0
+	// Defer free scroll
+	defer func() {
+		if scroll == nil {
+			return
+		}
+		url := ctx.ESURL + "/_search/scroll"
+		payload := []byte(`{"scroll_id":"` + *scroll + `"}`)
+		_, _, err := Request(
+			ctx,
+			url,
+			Delete,
+			headers,
+			payload,
+			nil,
+			nil,                                 // Error statuses
+			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses
+		)
+		if err != nil {
+			Printf("Error releasing scroll %s: %+v\n", *scroll, err)
+		}
+	}()
+	thrN := GetThreadsNum(ctx)
+	nThreads := 0
+	var (
+		mtx *sync.Mutex
+		ch  chan error
+	)
+	docs := []interface{}{}
+	if thrN > 1 {
+		mtx = &sync.Mutex{}
+		ch = make(chan error)
+	}
+	funct := func(c chan error) (e error) {
+		defer func() {
+			if thrN > 1 {
+				mtx.Unlock()
+			}
+			if c != nil {
+				c <- e
+			}
+		}()
+		if thrN > 1 {
+			mtx.Lock()
+		}
+		e = ufunct(&docs)
 		return
 	}
 	needsOrigin := ds.ResumeNeedsOrigin(ctx)
@@ -621,32 +681,17 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 			Printf("Processing %d items\n", nItems)
 		}
 		if thrN > 1 {
-			allIdentitiesMtx.Lock()
+			mtx.Lock()
 		}
-		for _, item := range items {
-			doc, ok := item.(map[string]interface{})["_source"]
-			if !ok {
-				err = fmt.Errorf("Missing _source in item %+v", item)
-				return
-			}
-			var identities map[[3]string]struct{}
-			identities, err = ds.GetItemIdentities(doc)
-			if err != nil {
-				err = fmt.Errorf("Cannot get identities from doc %+v", doc)
-				return
-			}
-			if identities == nil {
-				continue
-			}
-			for identity := range identities {
-				allIdentities[identity] = struct{}{}
-			}
+		err = uitems(items, &docs)
+		if err != nil {
+			return
 		}
-		nIdentities := len(allIdentities)
-		if nIdentities >= ctx.DBBulkSize {
+		nDocs := len(docs)
+		if nDocs >= ctx.DBBulkSize {
 			if thrN > 1 {
 				go func() {
-					_ = uploadIdentities(ch)
+					_ = funct(ch)
 				}()
 				nThreads++
 				if nThreads == thrN {
@@ -657,26 +702,25 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 					nThreads--
 				}
 			} else {
-				err = uploadIdentities(nil)
+				err = funct(nil)
 				if err != nil {
-					Printf("uploadIdentities error: %+v\n", err)
 					return
 				}
 			}
 		}
 		if thrN > 1 {
-			allIdentitiesMtx.Unlock()
+			mtx.Unlock()
 		}
 		total += nItems
 	}
 	if thrN > 1 {
-		allIdentitiesMtx.Lock()
+		mtx.Lock()
 	}
-	nIdentities := len(allIdentities)
-	if nIdentities > 0 {
+	nDocs := len(docs)
+	if nDocs > 0 {
 		if thrN > 1 {
 			go func() {
-				_ = uploadIdentities(ch)
+				_ = funct(ch)
 			}()
 			nThreads++
 			if nThreads == thrN {
@@ -687,15 +731,14 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 				nThreads--
 			}
 		} else {
-			err = uploadIdentities(nil)
+			err = funct(nil)
 			if err != nil {
-				Printf("uploadIdentities error: %+v\n", err)
 				return
 			}
 		}
 	}
 	if thrN > 1 {
-		allIdentitiesMtx.Unlock()
+		mtx.Unlock()
 	}
 	for thrN > 1 && nThreads > 0 {
 		err = <-ch
@@ -707,12 +750,6 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 	if ctx.Debug > 0 {
 		Printf("Total number of items processed: %d\n", total)
 	}
-	return
-}
-
-// EnrichItems - upload identities to SH DB
-func EnrichItems(ctx *Ctx, ds DS) (err error) {
-	Printf("STUB: EnrichItems\n")
 	return
 }
 
@@ -846,6 +883,13 @@ func Enrich(ctx *Ctx, ds DS) (err error) {
 	if ds.CustomEnrich() {
 		return ds.Enrich(ctx)
 	}
+	dbConfigured := ctx.AffsDBConfigured()
+	if !dbConfigured && ctx.OnlyIdentities {
+		Fatalf("Only identities mode specified and DB not configured")
+	}
+	if dbConfigured {
+		ConnectAffiliationsDB(ctx)
+	}
 	var (
 		lastUpdate *time.Time
 		offset     *float64
@@ -897,7 +941,6 @@ func Enrich(ctx *Ctx, ds DS) (err error) {
 		return
 	}
 	if ctx.AffsDBConfigured() {
-		ConnectAffiliationsDB(ctx)
 		err = UploadIdentities(ctx, ds)
 		if err != nil {
 			Fatalf(ds.Name()+": UploadIdentities error: %+v\n", err)
