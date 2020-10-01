@@ -61,7 +61,7 @@ type DS interface {
 	ElasticRawMapping() []byte
 	ElasticRichMapping() []byte
 	GetItemIdentities(interface{}) (map[[3]string]struct{}, error)
-	EnrichItem(map[string]interface{}, string) (map[string]interface{}, error)
+	EnrichItem(map[string]interface{}, string, bool) (map[string]interface{}, error)
 }
 
 // UUIDNonEmpty - generate UUID of string args (all must be non-empty)
@@ -608,6 +608,7 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 
 // EnrichItems - perform the enrichment
 func EnrichItems(ctx *Ctx, ds DS) (err error) {
+	dbConfigured := ctx.AffsDBConfigured()
 	enrichFunc := func(docs, outDocs *[]interface{}) (e error) {
 		Printf("-> enrichFunc(%d,%d)\n", len(*docs), len(*outDocs))
 		var rich map[string]interface{}
@@ -618,7 +619,7 @@ func EnrichItems(ctx *Ctx, ds DS) (err error) {
 				return
 			}
 			for _, author := range []string{"creator", "assignee", "reporter"} {
-				rich, e = ds.EnrichItem(item, author)
+				rich, e = ds.EnrichItem(item, author, dbConfigured)
 				if e != nil {
 					return
 				}

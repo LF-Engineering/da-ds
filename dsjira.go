@@ -872,7 +872,7 @@ func (j *DSJira) GetItemIdentities(doc interface{}) (identities map[[3]string]st
 }
 
 // EnrichItem - return rich item from raw item for a given author type
-func (j *DSJira) EnrichItem(item map[string]interface{}, author string) (rich map[string]interface{}, err error) {
+func (j *DSJira) EnrichItem(item map[string]interface{}, author string, affs bool) (rich map[string]interface{}, err error) {
 	// copy RawFields
 	rich = make(map[string]interface{})
 	for _, field := range RawFields {
@@ -1123,6 +1123,9 @@ func (j *DSJira) EnrichItem(item map[string]interface{}, author string) (rich ma
 				Printf("%s: %T %+v\n", k, rich[k], rich[k])
 			}
 		}
+	}
+
+	if affs {
 	}
 	return
 }

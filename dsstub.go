@@ -139,7 +139,7 @@ func (j *DSStub) GetItemIdentities(interface{}) (map[[3]string]struct{}, error) 
 }
 
 // EnrichItem - return rich item from raw item for a given author type
-func (j *DSStub) EnrichItem(item map[string]interface{}, author string) (rich map[string]interface{}, err error) {
+func (j *DSStub) EnrichItem(item map[string]interface{}, author string, affs bool) (rich map[string]interface{}, err error) {
 	rich = item
 	return
 }
