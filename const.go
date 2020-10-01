@@ -3,6 +3,9 @@ package dads
 // OK - common constant string
 const OK string = "ok"
 
+// DADSOrigin - common constant string
+const DADSOrigin string = "dads"
+
 // Jira - common constant string
 const Jira string = "jira"
 

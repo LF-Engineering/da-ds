@@ -451,6 +451,10 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 	}
 	uploadIdentities := func(c chan error) (e error) {
 		var tx *sql.Tx
+		e = SetDBSessionOrigin(ctx)
+		if e != nil {
+			return
+		}
 		tx, e = ctx.DB.Begin()
 		if e != nil {
 			return

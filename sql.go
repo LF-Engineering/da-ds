@@ -47,6 +47,13 @@ func ConnectAffiliationsDB(ctx *Ctx) {
 	d, err := sqlx.Connect("mysql", connStr)
 	FatalOnError(err)
 	ctx.DB = d
+	FatalOnError(SetDBSessionOrigin(ctx))
+}
+
+// SetDBSessionOrigin - Set Session DB variable @origin to 'dads' so we will know which tool performed the DB operation
+func SetDBSessionOrigin(ctx *Ctx) (err error) {
+	_, err = ExecSQL(ctx, nil, "set @origin = ?", DADSOrigin)
+	return err
 }
 
 // QueryOut - display DB query
