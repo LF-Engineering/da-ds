@@ -34,6 +34,8 @@ const (
 	JiraFilterByProjectInComments = false
 	// JiraMapCustomFields - run custom fields mapping
 	JiraMapCustomFields = true
+	// ClosedStatusCategoryKey - issue closed status key
+	ClosedStatusCategoryKey = "done"
 )
 
 var (
@@ -264,7 +266,7 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 			}
 			comments, ok := res.(map[string]interface{})["comments"].([]interface{})
 			if !ok {
-				e = fmt.Errorf("unable to unmarshal comments from %+v", res)
+				e = fmt.Errorf("unable to unmarshal comments from %+v", DumpKeys(res))
 				return
 			}
 			if ctx.Debug > 1 {
@@ -292,12 +294,12 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 			}
 			totalF, ok := res.(map[string]interface{})["total"].(float64)
 			if !ok {
-				e = fmt.Errorf("unable to unmarshal total from %+v", res)
+				e = fmt.Errorf("unable to unmarshal total from %+v", DumpKeys(res))
 				return
 			}
 			maxResultsF, ok := res.(map[string]interface{})["maxResults"].(float64)
 			if !ok {
-				e = fmt.Errorf("unable to maxResults total from %+v", res)
+				e = fmt.Errorf("unable to maxResults total from %+v", DumpKeys(res))
 				return
 			}
 			total := int64(totalF)
@@ -340,7 +342,7 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 		mtx.RUnlock()
 	}
 	if !ok {
-		err = fmt.Errorf("unable to unmarshal fields from issue %+v", issue)
+		err = fmt.Errorf("unable to unmarshal fields from issue %+v", DumpKeys(issue))
 		return
 	}
 	if JiraMapCustomFields {
@@ -560,7 +562,7 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 			}()
 			issues, ok := res.(map[string]interface{})["issues"].([]interface{})
 			if !ok {
-				e = fmt.Errorf("unable to unmarshal issues from %+v", res)
+				e = fmt.Errorf("unable to unmarshal issues from %+v", DumpKeys(res))
 				return
 			}
 			if ctx.Debug > 0 {
@@ -605,12 +607,12 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 		}
 		totalF, ok := res.(map[string]interface{})["total"].(float64)
 		if !ok {
-			err = fmt.Errorf("unable to unmarshal total from %+v", res)
+			err = fmt.Errorf("unable to unmarshal total from %+v", DumpKeys(res))
 			return
 		}
 		maxResultsF, ok := res.(map[string]interface{})["maxResults"].(float64)
 		if !ok {
-			err = fmt.Errorf("unable to maxResults total from %+v", res)
+			err = fmt.Errorf("unable to maxResults total from %+v", DumpKeys(res))
 			return
 		}
 		total := int64(totalF)
@@ -754,7 +756,7 @@ func (j *DSJira) ElasticRichMapping() []byte {
 func (j *DSJira) GetItemIdentities(doc interface{}) (identities map[[3]string]struct{}, err error) {
 	fields, ok := doc.(map[string]interface{})["data"].(map[string]interface{})["fields"].(map[string]interface{})
 	if !ok {
-		err = fmt.Errorf("cannot read data.fields from doc %+v", doc)
+		err = fmt.Errorf("cannot read data.fields from doc %+v", DumpKeys(doc))
 		return
 	}
 	init := false
@@ -786,7 +788,7 @@ func (j *DSJira) GetItemIdentities(doc interface{}) (identities map[[3]string]st
 	}
 	comments, ok := doc.(map[string]interface{})["data"].(map[string]interface{})["comments_data"].([]interface{})
 	if !ok {
-		err = fmt.Errorf("cannot read data.comments_data from doc %+v", doc)
+		err = fmt.Errorf("cannot read data.comments_data from doc %+v", DumpKeys(doc))
 		return
 	}
 	for _, rawComment := range comments {
@@ -828,6 +830,250 @@ func (j *DSJira) GetItemIdentities(doc interface{}) (identities map[[3]string]st
 // EnrichItem - return rich item from raw item for a given author type
 func (j *DSJira) EnrichItem(item map[string]interface{}, author string) (rich map[string]interface{}, err error) {
 	// copy RawFields
-	rich = item
+	rich = make(map[string]interface{})
+	for _, field := range RawFields {
+		v, ok := item[field]
+		if !ok {
+			continue
+		}
+		rich[field] = v
+	}
+	issue, ok := item["data"].(map[string]interface{})
+	if !ok {
+		err = fmt.Errorf("missing data field in item %+v", DumpKeys(item))
+		return
+	}
+	rich["changes"], _ = Dig(issue, []string{"changelog", "total"}, true, false)
+	fields, ok := issue["fields"].(map[string]interface{})
+	if !ok {
+		err = fmt.Errorf("missing fields field in issue %+v", DumpKeys(issue))
+		return
+	}
+	for _, field := range []string{"assignee", "reporter"} {
+		v, _ := issue[field]
+		rich[field] = v
+	}
+	for _, field := range []string{"creator", "assignee", "reporter"} {
+		v, ok := fields[field].(map[string]interface{})
+		if !ok || v == nil {
+			continue
+		}
+		tz, ok := v["timeZone"]
+		if ok {
+			rich[field+"_tz"] = tz
+		}
+		if field == "assignee" {
+			name, _ := v["displayName"]
+			rich[field] = name
+		} else {
+			name, _ := v["displayName"]
+			login, _ := v["name"]
+			rich[field+"_name"] = name
+			rich[field+"_login"] = login
+		}
+	}
+	authorName, _ := rich[author+"_name"]
+	authorLogin, _ := rich[author+"_login"]
+	authorTz, _ := rich[author+"_tz"]
+	rich["author_type"] = author
+	rich["author_name"] = authorName
+	rich["author_login"] = authorLogin
+	rich["author_tz"] = authorTz
+	created, _ := Dig(fields, []string{"created"}, true, false)
+	rich["creation_date"] = created
+	desc, ok := fields["description"].(string)
+	if ok {
+		rich["main_description_analyzed"] = desc
+		if len(desc) > KeywordMaxlength {
+			desc = desc[:KeywordMaxlength]
+		}
+		rich["main_description"] = desc
+	}
+	rich["issue_type"], _ = Dig(fields, []string{"issuetype", "name"}, true, false)
+	rich["issue_description"], _ = Dig(fields, []string{"issuetype", "description"}, true, false)
+	labels, ok := fields["labels"]
+	if ok {
+		rich["labels"] = labels
+	}
+	priority, ok := Dig(fields, []string{"priority", "name"}, false, true)
+	if ok {
+		rich["priority"] = priority
+	}
+	progress, ok := Dig(fields, []string{"progress", "total"}, false, true)
+	if ok {
+		rich["progress_total"] = progress
+	}
+	rich["project_id"], _ = Dig(fields, []string{"project", "id"}, true, false)
+	rich["project_key"], _ = Dig(fields, []string{"project", "key"}, true, false)
+	rich["project_name"], _ = Dig(fields, []string{"project", "name"}, true, false)
+	resolution, ok := fields["resolution"]
+	if ok && resolution != nil {
+		rich["resolution_id"], _ = Dig(resolution, []string{"id"}, true, false)
+		rich["resolution_name"], _ = Dig(resolution, []string{"name"}, true, false)
+		rich["resolution_description"], _ = Dig(resolution, []string{"description"}, true, false)
+		rich["resolution_self"], _ = Dig(resolution, []string{"self"}, true, false)
+	}
+	rich["resolution_date"], _ = Dig(fields, []string{"resolutiondate"}, true, false)
+	rich["status_description"], _ = Dig(fields, []string{"status", "description"}, true, false)
+	rich["status"], _ = Dig(fields, []string{"status", "name"}, true, false)
+	rich["status_category_key"], _ = Dig(fields, []string{"status", "statusCategory", "key"}, true, false)
+	rich["is_closed"] = 0
+	catKey, _ := rich["status_category_key"].(string)
+	if catKey == ClosedStatusCategoryKey {
+		rich["is_closed"] = 1
+	}
+	rich["summary"], _ = Dig(fields, []string{"summary"}, true, false)
+	timeoriginalestimate, ok := Dig(fields, []string{"timeoriginalestimate"}, false, true)
+	if ok {
+		rich["original_time_estimation"] = timeoriginalestimate
+		if timeoriginalestimate != nil {
+			fVal, ok := timeoriginalestimate.(float64)
+			if ok {
+				rich["original_time_estimation_hours"] = int(fVal / 3600.0)
+			}
+		}
+	}
+	timespent, ok := Dig(fields, []string{"timespent"}, false, true)
+	if ok {
+		rich["time_spent"] = timespent
+		if timespent != nil {
+			fVal, ok := timespent.(float64)
+			if ok {
+				rich["time_spent_hours"] = int(fVal / 3600.0)
+			}
+		}
+	}
+	timeestimate, ok := Dig(fields, []string{"timeestimate"}, false, true)
+	if ok {
+		rich["time_estimation"] = timeestimate
+		if timeestimate != nil {
+			fVal, ok := timeestimate.(float64)
+			if ok {
+				rich["time_estimation_hours"] = int(fVal / 3600.0)
+			}
+		}
+	}
+	rich["watchers"], _ = Dig(fields, []string{"watches", "watchCount"}, true, false)
+	iKey, _ := Dig(issue, []string{"key"}, true, false)
+	key, ok := iKey.(string)
+	if !ok {
+		err = fmt.Errorf("cannot read key as string from %T %+v", iKey, iKey)
+		return
+	}
+	rich["key"] = key
+	iid, ok := issue["id"].(string)
+	if !ok {
+		err = fmt.Errorf("missing int id field in issue %+v", DumpKeys(issue))
+		return
+	}
+	rich["id"] = fmt.Sprintf("%s_issue_%s_user_%s", rich[UUID], iid, author)
+	rich["number_of_comments"] = 0
+	comments, ok := issue["comments_data"].([]interface{})
+	if ok {
+		rich["number_of_comments"] = len(comments)
+	}
+	updated, _ := Dig(fields, []string{"updated"}, false, true)
+	rich["updated"] = updated
+	origin, ok := rich[DefaultOriginField].(string)
+	if !ok {
+		err = fmt.Errorf("cannot read origin as string from rich %+v", rich)
+		return
+	}
+	rich["url"] = origin + "/browse/" + key
+	var (
+		sCreated  string
+		createdDt time.Time
+		sUpdated  string
+		updatedDt time.Time
+		e         error
+		o         bool
+	)
+	sCreated, o = created.(string)
+	if o {
+		createdDt, e = TimeParseES(sCreated)
+		if e != nil {
+			o = false
+		}
+	}
+	if o {
+		sUpdated, o = updated.(string)
+	}
+	if o {
+		updatedDt, e = TimeParseES(sUpdated)
+		if e != nil {
+			o = false
+		}
+	}
+	if o {
+		now := time.Now()
+		days := float64(updatedDt.Sub(createdDt).Seconds()) / 86400.0
+		rich["time_to_close_days"] = days
+		days = float64(now.Sub(createdDt).Seconds()) / 86400.0
+		rich["time_to_last_update_days"] = days
+	} else {
+		rich["time_to_close_days"] = nil
+		rich["time_to_last_update_days"] = nil
+	}
+	fixVersions, ok := Dig(fields, []string{"fixVersions"}, false, true)
+	if ok {
+		rels := []interface{}{}
+		versions, ok := fixVersions.([]interface{})
+		if ok {
+			for _, version := range versions {
+				name, ok := Dig(version, []string{"name"}, false, true)
+				if ok {
+					rels = append(rels, name)
+				}
+			}
+		}
+		rich["releases"] = rels
+	}
+	for field, fieldValue := range fields {
+		if !strings.HasPrefix(strings.ToLower(field), "customfield_") {
+			continue
+		}
+		f, ok := fieldValue.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		name, ok := f["Name"]
+		if !ok {
+			continue
+		}
+		if name == "Story Points" {
+			rich["story_points"] = f["value"]
+		} else if name == "Sprint" {
+			v, ok := f["value"]
+			if !ok {
+				continue
+			}
+			fmt.Printf("Sprint: %+v\n", v)
+			iAry, ok := v.([]interface{})
+			if !ok {
+				continue
+			}
+			if len(iAry) == 0 {
+				continue
+			}
+			s, ok := iAry[0].(string)
+			if !ok {
+				continue
+			}
+			rich["sprint"] = strings.Split(PartitionString(s, ",name=")[2], ",")[0]
+			rich["sprint_start"] = strings.Split(PartitionString(s, ",startDate=")[2], ",")[0]
+			rich["sprint_end"] = strings.Split(PartitionString(s, ",endDate=")[2], ",")[0]
+			rich["sprint_complete"] = strings.Split(PartitionString(s, ",completeDate=")[2], ",")[0]
+		}
+	}
+	/*
+		ks := []string{}
+		for k := range rich {
+			ks = append(ks, k)
+		}
+		sort.Strings(ks)
+		for _, k := range ks {
+			Printf("%s: %T %+v\n", k, rich[k], rich[k])
+		}
+	*/
 	return
 }

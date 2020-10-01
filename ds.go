@@ -24,6 +24,8 @@ import (
 const (
 	// BulkRefreshMode - bulk upload refresh mode, can be: false, true, wait_for
 	BulkRefreshMode = "true"
+	// KeywordMaxlength - max description length
+	KeywordMaxlength = 1000
 )
 
 var (
@@ -137,6 +139,69 @@ func UUIDAffs(ctx *Ctx, args ...string) (h string) {
 	return
 }
 
+// KeysOnly - return a corresponding interface contining only keys
+func KeysOnly(i interface{}) (o map[string]interface{}) {
+	if i == nil {
+		return
+	}
+	is, ok := i.(map[string]interface{})
+	if !ok {
+		return
+	}
+	o = make(map[string]interface{})
+	for k, v := range is {
+		o[k] = KeysOnly(v)
+	}
+	return
+}
+
+// DumpKeys - dump interface structure, but only keys, no values
+func DumpKeys(i interface{}) string {
+	return strings.Replace(fmt.Sprintf("%v", KeysOnly(i)), "map[]", "", -1)
+}
+
+// PartitionString - partition a string to [pre-sep, sep, post-sep]
+func PartitionString(s string, sep string) [3]string {
+	parts := strings.SplitN(s, sep, 2)
+	if len(parts) == 1 {
+		return [3]string{parts[0], "", ""}
+	}
+	return [3]string{parts[0], sep, parts[1]}
+}
+
+// Dig interface for array of keys
+func Dig(iface interface{}, keys []string, fatal, silent bool) (v interface{}, ok bool) {
+	miss := false
+	defer func() {
+		if !ok && fatal {
+			Fatalf("cannot dig %+v in %s", keys, DumpKeys(iface))
+		}
+	}()
+	item, o := iface.(map[string]interface{})
+	if !o {
+		Printf("Interface cannot be parsed: %+v\n", iface)
+		return
+	}
+	last := len(keys) - 1
+	for i, key := range keys {
+		var o bool
+		if i < last {
+			item, o = item[key].(map[string]interface{})
+		} else {
+			v, o = item[key]
+		}
+		if !o {
+			if !silent {
+				Printf("%+v, current: %s, %d/%d failed\n", keys, key, i+1, last+1)
+			}
+			miss = true
+			break
+		}
+	}
+	ok = !miss
+	return
+}
+
 // Request - wrapper to do any HTTP request
 // jsonStatuses - set of status code ranges to be parsed as JSONs
 // errorStatuses - specify status value ranges for which we should return error
@@ -245,7 +310,7 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 		}
 		uuid, ok := item.(map[string]interface{})[key].(string)
 		if !ok {
-			err = fmt.Errorf("missing %s property in %+v", key, item)
+			err = fmt.Errorf("missing %s property in %+v", key, DumpKeys(item))
 			return
 		}
 		hdr = []byte(`{"index":{"_id":"` + uuid + "\"}}\n")
@@ -408,7 +473,7 @@ func GetLastOffset(ctx *Ctx, ds DS, raw bool) (offset float64) {
 
 // UploadIdentities - upload identities to SH DB
 func UploadIdentities(ctx *Ctx, ds DS) (err error) {
-	uploadFunc := func(docs *[]interface{}) (e error) {
+	uploadFunc := func(docs, outDocs *[]interface{}) (e error) {
 		var tx *sql.Tx
 		e = SetDBSessionOrigin(ctx)
 		if e != nil {
@@ -509,13 +574,13 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 		for _, item := range items {
 			doc, ok := item.(map[string]interface{})["_source"]
 			if !ok {
-				err = fmt.Errorf("Missing _source in item %+v", item)
+				err = fmt.Errorf("Missing _source in item %+v", DumpKeys(item))
 				return
 			}
 			var identities map[[3]string]struct{}
 			identities, err = ds.GetItemIdentities(doc)
 			if err != nil {
-				err = fmt.Errorf("Cannot get identities from doc %+v", doc)
+				err = fmt.Errorf("Cannot get identities from doc %+v", DumpKeys(doc))
 				return
 			}
 			if identities == nil {
@@ -537,9 +602,8 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 
 // EnrichItems - perform the enrichment
 func EnrichItems(ctx *Ctx, ds DS) (err error) {
-	// total = enrich_backend.enrich_items(ocean_backend)
-	// enrich_backend.update_items(ocean_backend, enrich_backend)
-	enrichFunc := func(docs *[]interface{}) (e error) {
+	enrichFunc := func(docs, outDocs *[]interface{}) (e error) {
+		Printf("-> enrichFunc(%d,%d)\n", len(*docs), len(*outDocs))
 		var rich map[string]interface{}
 		for _, doc := range *docs {
 			item, ok := doc.(map[string]interface{})
@@ -552,17 +616,19 @@ func EnrichItems(ctx *Ctx, ds DS) (err error) {
 				if e != nil {
 					return
 				}
-				Printf("rich: %d\n", len(rich))
+				// should detect if a particular author type is missing
+				*outDocs = append(*outDocs, rich)
 			}
 		}
 		*docs = []interface{}{}
+		Printf("<- enrichFunc(%d,%d)\n", len(*docs), len(*outDocs))
 		return
 	}
 	itemsFunc := func(items []interface{}, docs *[]interface{}) (e error) {
 		for _, item := range items {
 			doc, ok := item.(map[string]interface{})["_source"]
 			if !ok {
-				e = fmt.Errorf("Missing _source in item %+v", item)
+				e = fmt.Errorf("Missing _source in item %+v", DumpKeys(item))
 				return
 			}
 			*docs = append(*docs, doc)
@@ -574,7 +640,7 @@ func EnrichItems(ctx *Ctx, ds DS) (err error) {
 }
 
 // ForEachRawItem - perform specific function for all raw items
-func ForEachRawItem(ctx *Ctx, ds DS, packSize int, ufunct func(*[]interface{}) error, uitems func([]interface{}, *[]interface{}) error) (err error) {
+func ForEachRawItem(ctx *Ctx, ds DS, packSize int, ufunct func(*[]interface{}, *[]interface{}) error, uitems func([]interface{}, *[]interface{}) error) (err error) {
 	dateField := JSONEscape(ds.DateField(ctx))
 	originField := JSONEscape(ds.OriginField(ctx))
 	origin := JSONEscape(ds.Origin(ctx))
@@ -618,6 +684,7 @@ func ForEachRawItem(ctx *Ctx, ds DS, packSize int, ufunct func(*[]interface{}) e
 		ch  chan error
 	)
 	docs := []interface{}{}
+	outDocs := []interface{}{}
 	if thrN > 1 {
 		mtx = &sync.Mutex{}
 		ch = make(chan error)
@@ -634,7 +701,7 @@ func ForEachRawItem(ctx *Ctx, ds DS, packSize int, ufunct func(*[]interface{}) e
 		if thrN > 1 {
 			mtx.Lock()
 		}
-		e = ufunct(&docs)
+		e = ufunct(&docs, &outDocs)
 		return
 	}
 	needsOrigin := ds.ResumeNeedsOrigin(ctx)
@@ -686,13 +753,13 @@ func ForEachRawItem(ctx *Ctx, ds DS, packSize int, ufunct func(*[]interface{}) e
 		}
 		sScroll, ok := res.(map[string]interface{})["_scroll_id"].(string)
 		if !ok {
-			err = fmt.Errorf("Missing _scroll_id in the response")
+			err = fmt.Errorf("Missing _scroll_id in the response %+v", DumpKeys(res))
 			return
 		}
 		scroll = &sScroll
 		items, ok := res.(map[string]interface{})["hits"].(map[string]interface{})["hits"].([]interface{})
 		if !ok {
-			err = fmt.Errorf("Missing hits.hits in the response")
+			err = fmt.Errorf("Missing hits.hits in the response %+v", DumpKeys(res))
 			return
 		}
 		nItems := len(items)
