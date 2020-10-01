@@ -56,3 +56,6 @@ const Offset = "offset"
 
 // UUID - common constant string
 const UUID = "uuid"
+
+// Unknown - common constant string
+const Unknown = "Unknown"

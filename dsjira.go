@@ -380,7 +380,6 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 			}
 			m[k] = mapping{ID: customField.ID, Name: customField.Name, Value: v}
 		}
-		// Printf("%+v\n", m)
 		for k, v := range m {
 			if ctx.Debug > 1 {
 				prev := issueFields[k]
@@ -689,7 +688,7 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 	}
 	nIssues := len(allIssues)
 	if ctx.Debug > 0 {
-		Printf("Remain %d issues to send to ElasticSearch\n", nIssues)
+		Printf("%d remaining issues to send to ElasticSearch\n", nIssues)
 	}
 	if nIssues > 0 {
 		err = SendToElastic(ctx, j, true, UUID, allIssues)
@@ -1098,7 +1097,6 @@ func (j *DSJira) EnrichItem(item map[string]interface{}, author string, affs boo
 			if !ok {
 				continue
 			}
-			fmt.Printf("Sprint: %+v\n", v)
 			iAry, ok := v.([]interface{})
 			if !ok {
 				continue
@@ -1114,18 +1112,97 @@ func (j *DSJira) EnrichItem(item map[string]interface{}, author string, affs boo
 			rich["sprint_start"] = strings.Split(PartitionString(s, ",startDate=")[2], ",")[0]
 			rich["sprint_end"] = strings.Split(PartitionString(s, ",endDate=")[2], ",")[0]
 			rich["sprint_complete"] = strings.Split(PartitionString(s, ",completeDate=")[2], ",")[0]
-			ks := []string{}
-			for k := range rich {
-				ks = append(ks, k)
-			}
-			sort.Strings(ks)
-			for _, k := range ks {
-				Printf("%s: %T %+v\n", k, rich[k], rich[k])
+		}
+	}
+	// If affiliations DB enabled
+	if affs {
+		var affsItems map[string]interface{}
+		affsItems, err = j.AffsItems(item, []string{"assignee", "reporter", "creator"}, created)
+		if err != nil {
+			return
+		}
+		for prop, value := range affsItems {
+			rich[prop] = value
+		}
+		suffs := []string{"_id", "_uuid", "_name", "_user_name", "_domain", "_gender", "_gender_acc", "_org_name", "_bot"}
+		for _, suff := range suffs {
+			rich["author"+suff] = rich[author+suff]
+		}
+		orgs, ok := Dig(rich, []string{author + "_multi_org_names"}, false, true)
+		if ok {
+			rich["author_multi_org_names"] = orgs
+		} else {
+			rich["author_multi_org_names"] = []interface{}{}
+		}
+	}
+	for prop, value := range CommonFields(j, created, Issue) {
+		rich[prop] = value
+	}
+	rich["type"] = Issue
+	// FIXME
+	ks := []string{}
+	for k := range rich {
+		ks = append(ks, k)
+	}
+	sort.Strings(ks)
+	for _, k := range ks {
+		Printf("%s: %T %+v\n", k, rich[k], rich[k])
+	}
+	os.Exit(1)
+	return
+}
+
+// AffsItems - return affiliations data items for given roles and date
+func (j *DSJira) AffsItems(item map[string]interface{}, roles []string, date interface{}) (affsItems map[string]interface{}, err error) {
+	affsItems = make(map[string]interface{})
+	var dt time.Time
+	sDate, ok := date.(string)
+	if !ok {
+		err = fmt.Errorf("%+v %T is not a string", date, date)
+		return
+	}
+	dt, err = TimeParseES(sDate)
+	if err != nil {
+		return
+	}
+	for _, role := range roles {
+		identity := j.GetRoleIdentity(item, role)
+		affsIdentity := IdenityAffsData(identity, dt, role)
+		// FIXME
+		fmt.Printf("%+v %+v\n", dt, affsIdentity)
+		for prop, value := range affsIdentity {
+			affsItems[prop] = value
+		}
+		suffs := []string{"_org_name", "_name", "_user_name"}
+		for _, suff := range suffs {
+			k := role + suff
+			_, ok := affsIdentity[k]
+			if !ok {
+				affsIdentity[k] = Unknown
 			}
 		}
 	}
+	// FIXME
+	fmt.Printf("affsItems %+v\n", affsItems)
+	return
+}
 
-	if affs {
+// GetRoleIdentity - return identity data for a given role
+func (j *DSJira) GetRoleIdentity(item map[string]interface{}, role string) (identity map[string]interface{}) {
+	identity = make(map[string]interface{})
+	fields, _ := Dig(item, []string{"data", "fields"}, true, false)
+	user, ok := Dig(fields, []string{role}, false, true)
+	if !ok {
+		return
+	}
+	data := [][2]string{
+		{"name", "displayName"},
+		{"username", "name"},
+		{"email", "emailAddress"},
+	}
+	for _, row := range data {
+		v, _ := Dig(user, []string{row[1]}, false, true)
+		identity[row[0]] = v
 	}
 	return
 }

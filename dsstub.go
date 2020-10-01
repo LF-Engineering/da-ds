@@ -143,3 +143,13 @@ func (j *DSStub) EnrichItem(item map[string]interface{}, author string, affs boo
 	rich = item
 	return
 }
+
+// AffsItems - return affiliations data items for given roles and date
+func (j *DSStub) AffsItems(rawItem map[string]interface{}, roles []string, date interface{}) (affsItems map[string]interface{}, err error) {
+	return
+}
+
+// GetRoleIdentity - return identity data for a given role
+func (j *DSStub) GetRoleIdentity(item map[string]interface{}, role string) map[string]interface{} {
+	return map[string]interface{}{"name": nil, "username": nil, "email": nil}
+}
