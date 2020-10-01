@@ -554,10 +554,14 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 	if ctx.Debug > 0 {
 		Printf("requesting issues from: %s\n", from)
 	}
+	retry := 0
 	for {
 		payloadBytes := []byte(fmt.Sprintf(`{"startAt":%d,"maxResults":%d,%s,%s}`, startAt, maxResults, jql, expand))
-		var res interface{}
-		res, _, err = Request(
+		var (
+			res    interface{}
+			status int
+		)
+		res, status, err = Request(
 			ctx,
 			url,
 			method,
@@ -568,7 +572,23 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200, 404
 		)
 		if err != nil {
-			return
+			inf := fmt.Sprintf("%d:%s:%v", status, url, string(payloadBytes))
+			retry++
+			if retry > ctx.Retry {
+				Printf("%s failed after %d retries\n", inf, retry)
+				return
+			}
+			seconds := (retry + 1) * (retry + 1)
+			Printf("will do #%d retry of %s after %d seconds\n", retry, inf, seconds)
+			time.Sleep(time.Duration(seconds) * time.Second)
+			Printf("retrying #%d retry of %s - passed %d seconds\n", retry, inf, seconds)
+			continue
+		} else {
+			if retry > 0 {
+				inf := fmt.Sprintf("%d:%s:%v", status, url, string(payloadBytes))
+				Printf("#%d retry of %s succeeded\n", retry, inf)
+			}
+			retry = 0
 		}
 		if !fieldsFetched {
 			err = <-chF
