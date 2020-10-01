@@ -378,7 +378,7 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 	esItem["backend_name"] = j.DS
 	esItem["backend_version"] = JiraBackendVersion
 	esItem["timestamp"] = fmt.Sprintf("%.06f", float64(timestamp.UnixNano())/1.0e3)
-	esItem["uuid"] = uuid
+	esItem[UUID] = uuid
 	esItem[DefaultOriginField] = origin
 	esItem[DefaultTagField] = tag
 	if thrN > 1 {
@@ -418,7 +418,7 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 					c <- e
 				}
 			}()
-			e = SendToElastic(ctx, j, true, "uuid", *allIssues)
+			e = SendToElastic(ctx, j, true, UUID, *allIssues)
 			if e != nil {
 				Printf("Error %v sending %d issues to ElasticSearch\n", e, len(*allIssues))
 			}
@@ -646,7 +646,7 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 		Printf("Remain %d issues to send to ElasticSearch\n", nIssues)
 	}
 	if nIssues > 0 {
-		err = SendToElastic(ctx, j, true, "uuid", allIssues)
+		err = SendToElastic(ctx, j, true, UUID, allIssues)
 		if err != nil {
 			Printf("Error %v sending %d issues to ElasticSearch\n", err, len(allIssues))
 		}
@@ -827,6 +827,7 @@ func (j *DSJira) GetItemIdentities(doc interface{}) (identities map[[3]string]st
 
 // EnrichItem - return rich item from raw item for a given author type
 func (j *DSJira) EnrichItem(item map[string]interface{}, author string) (rich map[string]interface{}, err error) {
+	// copy RawFields
 	rich = item
 	return
 }

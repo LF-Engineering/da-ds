@@ -21,11 +21,16 @@ import (
 // Typical run:
 // DA_DS=jira DA_JIRA_ENRICH=1 DA_JIRA_ES_URL=... DA_JIRA_RAW_INDEX=proj-raw DA_JIRA_RICH_INDEX=proj DA_JIRA_URL=https://jira.xyz.org DA_JIRA_DEBUG=1 DA_JIRA_PROJECT=proj DA_JIRA_DB_NAME=db DA_JIRA_DB_USER=u DA_JIRA_DB_PASS=p DA_JIRA_MULTI_ORIGIN=1 ./dads
 
+const (
+	// BulkRefreshMode - bulk upload refresh mode, can be: false, true, wait_for
+	BulkRefreshMode = "true"
+)
+
 var (
 	// MappingNotAnalyzeString - make all string keywords by default (not analyze them)
 	MappingNotAnalyzeString = []byte(`{"dynamic_templates":[{"notanalyzed":{"match":"*","match_mapping_type":"string","mapping":{"type":"keyword"}}},{"formatdate":{"match":"*","match_mapping_type":"date","mapping":{"type":"date","format":"strict_date_optional_time||epoch_millis"}}}]}`)
-	// BulkRefreshMode - bulk upload refresh mode, can be: false, true, wait_for
-	BulkRefreshMode = "true"
+	// RawFields - standard raw fields
+	RawFields = []string{DefaultDateField, DefaultTimestampField, DefaultOriginField, DefaultTagField, UUID, Offset}
 )
 
 // DS - interface for all data source types

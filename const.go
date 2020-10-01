@@ -50,3 +50,9 @@ const Nil = "<nil>"
 
 // None - common constant string
 const None = "None"
+
+// Offset - common constant string
+const Offset = "offset"
+
+// UUID - common constant string
+const UUID = "uuid"
