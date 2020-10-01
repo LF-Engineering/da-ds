@@ -3,6 +3,7 @@ package dads
 import (
 	"bytes"
 	"crypto/sha1"
+	"database/sql"
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
@@ -51,11 +52,11 @@ type DS interface {
 	GetItemIdentities(interface{}) (map[[3]string]struct{}, error)
 }
 
-// GetUUIDNonEmpty - generate UUID of string args (all must be non-empty)
-func GetUUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
+// UUIDNonEmpty - generate UUID of string args (all must be non-empty)
+func UUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
 	if ctx.Debug > 1 {
 		defer func() {
-			Printf("GetUUIDNonEmpty(%v) --> %s\n", args, h)
+			Printf("UUIDNonEmpty(%v) --> %s\n", args, h)
 		}()
 	}
 	stripF := func(str string) string {
@@ -69,7 +70,7 @@ func GetUUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
 	arg := ""
 	for _, a := range args {
 		if a == "" {
-			Fatalf("GetUUID(%v) - empty argument(s) not allowed", args)
+			Fatalf("UUIDNonEmpty(%v) - empty argument(s) not allowed", args)
 		}
 		if arg != "" {
 			arg += ":"
@@ -77,19 +78,22 @@ func GetUUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
 		arg += stripF(a)
 	}
 	hash := sha1.New()
+	if ctx.Debug > 1 {
+		Printf("UUIDNonEmpty(%s)\n", arg)
+	}
 	_, err := hash.Write([]byte(arg))
 	FatalOnError(err)
 	h = hex.EncodeToString(hash.Sum(nil))
 	return
 }
 
-// GetUUIDAffs - generate UUID of string args
+// UUIDAffs - generate UUID of string args
 // downcases arguments, all but first can be empty
 // if argument is Nil "<nil>" replaces with "None"
-func GetUUIDAffs(ctx *Ctx, args ...string) (h string) {
+func UUIDAffs(ctx *Ctx, args ...string) (h string) {
 	if ctx.Debug > 1 {
 		defer func() {
-			Printf("GetUUIDAffs(%v) --> %s\n", args, h)
+			Printf("UUIDAffs(%v) --> %s\n", args, h)
 		}()
 	}
 	stripF := func(str string) string {
@@ -103,7 +107,7 @@ func GetUUIDAffs(ctx *Ctx, args ...string) (h string) {
 	arg := ""
 	for i, a := range args {
 		if i == 0 && a == "" {
-			Fatalf("GetUUIDAffs(%v) - empty first argument not allowed", args)
+			Fatalf("UUIDAffs(%v) - empty first argument not allowed", args)
 		}
 		if a == Nil {
 			a = None
@@ -114,6 +118,9 @@ func GetUUIDAffs(ctx *Ctx, args ...string) (h string) {
 		arg += stripF(a)
 	}
 	hash := sha1.New()
+	if ctx.Debug > 1 {
+		Printf("UUIDAffs(%s)\n", strings.ToLower(arg))
+	}
 	_, err := hash.Write([]byte(strings.ToLower(arg)))
 	FatalOnError(err)
 	h = hex.EncodeToString(hash.Sum(nil))
@@ -434,7 +441,16 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 		ch = make(chan error)
 	}
 	uploadIdentities := func(c chan error) (e error) {
+		var tx *sql.Tx
+		tx, e = ctx.DB.Begin()
+		if e != nil {
+			return
+		}
 		defer func() {
+			if tx != nil {
+				Printf("Rolling back %d items\n", len(allIdentities))
+				_ = tx.Rollback()
+			}
 			if thrN > 1 {
 				allIdentitiesMtx.Unlock()
 			}
@@ -453,14 +469,15 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 		if ctx.Debug > 0 {
 			Printf("Bulk adding %d idents\n", nIdents)
 		}
-		nPacks := nIdents / ctx.DBBulkSize
-		if nIdents%ctx.DBBulkSize != 0 {
+		bulkSize := ctx.DBBulkSize / 6
+		nPacks := nIdents / bulkSize
+		if nIdents%bulkSize != 0 {
 			nPacks++
 		}
 		source := ds.Name()
 		for i := 0; i < nPacks; i++ {
-			from := i * ctx.DBBulkSize
-			to := from + ctx.DBBulkSize
+			from := i * bulkSize
+			to := from + bulkSize
 			if to > nIdents {
 				to = nIdents
 			}
@@ -477,7 +494,7 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 				username := ident[1]
 				email := ident[2]
 				// uuid(source, email, name, username)
-				uuid := GetUUIDAffs(ctx, source, email, name, username)
+				uuid := UUIDAffs(ctx, source, email, name, username)
 				queryU += fmt.Sprintf("(?,now()),")
 				argsU = append(argsU, uuid)
 				var (
@@ -499,16 +516,21 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 			}
 			queryU = queryU[:len(queryU)-1]
 			queryI = queryI[:len(queryI)-1]
-			_, e = ExecSQL(ctx, nil, queryU, argsU...)
+			_, e = ExecSQL(ctx, tx, queryU, argsU...)
 			if e != nil {
 				return
 			}
-			_, e = ExecSQL(ctx, nil, queryI, argsI...)
+			_, e = ExecSQL(ctx, tx, queryI, argsI...)
 			if e != nil {
 				return
 			}
 		}
+		e = tx.Commit()
+		if e != nil {
+			return
+		}
 		allIdentities = make(map[[3]string]struct{})
+		tx = nil
 		return
 	}
 	for {

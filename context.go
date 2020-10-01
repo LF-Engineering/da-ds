@@ -162,7 +162,7 @@ func (ctx *Ctx) Init() {
 			ctx.DBBulkSize = bulkSize
 		}
 	} else {
-		ctx.DBBulkSize = 100
+		ctx.DBBulkSize = 1000
 	}
 
 	// Affiliations re-enrich special flags

@@ -211,7 +211,7 @@ func TestInit(t *testing.T) {
 		DBPort:           "",
 		DBOpts:           "",
 		DBConn:           "",
-		DBBulkSize:       100,
+		DBBulkSize:       1000,
 		NoRaw:            false,
 		RefreshAffs:      false,
 		OnlyIdentities:   false,
