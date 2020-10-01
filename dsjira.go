@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -1128,11 +1127,10 @@ func (j *DSJira) EnrichItem(item map[string]interface{}, author string, affs boo
 		for _, suff := range suffs {
 			rich["author"+suff] = rich[author+suff]
 		}
-		orgs, ok := Dig(rich, []string{author + "_multi_org_names"}, false, true)
-		if ok {
-			rich["author_multi_org_names"] = orgs
-		} else {
-			rich["author_multi_org_names"] = []interface{}{}
+		orgsKey := author + MultiOrgNames
+		_, ok := Dig(rich, []string{orgsKey}, false, true)
+		if !ok {
+			rich[orgsKey] = []interface{}{}
 		}
 	}
 	for prop, value := range CommonFields(j, created, Issue) {
@@ -1140,15 +1138,17 @@ func (j *DSJira) EnrichItem(item map[string]interface{}, author string, affs boo
 	}
 	rich["type"] = Issue
 	// FIXME
-	ks := []string{}
-	for k := range rich {
-		ks = append(ks, k)
-	}
-	sort.Strings(ks)
-	for _, k := range ks {
-		Printf("%s: %T %+v\n", k, rich[k], rich[k])
-	}
-	os.Exit(1)
+	/*
+		ks := []string{}
+		for k := range rich {
+			ks = append(ks, k)
+		}
+		sort.Strings(ks)
+		for _, k := range ks {
+			Printf("%s: %T %+v\n", k, rich[k], rich[k])
+		}
+		os.Exit(1)
+	*/
 	return
 }
 
@@ -1168,8 +1168,6 @@ func (j *DSJira) AffsItems(item map[string]interface{}, roles []string, date int
 	for _, role := range roles {
 		identity := j.GetRoleIdentity(item, role)
 		affsIdentity := IdenityAffsData(identity, dt, role)
-		// FIXME
-		fmt.Printf("%+v %+v\n", dt, affsIdentity)
 		for prop, value := range affsIdentity {
 			affsItems[prop] = value
 		}
@@ -1182,8 +1180,6 @@ func (j *DSJira) AffsItems(item map[string]interface{}, roles []string, date int
 			}
 		}
 	}
-	// FIXME
-	fmt.Printf("affsItems %+v\n", affsItems)
 	return
 }
 

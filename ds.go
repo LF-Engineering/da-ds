@@ -26,6 +26,8 @@ const (
 	BulkRefreshMode = "true"
 	// KeywordMaxlength - max description length
 	KeywordMaxlength = 1000
+	// MultiOrgNames - suffix for multiple orgs affiliation data
+	MultiOrgNames = "_multi_org_names"
 )
 
 var (
@@ -494,64 +496,26 @@ func CommonFields(ds DS, date interface{}, category string) (fields map[string]i
 	return
 }
 
+// EmptyAffsItem - return empty affiliation sitem for a given role
+func EmptyAffsItem(role string) map[string]interface{} {
+	return map[string]interface{}{
+		role + "_id":         "",
+		role + "_uuid":       "",
+		role + "_name":       "",
+		role + "_user_name":  "",
+		role + "_domain":     "",
+		role + "_gender":     "",
+		role + "_gender_acc": nil,
+		role + "_org_name":   "",
+		role + "_bot":        false,
+		role + MultiOrgNames: []interface{}{},
+	}
+}
+
 // IdenityAffsData - add affiliations related data
 func IdenityAffsData(identity map[string]interface{}, dt time.Time, role string) (outItem map[string]interface{}) {
-	outItem = identity
+	outItem = EmptyAffsItem(role)
 	return
-	/*
-	   def get_item_sh_fields(self, identity=None, item_date=None, sh_id=None,
-	                          rol='author'):
-	       """ Get standard SH fields from a SH identity """
-	       eitem_sh = self.__get_item_sh_fields_empty(rol)
-
-	       if identity:
-	           # Use the identity to get the SortingHat identity
-	           sh_ids = self.get_sh_ids(identity, self.get_connector_name())
-	           eitem_sh[rol + "_id"] = sh_ids.get('id', '')
-	           eitem_sh[rol + "_uuid"] = sh_ids.get('uuid', '')
-	           eitem_sh[rol + "_name"] = identity.get('name', '')
-	           eitem_sh[rol + "_user_name"] = identity.get('username', '')
-	           eitem_sh[rol + "_domain"] = self.get_identity_domain(identity)
-	       elif sh_id:
-	           # Use the SortingHat id to get the identity
-	           eitem_sh[rol + "_id"] = sh_id
-	           eitem_sh[rol + "_uuid"] = self.get_uuid_from_id(sh_id)
-	       else:
-	           # No data to get a SH identity. Return an empty one.
-	           return eitem_sh
-
-	       # If the identity does not exists return and empty identity
-	       if rol + "_uuid" not in eitem_sh or not eitem_sh[rol + "_uuid"]:
-	           return self.__get_item_sh_fields_empty(rol, undefined=True)
-
-	       # Get the SH profile to use first this data
-	       profile = self.get_profile_sh(eitem_sh[rol + "_uuid"])
-
-	       if profile:
-	           # If name not in profile, keep its old value (should be empty or identity's name field value)
-	           eitem_sh[rol + "_name"] = profile.get('name', eitem_sh[rol + "_name"])
-
-	           email = profile.get('email', None)
-	           if email:
-	               eitem_sh[rol + "_domain"] = self.get_email_domain(email)
-
-	           eitem_sh[rol + "_gender"] = profile.get('gender', self.unknown_gender)
-	           eitem_sh[rol + "_gender_acc"] = profile.get('gender_acc', 0)
-
-	       elif not profile and sh_id:
-	           logger.warning("Can't find SH identity profile: {}".format(sh_id))
-
-	       # Ensure we always write gender fields
-	       if not eitem_sh.get(rol + "_gender"):
-	           eitem_sh[rol + "_gender"] = self.unknown_gender
-	           eitem_sh[rol + "_gender_acc"] = 0
-
-	       eitem_sh[rol + "_org_name"] = self.get_enrollment(eitem_sh[rol + "_uuid"], item_date)
-	       eitem_sh[rol + "_bot"] = self.is_bot(eitem_sh[rol + '_uuid'])
-
-	       eitem_sh[rol + MULTI_ORG_NAMES] = self.get_multi_enrollment(eitem_sh[rol + "_uuid"], item_date)
-	       return eitem_sh
-	*/
 }
 
 // UploadIdentities - upload identities to SH DB
