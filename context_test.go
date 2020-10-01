@@ -19,6 +19,7 @@ func copyContext(in *lib.Ctx) *lib.Ctx {
 		DSPrefix:         in.DSPrefix,
 		Debug:            in.Debug,
 		DebugSQL:         in.DebugSQL,
+		Retry:            in.Retry,
 		ST:               in.ST,
 		NCPUs:            in.NCPUs,
 		NCPUsScale:       in.NCPUsScale,
@@ -195,6 +196,7 @@ func TestInit(t *testing.T) {
 		DSPrefix:         "DA_DS_",
 		Debug:            0,
 		DebugSQL:         0,
+		Retry:            10,
 		ST:               false,
 		NCPUs:            0,
 		NCPUsScale:       1.0,
@@ -245,10 +247,11 @@ func TestInit(t *testing.T) {
 			&defaultContext,
 		},
 		{
-			"Setting debug levels",
+			"Setting debug levels and retry",
 			map[string]string{
 				"DA_DS_DEBUG":     "2",
 				"DA_DS_DEBUG_SQL": "1",
+				"DA_DS_RETRY":     "3",
 			},
 			dynamicSetFields(
 				t,
@@ -256,6 +259,7 @@ func TestInit(t *testing.T) {
 				map[string]interface{}{
 					"Debug":    2,
 					"DebugSQL": 1,
+					"Retry":    3,
 				},
 			),
 		},
