@@ -10,16 +10,17 @@ import (
 )
 
 var (
-	// UUIDsCacheNonEmpty caches UUIDNonEmpty calls
-	UUIDsCacheNonEmpty = map[string]string{}
-	// UUIDsCacheAffs caches UUIDAffs calls
-	UUIDsCacheAffs = map[string]string{}
+	// uuidsCacheNonEmpty caches UUIDNonEmpty calls
+	uuidsCacheNonEmpty = map[string]string{}
+	// uuidsCacheAffs caches UUIDAffs calls
+	uuidsCacheAffs = map[string]string{}
 )
 
 // UUIDNonEmpty - generate UUID of string args (all must be non-empty)
+// uses internal cache
 func UUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
 	k := strings.Join(args, ":")
-	c, ok := UUIDsCacheNonEmpty[k]
+	c, ok := uuidsCacheNonEmpty[k]
 	if ok {
 		return c
 	}
@@ -53,17 +54,24 @@ func UUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
 	_, err := hash.Write([]byte(arg))
 	FatalOnError(err)
 	h = hex.EncodeToString(hash.Sum(nil))
-	UUIDsCacheNonEmpty[k] = h
+	uuidsCacheNonEmpty[k] = h
 	return
 }
 
 // UUIDAffs - generate UUID of string args
+// uses internal cache
 // downcases arguments, all but first can be empty
 // if argument is Nil "<nil>" replaces with "None"
 func UUIDAffs(ctx *Ctx, args ...string) (h string) {
 	k := strings.Join(args, ":")
-	c, ok := UUIDsCacheAffs[k]
+	c, ok := uuidsCacheAffs[k]
 	if ok {
+		/*
+					Printf("cached: %s -> %s\n", k, c)
+			    for a, b := range uuidsCacheAffs {
+			      Printf("%s --> %s\n", a, b)
+			    }
+		*/
 		return c
 	}
 	if ctx.Debug > 1 {
@@ -99,6 +107,6 @@ func UUIDAffs(ctx *Ctx, args ...string) (h string) {
 	_, err := hash.Write([]byte(strings.ToLower(arg)))
 	FatalOnError(err)
 	h = hex.EncodeToString(hash.Sum(nil))
-	UUIDsCacheAffs[k] = h
+	uuidsCacheAffs[k] = h
 	return
 }

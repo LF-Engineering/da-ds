@@ -134,7 +134,7 @@ func (j *DSStub) ElasticRichMapping() []byte {
 // GetItemIdentities return list of item's identities, each one is [3]string
 // (name, username, email) tripples, special value Nil "<nil>" means null
 // we use string and not *string which allows nil to allow usage as a map key
-func (j *DSStub) GetItemIdentities(interface{}) (map[[3]string]struct{}, error) {
+func (j *DSStub) GetItemIdentities(ctx *Ctx, doc interface{}) (map[[3]string]struct{}, error) {
 	return map[[3]string]struct{}{}, nil
 }
 
@@ -144,17 +144,17 @@ func (j *DSStub) EnrichItems(ctx *Ctx) (err error) {
 }
 
 // EnrichItem - return rich item from raw item for a given author type
-func (j *DSStub) EnrichItem(item map[string]interface{}, author string, affs bool) (rich map[string]interface{}, err error) {
+func (j *DSStub) EnrichItem(ctx *Ctx, item map[string]interface{}, author string, affs bool) (rich map[string]interface{}, err error) {
 	rich = item
 	return
 }
 
 // AffsItems - return affiliations data items for given roles and date
-func (j *DSStub) AffsItems(rawItem map[string]interface{}, roles []string, date interface{}) (affsItems map[string]interface{}, err error) {
+func (j *DSStub) AffsItems(ctx *Ctx, rawItem map[string]interface{}, roles []string, date interface{}) (affsItems map[string]interface{}, err error) {
 	return
 }
 
 // GetRoleIdentity - return identity data for a given role
-func (j *DSStub) GetRoleIdentity(item map[string]interface{}, role string) map[string]interface{} {
+func (j *DSStub) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role string) map[string]interface{} {
 	return map[string]interface{}{"name": nil, "username": nil, "email": nil}
 }

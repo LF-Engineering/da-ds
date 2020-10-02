@@ -57,9 +57,9 @@ func SetDBSessionOrigin(ctx *Ctx) (err error) {
 }
 
 // QueryOut - display DB query
-func QueryOut(ctx *Ctx, query string, args ...interface{}) {
+func QueryOut(ctx *Ctx, err error, query string, args ...interface{}) {
 	q := query + "\n"
-	if ctx.DebugSQL > 1 && len(args) > 0 {
+	if (err != nil || ctx.DebugSQL > 1) && len(args) > 0 {
 		s := ""
 		for vi, vv := range args {
 			switch v := vv.(type) {
@@ -75,14 +75,19 @@ func QueryOut(ctx *Ctx, query string, args ...interface{}) {
 		}
 		q += "[" + s + "]\n"
 	}
-	Printf("%s", q)
+	if err != nil || ctx.DebugSQL > 0 {
+		Printf("%s", q)
+		if err != nil {
+			Printf("Error: %+v\n", err)
+		}
+	}
 }
 
 // ExecDB - execute DB query without transaction
 func ExecDB(ctx *Ctx, query string, args ...interface{}) (res sql.Result, err error) {
 	res, err = ctx.DB.Exec(query, args...)
 	if err != nil || ctx.DebugSQL > 0 {
-		QueryOut(ctx, query, args...)
+		QueryOut(ctx, err, query, args...)
 	}
 	return
 }
@@ -91,7 +96,7 @@ func ExecDB(ctx *Ctx, query string, args ...interface{}) (res sql.Result, err er
 func ExecTX(ctx *Ctx, tx *sql.Tx, query string, args ...interface{}) (res sql.Result, err error) {
 	res, err = tx.Exec(query, args...)
 	if err != nil || ctx.DebugSQL > 0 {
-		QueryOut(ctx, query, args...)
+		QueryOut(ctx, err, query, args...)
 	}
 	return
 }
@@ -102,4 +107,30 @@ func ExecSQL(ctx *Ctx, tx *sql.Tx, query string, args ...interface{}) (sql.Resul
 		return ExecDB(ctx, query, args...)
 	}
 	return ExecTX(ctx, tx, query, args...)
+}
+
+// QueryDB - query database without transaction
+func QueryDB(ctx *Ctx, query string, args ...interface{}) (rows *sql.Rows, err error) {
+	rows, err = ctx.DB.Query(query, args...)
+	if err != nil || ctx.DebugSQL > 0 {
+		QueryOut(ctx, err, query, args...)
+	}
+	return
+}
+
+// QueryTX - query database with transaction
+func QueryTX(ctx *Ctx, tx *sql.Tx, query string, args ...interface{}) (rows *sql.Rows, err error) {
+	rows, err = tx.Query(query, args...)
+	if err != nil || ctx.DebugSQL > 0 {
+		QueryOut(ctx, err, query, args...)
+	}
+	return
+}
+
+// QuerySQL - query DB using transaction if provided
+func QuerySQL(ctx *Ctx, tx *sql.Tx, query string, args ...interface{}) (*sql.Rows, error) {
+	if tx == nil {
+		return QueryDB(ctx, query, args...)
+	}
+	return QueryTX(ctx, tx, query, args...)
 }

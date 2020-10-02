@@ -53,11 +53,11 @@ type DS interface {
 	SearchFields() map[string][]string
 	ElasticRawMapping() []byte
 	ElasticRichMapping() []byte
-	GetItemIdentities(interface{}) (map[[3]string]struct{}, error)
+	GetItemIdentities(*Ctx, interface{}) (map[[3]string]struct{}, error)
 	EnrichItems(*Ctx) error
-	EnrichItem(map[string]interface{}, string, bool) (map[string]interface{}, error)
-	AffsItems(map[string]interface{}, []string, interface{}) (map[string]interface{}, error)
-	GetRoleIdentity(map[string]interface{}, string) map[string]interface{}
+	EnrichItem(*Ctx, map[string]interface{}, string, bool) (map[string]interface{}, error)
+	AffsItems(*Ctx, map[string]interface{}, []string, interface{}) (map[string]interface{}, error)
+	GetRoleIdentity(*Ctx, map[string]interface{}, string) map[string]interface{}
 }
 
 // CommonFields - common rich item fields
@@ -240,7 +240,7 @@ func ItemsIdentitiesFunc(ctx *Ctx, ds DS, items []interface{}, docs *[]interface
 			return
 		}
 		var identities map[[3]string]struct{}
-		identities, err = ds.GetItemIdentities(doc)
+		identities, err = ds.GetItemIdentities(ctx, doc)
 		if err != nil {
 			err = fmt.Errorf("Cannot get identities from doc %+v", DumpKeys(doc))
 			return

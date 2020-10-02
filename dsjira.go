@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -796,7 +795,7 @@ func (j *DSJira) ElasticRichMapping() []byte {
 // GetItemIdentities return list of item's identities, each one is [3]string
 // (name, username, email) tripples, special value Nil "<nil>" means null
 // we use string and not *string which allows nil to allow usage as a map key
-func (j *DSJira) GetItemIdentities(doc interface{}) (identities map[[3]string]struct{}, err error) {
+func (j *DSJira) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3]string]struct{}, err error) {
 	fields, ok := doc.(map[string]interface{})["data"].(map[string]interface{})["fields"].(map[string]interface{})
 	if !ok {
 		err = fmt.Errorf("cannot read data.fields from doc %+v", DumpKeys(doc))
@@ -885,7 +884,7 @@ func JiraEnrichFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last bool) (e
 			return
 		}
 		for _, author := range []string{"creator", "assignee", "reporter"} {
-			rich, err = ds.EnrichItem(item, author, dbConfigured)
+			rich, err = ds.EnrichItem(ctx, item, author, dbConfigured)
 			if err != nil {
 				return
 			}
@@ -907,7 +906,7 @@ func (j *DSJira) EnrichItems(ctx *Ctx) (err error) {
 }
 
 // EnrichItem - return rich item from raw item for a given author type
-func (j *DSJira) EnrichItem(item map[string]interface{}, author string, affs bool) (rich map[string]interface{}, err error) {
+func (j *DSJira) EnrichItem(ctx *Ctx, item map[string]interface{}, author string, affs bool) (rich map[string]interface{}, err error) {
 	// copy RawFields
 	rich = make(map[string]interface{})
 	for _, field := range RawFields {
@@ -1153,7 +1152,7 @@ func (j *DSJira) EnrichItem(item map[string]interface{}, author string, affs boo
 	// If affiliations DB enabled
 	if affs {
 		var affsItems map[string]interface{}
-		affsItems, err = j.AffsItems(item, []string{"assignee", "reporter", "creator"}, created)
+		affsItems, err = j.AffsItems(ctx, item, []string{"assignee", "reporter", "creator"}, created)
 		if err != nil {
 			return
 		}
@@ -1175,20 +1174,22 @@ func (j *DSJira) EnrichItem(item map[string]interface{}, author string, affs boo
 	}
 	rich["type"] = Issue
 	// FIXME
-	ks := []string{}
-	for k := range rich {
-		ks = append(ks, k)
-	}
-	sort.Strings(ks)
-	for _, k := range ks {
-		Printf("%s: %T %+v\n", k, rich[k], rich[k])
-	}
+	/*
+		ks := []string{}
+		for k := range rich {
+			ks = append(ks, k)
+		}
+		sort.Strings(ks)
+		for _, k := range ks {
+			Printf("%s: %T %+v\n", k, rich[k], rich[k])
+		}
+	*/
 	os.Exit(1)
 	return
 }
 
 // AffsItems - return affiliations data items for given roles and date
-func (j *DSJira) AffsItems(item map[string]interface{}, roles []string, date interface{}) (affsItems map[string]interface{}, err error) {
+func (j *DSJira) AffsItems(ctx *Ctx, item map[string]interface{}, roles []string, date interface{}) (affsItems map[string]interface{}, err error) {
 	affsItems = make(map[string]interface{})
 	var dt time.Time
 	sDate, ok := date.(string)
@@ -1201,11 +1202,11 @@ func (j *DSJira) AffsItems(item map[string]interface{}, roles []string, date int
 		return
 	}
 	for _, role := range roles {
-		identity := j.GetRoleIdentity(item, role)
+		identity := j.GetRoleIdentity(ctx, item, role)
 		if len(identity) == 0 {
 			continue
 		}
-		affsIdentity := IdenityAffsData(identity, dt, role)
+		affsIdentity := IdenityAffsData(ctx, j, identity, dt, role)
 		for prop, value := range affsIdentity {
 			affsItems[prop] = value
 		}
@@ -1222,7 +1223,7 @@ func (j *DSJira) AffsItems(item map[string]interface{}, roles []string, date int
 }
 
 // GetRoleIdentity - return identity data for a given role
-func (j *DSJira) GetRoleIdentity(item map[string]interface{}, role string) (identity map[string]interface{}) {
+func (j *DSJira) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role string) (identity map[string]interface{}) {
 	identity = make(map[string]interface{})
 	fields, _ := Dig(item, []string{"data", "fields"}, true, false)
 	user, ok := Dig(fields, []string{role}, false, true)
