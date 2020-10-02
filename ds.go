@@ -17,8 +17,6 @@ const (
 	BulkRefreshMode = "true"
 	// KeywordMaxlength - max description length
 	KeywordMaxlength = 1000
-	// MultiOrgNames - suffix for multiple orgs affiliation data
-	MultiOrgNames = "_multi_org_names"
 )
 
 var (

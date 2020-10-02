@@ -7,8 +7,14 @@ import (
 	"time"
 )
 
+const (
+	// MultiOrgNames - suffix for multiple orgs affiliation data
+	MultiOrgNames = "_multi_org_names"
+)
+
 var (
 	identityCache = map[string][2]interface{}{}
+	rollsCache    = map[string][]string{}
 )
 
 // EmptyAffsItem - return empty affiliation sitem for a given role
@@ -98,9 +104,9 @@ func AffsIdentityIDs(ctx *Ctx, ds DS, identity map[string]interface{}) (ids [2]i
 	sName, okN := name.(string)
 	sUsername, okU := username.(string)
 	k := sEmail + ":" + sName + ":" + sUsername
-	c, ok := identityCache[k]
+	ids, ok := identityCache[k]
 	if ok {
-		return c
+		return
 	}
 	if !okE {
 		sEmail = Nil
@@ -121,6 +127,46 @@ func AffsIdentityIDs(ctx *Ctx, ds DS, identity map[string]interface{}) (ids [2]i
 	ids[0] = identityFound["id"]
 	ids[1] = identityFound["uuid"]
 	identityCache[k] = ids
+	return
+}
+
+// GetEnrollments - returns enrollments for a given uuid in a given date, possibly multiple
+// uses cache with date resolution (uuid,dt.YYYYMMDD)
+func GetEnrollments(ctx *Ctx, ds DS, uuid string, dt time.Time, single bool) (orgs []string) {
+	sSep := "m"
+	if single {
+		sSep = "s"
+	}
+	k := uuid + sSep + ToYMDDate(dt)
+	orgs, ok := rollsCache[k]
+	if ok {
+		return
+	}
+	defer func() {
+		rollsCache[k] = orgs
+	}()
+	return
+}
+
+// GetEnrollmentsSingle - returns org name (or Unknown) for given uuid and date
+func GetEnrollmentsSingle(ctx *Ctx, ds DS, uuid string, dt time.Time) (org string) {
+	orgs := GetEnrollments(ctx, ds, uuid, dt, true)
+	if len(orgs) == 0 {
+		org = Unknown
+		return
+	}
+	org = orgs[0]
+	return
+}
+
+// GetEnrollmentsMulti - returns org name(s) for given uuid and name
+// Returns 1 or more organizations (all that matches the current date)
+// If none matches it returns array [Unknown]
+func GetEnrollmentsMulti(ctx *Ctx, ds DS, uuid string, dt time.Time) (orgs []string) {
+	orgs = GetEnrollments(ctx, ds, uuid, dt, false)
+	if len(orgs) == 0 {
+		orgs = append(orgs, Unknown)
+	}
 	return
 }
 
@@ -150,7 +196,8 @@ func IdenityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, dt time.T
 		outItem = EmptyAffsItem(role, true)
 		return
 	}
-	profile, err := FindObject(ctx, "profiles", "uuid", uuid.(string), []string{"name", "email", "gender", "gender_acc", "is_bot"})
+	suuid, _ := uuid.(string)
+	profile, err := FindObject(ctx, "profiles", "uuid", suuid, []string{"name", "email", "gender", "gender_acc", "is_bot"})
 	isBot := 0
 	if err == nil && profile != nil {
 		pName, _ := profile["name"]
@@ -181,11 +228,8 @@ func IdenityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, dt time.T
 		outItem[role+"_gender_acc"] = 0
 	}
 	outItem[role+"_bot"] = isBot
-	//Printf("identity=%+v, ids=%+v, profile=%+v outItem=%+v\n", identity, ids, profile, outItem)
+	outItem[role+"_org_name"] = GetEnrollmentsSingle(ctx, ds, suuid, dt)
+	outItem[role+MultiOrgNames] = GetEnrollmentsMulti(ctx, ds, suuid, dt)
+	Printf("identity=%+v, ids=%+v, profile=%+v outItem=%+v\n", identity, ids, profile, outItem)
 	return
-	/*
-		   eitem_sh[rol + "_org_name"] = self.get_enrollment(eitem_sh[rol + "_uuid"], item_date)
-		   eitem_sh[rol + MULTI_ORG_NAMES] = self.get_multi_enrollment(eitem_sh[rol + "_uuid"], item_date)
-		}
-	*/
 }

@@ -32,6 +32,11 @@ func ProgressInfo(i, n int, start time.Time, last *time.Time, period time.Durati
 	}
 }
 
+// ToYMDDate - return time formatted as YYYYMMDD
+func ToYMDDate(dt time.Time) string {
+	return fmt.Sprintf("%04d%02d%02d", dt.Year(), dt.Month(), dt.Day())
+}
+
 // ToYMDHMSDate - return time formatted as YYYY-MM-DD HH:MI:SS
 func ToYMDHMSDate(dt time.Time) string {
 	return fmt.Sprintf("%04d-%02d-%02d %02d:%02d:%02d", dt.Year(), dt.Month(), dt.Day(), dt.Hour(), dt.Minute(), dt.Second())

@@ -20,9 +20,9 @@ var (
 // uses internal cache
 func UUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
 	k := strings.Join(args, ":")
-	c, ok := uuidsCacheNonEmpty[k]
+	h, ok := uuidsCacheNonEmpty[k]
 	if ok {
-		return c
+		return
 	}
 	if ctx.Debug > 1 {
 		defer func() {
@@ -64,15 +64,9 @@ func UUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
 // if argument is Nil "<nil>" replaces with "None"
 func UUIDAffs(ctx *Ctx, args ...string) (h string) {
 	k := strings.Join(args, ":")
-	c, ok := uuidsCacheAffs[k]
+	h, ok := uuidsCacheAffs[k]
 	if ok {
-		/*
-					Printf("cached: %s -> %s\n", k, c)
-			    for a, b := range uuidsCacheAffs {
-			      Printf("%s --> %s\n", a, b)
-			    }
-		*/
-		return c
+		return
 	}
 	if ctx.Debug > 1 {
 		defer func() {
