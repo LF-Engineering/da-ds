@@ -1173,18 +1173,6 @@ func (j *DSJira) EnrichItem(ctx *Ctx, item map[string]interface{}, author string
 		rich[prop] = value
 	}
 	rich["type"] = Issue
-	// FIXME
-	/*
-		ks := []string{}
-		for k := range rich {
-			ks = append(ks, k)
-		}
-		sort.Strings(ks)
-		for _, k := range ks {
-			Printf("%s: %T %+v\n", k, rich[k], rich[k])
-		}
-	*/
-	os.Exit(1)
 	return
 }
 

@@ -199,7 +199,6 @@ func GetEnrollments(ctx *Ctx, ds DS, uuid string, dt time.Time, single bool) (or
 		return
 	}
 	defer func() {
-		Printf("ROLLZ %s --> %+v\n", k, orgs)
 		rollsCache[k] = orgs
 	}()
 	pSlug := ctx.ProjectSlug
@@ -394,6 +393,6 @@ func IdenityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, dt time.T
 	outItem[role+"_bot"] = isBot
 	outItem[role+"_org_name"] = GetEnrollmentsSingle(ctx, ds, suuid, dt)
 	outItem[role+MultiOrgNames] = GetEnrollmentsMulti(ctx, ds, suuid, dt)
-	Printf("identity=%+v, ids=%+v, profile=%+v outItem=%+v\n", identity, ids, profile, outItem)
+	// Printf("identity=%+v, ids=%+v, profile=%+v outItem=%+v\n", identity, ids, profile, outItem)
 	return
 }
