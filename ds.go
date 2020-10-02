@@ -147,13 +147,13 @@ func ESBulkUploadFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last bool) 
 	return
 }
 
-// UploadIdentitiesFunc - function to upload identities to affiliation DB
+// DBUploadIdentitiesFunc - function to upload identities to affiliation DB
 // We assume here that docs maintained my iterator func contains a list of [3]string
 // Each identity is [3]string [name, username, email]
 // outDocs is maintained with DB bulk size
 // last flag signalling that this is the last (so it must flush output then)
 //         there can be no items in input pack in the last flush call
-func UploadIdentitiesFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last bool) (e error) {
+func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last bool) (e error) {
 	bulkSize := ctx.DBBulkSize / 6
 	run := func() (err error) {
 		var tx *sql.Tx
@@ -294,6 +294,21 @@ func UploadIdentitiesFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last bo
 	return
 }
 
+// StandardItemsFunc - just get each doument's _source and append to output docs
+// items is a current pack of input items
+// docs is a pointer to where extracted identities will be stored
+func StandardItemsFunc(ctx *Ctx, ds DS, items []interface{}, docs *[]interface{}) (err error) {
+	for _, item := range items {
+		doc, ok := item.(map[string]interface{})["_source"]
+		if !ok {
+			err = fmt.Errorf("Missing _source in item %+v", DumpKeys(item))
+			return
+		}
+		*docs = append(*docs, doc)
+	}
+	return
+}
+
 // ItemsIdentitiesFunc - extract identities from items
 // items is a current pack of input items
 // docs is a pointer to where extracted identities will be stored
@@ -330,18 +345,22 @@ func ItemsIdentitiesFunc(ctx *Ctx, ds DS, items []interface{}, docs *[]interface
 	return
 }
 
-// StandardItemsFunc - just get each doument's _source and append to output docs
+// ItemsRefreshIdentitiesFunc - refresh input raw items/re-enrich
 // items is a current pack of input items
 // docs is a pointer to where extracted identities will be stored
-func StandardItemsFunc(ctx *Ctx, ds DS, items []interface{}, docs *[]interface{}) (err error) {
-	for _, item := range items {
-		doc, ok := item.(map[string]interface{})["_source"]
-		if !ok {
-			err = fmt.Errorf("Missing _source in item %+v", DumpKeys(item))
-			return
+// outDocs is not used - but function must conform to ForEachRawItem requirements
+func ItemsRefreshIdentitiesFunc(ctx *Ctx, ds DS, items []interface{}, docs *[]interface{}) (err error) {
+	/*
+		for _, item := range items {
+			doc, ok := item.(map[string]interface{})["_source"]
+			if !ok {
+				err = fmt.Errorf("Missing _source in item %+v", DumpKeys(item))
+				return
+			}
+			*docs = append(*docs, doc)
 		}
-		*docs = append(*docs, doc)
-	}
+	*/
+	fmt.Printf("ItemsRefreshIdentitiesFunc: STUB with %d items to re-enrich\n", len(items))
 	return
 }
 
@@ -349,12 +368,17 @@ func StandardItemsFunc(ctx *Ctx, ds DS, items []interface{}, docs *[]interface{}
 // We assume here that docs maintained my iterator func contains a list of [3]string
 // Each identity is [3]string [name, username, email]
 func UploadIdentities(ctx *Ctx, ds DS) (err error) {
-	err = ForEachRawItem(ctx, ds, ctx.ESScrollSize, UploadIdentitiesFunc, ItemsIdentitiesFunc)
+	err = ForEachRawItem(ctx, ds, DBUploadIdentitiesFunc, ItemsIdentitiesFunc)
+	return
+}
+
+// RefreshIdentities - refresh identities
+func RefreshIdentities(ctx *Ctx, ds DS) (err error) {
+	err = ForEachRawItem(ctx, ds, ESBulkUploadFunc, ItemsRefreshIdentitiesFunc)
 	return
 }
 
 // ForEachRawItem - perform specific function for all raw items
-// packSize: for iterating input items
 // ufunct: function to perform on input pack, receives input pack, pointer to an output pack
 //         and a flag signalling that this is the last (so it must flush output then)
 //         there can be no items in input pack in the last flush call
@@ -363,13 +387,13 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 func ForEachRawItem(
 	ctx *Ctx,
 	ds DS,
-	packSize int,
 	ufunct func(*Ctx, DS, *[]interface{}, *[]interface{}, bool) error,
 	uitems func(*Ctx, DS, []interface{}, *[]interface{}) error,
 ) (err error) {
 	dateField := JSONEscape(ds.DateField(ctx))
 	originField := JSONEscape(ds.OriginField(ctx))
 	origin := JSONEscape(ds.Origin(ctx))
+	packSize := ctx.ESScrollSize
 	var (
 		scroll   *string
 		dateFrom string
@@ -708,6 +732,9 @@ func Enrich(ctx *Ctx, ds DS) (err error) {
 	if !dbConfigured && ctx.OnlyIdentities {
 		Fatalf("Only identities mode specified and DB not configured")
 	}
+	if !dbConfigured && ctx.RefreshAffs {
+		Fatalf("Refresh affiliations mode specified and DB not configured")
+	}
 	if dbConfigured {
 		ConnectAffiliationsDB(ctx)
 	}
@@ -758,8 +785,10 @@ func Enrich(ctx *Ctx, ds DS) (err error) {
 		}
 	}
 	if ctx.RefreshAffs {
-		// FIXME
-		Printf("STUB: refresh affiliations\n")
+		err = RefreshIdentities(ctx, ds)
+		if err != nil {
+			Fatalf(ds.Name()+": RefreshIdentities error: %+v\n", err)
+		}
 		return
 	}
 	if ctx.AffsDBConfigured() {

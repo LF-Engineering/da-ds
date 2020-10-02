@@ -944,7 +944,7 @@ func JiraEnrichItemsFunc(ctx *Ctx, ds DS, items []interface{}, docs *[]interface
 
 // EnrichItems - perform the enrichment
 func (j *DSJira) EnrichItems(ctx *Ctx) (err error) {
-	err = ForEachRawItem(ctx, j, ctx.ESBulkSize, ESBulkUploadFunc, JiraEnrichItemsFunc)
+	err = ForEachRawItem(ctx, j, ESBulkUploadFunc, JiraEnrichItemsFunc)
 	return
 }
 
