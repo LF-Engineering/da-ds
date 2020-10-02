@@ -45,6 +45,9 @@ const DefaultIDField string = "id"
 // Issue - common constant string
 const Issue string = "issue"
 
+// Comment - common constant string
+const Comment string = "comment"
+
 // TooManyScrolls - this appearch in error message when too many scrolls are created
 const TooManyScrolls = "Trying to create too many scroll contexts"
 

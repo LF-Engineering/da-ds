@@ -74,3 +74,14 @@ func TimeParseES(dtStr string) (time.Time, error) {
 	ary := strings.Split(dtStr, "+")
 	return time.Parse("2006-01-02T15:04:05.000", ary[0])
 }
+
+// TimeParseInterfaceString - parse interface{} -> string -> time.Time
+func TimeParseInterfaceString(date interface{}) (dt time.Time, err error) {
+	sDate, ok := date.(string)
+	if !ok {
+		err = fmt.Errorf("%+v %T is not a string", date, date)
+		return
+	}
+	dt, err = TimeParseES(sDate)
+	return
+}

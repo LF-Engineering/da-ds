@@ -86,7 +86,7 @@ func ESBulkUploadFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last bool) 
 	run := func() (err error) {
 		nItems := len(*outDocs)
 		if ctx.Debug > 0 {
-			Printf("bulk uploading %d idents to ES\n", nItems)
+			Printf("bulk uploading %d items to ES\n", nItems)
 		}
 		nPacks := nItems / bulkSize
 		if nItems%bulkSize != 0 {

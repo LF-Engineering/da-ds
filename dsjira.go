@@ -815,6 +815,85 @@ func (j *DSJira) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3
 	return
 }
 
+// EnrichComments - return rich item from raw item for a given author type
+func EnrichComments(ctx *Ctx, ds DS, comments []interface{}, item map[string]interface{}, affs bool) (richComments []interface{}, err error) {
+	for _, comment := range comments {
+		richComment := make(map[string]interface{})
+		for _, field := range RawFields {
+			v, ok := item[field]
+			if !ok {
+				continue
+			}
+			richComment[field] = v
+		}
+		fields := []string{"project_id", "project_key", "project_name", "issue_type", "issue_description"}
+		for _, field := range fields {
+			richComment[field] = item[field]
+		}
+		richComment["issue_key"] = item["key"]
+		richComment["issue_url"] = item["url"]
+
+		authors := []string{"author", "updateAuthor"}
+		for _, a := range authors {
+			author, ok := Dig(comment, []string{a}, false, true)
+			if ok {
+				richComment[a], _ = Dig(author, []string{"displayName"}, true, false)
+				tz, ok := Dig(author, []string{"timeZone"}, false, true)
+				if ok {
+					richComment[a+"_tz"] = tz
+				}
+			} else {
+				richComment[a] = nil
+			}
+		}
+		var dt time.Time
+		var created interface{}
+		for _, field := range []string{"created", "updated"} {
+			idt, _ := Dig(comment, []string{field}, true, false)
+			dt, err = TimeParseInterfaceString(idt)
+			if err != nil {
+				richComment[field] = nil
+			} else {
+				richComment[field] = dt
+			}
+			if field == "created" {
+				created = idt
+			}
+		}
+		cid, _ := Dig(comment, []string{"id"}, true, false)
+		richComment["body"], _ = Dig(comment, []string{"body"}, true, false)
+		richComment["comment_id"] = cid
+		iid, ok := item["id"].(string)
+		if !ok {
+			err = fmt.Errorf("missing string id field in issue %+v", DumpKeys(item))
+			return
+		}
+		comid, ok := cid.(string)
+		if !ok {
+			err = fmt.Errorf("missing string id field in comment %+v", DumpKeys(comment))
+			return
+		}
+		richComment["id"] = fmt.Sprintf("%s_comment_%s", iid, comid)
+		richComment["type"] = Comment
+		if affs {
+			var affsItems map[string]interface{}
+			itemComment := map[string]interface{}{"data": map[string]interface{}{"fields": comment}}
+			affsItems, err = ds.AffsItems(ctx, itemComment, []string{"author", "updateAuthor"}, created)
+			if err != nil {
+				return
+			}
+			for prop, value := range affsItems {
+				richComment[prop] = value
+			}
+		}
+		for prop, value := range CommonFields(ds, created, Comment) {
+			richComment[prop] = value
+		}
+		richComments = append(richComments, richComment)
+	}
+	return
+}
+
 // JiraEnrichItemsFunc - iterate items and enrich them
 // items is a current pack of input items
 // docs is a pointer to where extracted identities will be stored
@@ -832,16 +911,34 @@ func JiraEnrichItemsFunc(ctx *Ctx, ds DS, items []interface{}, docs *[]interface
 			err = fmt.Errorf("Failed to parse document %+v\n", doc)
 			return
 		}
-		for _, author := range []string{"creator", "assignee", "reporter"} {
+		var richItem map[string]interface{}
+		for i, author := range []string{"creator", "assignee", "reporter"} {
 			rich, err = ds.EnrichItem(ctx, doc, author, dbConfigured)
 			if err != nil {
 				return
 			}
 			*docs = append(*docs, rich)
+			if i == 0 {
+				richItem = rich
+			}
 		}
-		// FIXME: enrich comments continue
+		comms, ok := Dig(doc, []string{"data", "comments_data"}, false, true)
+		if !ok {
+			continue
+		}
+		comments, _ := comms.([]interface{})
+		if len(comments) == 0 {
+			continue
+		}
+		var richComments []interface{}
+		richComments, err = EnrichComments(ctx, ds, comments, richItem, dbConfigured)
+		if err != nil {
+			return
+		}
+		for _, richComment := range richComments {
+			*docs = append(*docs, richComment)
+		}
 	}
-	// fmt.Printf("currently %d jira enriched docs\n", len(*docs))
 	return
 }
 
@@ -994,7 +1091,7 @@ func (j *DSJira) EnrichItem(ctx *Ctx, item map[string]interface{}, author string
 	rich["key"] = key
 	iid, ok := issue["id"].(string)
 	if !ok {
-		err = fmt.Errorf("missing int id field in issue %+v", DumpKeys(issue))
+		err = fmt.Errorf("missing string id field in issue %+v", DumpKeys(issue))
 		return
 	}
 	rich["id"] = fmt.Sprintf("%s_issue_%s_user_%s", rich[UUID], iid, author)
@@ -1126,21 +1223,16 @@ func (j *DSJira) EnrichItem(ctx *Ctx, item map[string]interface{}, author string
 func (j *DSJira) AffsItems(ctx *Ctx, item map[string]interface{}, roles []string, date interface{}) (affsItems map[string]interface{}, err error) {
 	affsItems = make(map[string]interface{})
 	var dt time.Time
-	sDate, ok := date.(string)
-	if !ok {
-		err = fmt.Errorf("%+v %T is not a string", date, date)
-		return
-	}
-	dt, err = TimeParseES(sDate)
+	dt, err = TimeParseInterfaceString(date)
 	if err != nil {
 		return
 	}
 	for _, role := range roles {
 		identity := j.GetRoleIdentity(ctx, item, role)
-		// FIXME: due to this?
 		if len(identity) == 0 {
-			Printf("warning: empty identity returned for %s %+v\n", role, DumpKeys(item))
-			//continue
+			// FIXME
+			// Printf("warning: empty identity returned for %s %+v\n", role, DumpKeys(item))
+			continue
 		}
 		affsIdentity := IdenityAffsData(ctx, j, identity, dt, role)
 		for prop, value := range affsIdentity {
