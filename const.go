@@ -42,6 +42,9 @@ const DefaultTagField string = "tag"
 // DefaultIDField - default id field
 const DefaultIDField string = "id"
 
+// DefaultAuthorField - default author field
+const DefaultAuthorField string = "author"
+
 // Issue - common constant string
 const Issue string = "issue"
 

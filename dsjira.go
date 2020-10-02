@@ -36,6 +36,8 @@ const (
 	JiraMapCustomFields = true
 	// ClosedStatusCategoryKey - issue closed status key
 	ClosedStatusCategoryKey = "done"
+	// JiraRichAuthorField - rich index author field
+	JiraRichAuthorField = "reporter"
 )
 
 var (
@@ -50,6 +52,8 @@ var (
 	JiraRawMapping = []byte(`{"dynamic":true,"properties":{"metadata__updated_on":{"type":"date"},"data":{"properties":{"renderedFields":{"dynamic":false,"properties":{}},"operations":{"dynamic":false,"properties":{}},"fields":{"dynamic":true,"properties":{"description":{"type":"text","index":true},"environment":{"type":"text","index":true}}},"changelog":{"properties":{"histories":{"dynamic":false,"properties":{}}}},"comments_data":{"properties":{"body":{"type":"text","index":true}}}}}}}`)
 	// JiraRichMapping - Jira index mapping
 	JiraRichMapping = []byte(`{"properties":{"main_description_analyzed":{"type":"text","index":true},"releases":{"type":"keyword"},"body":{"type":"text","index":true}}}`)
+	// JiraRoles - roles defined for Jira backend
+	JiraRoles = []string{"assignee", "reporter", "creator", "author", "updateAuthor"}
 )
 
 // DSJira - DS implementation for Jira
@@ -662,6 +666,11 @@ func (j *DSJira) RichIDField(*Ctx) string {
 	return DefaultIDField
 }
 
+// RichAuthorField - return rich ID field name
+func (j *DSJira) RichAuthorField(*Ctx) string {
+	return JiraRichAuthorField
+}
+
 // OffsetField - return offset field used to detect where to restart from
 func (j *DSJira) OffsetField(*Ctx) string {
 	return DefaultOffsetField
@@ -944,7 +953,7 @@ func JiraEnrichItemsFunc(ctx *Ctx, ds DS, items []interface{}, docs *[]interface
 
 // EnrichItems - perform the enrichment
 func (j *DSJira) EnrichItems(ctx *Ctx) (err error) {
-	err = ForEachRawItem(ctx, j, ESBulkUploadFunc, JiraEnrichItemsFunc)
+	err = ForEachESItem(ctx, j, true, ESBulkUploadFunc, JiraEnrichItemsFunc)
 	return
 }
 
@@ -1230,11 +1239,9 @@ func (j *DSJira) AffsItems(ctx *Ctx, item map[string]interface{}, roles []string
 	for _, role := range roles {
 		identity := j.GetRoleIdentity(ctx, item, role)
 		if len(identity) == 0 {
-			// FIXME
-			// Printf("warning: empty identity returned for %s %+v\n", role, DumpKeys(item))
 			continue
 		}
-		affsIdentity := IdenityAffsData(ctx, j, identity, dt, role)
+		affsIdentity := IdenityAffsData(ctx, j, identity, nil, dt, role)
 		for prop, value := range affsIdentity {
 			affsItems[prop] = value
 		}
@@ -1268,4 +1275,9 @@ func (j *DSJira) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role str
 		identity[row[0]] = v
 	}
 	return
+}
+
+// AllRoles - return all roles defined for Jira backend
+func (j *DSJira) AllRoles(ctx *Ctx) []string {
+	return JiraRoles
 }

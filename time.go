@@ -51,6 +51,8 @@ func ToESDate(dt time.Time) string {
 // Skipping parts from right until only YYYY id left
 func TimeParseAny(dtStr string) (time.Time, error) {
 	formats := []string{
+		"2006-01-02T15:04:05.000000",
+		"2006-01-02T15:04:05.000",
 		"2006-01-02T15:04:05Z",
 		"2006-01-02 15:04:05",
 		"2006-01-02 15:04",
@@ -69,10 +71,22 @@ func TimeParseAny(dtStr string) (time.Time, error) {
 	return time.Now(), e
 }
 
+// TimeParseESSec - parse datetime in ElasticSearch output format
+func TimeParseESSec(dtStr string) (time.Time, error) {
+	ary := strings.Split(dtStr, "+")
+	ary2 := strings.Split(ary[0], ".")
+	return time.Parse("2006-01-02T15:04:05", ary2[0])
+}
+
 // TimeParseES - parse datetime in ElasticSearch output format
 func TimeParseES(dtStr string) (time.Time, error) {
 	ary := strings.Split(dtStr, "+")
-	return time.Parse("2006-01-02T15:04:05.000", ary[0])
+	ary2 := strings.Split(ary[0], ".")
+	if len(ary2[1]) > 3 {
+		ary2[1] = ary2[1][:3]
+	}
+	s := strings.Join(ary2, ".")
+	return time.Parse("2006-01-02T15:04:05.000", s)
 }
 
 // TimeParseInterfaceString - parse interface{} -> string -> time.Time

@@ -47,6 +47,7 @@ type DS interface {
 	Origin(*Ctx) string
 	ItemID(interface{}) string
 	RichIDField(*Ctx) string
+	RichAuthorField(*Ctx) string
 	ItemUpdatedOn(interface{}) time.Time
 	ItemCategory(interface{}) string
 	SearchFields() map[string][]string
@@ -57,6 +58,7 @@ type DS interface {
 	EnrichItem(*Ctx, map[string]interface{}, string, bool) (map[string]interface{}, error)
 	AffsItems(*Ctx, map[string]interface{}, []string, interface{}) (map[string]interface{}, error)
 	GetRoleIdentity(*Ctx, map[string]interface{}, string) map[string]interface{}
+	AllRoles(*Ctx) []string
 }
 
 // CommonFields - common rich item fields
@@ -296,7 +298,7 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last 
 
 // StandardItemsFunc - just get each doument's _source and append to output docs
 // items is a current pack of input items
-// docs is a pointer to where extracted identities will be stored
+// docs is a pointer to where extracted items will be stored
 func StandardItemsFunc(ctx *Ctx, ds DS, items []interface{}, docs *[]interface{}) (err error) {
 	for _, item := range items {
 		doc, ok := item.(map[string]interface{})["_source"]
@@ -310,10 +312,9 @@ func StandardItemsFunc(ctx *Ctx, ds DS, items []interface{}, docs *[]interface{}
 }
 
 // ItemsIdentitiesFunc - extract identities from items
-// items is a current pack of input items
+// items is a current pack of ES input items
 // docs is a pointer to where extracted identities will be stored
 // each identity is [3]string [name, username, email]
-// outDocs is not used - but function must conform to ForEachRawItem requirements
 func ItemsIdentitiesFunc(ctx *Ctx, ds DS, items []interface{}, docs *[]interface{}) (err error) {
 	idents := make(map[[3]string]struct{})
 	for _, doc := range *docs {
@@ -346,21 +347,24 @@ func ItemsIdentitiesFunc(ctx *Ctx, ds DS, items []interface{}, docs *[]interface
 }
 
 // ItemsRefreshIdentitiesFunc - refresh input raw items/re-enrich
-// items is a current pack of input items
-// docs is a pointer to where extracted identities will be stored
-// outDocs is not used - but function must conform to ForEachRawItem requirements
-func ItemsRefreshIdentitiesFunc(ctx *Ctx, ds DS, items []interface{}, docs *[]interface{}) (err error) {
-	/*
-		for _, item := range items {
-			doc, ok := item.(map[string]interface{})["_source"]
-			if !ok {
-				err = fmt.Errorf("Missing _source in item %+v", DumpKeys(item))
-				return
-			}
-			*docs = append(*docs, doc)
+// items is a current pack of ES rich items
+// docs is a pointer to where updated rich items will be stored
+func ItemsRefreshIdentitiesFunc(ctx *Ctx, ds DS, richItems []interface{}, docs *[]interface{}) (err error) {
+	roles := ds.AllRoles(ctx)
+	var values map[string]interface{}
+	for _, richItem := range richItems {
+		doc, ok := richItem.(map[string]interface{})["_source"]
+		if !ok {
+			err = fmt.Errorf("Missing _source in item %+v", DumpKeys(richItem))
+			return
 		}
-	*/
-	fmt.Printf("ItemsRefreshIdentitiesFunc: STUB with %d items to re-enrich\n", len(items))
+		rich, _ := doc.(map[string]interface{})
+		values = AffsDataForRoles(ctx, ds, rich, roles)
+		for prop, val := range values {
+			rich[prop] = val
+		}
+		*docs = append(*docs, rich)
+	}
 	return
 }
 
@@ -368,25 +372,27 @@ func ItemsRefreshIdentitiesFunc(ctx *Ctx, ds DS, items []interface{}, docs *[]in
 // We assume here that docs maintained my iterator func contains a list of [3]string
 // Each identity is [3]string [name, username, email]
 func UploadIdentities(ctx *Ctx, ds DS) (err error) {
-	err = ForEachRawItem(ctx, ds, DBUploadIdentitiesFunc, ItemsIdentitiesFunc)
+	err = ForEachESItem(ctx, ds, true, DBUploadIdentitiesFunc, ItemsIdentitiesFunc)
 	return
 }
 
 // RefreshIdentities - refresh identities
+// We iterate over rich index to refresh its affiliation data
 func RefreshIdentities(ctx *Ctx, ds DS) (err error) {
-	err = ForEachRawItem(ctx, ds, ESBulkUploadFunc, ItemsRefreshIdentitiesFunc)
+	err = ForEachESItem(ctx, ds, false, ESBulkUploadFunc, ItemsRefreshIdentitiesFunc)
 	return
 }
 
-// ForEachRawItem - perform specific function for all raw items
+// ForEachESItem - perform specific function for all raw/rich items
 // ufunct: function to perform on input pack, receives input pack, pointer to an output pack
 //         and a flag signalling that this is the last (so it must flush output then)
 //         there can be no items in input pack in the last flush call
 // uitems: function to extract items from input data: can just add documents, but can also maintain a pack of documents identities
 //         receives items and pointer to output items (which then become input for ufunct)
-func ForEachRawItem(
+func ForEachESItem(
 	ctx *Ctx,
 	ds DS,
+	raw bool,
 	ufunct func(*Ctx, DS, *[]interface{}, *[]interface{}, bool) error,
 	uitems func(*Ctx, DS, []interface{}, *[]interface{}) error,
 ) (err error) {
@@ -463,7 +469,11 @@ func ForEachRawItem(
 			payload []byte
 		)
 		if scroll == nil {
-			url = ctx.ESURL + "/" + ctx.RawIndex + "/_search?scroll=" + ctx.ESScrollWait + "&size=" + strconv.Itoa(ctx.ESScrollSize)
+			if raw {
+				url = ctx.ESURL + "/" + ctx.RawIndex + "/_search?scroll=" + ctx.ESScrollWait + "&size=" + strconv.Itoa(ctx.ESScrollSize)
+			} else {
+				url = ctx.ESURL + "/" + ctx.RichIndex + "/_search?scroll=" + ctx.ESScrollWait + "&size=" + strconv.Itoa(ctx.ESScrollSize)
+			}
 			if needsOrigin {
 				if ctx.DateFrom == nil {
 					payload = []byte(`{"query":{"bool":{"filter":{"term":{"` + originField + `":"` + origin + `"}}}},"sort":{"` + dateField + `":{"order":"asc"}}}`)
@@ -479,7 +489,7 @@ func ForEachRawItem(
 				}
 			}
 			if ctx.Debug > 0 {
-				Printf("raw feed: processing query: %s\n", string(payload))
+				Printf("feed raw=%v: processing query: %s\n", raw, string(payload))
 			}
 		} else {
 			url = ctx.ESURL + "/_search/scroll"
@@ -523,7 +533,7 @@ func ForEachRawItem(
 			break
 		}
 		if ctx.Debug > 0 {
-			Printf("raw feed: processing %d items\n", nItems)
+			Printf("feed raw=%v: processing %d items\n", raw, nItems)
 		}
 		if thrN > 1 {
 			mtx.Lock()
@@ -590,7 +600,7 @@ func ForEachRawItem(
 		}
 	}
 	if ctx.Debug > 0 {
-		Printf("raw feed: total number of items processed: %d\n", total)
+		Printf("feed raw=%v: total number of items processed: %d\n", raw, total)
 	}
 	return
 }

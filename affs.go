@@ -18,6 +18,8 @@ var (
 	identityCacheMtx *sync.RWMutex
 	rollsCache       = map[string][]string{}
 	rollsCacheMtx    *sync.RWMutex
+	i2uCache         = map[string]interface{}{}
+	i2uCacheMtx      *sync.RWMutex
 )
 
 // EmptyAffsItem - return empty affiliation sitem for a given role
@@ -91,6 +93,28 @@ func FindObject(ctx *Ctx, object, key, id string, fields []string) (obj map[stri
 		return
 	}
 	err = rows.Close()
+	return
+}
+
+// GetIdentityUUID - identity's UUID for a given ID
+// uses internal cache
+func GetIdentityUUID(ctx *Ctx, ds DS, id string) (uuid interface{}) {
+	i2uCacheMtx.RLock()
+	uuid, ok := i2uCache[id]
+	i2uCacheMtx.RUnlock()
+	if ok {
+		return
+	}
+	defer func() {
+		i2uCacheMtx.Lock()
+		i2uCache[id] = uuid
+		i2uCacheMtx.Unlock()
+	}()
+	i, err := FindObject(ctx, "identities", "id", id, []string{"uuid"})
+	if err != nil || i == nil {
+		return
+	}
+	uuid = i["uuid"]
 	return
 }
 
@@ -346,25 +370,36 @@ func GetEnrollmentsMulti(ctx *Ctx, ds DS, uuid string, dt time.Time) (orgs []str
 }
 
 // IdenityAffsData - add affiliations related data
-func IdenityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, dt time.Time, role string) (outItem map[string]interface{}) {
-	ids := AffsIdentityIDs(ctx, ds, identity)
+// identity - full identity
+// aid identity ID value (which is uuis), for example from "author_id", "creator_id" etc.
+// either identity or aid must be specified
+func IdenityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, aid interface{}, dt time.Time, role string) (outItem map[string]interface{}) {
 	outItem = EmptyAffsItem(role, false)
-	outItem[role+"_id"] = ids[0]
-	outItem[role+"_uuid"] = ids[1]
-	name, _ := identity["name"]
-	if name == nil {
-		outItem[role+"_name"] = ""
-	} else {
-		outItem[role+"_name"] = name
+	var uuid interface{}
+	if identity != nil {
+		ids := AffsIdentityIDs(ctx, ds, identity)
+		outItem[role+"_id"] = ids[0]
+		outItem[role+"_uuid"] = ids[1]
+		name, _ := identity["name"]
+		if name == nil {
+			outItem[role+"_name"] = ""
+		} else {
+			outItem[role+"_name"] = name
+		}
+		username, _ := identity["username"]
+		if username == nil {
+			outItem[role+"_user_name"] = ""
+		} else {
+			outItem[role+"_user_name"] = username
+		}
+		outItem[role+"_domain"] = IdentityAffsDomain(identity)
+		uuid = ids[1]
 	}
-	username, _ := identity["username"]
-	if username == nil {
-		outItem[role+"_user_name"] = ""
-	} else {
-		outItem[role+"_user_name"] = username
+	if aid != nil {
+		outItem[role+"_id"] = aid
+		uuid = GetIdentityUUID(ctx, ds, aid.(string))
+		outItem[role+"_uuid"] = uuid
 	}
-	outItem[role+"_domain"] = IdentityAffsDomain(identity)
-	uuid := ids[1]
 	if uuid == nil {
 		outItem = EmptyAffsItem(role, true)
 		return
@@ -372,6 +407,9 @@ func IdenityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, dt time.T
 	suuid, _ := uuid.(string)
 	profile, err := FindObject(ctx, "profiles", "uuid", suuid, []string{"name", "email", "gender", "gender_acc", "is_bot"})
 	isBot := 0
+	if aid != nil && profile == nil {
+		Printf("warning cannot find profile for identity id %v\n", aid)
+	}
 	if err == nil && profile != nil {
 		pName, _ := profile["name"]
 		if pName != nil {
@@ -403,5 +441,53 @@ func IdenityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, dt time.T
 	outItem[role+"_bot"] = isBot
 	outItem[role+"_org_name"] = GetEnrollmentsSingle(ctx, ds, suuid, dt)
 	outItem[role+MultiOrgNames] = GetEnrollmentsMulti(ctx, ds, suuid, dt)
+	return
+}
+
+// AffsDataForRoles - return affs data for given roles
+func AffsDataForRoles(ctx *Ctx, ds DS, rich map[string]interface{}, roles []string) (data map[string]interface{}) {
+	data = make(map[string]interface{})
+	authorField := ds.RichAuthorField(ctx)
+	if len(roles) == 0 {
+		roles = append(roles, authorField)
+	}
+	dateField := ds.DateField(ctx)
+	idt, ok := rich[dateField]
+	if !ok {
+		Printf("cannot read %s from %v\n", dateField, DumpKeys(rich))
+		return
+	}
+	date, err := TimeParseInterfaceString(idt)
+	if err != nil {
+		Printf("cannot parse date %v\n", idt)
+		return
+	}
+	var idAuthor interface{}
+	for _, role := range roles {
+		roleID := role + "_id"
+		id, ok := Dig(rich, []string{roleID}, false, true)
+		if !ok || id == nil {
+			if ctx.Debug > 1 {
+				Printf("no %s role in %v (or nil), skipping\n", roleID, DumpKeys(rich))
+			}
+			continue
+		}
+		if role == authorField {
+			idAuthor = id
+		}
+		affsIdentity := IdenityAffsData(ctx, ds, nil, id, date, role)
+		for prop, value := range affsIdentity {
+			data[prop] = value
+		}
+	}
+	if idAuthor != nil && authorField != "author" {
+		affsIdentity := IdenityAffsData(ctx, ds, nil, idAuthor, date, "author")
+		for prop, value := range affsIdentity {
+			data[prop] = value
+		}
+	}
+	if ctx.Debug > 1 {
+		Printf("enriched %v\n", DumpKeys(data))
+	}
 	return
 }

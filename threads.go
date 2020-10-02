@@ -19,6 +19,9 @@ func SetMT() {
 	if rollsCacheMtx == nil {
 		rollsCacheMtx = &sync.RWMutex{}
 	}
+	if i2uCacheMtx == nil {
+		i2uCacheMtx = &sync.RWMutex{}
+	}
 }
 
 // GetThreadsNum returns the number of available CPUs

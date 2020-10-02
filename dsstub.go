@@ -13,7 +13,7 @@ type DSStub struct {
 // ParseArgs - parse stub specific environment variables
 func (j *DSStub) ParseArgs(ctx *Ctx) (err error) {
 	j.DS = Stub
-	fmt.Printf("DSStub.ParseArgs\n")
+	Printf("DSStub.ParseArgs\n")
 	return
 }
 
@@ -39,7 +39,7 @@ func (j *DSStub) CustomFetchRaw() bool {
 
 // FetchRaw - implement fetch raw data for stub datasource
 func (j *DSStub) FetchRaw(ctx *Ctx) (err error) {
-	fmt.Printf("DSStub.FetchRaw\n")
+	Printf("DSStub.FetchRaw\n")
 	return
 }
 
@@ -50,13 +50,13 @@ func (j *DSStub) CustomEnrich() bool {
 
 // Enrich - implement enrich data for stub datasource
 func (j *DSStub) Enrich(ctx *Ctx) (err error) {
-	fmt.Printf("DSStub.Enrich\n")
+	Printf("DSStub.Enrich\n")
 	return
 }
 
 // FetchItems - implement enrich data for stub datasource
 func (j *DSStub) FetchItems(ctx *Ctx) (err error) {
-	fmt.Printf("DSStub.FetchItems\n")
+	Printf("DSStub.FetchItems\n")
 	return
 }
 
@@ -78,6 +78,11 @@ func (j *DSStub) DateField(*Ctx) string {
 // RichIDField - return rich ID field name
 func (j *DSStub) RichIDField(*Ctx) string {
 	return DefaultIDField
+}
+
+// RichAuthorField - return rich ID field name
+func (j *DSStub) RichAuthorField(*Ctx) string {
+	return DefaultAuthorField
 }
 
 // OffsetField - return offset field used to detect where to restart from
@@ -162,4 +167,9 @@ func (j *DSStub) AffsItems(ctx *Ctx, rawItem map[string]interface{}, roles []str
 // GetRoleIdentity - return identity data for a given role
 func (j *DSStub) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role string) map[string]interface{} {
 	return map[string]interface{}{"name": nil, "username": nil, "email": nil}
+}
+
+// AllRoles - return all roles defined for Jira backend
+func (j *DSStub) AllRoles(ctx *Ctx) []string {
+	return []string{"author"}
 }
