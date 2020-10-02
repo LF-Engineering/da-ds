@@ -10,7 +10,7 @@ import (
 // SendToElastic - send items to ElasticSearch
 func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (err error) {
 	if ctx.Debug > 0 {
-		Printf("%s: saving %d items\n", ds.Name(), len(items))
+		Printf("%s(raw=%v,key=%s) ES bulk uploading %d items\n", ds.Name(), raw, key, len(items))
 	}
 	var url string
 	if raw {
@@ -53,13 +53,13 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 	)
 	if err == nil {
 		if ctx.Debug > 0 {
-			Printf("%s: saved %d items\n", ds.Name(), len(items))
+			Printf("%s(raw=%v,key=%s) ES bulk upload saved %d items\n", ds.Name(), raw, key, len(items))
 		}
 		return
 	}
-	Printf("%s: bulk upload of %d items failed, falling back to one-by-one mode\n", ds.Name(), len(items))
-	if ctx.Debug > 1 {
-		Printf("Error: %+v\n", err)
+	Printf("%s(raw=%v,key=%s) ES bulk upload of %d items failed, falling back to one-by-one mode\n", ds.Name(), raw, key, len(items))
+	if ctx.Debug > 0 {
+		Printf("%s(raw=%v,key=%s) ES bulk upload error: %+v\n", ds.Name(), raw, key, err)
 	}
 	err = nil
 	// Fallback to one-by-one inserts
@@ -85,7 +85,7 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 		)
 	}
 	if ctx.Debug > 0 {
-		Printf("%s: saved %d items (in non-bulk mode)\n", ds.Name(), len(items))
+		Printf("%s(raw=%v,key=%s) ES bulk upload saved %d items (in non-bulk mode)\n", ds.Name(), raw, key, len(items))
 	}
 	return
 }
@@ -109,7 +109,7 @@ func GetLastUpdate(ctx *Ctx, ds DS, raw bool) (lastUpdate *time.Time) {
 		url = ctx.ESURL + "/" + ctx.RichIndex + "/_search?size=0"
 	}
 	if ctx.Debug > 0 {
-		Printf("raw %v resume from date query: %s\n", raw, string(payloadBytes))
+		Printf("resume from date query raw=%v: %s\n", raw, string(payloadBytes))
 	}
 	method := Post
 	resp, _, err := Request(
@@ -134,14 +134,14 @@ func GetLastUpdate(ctx *Ctx, ds DS, raw bool) (lastUpdate *time.Time) {
 	var res resultStruct
 	err = jsoniter.Unmarshal(resp.([]byte), &res)
 	if err != nil {
-		Printf("JSON decode error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
+		Printf("resume from date JSON decode error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
 		return
 	}
 	if res.Aggs.M.Str != "" {
 		var tm time.Time
 		tm, err = TimeParseAny(res.Aggs.M.Str)
 		if err != nil {
-			Printf("Decode aggregations error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
+			Printf("resume from date decode aggregations error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
 			return
 		}
 		lastUpdate = &tm
@@ -169,7 +169,7 @@ func GetLastOffset(ctx *Ctx, ds DS, raw bool) (offset float64) {
 		url = ctx.ESURL + "/" + ctx.RichIndex + "/_search?size=0"
 	}
 	if ctx.Debug > 0 {
-		Printf("raw %v resume from offset query: %s\n", raw, string(payloadBytes))
+		Printf("resume from offset query raw=%v: %s\n", raw, string(payloadBytes))
 	}
 	method := Post
 	resp, _, err := Request(
@@ -194,7 +194,7 @@ func GetLastOffset(ctx *Ctx, ds DS, raw bool) (offset float64) {
 	var res = resultStruct{}
 	err = jsoniter.Unmarshal(resp.([]byte), &res)
 	if err != nil {
-		Printf("JSON decode error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
+		Printf("resume from offset JSON decode error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
 		return
 	}
 	if res.Aggs.M.Int != nil {

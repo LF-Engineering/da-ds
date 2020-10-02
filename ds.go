@@ -86,7 +86,7 @@ func ESBulkUploadFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last bool) 
 	run := func() (err error) {
 		nItems := len(*outDocs)
 		if ctx.Debug > 0 {
-			Printf("Bulk uploading %d idents\n", nItems)
+			Printf("bulk uploading %d idents to ES\n", nItems)
 		}
 		nPacks := nItems / bulkSize
 		if nItems%bulkSize != 0 {
@@ -99,7 +99,7 @@ func ESBulkUploadFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last bool) 
 				to = nItems
 			}
 			if ctx.Debug > 0 {
-				Printf("Bulk uploading pack #%d %d-%d (%d/%d)\n", i+1, from, to, to-from, nPacks)
+				Printf("bulk uploading pack #%d %d-%d (%d/%d) to ES\n", i+1, from, to, to-from, nPacks)
 			}
 			err = SendToElastic(ctx, ds, false, itemID, (*outDocs)[from:to])
 			if err != nil {
@@ -111,14 +111,14 @@ func ESBulkUploadFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last bool) 
 	nDocs := len(*docs)
 	nOutDocs := len(*outDocs)
 	if ctx.Debug > 0 {
-		Printf("Input pack size %d/%d last %v\n", nDocs, nOutDocs, last)
+		Printf("ES bulk upload pack size %d/%d last %v\n", nDocs, nOutDocs, last)
 	}
 	for _, doc := range *docs {
 		*outDocs = append(*outDocs, doc)
 		nOutDocs = len(*outDocs)
 		if nOutDocs >= bulkSize {
 			if ctx.Debug > 0 {
-				Printf("Bulk pack size %d/%d reached, flushing\n", nOutDocs, bulkSize)
+				Printf("ES bulk pack size %d/%d reached, flushing\n", nOutDocs, bulkSize)
 			}
 			e = run()
 			if e != nil {
@@ -140,7 +140,9 @@ func ESBulkUploadFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last bool) 
 	*docs = []interface{}{}
 	if ctx.Debug > 0 {
 		nOutDocs = len(*outDocs)
-		Printf("Left pack size 0/%d last %v\n", nOutDocs, last)
+		if nOutDocs > 0 {
+			Printf("ES bulk upload %d items left (last %v)\n", nOutDocs, last)
+		}
 	}
 	return
 }
@@ -177,12 +179,12 @@ func UploadIdentitiesFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last bo
 		nIdents := len(identsAry)
 		defer func() {
 			if tx != nil {
-				Printf("Rolling back %d items\n", nIdents)
+				Printf("rolling back %d identities insert\n", nIdents)
 				_ = tx.Rollback()
 			}
 		}()
 		if ctx.Debug > 0 {
-			Printf("Bulk adding %d -> %d idents\n", nNonUni, nIdents)
+			Printf("bulk adding %d (%d unique) idents\n", nNonUni, nIdents)
 		}
 		nPacks := nIdents / bulkSize
 		if nIdents%bulkSize != 0 {
@@ -202,7 +204,7 @@ func UploadIdentitiesFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last bo
 			argsP := []interface{}{}
 			argsI := []interface{}{}
 			if ctx.Debug > 0 {
-				Printf("Bulk adding pack #%d %d-%d (%d/%d)\n", i+1, from, to, to-from, nIdents)
+				Printf("bulk adding idents pack #%d %d-%d (%d/%d)\n", i+1, from, to, to-from, nIdents)
 			}
 			for j := from; j < to; j++ {
 				ident := identsAry[j]
@@ -258,14 +260,14 @@ func UploadIdentitiesFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last bo
 	nDocs := len(*docs)
 	nOutDocs := len(*outDocs)
 	if ctx.Debug > 0 {
-		Printf("Input pack size %d/%d last %v\n", nDocs, nOutDocs, last)
+		Printf("upload idents pack size %d/%d last %v\n", nDocs, nOutDocs, last)
 	}
 	for _, doc := range *docs {
 		*outDocs = append(*outDocs, doc)
 		nOutDocs = len(*outDocs)
 		if nOutDocs >= bulkSize {
 			if ctx.Debug > 0 {
-				Printf("Bulk pack size %d/%d reached, flushing\n", nOutDocs, bulkSize)
+				Printf("upload idents pack size %d/%d reached, flushing\n", nOutDocs, bulkSize)
 			}
 			e = run()
 			if e != nil {
@@ -287,7 +289,7 @@ func UploadIdentitiesFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last bo
 	*docs = []interface{}{}
 	if ctx.Debug > 0 {
 		nOutDocs = len(*outDocs)
-		Printf("Left pack size 0/%d last %v\n", nOutDocs, last)
+		Printf("upload idents %d items left (last %v)\n", nOutDocs, last)
 	}
 	return
 }
@@ -453,7 +455,7 @@ func ForEachRawItem(
 				}
 			}
 			if ctx.Debug > 0 {
-				Printf("processing query: %s\n", string(payload))
+				Printf("raw feed: processing query: %s\n", string(payload))
 			}
 		} else {
 			url = ctx.ESURL + "/_search/scroll"
@@ -475,7 +477,7 @@ func ForEachRawItem(
 			time.Sleep(5)
 			now := time.Now()
 			elapsed := now.Sub(attemptAt)
-			Printf("%d Retrying scroll, first attempt at %+v, elapsed %+v/%.0fs\n", len(res.(map[string]interface{})), attemptAt, elapsed, ctx.ESScrollWaitSecs)
+			Printf("%d retrying scroll, first attempt at %+v, elapsed %+v/%.0fs\n", len(res.(map[string]interface{})), attemptAt, elapsed, ctx.ESScrollWaitSecs)
 			if elapsed.Seconds() > ctx.ESScrollWaitSecs {
 				Fatalf("Tried to acquire scroll too many times, first attempt at %v, elapsed %v/%.0fs", attemptAt, elapsed, ctx.ESScrollWaitSecs)
 			}
@@ -497,7 +499,7 @@ func ForEachRawItem(
 			break
 		}
 		if ctx.Debug > 0 {
-			Printf("Processing %d items\n", nItems)
+			Printf("raw feed: processing %d items\n", nItems)
 		}
 		if thrN > 1 {
 			mtx.Lock()
@@ -564,7 +566,7 @@ func ForEachRawItem(
 		}
 	}
 	if ctx.Debug > 0 {
-		Printf("Total number of items processed: %d\n", total)
+		Printf("raw feed: total number of items processed: %d\n", total)
 	}
 	return
 }
@@ -756,6 +758,7 @@ func Enrich(ctx *Ctx, ds DS) (err error) {
 		}
 	}
 	if ctx.RefreshAffs {
+		// FIXME
 		Printf("STUB: refresh affiliations\n")
 		return
 	}

@@ -169,32 +169,13 @@ func (j *DSJira) GenSearchFields(ctx *Ctx, issue interface{}, uuid string) (fiel
 	fields = make(map[string]interface{})
 	fields[JiraDefaultSearchField] = uuid
 	for field, keyAry := range searchFields {
-		item, _ := issue.(map[string]interface{})
-		var value interface{}
-		last := len(keyAry) - 1
-		miss := false
-		for i, key := range keyAry {
-			var ok bool
-			if i < last {
-				item, ok = item[key].(map[string]interface{})
-			} else {
-				value, ok = item[key]
-			}
-			if !ok {
-				Printf("%s: %+v, current: %s, %d/%d failed\n", field, keyAry, key, i+1, last+1)
-				miss = true
-				break
-			}
-		}
-		if !miss {
-			if ctx.Debug > 1 {
-				Printf("Found %s: %+v --> %+v\n", field, keyAry, value)
-			}
+		value, ok := Dig(issue, keyAry, false, true)
+		if ok {
 			fields[field] = value
 		}
 	}
 	if ctx.Debug > 1 {
-		Printf("Returing %+v\n", fields)
+		Printf("returing search fields %+v\n", fields)
 	}
 	return
 }
@@ -273,7 +254,7 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 			if ctx.Debug > 1 {
 				nComments := len(comments)
 				if nComments > 0 {
-					Printf("Processing %d comments\n", len(comments))
+					Printf("processing %d comments\n", len(comments))
 				}
 			}
 			if thrN > 1 {
@@ -315,11 +296,11 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 				break
 			}
 			if ctx.Debug > 0 {
-				Printf("Processing next comments page from %d/%d\n", startAt, total)
+				Printf("processing next comments page from %d/%d\n", startAt, total)
 			}
 		}
 		if ctx.Debug > 1 {
-			Printf("Processed %d comments\n", startAt)
+			Printf("processed %d comments\n", startAt)
 		}
 		return
 	}
@@ -363,7 +344,7 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 		for k, v := range m {
 			if ctx.Debug > 1 {
 				prev := issueFields[k]
-				Printf("%s: %+v -> %+v\n", k, prev, v)
+				Printf("mapping custom fields %s: %+v -> %+v\n", k, prev, v)
 			}
 			issueFields[k] = v
 		}
@@ -422,7 +403,7 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 			}()
 			e = SendToElastic(ctx, j, true, UUID, *allIssues)
 			if e != nil {
-				Printf("Error %v sending %d issues to ElasticSearch\n", e, len(*allIssues))
+				Printf("error %v sending %d issues to ElasticSearch\n", e, len(*allIssues))
 			}
 			*allIssues = []interface{}{}
 			if allIssuesMtx != nil {
@@ -461,7 +442,7 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 				c <- e
 			}
 			if ctx.Debug > 0 {
-				Printf("Got %d custom fields\n", len(customFields))
+				Printf("got %d custom fields\n", len(customFields))
 			}
 		}()
 		customFields, e = j.GetFields(ctx)
@@ -570,7 +551,7 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 				return
 			}
 			if ctx.Debug > 0 {
-				Printf("Processing %d issues\n", len(issues))
+				Printf("processing %d issues\n", len(issues))
 			}
 			for _, issue := range issues {
 				var esch chan error
@@ -631,7 +612,7 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 			break
 		}
 		if ctx.Debug > 0 {
-			Printf("Processing next issues page from %d/%d\n", startAt, total)
+			Printf("processing next issues page from %d/%d\n", startAt, total)
 		}
 	}
 	for thrN > 1 && nThreads > 0 {
@@ -649,15 +630,15 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 	}
 	nIssues := len(allIssues)
 	if ctx.Debug > 0 {
-		Printf("%d remaining issues to send to ElasticSearch\n", nIssues)
+		Printf("%d remaining issues to send to ES\n", nIssues)
 	}
 	if nIssues > 0 {
 		err = SendToElastic(ctx, j, true, UUID, allIssues)
 		if err != nil {
-			Printf("Error %v sending %d issues to ElasticSearch\n", err, len(allIssues))
+			Printf("Error %v sending %d issues to ES\n", err, len(allIssues))
 		}
 	}
-	Printf("Processed %d issues\n", startAt)
+	Printf("processed %d issues\n", startAt)
 	return
 }
 
@@ -779,7 +760,6 @@ func (j *DSJira) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3
 		identity := [3]string{}
 		for i, k := range []string{"displayName", "name", "emailAddress"} {
 			v, ok := f[k].(string)
-			// Printf("%d: (%s,%s) -> (%s, %v)\n", i, field, k, v, ok)
 			if ok {
 				identity[i] = v
 				any = true
@@ -816,7 +796,6 @@ func (j *DSJira) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3
 			identity := [3]string{}
 			for i, k := range []string{"displayName", "name", "emailAddress"} {
 				v, ok := f[k].(string)
-				// Printf("%d: (%s,%s) -> (%s, %v)\n", i, field, k, v, ok)
 				if ok {
 					identity[i] = v
 					any = true
@@ -1158,8 +1137,10 @@ func (j *DSJira) AffsItems(ctx *Ctx, item map[string]interface{}, roles []string
 	}
 	for _, role := range roles {
 		identity := j.GetRoleIdentity(ctx, item, role)
+		// FIXME: due to this?
 		if len(identity) == 0 {
-			continue
+			Printf("warning: empty identity returned for %s %+v\n", role, DumpKeys(item))
+			//continue
 		}
 		affsIdentity := IdenityAffsData(ctx, j, identity, dt, role)
 		for prop, value := range affsIdentity {

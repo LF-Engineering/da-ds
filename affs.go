@@ -347,8 +347,6 @@ func GetEnrollmentsMulti(ctx *Ctx, ds DS, uuid string, dt time.Time) (orgs []str
 
 // IdenityAffsData - add affiliations related data
 func IdenityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, dt time.Time, role string) (outItem map[string]interface{}) {
-	// FIXME: possibly needs to add AffID support
-	// enrich 764
 	ids := AffsIdentityIDs(ctx, ds, identity)
 	outItem = EmptyAffsItem(role, false)
 	outItem[role+"_id"] = ids[0]
@@ -405,6 +403,5 @@ func IdenityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, dt time.T
 	outItem[role+"_bot"] = isBot
 	outItem[role+"_org_name"] = GetEnrollmentsSingle(ctx, ds, suuid, dt)
 	outItem[role+MultiOrgNames] = GetEnrollmentsMulti(ctx, ds, suuid, dt)
-	// Printf("identity=%+v, ids=%+v, profile=%+v outItem=%+v\n", identity, ids, profile, outItem)
 	return
 }

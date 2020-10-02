@@ -66,7 +66,7 @@ func Dig(iface interface{}, keys []string, fatal, silent bool) (v interface{}, o
 		}
 		if !o {
 			if !silent {
-				Printf("%+v, current: %s, %d/%d failed\n", keys, key, i+1, last+1)
+				Printf("dig %+v, current: %s, %d/%d failed\n", keys, key, i+1, last+1)
 			}
 			miss = true
 			break
@@ -191,7 +191,7 @@ func Request(
 			seconds := (retry + 1) * (retry + 1)
 			Printf("will do #%d retry of %s after %d seconds\n", retry, info(), seconds)
 			time.Sleep(time.Duration(seconds) * time.Second)
-			Printf("retrying #%d retry of %s - passed %d seconds\n", retry, info(), seconds)
+			Printf("retrying #%d retry of %s after %d seconds\n", retry, info(), seconds)
 			continue
 		}
 		if retry > 0 {
