@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"time"
 
 	jsoniter "github.com/json-iterator/go"
 )
@@ -75,11 +76,11 @@ func Dig(iface interface{}, keys []string, fatal, silent bool) (v interface{}, o
 	return
 }
 
-// Request - wrapper to do any HTTP request
+// RequestNoRetry - wrapper to do any HTTP request
 // jsonStatuses - set of status code ranges to be parsed as JSONs
 // errorStatuses - specify status value ranges for which we should return error
 // okStatuses - specify status value ranges for which we should return error (only taken into account if not empty)
-func Request(
+func RequestNoRetry(
 	ctx *Ctx,
 	url, method string,
 	headers map[string]string,
@@ -156,4 +157,46 @@ func Request(
 		}
 	}
 	return
+}
+
+// Request - wrapper around RequestNoRetry supporting retries
+func Request(
+	ctx *Ctx,
+	url, method string,
+	headers map[string]string,
+	payload []byte,
+	jsonStatuses, errorStatuses, okStatuses map[[2]int]struct{},
+	retryRequest bool,
+) (result interface{}, status int, err error) {
+	if !retryRequest {
+		result, status, err = RequestNoRetry(ctx, url, method, headers, payload, jsonStatuses, errorStatuses, okStatuses)
+		return
+	}
+	retry := 0
+	for {
+		result, status, err = RequestNoRetry(ctx, url, method, headers, payload, jsonStatuses, errorStatuses, okStatuses)
+		info := func() (inf string) {
+			inf = fmt.Sprintf("%s.%s:%s=%d", method, url, string(payload), status)
+			if ctx.Debug > 0 {
+				inf += fmt.Sprintf(" error: %+v", err)
+			}
+			return
+		}
+		if err != nil {
+			retry++
+			if retry > ctx.Retry {
+				Printf("%s failed after %d retries\n", info(), retry)
+				return
+			}
+			seconds := (retry + 1) * (retry + 1)
+			Printf("will do #%d retry of %s after %d seconds\n", retry, info(), seconds)
+			time.Sleep(time.Duration(seconds) * time.Second)
+			Printf("retrying #%d retry of %s - passed %d seconds\n", retry, info(), seconds)
+			continue
+		}
+		if retry > 0 {
+			Printf("#%d retry of %s succeeded\n", retry, info())
+		}
+		return
+	}
 }

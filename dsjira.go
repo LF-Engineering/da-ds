@@ -144,7 +144,7 @@ func (j *DSJira) GetFields(ctx *Ctx) (customFields map[string]JiraField, err err
 		headers = map[string]string{"Authorization": "Basic " + j.Token}
 	}
 	var resp interface{}
-	resp, _, err = Request(ctx, url, method, headers, nil, nil, nil, map[[2]int]struct{}{{200, 200}: {}})
+	resp, _, err = Request(ctx, url, method, headers, nil, nil, nil, map[[2]int]struct{}{{200, 200}: {}}, true)
 	if err != nil {
 		return
 	}
@@ -248,14 +248,10 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 			}
 		}
 		method := Get
-		retry := 0
 		for {
 			payloadBytes := []byte(fmt.Sprintf(`{"startAt":%d,"maxResults":%d,%s}`, startAt, maxResults, jql))
-			var (
-				res    interface{}
-				status int
-			)
-			res, status, e = Request(
+			var res interface{}
+			res, _, e = Request(
 				ctx,
 				url,
 				method,
@@ -264,25 +260,10 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 				map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses
 				nil,                                 // Error statuses
 				map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
+				true,
 			)
 			if e != nil {
-				inf := fmt.Sprintf("%d:%s:%v", status, url, string(payloadBytes))
-				retry++
-				if retry > ctx.Retry {
-					Printf("%s failed after %d retries\n", inf, retry)
-					return
-				}
-				seconds := (retry + 1) * (retry + 1)
-				Printf("will do #%d retry of %s after %d seconds\n", retry, inf, seconds)
-				time.Sleep(time.Duration(seconds) * time.Second)
-				Printf("retrying #%d retry of %s - passed %d seconds\n", retry, inf, seconds)
-				continue
-			} else {
-				if retry > 0 {
-					inf := fmt.Sprintf("%d:%s:%v", status, url, string(payloadBytes))
-					Printf("#%d retry of %s succeeded\n", retry, inf)
-				}
-				retry = 0
+				return
 			}
 			comments, ok := res.(map[string]interface{})["comments"].([]interface{})
 			if !ok {
@@ -552,14 +533,10 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 	if ctx.Debug > 0 {
 		Printf("requesting issues from: %s\n", from)
 	}
-	retry := 0
 	for {
 		payloadBytes := []byte(fmt.Sprintf(`{"startAt":%d,"maxResults":%d,%s,%s}`, startAt, maxResults, jql, expand))
-		var (
-			res    interface{}
-			status int
-		)
-		res, status, err = Request(
+		var res interface{}
+		res, _, err = Request(
 			ctx,
 			url,
 			method,
@@ -568,25 +545,10 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 			map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses
 			nil,                                 // Error statuses
 			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200, 404
+			true,
 		)
 		if err != nil {
-			inf := fmt.Sprintf("%d:%s:%v", status, url, string(payloadBytes))
-			retry++
-			if retry > ctx.Retry {
-				Printf("%s failed after %d retries\n", inf, retry)
-				return
-			}
-			seconds := (retry + 1) * (retry + 1)
-			Printf("will do #%d retry of %s after %d seconds\n", retry, inf, seconds)
-			time.Sleep(time.Duration(seconds) * time.Second)
-			Printf("retrying #%d retry of %s - passed %d seconds\n", retry, inf, seconds)
-			continue
-		} else {
-			if retry > 0 {
-				inf := fmt.Sprintf("%d:%s:%v", status, url, string(payloadBytes))
-				Printf("#%d retry of %s succeeded\n", retry, inf)
-			}
-			retry = 0
+			return
 		}
 		if !fieldsFetched {
 			err = <-chF
@@ -888,9 +850,6 @@ func JiraEnrichFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last bool) (e
 			if err != nil {
 				return
 			}
-			// FIXME continue
-			// should detect if a particular author type is missing
-			// continue: enriched/jira 449 - enrich comments, handle packs, send to ES
 			*outDocs = append(*outDocs, rich)
 		}
 	}

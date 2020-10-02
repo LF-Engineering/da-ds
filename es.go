@@ -49,6 +49,7 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 		nil,                                 // JSON statuses
 		map[[2]int]struct{}{{400, 599}: {}}, // error statuses: 400-599
 		nil,                                 // OK statuses
+		true,
 	)
 	if err == nil {
 		if ctx.Debug > 0 {
@@ -80,6 +81,7 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 			nil,                                 // JSON statuses
 			map[[2]int]struct{}{{400, 599}: {}}, // error statuses: 400-599
 			map[[2]int]struct{}{{200, 201}: {}}, // OK statuses: 200-201
+			true,
 		)
 	}
 	if ctx.Debug > 0 {
@@ -119,6 +121,7 @@ func GetLastUpdate(ctx *Ctx, ds DS, raw bool) (lastUpdate *time.Time) {
 		nil,                                 // JSON statuses
 		nil,                                 // Error statuses
 		map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200, 404
+		true,
 	)
 	FatalOnError(err)
 	type resultStruct struct {
@@ -178,6 +181,7 @@ func GetLastOffset(ctx *Ctx, ds DS, raw bool) (offset float64) {
 		nil,                                 // JSON statuses
 		nil,                                 // Error statuses
 		map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200, 404
+		true,
 	)
 	FatalOnError(err)
 	type resultStruct struct {

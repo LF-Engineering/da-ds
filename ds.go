@@ -325,9 +325,11 @@ func ForEachRawItem(
 			nil,
 			nil,                                 // Error statuses
 			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses
+			false,
 		)
 		if err != nil {
 			Printf("Error releasing scroll %s: %+v\n", *scroll, err)
+			err = nil
 		}
 	}()
 	thrN := GetThreadsNum(ctx)
@@ -395,6 +397,7 @@ func ForEachRawItem(
 			map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses
 			nil,                                 // Error statuses
 			map[[2]int]struct{}{{200, 200}: {}, {500, 500}: {}}, // OK statuses
+			true,
 		)
 		FatalOnError(err)
 		if scroll == nil && status == 500 && strings.Contains(string(res.([]byte)), TooManyScrolls) {
@@ -513,6 +516,7 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 		nil,                                 // JSON statuses
 		map[[2]int]struct{}{{401, 599}: {}}, // error statuses: 401-599
 		nil,                                 // OK statuses
+		true,
 	)
 	FatalOnError(err)
 	// DS specific raw index mapping
@@ -532,6 +536,7 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 		nil,
 		nil,
 		map[[2]int]struct{}{{200, 200}: {}},
+		true,
 	)
 	FatalOnError(err)
 	// Global not analyze string mapping
@@ -544,6 +549,7 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 		nil,
 		nil,
 		map[[2]int]struct{}{{200, 200}: {}},
+		true,
 	)
 	FatalOnError(err)
 	return

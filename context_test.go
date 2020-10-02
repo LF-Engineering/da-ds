@@ -196,7 +196,7 @@ func TestInit(t *testing.T) {
 		DSPrefix:         "DA_DS_",
 		Debug:            0,
 		DebugSQL:         0,
-		Retry:            10,
+		Retry:            5,
 		ST:               false,
 		NCPUs:            0,
 		NCPUsScale:       1.0,
