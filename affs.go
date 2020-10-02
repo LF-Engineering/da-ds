@@ -44,7 +44,6 @@ func EmptyAffsItem(role string, undef bool) map[string]interface{} {
 
 // IdentityAffsDomain -return domain for given identity using email if specified
 func IdentityAffsDomain(identity map[string]interface{}) (domain interface{}) {
-	// domain = self.get_email_domain(identity['email'])
 	email, ok := identity["email"].(string)
 	if ok {
 		ary := strings.Split(email, "@")
