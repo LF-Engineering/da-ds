@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -47,7 +48,7 @@ var (
 		"issue_key":    {"key"},
 	}
 	// JiraRawMapping - Jira index mapping
-	JiraRawMapping = []byte(`{"dynamic":true,"properties":{"metadata__updated_on":{"type": "date"},"data":{"properties":{"renderedFields":{"dynamic":false,"properties":{}},"operations":{"dynamic":false,"properties":{}},"fields":{"dynamic":true,"properties":{"description":{"type":"text","index":true},"environment":{"type":"text","index":true}}},"changelog":{"properties":{"histories":{"dynamic":false,"properties":{}}}},"comments_data":{"properties":{"body":{"type":"text","index":true}}}}}}}`)
+	JiraRawMapping = []byte(`{"dynamic":true,"properties":{"metadata__updated_on":{"type":"date"},"data":{"properties":{"renderedFields":{"dynamic":false,"properties":{}},"operations":{"dynamic":false,"properties":{}},"fields":{"dynamic":true,"properties":{"description":{"type":"text","index":true},"environment":{"type":"text","index":true}}},"changelog":{"properties":{"histories":{"dynamic":false,"properties":{}}}},"comments_data":{"properties":{"body":{"type":"text","index":true}}}}}}}`)
 	// JiraRichMapping - Jira index mapping
 	JiraRichMapping = []byte(`{"properties":{"main_description_analyzed":{"type":"text","index":true},"releases":{"type":"keyword"},"body":{"type":"text","index":true}}}`)
 )
@@ -869,6 +870,42 @@ func (j *DSJira) GetItemIdentities(doc interface{}) (identities map[[3]string]st
 	return
 }
 
+// JiraEnrichFunc - perform Jira specific enrichment
+// We assume here that docs maintained my iterator func contains a list of issues
+// outDocs fills with enriched items and is uploaded to ES every time it reaches ES Bulk size
+// last flag signalling that this is the last (so it must flush output then)
+//         there can be no items in input pack in the last flush call
+func JiraEnrichFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last bool) (err error) {
+	dbConfigured := ctx.AffsDBConfigured()
+	var rich map[string]interface{}
+	for _, doc := range *docs {
+		item, ok := doc.(map[string]interface{})
+		if !ok {
+			err = fmt.Errorf("Failed to parse document %+v\n", doc)
+			return
+		}
+		for _, author := range []string{"creator", "assignee", "reporter"} {
+			rich, err = ds.EnrichItem(item, author, dbConfigured)
+			if err != nil {
+				return
+			}
+			// FIXME continue
+			// should detect if a particular author type is missing
+			// continue: enriched/jira 449 - enrich comments, handle packs, send to ES
+			*outDocs = append(*outDocs, rich)
+		}
+	}
+	*docs = []interface{}{}
+	// FIXME: handle outDocs in pack and clean it after processed
+	return
+}
+
+// EnrichItems - perform the enrichment
+func (j *DSJira) EnrichItems(ctx *Ctx) (err error) {
+	err = ForEachRawItem(ctx, j, ctx.ESBulkSize, JiraEnrichFunc, StandardItemsFunc)
+	return
+}
+
 // EnrichItem - return rich item from raw item for a given author type
 func (j *DSJira) EnrichItem(item map[string]interface{}, author string, affs bool) (rich map[string]interface{}, err error) {
 	// copy RawFields
@@ -1138,17 +1175,15 @@ func (j *DSJira) EnrichItem(item map[string]interface{}, author string, affs boo
 	}
 	rich["type"] = Issue
 	// FIXME
-	/*
-		ks := []string{}
-		for k := range rich {
-			ks = append(ks, k)
-		}
-		sort.Strings(ks)
-		for _, k := range ks {
-			Printf("%s: %T %+v\n", k, rich[k], rich[k])
-		}
-		os.Exit(1)
-	*/
+	ks := []string{}
+	for k := range rich {
+		ks = append(ks, k)
+	}
+	sort.Strings(ks)
+	for _, k := range ks {
+		Printf("%s: %T %+v\n", k, rich[k], rich[k])
+	}
+	os.Exit(1)
 	return
 }
 
@@ -1167,6 +1202,9 @@ func (j *DSJira) AffsItems(item map[string]interface{}, roles []string, date int
 	}
 	for _, role := range roles {
 		identity := j.GetRoleIdentity(item, role)
+		if len(identity) == 0 {
+			continue
+		}
 		affsIdentity := IdenityAffsData(identity, dt, role)
 		for prop, value := range affsIdentity {
 			affsItems[prop] = value

@@ -1,21 +1,12 @@
 package dads
 
 import (
-	"bytes"
-	"crypto/sha1"
 	"database/sql"
-	"encoding/hex"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
-
-	jsoniter "github.com/json-iterator/go"
-	"golang.org/x/text/transform"
-	"golang.org/x/text/unicode/norm"
 )
 
 // Typical run:
@@ -63,425 +54,14 @@ type DS interface {
 	ElasticRawMapping() []byte
 	ElasticRichMapping() []byte
 	GetItemIdentities(interface{}) (map[[3]string]struct{}, error)
+	EnrichItems(*Ctx) error
 	EnrichItem(map[string]interface{}, string, bool) (map[string]interface{}, error)
 	AffsItems(map[string]interface{}, []string, interface{}) (map[string]interface{}, error)
 	GetRoleIdentity(map[string]interface{}, string) map[string]interface{}
 }
 
-// UUIDNonEmpty - generate UUID of string args (all must be non-empty)
-func UUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
-	if ctx.Debug > 1 {
-		defer func() {
-			Printf("UUIDNonEmpty(%v) --> %s\n", args, h)
-		}()
-	}
-	stripF := func(str string) string {
-		isOk := func(r rune) bool {
-			return r < 32 || r >= 127
-		}
-		t := transform.Chain(norm.NFKD, transform.RemoveFunc(isOk))
-		str, _, _ = transform.String(t, str)
-		return str
-	}
-	arg := ""
-	for _, a := range args {
-		if a == "" {
-			Fatalf("UUIDNonEmpty(%v) - empty argument(s) not allowed", args)
-		}
-		if arg != "" {
-			arg += ":"
-		}
-		arg += stripF(a)
-	}
-	hash := sha1.New()
-	if ctx.Debug > 1 {
-		Printf("UUIDNonEmpty(%s)\n", arg)
-	}
-	_, err := hash.Write([]byte(arg))
-	FatalOnError(err)
-	h = hex.EncodeToString(hash.Sum(nil))
-	return
-}
-
-// UUIDAffs - generate UUID of string args
-// downcases arguments, all but first can be empty
-// if argument is Nil "<nil>" replaces with "None"
-func UUIDAffs(ctx *Ctx, args ...string) (h string) {
-	if ctx.Debug > 1 {
-		defer func() {
-			Printf("UUIDAffs(%v) --> %s\n", args, h)
-		}()
-	}
-	stripF := func(str string) string {
-		isOk := func(r rune) bool {
-			return r < 32 || r >= 127
-		}
-		t := transform.Chain(norm.NFKD, transform.RemoveFunc(isOk))
-		str, _, _ = transform.String(t, str)
-		return str
-	}
-	arg := ""
-	for i, a := range args {
-		if i == 0 && a == "" {
-			Fatalf("UUIDAffs(%v) - empty first argument not allowed", args)
-		}
-		if a == Nil {
-			a = None
-		}
-		if arg != "" {
-			arg += ":"
-		}
-		arg += stripF(a)
-	}
-	hash := sha1.New()
-	if ctx.Debug > 1 {
-		Printf("UUIDAffs(%s)\n", strings.ToLower(arg))
-	}
-	_, err := hash.Write([]byte(strings.ToLower(arg)))
-	FatalOnError(err)
-	h = hex.EncodeToString(hash.Sum(nil))
-	return
-}
-
-// KeysOnly - return a corresponding interface contining only keys
-func KeysOnly(i interface{}) (o map[string]interface{}) {
-	if i == nil {
-		return
-	}
-	is, ok := i.(map[string]interface{})
-	if !ok {
-		return
-	}
-	o = make(map[string]interface{})
-	for k, v := range is {
-		o[k] = KeysOnly(v)
-	}
-	return
-}
-
-// DumpKeys - dump interface structure, but only keys, no values
-func DumpKeys(i interface{}) string {
-	return strings.Replace(fmt.Sprintf("%v", KeysOnly(i)), "map[]", "", -1)
-}
-
-// PartitionString - partition a string to [pre-sep, sep, post-sep]
-func PartitionString(s string, sep string) [3]string {
-	parts := strings.SplitN(s, sep, 2)
-	if len(parts) == 1 {
-		return [3]string{parts[0], "", ""}
-	}
-	return [3]string{parts[0], sep, parts[1]}
-}
-
-// Dig interface for array of keys
-func Dig(iface interface{}, keys []string, fatal, silent bool) (v interface{}, ok bool) {
-	miss := false
-	defer func() {
-		if !ok && fatal {
-			Fatalf("cannot dig %+v in %s", keys, DumpKeys(iface))
-		}
-	}()
-	item, o := iface.(map[string]interface{})
-	if !o {
-		Printf("Interface cannot be parsed: %+v\n", iface)
-		return
-	}
-	last := len(keys) - 1
-	for i, key := range keys {
-		var o bool
-		if i < last {
-			item, o = item[key].(map[string]interface{})
-		} else {
-			v, o = item[key]
-		}
-		if !o {
-			if !silent {
-				Printf("%+v, current: %s, %d/%d failed\n", keys, key, i+1, last+1)
-			}
-			miss = true
-			break
-		}
-	}
-	ok = !miss
-	return
-}
-
-// Request - wrapper to do any HTTP request
-// jsonStatuses - set of status code ranges to be parsed as JSONs
-// errorStatuses - specify status value ranges for which we should return error
-// okStatuses - specify status value ranges for which we should return error (only taken into account if not empty)
-func Request(
-	ctx *Ctx,
-	url, method string,
-	headers map[string]string,
-	payload []byte,
-	jsonStatuses, errorStatuses, okStatuses map[[2]int]struct{},
-) (result interface{}, status int, err error) {
-	var (
-		payloadBody *bytes.Reader
-		req         *http.Request
-	)
-	if len(payload) > 0 {
-		payloadBody = bytes.NewReader(payload)
-		req, err = http.NewRequest(method, url, payloadBody)
-	} else {
-		req, err = http.NewRequest(method, url, nil)
-	}
-	if err != nil {
-		err = fmt.Errorf("new request error:%+v for method:%s url:%s payload:%s", err, method, url, string(payload))
-		return
-	}
-	for header, value := range headers {
-		req.Header.Set(header, value)
-	}
-	var resp *http.Response
-	resp, err = http.DefaultClient.Do(req)
-	if err != nil {
-		err = fmt.Errorf("do request error:%+v for method:%s url:%s headers:%v payload:%s", err, method, url, headers, string(payload))
-		return
-	}
-	var body []byte
-	body, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		err = fmt.Errorf("read request body error:%+v for method:%s url:%s headers:%v payload:%s", err, method, url, headers, string(payload))
-		return
-	}
-	_ = resp.Body.Close()
-	status = resp.StatusCode
-	hit := false
-	for r := range jsonStatuses {
-		if status >= r[0] && status <= r[1] {
-			hit = true
-			break
-		}
-	}
-	if hit {
-		err = jsoniter.Unmarshal(body, &result)
-		if err != nil {
-			err = fmt.Errorf("unmarshall request error:%+v for method:%s url:%s headers:%v status:%d payload:%s body:%s", err, method, url, headers, status, string(payload), string(body))
-			return
-		}
-	} else {
-		result = body
-	}
-	hit = false
-	for r := range errorStatuses {
-		if status >= r[0] && status <= r[1] {
-			hit = true
-			break
-		}
-	}
-	if hit {
-		err = fmt.Errorf("status error:%+v for method:%s url:%s headers:%v status:%d payload:%s body:%s result:%+v", err, method, url, headers, status, string(payload), string(body), result)
-	}
-	if len(okStatuses) > 0 {
-		hit = false
-		for r := range okStatuses {
-			if status >= r[0] && status <= r[1] {
-				hit = true
-				break
-			}
-		}
-		if !hit {
-			err = fmt.Errorf("status not success:%+v for method:%s url:%s headers:%v status:%d payload:%s body:%s result:%+v", err, method, url, headers, status, string(payload), string(body), result)
-		}
-	}
-	return
-}
-
-// SendToElastic - send items to ElasticSearch
-func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (err error) {
-	if ctx.Debug > 0 {
-		Printf("%s: saving %d items\n", ds.Name(), len(items))
-	}
-	var url string
-	if raw {
-		url = ctx.ESURL + "/" + ctx.RawIndex + "/_bulk?refresh=" + BulkRefreshMode
-	} else {
-		url = ctx.ESURL + "/" + ctx.RichIndex + "/_bulk?refresh=" + BulkRefreshMode
-	}
-	// {"index":{"_id":"uuid"}}
-	payloads := []byte{}
-	newLine := []byte("\n")
-	var (
-		doc []byte
-		hdr []byte
-	)
-	for _, item := range items {
-		doc, err = jsoniter.Marshal(item)
-		if err != nil {
-			return
-		}
-		uuid, ok := item.(map[string]interface{})[key].(string)
-		if !ok {
-			err = fmt.Errorf("missing %s property in %+v", key, DumpKeys(item))
-			return
-		}
-		hdr = []byte(`{"index":{"_id":"` + uuid + "\"}}\n")
-		payloads = append(payloads, hdr...)
-		payloads = append(payloads, doc...)
-		payloads = append(payloads, newLine...)
-	}
-	_, _, err = Request(
-		ctx,
-		url,
-		Post,
-		map[string]string{"Content-Type": "application/x-ndjson"},
-		payloads,
-		nil,                                 // JSON statuses
-		map[[2]int]struct{}{{400, 599}: {}}, // error statuses: 400-599
-		nil,                                 // OK statuses
-	)
-	if err == nil {
-		if ctx.Debug > 0 {
-			Printf("%s: saved %d items\n", ds.Name(), len(items))
-		}
-		return
-	}
-	Printf("%s: bulk upload of %d items failed, falling back to one-by-one mode\n", ds.Name(), len(items))
-	if ctx.Debug > 1 {
-		Printf("Error: %+v\n", err)
-	}
-	err = nil
-	// Fallback to one-by-one inserts
-	if raw {
-		url = ctx.ESURL + "/" + ctx.RawIndex + "/_doc/"
-	} else {
-		url = ctx.ESURL + "/" + ctx.RichIndex + "/_doc/"
-	}
-	headers := map[string]string{"Content-Type": "application/json"}
-	for _, item := range items {
-		doc, _ = jsoniter.Marshal(item)
-		uuid, _ := item.(map[string]interface{})[key].(string)
-		_, _, err = Request(
-			ctx,
-			url+uuid,
-			Put,
-			headers,
-			doc,
-			nil,                                 // JSON statuses
-			map[[2]int]struct{}{{400, 599}: {}}, // error statuses: 400-599
-			map[[2]int]struct{}{{200, 201}: {}}, // OK statuses: 200-201
-		)
-	}
-	if ctx.Debug > 0 {
-		Printf("%s: saved %d items (in non-bulk mode)\n", ds.Name(), len(items))
-	}
-	return
-}
-
-// GetLastUpdate - get last update date from ElasticSearch
-func GetLastUpdate(ctx *Ctx, ds DS, raw bool) (lastUpdate *time.Time) {
-	// curl -s -XPOST -H 'Content-type: application/json' '${URL}/index/_search?size=0' -d '{"aggs":{"m":{"max":{"field":"date_field"}}}}' | jq -r '.aggregations.m.value_as_string'
-	dateField := JSONEscape(ds.DateField(ctx))
-	originField := JSONEscape(ds.OriginField(ctx))
-	origin := JSONEscape(ds.Origin(ctx))
-	var payloadBytes []byte
-	if ds.ResumeNeedsOrigin(ctx) {
-		payloadBytes = []byte(`{"query":{"bool":{"filter":{"term":{"` + originField + `":"` + origin + `"}}}},"aggs":{"m":{"max":{"field":"` + dateField + `"}}}}`)
-	} else {
-		payloadBytes = []byte(`{"aggs":{"m":{"max":{"field":"` + dateField + `"}}}}`)
-	}
-	var url string
-	if raw {
-		url = ctx.ESURL + "/" + ctx.RawIndex + "/_search?size=0"
-	} else {
-		url = ctx.ESURL + "/" + ctx.RichIndex + "/_search?size=0"
-	}
-	if ctx.Debug > 0 {
-		Printf("raw %v resume from date query: %s\n", raw, string(payloadBytes))
-	}
-	method := Post
-	resp, _, err := Request(
-		ctx,
-		url,
-		method,
-		map[string]string{"Content-Type": "application/json"}, // headers
-		payloadBytes,                        // payload
-		nil,                                 // JSON statuses
-		nil,                                 // Error statuses
-		map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200, 404
-	)
-	FatalOnError(err)
-	type resultStruct struct {
-		Aggs struct {
-			M struct {
-				Str string `json:"value_as_string"`
-			} `json:"m"`
-		} `json:"aggregations"`
-	}
-	var res resultStruct
-	err = jsoniter.Unmarshal(resp.([]byte), &res)
-	if err != nil {
-		Printf("JSON decode error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
-		return
-	}
-	if res.Aggs.M.Str != "" {
-		var tm time.Time
-		tm, err = TimeParseAny(res.Aggs.M.Str)
-		if err != nil {
-			Printf("Decode aggregations error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
-			return
-		}
-		lastUpdate = &tm
-	}
-	return
-}
-
-// GetLastOffset - get last offset from ElasticSearch
-func GetLastOffset(ctx *Ctx, ds DS, raw bool) (offset float64) {
-	offset = -1.0
-	// curl -s -XPOST -H 'Content-type: application/json' '${URL}/index/_search?size=0' -d '{"aggs":{"m":{"max":{"field":"offset_field"}}}}' | jq -r '.aggregations.m.value'
-	offsetField := JSONEscape(ds.OffsetField(ctx))
-	originField := JSONEscape(ds.OffsetField(ctx))
-	origin := JSONEscape(ds.Origin(ctx))
-	var payloadBytes []byte
-	if ds.ResumeNeedsOrigin(ctx) {
-		payloadBytes = []byte(`{"query":{"bool":{"filter":{"term":{"` + originField + `":"` + origin + `"}}}},"aggs":{"m":{"max":{"field":"` + offsetField + `"}}}}`)
-	} else {
-		payloadBytes = []byte(`{"aggs":{"m":{"max":{"field":"` + offsetField + `"}}}}`)
-	}
-	var url string
-	if raw {
-		url = ctx.ESURL + "/" + ctx.RawIndex + "/_search?size=0"
-	} else {
-		url = ctx.ESURL + "/" + ctx.RichIndex + "/_search?size=0"
-	}
-	if ctx.Debug > 0 {
-		Printf("raw %v resume from offset query: %s\n", raw, string(payloadBytes))
-	}
-	method := Post
-	resp, _, err := Request(
-		ctx,
-		url,
-		method,
-		map[string]string{"Content-Type": "application/json"}, // headers
-		payloadBytes,                        // payload
-		nil,                                 // JSON statuses
-		nil,                                 // Error statuses
-		map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200, 404
-	)
-	FatalOnError(err)
-	type resultStruct struct {
-		Aggs struct {
-			M struct {
-				Int *float64 `json:"value,omitempty"`
-			} `json:"m"`
-		} `json:"aggregations"`
-	}
-	var res = resultStruct{}
-	err = jsoniter.Unmarshal(resp.([]byte), &res)
-	if err != nil {
-		Printf("JSON decode error: %+v for %s url: %s, query: %s\n", err, method, url, string(payloadBytes))
-		return
-	}
-	if res.Aggs.M.Int != nil {
-		offset = *res.Aggs.M.Int
-	}
-	return
-}
-
 // CommonFields - common rich item fields
+// { "is_dsname_category": 1, "grimoire_creation_date": dt}
 func CommonFields(ds DS, date interface{}, category string) (fields map[string]interface{}) {
 	var dt *time.Time
 	sDate, ok := date.(string)
@@ -496,41 +76,36 @@ func CommonFields(ds DS, date interface{}, category string) (fields map[string]i
 	return
 }
 
-// EmptyAffsItem - return empty affiliation sitem for a given role
-func EmptyAffsItem(role string) map[string]interface{} {
-	return map[string]interface{}{
-		role + "_id":         "",
-		role + "_uuid":       "",
-		role + "_name":       "",
-		role + "_user_name":  "",
-		role + "_domain":     "",
-		role + "_gender":     "",
-		role + "_gender_acc": nil,
-		role + "_org_name":   "",
-		role + "_bot":        false,
-		role + MultiOrgNames: []interface{}{},
-	}
-}
-
-// IdenityAffsData - add affiliations related data
-func IdenityAffsData(identity map[string]interface{}, dt time.Time, role string) (outItem map[string]interface{}) {
-	outItem = EmptyAffsItem(role)
-	return
-}
-
-// UploadIdentities - upload identities to SH DB
-func UploadIdentities(ctx *Ctx, ds DS) (err error) {
-	uploadFunc := func(docs, outDocs *[]interface{}) (e error) {
+// UploadIdentitiesFunc - function to upload identities to affiliation DB
+// We assume here that docs maintained my iterator func contains a list of [3]string
+// Each identity is [3]string [name, username, email]
+// outDocs is maintained with DB bulk size
+// last flag signalling that this is the last (so it must flush output then)
+//         there can be no items in input pack in the last flush call
+func UploadIdentitiesFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last bool) (e error) {
+	bulkSize := ctx.DBBulkSize / 6
+	run := func() (err error) {
 		var tx *sql.Tx
-		e = SetDBSessionOrigin(ctx)
-		if e != nil {
+		err = SetDBSessionOrigin(ctx)
+		if err != nil {
 			return
 		}
-		tx, e = ctx.DB.Begin()
-		if e != nil {
+		tx, err = ctx.DB.Begin()
+		if err != nil {
 			return
 		}
-		nIdents := len(*docs)
+		// Dedup (data comes from possibly multiple input packs
+		// Each one is already deduped but the combination may have duplicates
+		nNonUni := len(*outDocs)
+		idents := make(map[[3]string]struct{})
+		for _, doc := range *outDocs {
+			idents[doc.([3]string)] = struct{}{}
+		}
+		identsAry := [][3]string{}
+		for ident := range idents {
+			identsAry = append(identsAry, ident)
+		}
+		nIdents := len(identsAry)
 		defer func() {
 			if tx != nil {
 				Printf("Rolling back %d items\n", nIdents)
@@ -538,9 +113,8 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 			}
 		}()
 		if ctx.Debug > 0 {
-			Printf("Bulk adding %d idents\n", nIdents)
+			Printf("Bulk adding %d -> %d idents\n", nNonUni, nIdents)
 		}
-		bulkSize := ctx.DBBulkSize / 6
 		nPacks := nIdents / bulkSize
 		if nIdents%bulkSize != 0 {
 			nPacks++
@@ -562,7 +136,7 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 				Printf("Bulk adding pack #%d %d-%d (%d/%d)\n", i+1, from, to, to-from, nIdents)
 			}
 			for j := from; j < to; j++ {
-				ident, _ := (*docs)[j].([3]string)
+				ident := identsAry[j]
 				name := ident[0]
 				username := ident[1]
 				email := ident[2]
@@ -592,103 +166,136 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 			queryU = queryU[:len(queryU)-1]
 			queryP = queryP[:len(queryP)-1]
 			queryI = queryI[:len(queryI)-1]
-			_, e = ExecSQL(ctx, tx, queryU, argsU...)
-			if e != nil {
+			_, err = ExecSQL(ctx, tx, queryU, argsU...)
+			if err != nil {
 				return
 			}
-			_, e = ExecSQL(ctx, tx, queryP, argsP...)
-			if e != nil {
+			_, err = ExecSQL(ctx, tx, queryP, argsP...)
+			if err != nil {
 				return
 			}
-			_, e = ExecSQL(ctx, tx, queryI, argsI...)
-			if e != nil {
+			_, err = ExecSQL(ctx, tx, queryI, argsI...)
+			if err != nil {
 				return
 			}
 		}
-		e = tx.Commit()
-		if e != nil {
+		err = tx.Commit()
+		if err != nil {
 			return
 		}
-		*docs = []interface{}{}
 		tx = nil
 		return
 	}
-	itemsFunc := func(items []interface{}, docs *[]interface{}) (e error) {
-		idents := make(map[[3]string]struct{})
-		for _, doc := range *docs {
-			idents[doc.([3]string)] = struct{}{}
-		}
-		for _, item := range items {
-			doc, ok := item.(map[string]interface{})["_source"]
-			if !ok {
-				err = fmt.Errorf("Missing _source in item %+v", DumpKeys(item))
-				return
-			}
-			var identities map[[3]string]struct{}
-			identities, err = ds.GetItemIdentities(doc)
-			if err != nil {
-				err = fmt.Errorf("Cannot get identities from doc %+v", DumpKeys(doc))
-				return
-			}
-			if identities == nil {
-				continue
-			}
-			for identity := range identities {
-				idents[identity] = struct{}{}
-			}
-		}
-		*docs = []interface{}{}
-		for ident := range idents {
-			*docs = append(*docs, ident)
-		}
-		return
+	nDocs := len(*docs)
+	nOutDocs := len(*outDocs)
+	if ctx.Debug > 0 {
+		Printf("Input pack size %d/%d last %v\n", nDocs, nOutDocs, last)
 	}
-	err = ForEachRawItem(ctx, ds, ctx.DBBulkSize, uploadFunc, itemsFunc)
+	for _, doc := range *docs {
+		*outDocs = append(*outDocs, doc)
+		nOutDocs = len(*outDocs)
+		if nOutDocs >= bulkSize {
+			if ctx.Debug > 0 {
+				Printf("Bulk pack size %d/%d reached, flushing\n", nOutDocs, bulkSize)
+			}
+			e = run()
+			if e != nil {
+				return
+			}
+			*outDocs = []interface{}{}
+		}
+	}
+	if last {
+		nOutDocs := len(*outDocs)
+		if nOutDocs > 0 {
+			e = run()
+			if e != nil {
+				return
+			}
+			*outDocs = []interface{}{}
+		}
+	}
+	*docs = []interface{}{}
+	if ctx.Debug > 0 {
+		nOutDocs = len(*outDocs)
+		Printf("Left pack size 0/%d last %v\n", nOutDocs, last)
+	}
 	return
 }
 
-// EnrichItems - perform the enrichment
-func EnrichItems(ctx *Ctx, ds DS) (err error) {
-	dbConfigured := ctx.AffsDBConfigured()
-	enrichFunc := func(docs, outDocs *[]interface{}) (e error) {
-		Printf("-> enrichFunc(%d,%d)\n", len(*docs), len(*outDocs))
-		var rich map[string]interface{}
-		for _, doc := range *docs {
-			item, ok := doc.(map[string]interface{})
-			if !ok {
-				e = fmt.Errorf("Failed to parse document %+v\n", doc)
-				return
-			}
-			for _, author := range []string{"creator", "assignee", "reporter"} {
-				rich, e = ds.EnrichItem(item, author, dbConfigured)
-				if e != nil {
-					return
-				}
-				// should detect if a particular author type is missing
-				*outDocs = append(*outDocs, rich)
-			}
-		}
-		*docs = []interface{}{}
-		Printf("<- enrichFunc(%d,%d)\n", len(*docs), len(*outDocs))
-		return
+// ItemsIdentitiesFunc - extract identities from items
+// items is a current pack of input items
+// docs is a pointer to where extracted identities will be stored
+// each identity is [3]string [name, username, email]
+// outDocs is not used - but function must conform to ForEachRawItem requirements
+func ItemsIdentitiesFunc(ctx *Ctx, ds DS, items []interface{}, docs *[]interface{}) (err error) {
+	idents := make(map[[3]string]struct{})
+	for _, doc := range *docs {
+		idents[doc.([3]string)] = struct{}{}
 	}
-	itemsFunc := func(items []interface{}, docs *[]interface{}) (e error) {
-		for _, item := range items {
-			doc, ok := item.(map[string]interface{})["_source"]
-			if !ok {
-				e = fmt.Errorf("Missing _source in item %+v", DumpKeys(item))
-				return
-			}
-			*docs = append(*docs, doc)
+	for _, item := range items {
+		doc, ok := item.(map[string]interface{})["_source"]
+		if !ok {
+			err = fmt.Errorf("Missing _source in item %+v", DumpKeys(item))
+			return
 		}
-		return
+		var identities map[[3]string]struct{}
+		identities, err = ds.GetItemIdentities(doc)
+		if err != nil {
+			err = fmt.Errorf("Cannot get identities from doc %+v", DumpKeys(doc))
+			return
+		}
+		if identities == nil {
+			continue
+		}
+		for identity := range identities {
+			idents[identity] = struct{}{}
+		}
 	}
-	err = ForEachRawItem(ctx, ds, ctx.ESBulkSize, enrichFunc, itemsFunc)
+	*docs = []interface{}{}
+	for ident := range idents {
+		*docs = append(*docs, ident)
+	}
+	return
+}
+
+// StandardItemsFunc - just get each doument's _source and append to output docs
+// items is a current pack of input items
+// docs is a pointer to where extracted identities will be stored
+func StandardItemsFunc(ctx *Ctx, ds DS, items []interface{}, docs *[]interface{}) (err error) {
+	for _, item := range items {
+		doc, ok := item.(map[string]interface{})["_source"]
+		if !ok {
+			err = fmt.Errorf("Missing _source in item %+v", DumpKeys(item))
+			return
+		}
+		*docs = append(*docs, doc)
+	}
+	return
+}
+
+// UploadIdentities - upload identities to SH DB
+// We assume here that docs maintained my iterator func contains a list of [3]string
+// Each identity is [3]string [name, username, email]
+func UploadIdentities(ctx *Ctx, ds DS) (err error) {
+	err = ForEachRawItem(ctx, ds, ctx.ESScrollSize, UploadIdentitiesFunc, ItemsIdentitiesFunc)
 	return
 }
 
 // ForEachRawItem - perform specific function for all raw items
-func ForEachRawItem(ctx *Ctx, ds DS, packSize int, ufunct func(*[]interface{}, *[]interface{}) error, uitems func([]interface{}, *[]interface{}) error) (err error) {
+// packSize: for iterating input items
+// ufunct: function to perform on input pack, receives input pack, pointer to an output pack
+//         and a flag signalling that this is the last (so it must flush output then)
+//         there can be no items in input pack in the last flush call
+// uitems: function to extract items from input data: can just add documents, but can also maintain a pack of documents identities
+//         receives items and pointer to output items (which then become input for ufunct)
+func ForEachRawItem(
+	ctx *Ctx,
+	ds DS,
+	packSize int,
+	ufunct func(*Ctx, DS, *[]interface{}, *[]interface{}, bool) error,
+	uitems func(*Ctx, DS, []interface{}, *[]interface{}) error,
+) (err error) {
 	dateField := JSONEscape(ds.DateField(ctx))
 	originField := JSONEscape(ds.OriginField(ctx))
 	origin := JSONEscape(ds.Origin(ctx))
@@ -737,7 +344,7 @@ func ForEachRawItem(ctx *Ctx, ds DS, packSize int, ufunct func(*[]interface{}, *
 		mtx = &sync.Mutex{}
 		ch = make(chan error)
 	}
-	funct := func(c chan error) (e error) {
+	funct := func(c chan error, last bool) (e error) {
 		defer func() {
 			if thrN > 1 {
 				mtx.Unlock()
@@ -749,7 +356,7 @@ func ForEachRawItem(ctx *Ctx, ds DS, packSize int, ufunct func(*[]interface{}, *
 		if thrN > 1 {
 			mtx.Lock()
 		}
-		e = ufunct(&docs, &outDocs)
+		e = ufunct(ctx, ds, &docs, &outDocs, last)
 		return
 	}
 	needsOrigin := ds.ResumeNeedsOrigin(ctx)
@@ -823,7 +430,7 @@ func ForEachRawItem(ctx *Ctx, ds DS, packSize int, ufunct func(*[]interface{}, *
 		if thrN > 1 {
 			mtx.Lock()
 		}
-		err = uitems(items, &docs)
+		err = uitems(ctx, ds, items, &docs)
 		if err != nil {
 			return
 		}
@@ -831,7 +438,7 @@ func ForEachRawItem(ctx *Ctx, ds DS, packSize int, ufunct func(*[]interface{}, *
 		if nDocs >= packSize {
 			if thrN > 1 {
 				go func() {
-					_ = funct(ch)
+					_ = funct(ch, false)
 				}()
 				nThreads++
 				if nThreads == thrN {
@@ -842,7 +449,7 @@ func ForEachRawItem(ctx *Ctx, ds DS, packSize int, ufunct func(*[]interface{}, *
 					nThreads--
 				}
 			} else {
-				err = funct(nil)
+				err = funct(nil, false)
 				if err != nil {
 					return
 				}
@@ -856,25 +463,22 @@ func ForEachRawItem(ctx *Ctx, ds DS, packSize int, ufunct func(*[]interface{}, *
 	if thrN > 1 {
 		mtx.Lock()
 	}
-	nDocs := len(docs)
-	if nDocs > 0 {
-		if thrN > 1 {
-			go func() {
-				_ = funct(ch)
-			}()
-			nThreads++
-			if nThreads == thrN {
-				err = <-ch
-				if err != nil {
-					return
-				}
-				nThreads--
-			}
-		} else {
-			err = funct(nil)
+	if thrN > 1 {
+		go func() {
+			_ = funct(ch, true)
+		}()
+		nThreads++
+		if nThreads == thrN {
+			err = <-ch
 			if err != nil {
 				return
 			}
+			nThreads--
+		}
+	} else {
+		err = funct(nil, true)
+		if err != nil {
+			return
 		}
 	}
 	if thrN > 1 {
@@ -1089,7 +693,7 @@ func Enrich(ctx *Ctx, ds DS) (err error) {
 	if ctx.OnlyIdentities {
 		return
 	}
-	err = EnrichItems(ctx, ds)
+	err = ds.EnrichItems(ctx)
 	if err != nil {
 		Fatalf(ds.Name()+": EnrichItems error: %+v\n", err)
 	}

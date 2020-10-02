@@ -28,12 +28,11 @@ func runDS(ctx *lib.Ctx) (err error) {
 		lib.Printf("%s: Validate error: %v, allowing continue\n", ds.Info(), err)
 		return
 	}
-	var prevErr error
 	if !ctx.NoRaw {
 		err = lib.FetchRaw(ctx, ds)
 		if err != nil {
 			lib.Printf("%s: FetchRaw(%s) error: %v, allowing continue\n", ds.Info(), ctx.Info(), err)
-			prevErr = err
+			return
 		}
 	}
 	if ctx.Enrich {
@@ -42,9 +41,6 @@ func runDS(ctx *lib.Ctx) (err error) {
 			lib.Printf("%s: Enrich(%s) error: %v, allowing continue\n", ds.Info(), ctx.Info(), err)
 			return
 		}
-	}
-	if prevErr != nil {
-		err = prevErr
 	}
 	return
 }
