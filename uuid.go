@@ -4,6 +4,7 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"strings"
+	"sync"
 
 	"golang.org/x/text/transform"
 	"golang.org/x/text/unicode/norm"
@@ -11,16 +12,20 @@ import (
 
 var (
 	// uuidsCacheNonEmpty caches UUIDNonEmpty calls
-	uuidsCacheNonEmpty = map[string]string{}
+	uuidsCacheNonEmpty    = map[string]string{}
+	uuidsCacheNonEmptyMtx *sync.RWMutex
 	// uuidsCacheAffs caches UUIDAffs calls
-	uuidsCacheAffs = map[string]string{}
+	uuidsCacheAffs    = map[string]string{}
+	uuidsCacheAffsMtx *sync.RWMutex
 )
 
 // UUIDNonEmpty - generate UUID of string args (all must be non-empty)
 // uses internal cache
 func UUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
 	k := strings.Join(args, ":")
+	uuidsCacheNonEmptyMtx.RLock()
 	h, ok := uuidsCacheNonEmpty[k]
+	uuidsCacheNonEmptyMtx.RUnlock()
 	if ok {
 		return
 	}
@@ -54,7 +59,9 @@ func UUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
 	_, err := hash.Write([]byte(arg))
 	FatalOnError(err)
 	h = hex.EncodeToString(hash.Sum(nil))
+	uuidsCacheNonEmptyMtx.Lock()
 	uuidsCacheNonEmpty[k] = h
+	uuidsCacheNonEmptyMtx.Unlock()
 	return
 }
 
@@ -64,7 +71,9 @@ func UUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
 // if argument is Nil "<nil>" replaces with "None"
 func UUIDAffs(ctx *Ctx, args ...string) (h string) {
 	k := strings.Join(args, ":")
+	uuidsCacheAffsMtx.RLock()
 	h, ok := uuidsCacheAffs[k]
+	uuidsCacheAffsMtx.RUnlock()
 	if ok {
 		return
 	}
@@ -101,6 +110,8 @@ func UUIDAffs(ctx *Ctx, args ...string) (h string) {
 	_, err := hash.Write([]byte(strings.ToLower(arg)))
 	FatalOnError(err)
 	h = hex.EncodeToString(hash.Sum(nil))
+	uuidsCacheAffsMtx.Lock()
 	uuidsCacheAffs[k] = h
+	uuidsCacheAffsMtx.Unlock()
 	return
 }

@@ -46,6 +46,7 @@ type DS interface {
 	ResumeNeedsOrigin(*Ctx) bool
 	Origin(*Ctx) string
 	ItemID(interface{}) string
+	RichIDField(*Ctx) string
 	ItemUpdatedOn(interface{}) time.Time
 	ItemCategory(interface{}) string
 	SearchFields() map[string][]string
@@ -71,6 +72,76 @@ func CommonFields(ds DS, date interface{}, category string) (fields map[string]i
 	}
 	name := "is_" + ds.Name() + "_" + category
 	fields = map[string]interface{}{"grimoire_creation_date": dt, name: 1}
+	return
+}
+
+// ESBulkUploadFunc - function to bulk upload items to ES
+// We assume here that docs maintained my iterator func contains a list of rich items
+// outDocs is maintained with ES bulk size
+// last flag signalling that this is the last (so it must flush output then)
+//         there can be no items in input pack in the last flush call
+func ESBulkUploadFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last bool) (e error) {
+	bulkSize := ctx.ESBulkSize
+	itemID := ds.RichIDField(ctx)
+	run := func() (err error) {
+		nItems := len(*outDocs)
+		if ctx.Debug > 0 {
+			Printf("Bulk uploading %d idents\n", nItems)
+		}
+		nPacks := nItems / bulkSize
+		if nItems%bulkSize != 0 {
+			nPacks++
+		}
+		for i := 0; i < nPacks; i++ {
+			from := i * bulkSize
+			to := from + bulkSize
+			if to > nItems {
+				to = nItems
+			}
+			if ctx.Debug > 0 {
+				Printf("Bulk uploading pack #%d %d-%d (%d/%d)\n", i+1, from, to, to-from, nPacks)
+			}
+			err = SendToElastic(ctx, ds, false, itemID, (*outDocs)[from:to])
+			if err != nil {
+				return
+			}
+		}
+		return
+	}
+	nDocs := len(*docs)
+	nOutDocs := len(*outDocs)
+	if ctx.Debug > 0 {
+		Printf("Input pack size %d/%d last %v\n", nDocs, nOutDocs, last)
+	}
+	for _, doc := range *docs {
+		*outDocs = append(*outDocs, doc)
+		nOutDocs = len(*outDocs)
+		if nOutDocs >= bulkSize {
+			if ctx.Debug > 0 {
+				Printf("Bulk pack size %d/%d reached, flushing\n", nOutDocs, bulkSize)
+			}
+			e = run()
+			if e != nil {
+				return
+			}
+			*outDocs = []interface{}{}
+		}
+	}
+	if last {
+		nOutDocs := len(*outDocs)
+		if nOutDocs > 0 {
+			e = run()
+			if e != nil {
+				return
+			}
+			*outDocs = []interface{}{}
+		}
+	}
+	*docs = []interface{}{}
+	if ctx.Debug > 0 {
+		nOutDocs = len(*outDocs)
+		Printf("Left pack size 0/%d last %v\n", nOutDocs, last)
+	}
 	return
 }
 

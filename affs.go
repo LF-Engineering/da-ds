@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -13,8 +14,10 @@ const (
 )
 
 var (
-	identityCache = map[string][2]interface{}{}
-	rollsCache    = map[string][]string{}
+	identityCache    = map[string][2]interface{}{}
+	identityCacheMtx *sync.RWMutex
+	rollsCache       = map[string][]string{}
+	rollsCacheMtx    *sync.RWMutex
 )
 
 // EmptyAffsItem - return empty affiliation sitem for a given role
@@ -104,10 +107,17 @@ func AffsIdentityIDs(ctx *Ctx, ds DS, identity map[string]interface{}) (ids [2]i
 	sName, okN := name.(string)
 	sUsername, okU := username.(string)
 	k := sEmail + ":" + sName + ":" + sUsername
+	identityCacheMtx.RLock()
 	ids, ok := identityCache[k]
+	identityCacheMtx.RUnlock()
 	if ok {
 		return
 	}
+	defer func() {
+		identityCacheMtx.Lock()
+		identityCache[k] = ids
+		identityCacheMtx.Unlock()
+	}()
 	if !okE {
 		sEmail = Nil
 	}
@@ -121,12 +131,10 @@ func AffsIdentityIDs(ctx *Ctx, ds DS, identity map[string]interface{}) (ids [2]i
 	id := UUIDAffs(ctx, source, sEmail, sName, sUsername)
 	identityFound, err := FindObject(ctx, "identities", "id", id, []string{"id", "uuid"})
 	if err != nil || identityFound == nil {
-		identityCache[k] = ids
 		return
 	}
 	ids[0] = identityFound["id"]
 	ids[1] = identityFound["uuid"]
-	identityCache[k] = ids
 	return
 }
 
@@ -194,12 +202,16 @@ func GetEnrollments(ctx *Ctx, ds DS, uuid string, dt time.Time, single bool) (or
 		sSep = "s"
 	}
 	k := uuid + sSep + ToYMDDate(dt)
+	rollsCacheMtx.RLock()
 	orgs, ok := rollsCache[k]
+	rollsCacheMtx.RUnlock()
 	if ok {
 		return
 	}
 	defer func() {
+		rollsCacheMtx.Lock()
 		rollsCache[k] = orgs
+		rollsCacheMtx.Unlock()
 	}()
 	pSlug := ctx.ProjectSlug
 	// Step 1: Try project slug first

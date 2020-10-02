@@ -39,6 +39,9 @@ const DefaultOriginField string = "origin"
 // DefaultTagField - default tag field
 const DefaultTagField string = "tag"
 
+// DefaultIDField - default id field
+const DefaultIDField string = "id"
+
 // Issue - common constant string
 const Issue string = "issue"
 
@@ -56,6 +59,9 @@ const Offset = "offset"
 
 // UUID - common constant string
 const UUID = "uuid"
+
+// ID - common constant string
+const ID = "id"
 
 // Unknown - common constant string
 const Unknown = "Unknown"

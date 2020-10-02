@@ -75,6 +75,11 @@ func (j *DSStub) DateField(*Ctx) string {
 	return DefaultDateField
 }
 
+// RichIDField - return rich ID field name
+func (j *DSStub) RichIDField(*Ctx) string {
+	return DefaultIDField
+}
+
 // OffsetField - return offset field used to detect where to restart from
 func (j *DSStub) OffsetField(*Ctx) string {
 	return DefaultOffsetField

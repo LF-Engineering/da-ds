@@ -30,12 +30,12 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 		if err != nil {
 			return
 		}
-		uuid, ok := item.(map[string]interface{})[key].(string)
+		id, ok := item.(map[string]interface{})[key].(string)
 		if !ok {
 			err = fmt.Errorf("missing %s property in %+v", key, DumpKeys(item))
 			return
 		}
-		hdr = []byte(`{"index":{"_id":"` + uuid + "\"}}\n")
+		hdr = []byte(`{"index":{"_id":"` + id + "\"}}\n")
 		payloads = append(payloads, hdr...)
 		payloads = append(payloads, doc...)
 		payloads = append(payloads, newLine...)
@@ -71,10 +71,10 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 	headers := map[string]string{"Content-Type": "application/json"}
 	for _, item := range items {
 		doc, _ = jsoniter.Marshal(item)
-		uuid, _ := item.(map[string]interface{})[key].(string)
+		id, _ := item.(map[string]interface{})[key].(string)
 		_, _, err = Request(
 			ctx,
-			url+uuid,
+			url+id,
 			Put,
 			headers,
 			doc,

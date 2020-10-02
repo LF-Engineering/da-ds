@@ -676,6 +676,11 @@ func (j *DSJira) DateField(*Ctx) string {
 	return DefaultDateField
 }
 
+// RichIDField - return rich ID field name
+func (j *DSJira) RichIDField(*Ctx) string {
+	return DefaultIDField
+}
+
 // OffsetField - return offset field used to detect where to restart from
 func (j *DSJira) OffsetField(*Ctx) string {
 	return DefaultOffsetField
@@ -831,36 +836,39 @@ func (j *DSJira) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3
 	return
 }
 
-// JiraEnrichFunc - perform Jira specific enrichment
-// We assume here that docs maintained my iterator func contains a list of issues
-// outDocs fills with enriched items and is uploaded to ES every time it reaches ES Bulk size
-// last flag signalling that this is the last (so it must flush output then)
-//         there can be no items in input pack in the last flush call
-func JiraEnrichFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last bool) (err error) {
+// JiraEnrichItemsFunc - iterate items and enrich them
+// items is a current pack of input items
+// docs is a pointer to where extracted identities will be stored
+func JiraEnrichItemsFunc(ctx *Ctx, ds DS, items []interface{}, docs *[]interface{}) (err error) {
 	dbConfigured := ctx.AffsDBConfigured()
 	var rich map[string]interface{}
-	for _, doc := range *docs {
-		item, ok := doc.(map[string]interface{})
+	for _, item := range items {
+		src, ok := item.(map[string]interface{})["_source"]
+		if !ok {
+			err = fmt.Errorf("Missing _source in item %+v", DumpKeys(item))
+			return
+		}
+		doc, ok := src.(map[string]interface{})
 		if !ok {
 			err = fmt.Errorf("Failed to parse document %+v\n", doc)
 			return
 		}
 		for _, author := range []string{"creator", "assignee", "reporter"} {
-			rich, err = ds.EnrichItem(ctx, item, author, dbConfigured)
+			rich, err = ds.EnrichItem(ctx, doc, author, dbConfigured)
 			if err != nil {
 				return
 			}
-			*outDocs = append(*outDocs, rich)
+			*docs = append(*docs, rich)
 		}
+		// FIXME: enrich comments continue
 	}
-	*docs = []interface{}{}
-	// FIXME: handle outDocs in pack and clean it after processed
+	// fmt.Printf("currently %d jira enriched docs\n", len(*docs))
 	return
 }
 
 // EnrichItems - perform the enrichment
 func (j *DSJira) EnrichItems(ctx *Ctx) (err error) {
-	err = ForEachRawItem(ctx, j, ctx.ESBulkSize, JiraEnrichFunc, StandardItemsFunc)
+	err = ForEachRawItem(ctx, j, ctx.ESBulkSize, ESBulkUploadFunc, JiraEnrichItemsFunc)
 	return
 }
 
