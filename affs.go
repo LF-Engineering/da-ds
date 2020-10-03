@@ -461,7 +461,11 @@ func IdenityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, aid inter
 		outItem[role+"_gender"] = Unknown
 		outItem[role+"_gender_acc"] = 0
 	}
-	outItem[role+"_bot"] = isBot
+	if isBot == 0 {
+		outItem[role+"_bot"] = false
+	} else {
+		outItem[role+"_bot"] = true
+	}
 	outItem[role+"_org_name"] = GetEnrollmentsSingle(ctx, ds, suuid, dt)
 	outItem[role+MultiOrgNames] = GetEnrollmentsMulti(ctx, ds, suuid, dt)
 	return

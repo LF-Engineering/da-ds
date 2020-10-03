@@ -975,11 +975,11 @@ func (j *DSJira) EnrichItem(ctx *Ctx, item map[string]interface{}, author string
 	}
 	changes, ok := Dig(issue, []string{"changelog", "total"}, false, false)
 	if ok {
-		rich["channges"] = changes
+		rich["changes"] = changes
 	} else {
 		// Only evil Jiras do that, for example http://jira.akraino.org
 		// Almost the same address works OK https://jira.akraino.org
-		rich["channges"] = 0
+		rich["changes"] = 0
 	}
 	fields, ok := issue["fields"].(map[string]interface{})
 	if !ok {
