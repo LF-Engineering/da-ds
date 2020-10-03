@@ -825,3 +825,9 @@ func Enrich(ctx *Ctx, ds DS) (err error) {
 	}
 	return
 }
+
+// EnrichItem - perform generic additional operations on already enriched item
+func EnrichItem(ctx *Ctx, ds DS, richItem map[string]interface{}) (err error) {
+	richItem[DefaultEnrichDateField] = time.Now()
+	return
+}

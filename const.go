@@ -27,6 +27,9 @@ const Delete string = "DELETE"
 // DefaultDateField - default date field
 const DefaultDateField string = "metadata__updated_on"
 
+// DefaultEnrichDateField - default date field
+const DefaultEnrichDateField string = "metadata__enriched_on"
+
 // DefaultOffsetField - default offset field
 const DefaultOffsetField string = "updated_on"
 

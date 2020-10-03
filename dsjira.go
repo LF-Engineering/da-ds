@@ -898,6 +898,10 @@ func EnrichComments(ctx *Ctx, ds DS, comments []interface{}, item map[string]int
 		for prop, value := range CommonFields(ds, created, Comment) {
 			richComment[prop] = value
 		}
+		err = EnrichItem(ctx, ds, richComment)
+		if err != nil {
+			return
+		}
 		richComments = append(richComments, richComment)
 	}
 	return
@@ -923,6 +927,10 @@ func JiraEnrichItemsFunc(ctx *Ctx, ds DS, items []interface{}, docs *[]interface
 		var richItem map[string]interface{}
 		for i, author := range []string{"creator", "assignee", "reporter"} {
 			rich, err = ds.EnrichItem(ctx, doc, author, dbConfigured)
+			if err != nil {
+				return
+			}
+			err = EnrichItem(ctx, ds, rich)
 			if err != nil {
 				return
 			}
