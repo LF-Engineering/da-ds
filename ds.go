@@ -199,12 +199,12 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last 
 			if to > nIdents {
 				to = nIdents
 			}
-			queryU := "insert ignore into uidentities(uuid, last_modified) values"
-			queryP := "insert ignore into profiles(uuid) values"
-			queryI := "insert ignore into identities(id, source, name, email, username, uuid, last_modified) values"
+			queryU := "insert ignore into uidentities(uuid,last_modified) values"
+			queryI := "insert ignore into identities(id,source,name,email,username,uuid,last_modified) values"
+			queryP := "insert ignore into profiles(uuid,name,email) values"
 			argsU := []interface{}{}
-			argsP := []interface{}{}
 			argsI := []interface{}{}
+			argsP := []interface{}{}
 			if ctx.Debug > 0 {
 				Printf("bulk adding idents pack #%d %d-%d (%d/%d)\n", i+1, from, to, to-from, nIdents)
 			}
@@ -215,30 +215,35 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last 
 				email := ident[2]
 				// uuid(source, email, name, username)
 				uuid := UUIDAffs(ctx, source, email, name, username)
-				queryU += fmt.Sprintf("(?,now()),")
-				argsU = append(argsU, uuid)
-				queryP += fmt.Sprintf("(?),")
-				argsP = append(argsP, uuid)
 				var (
 					pname     *string
 					pemail    *string
 					pusername *string
+					profname  *string
 				)
 				if name != Nil {
 					pname = &name
+					profname = &name
 				}
 				if email != Nil {
 					pemail = &email
 				}
 				if username != Nil {
 					pusername = &username
+					if profname == nil {
+						profname = &username
+					}
 				}
+				queryU += fmt.Sprintf("(?,now()),")
 				queryI += fmt.Sprintf("(?,?,?,?,?,?,now()),")
+				queryP += fmt.Sprintf("(?,?,?),")
+				argsU = append(argsU, uuid)
 				argsI = append(argsI, uuid, source, pname, pemail, pusername, uuid)
+				argsP = append(argsP, uuid, profname, pemail)
 			}
 			queryU = queryU[:len(queryU)-1]
-			queryP = queryP[:len(queryP)-1]
 			queryI = queryI[:len(queryI)-1]
+			queryP = queryP[:len(queryP)-1] // + " on duplicate key update name=values(name),email=values(email),last_modified=now()"
 			_, err = ExecSQL(ctx, tx, queryU, argsU...)
 			if err != nil {
 				return

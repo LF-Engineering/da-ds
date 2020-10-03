@@ -20,3 +20,4 @@
 /out
 *.secret
 /data
+/local.sql
