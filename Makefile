@@ -2,7 +2,7 @@ GO_LIB_FILES=affs.go context.go const.go ds.go dsjira.go dsstub.go email.go es.g
 GO_BIN_FILES=cmd/dads/dads.go
 GO_TEST_FILES=context_test.go threads_test.go
 GO_LIBTEST_FILES=test/time.go
-GO_BIN_CMDS=github.com/LF-Engineering/da-ds/sources/cmd/dads
+GO_BIN_CMDS=github.com/LF-Engineering/da-ds/cmd/dads
 #for race CGO_ENABLED=1
 #GO_ENV=CGO_ENABLED=1
 GO_ENV=CGO_ENABLED=0
