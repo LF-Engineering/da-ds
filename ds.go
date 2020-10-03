@@ -213,8 +213,6 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last 
 				name := ident[0]
 				username := ident[1]
 				email := ident[2]
-				// uuid(source, email, name, username)
-				uuid := UUIDAffs(ctx, source, email, name, username)
 				var (
 					pname     *string
 					pemail    *string
@@ -236,7 +234,10 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last 
 				}
 				if pemail == nil && pusername != nil && IsValidEmail(username) {
 					pemail = &username
+					email = username
 				}
+				// uuid(source, email, name, username)
+				uuid := UUIDAffs(ctx, source, email, name, username)
 				queryU += fmt.Sprintf("(?,now()),")
 				queryI += fmt.Sprintf("(?,?,?,?,?,?,now()),")
 				queryP += fmt.Sprintf("(?,?,?),")
