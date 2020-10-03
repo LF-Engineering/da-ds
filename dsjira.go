@@ -829,10 +829,7 @@ func EnrichComments(ctx *Ctx, ds DS, comments []interface{}, item map[string]int
 	for _, comment := range comments {
 		richComment := make(map[string]interface{})
 		for _, field := range RawFields {
-			v, ok := item[field]
-			if !ok {
-				continue
-			}
+			v, _ := item[field]
 			richComment[field] = v
 		}
 		fields := []string{"project_id", "project_key", "project_name", "issue_type", "issue_description"}
@@ -970,10 +967,7 @@ func (j *DSJira) EnrichItem(ctx *Ctx, item map[string]interface{}, author string
 	// copy RawFields
 	rich = make(map[string]interface{})
 	for _, field := range RawFields {
-		v, ok := item[field]
-		if !ok {
-			continue
-		}
+		v, _ := item[field]
 		rich[field] = v
 	}
 	issue, ok := item["data"].(map[string]interface{})
