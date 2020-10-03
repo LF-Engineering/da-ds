@@ -5,13 +5,18 @@ import (
 	"sync"
 )
 
+var (
+	// MT -are we running in multiple threading mode?
+	MT = false
+)
+
 // SetMT - we're in multithreaded mode, setup global caches mutexes
 func SetMT() {
-	if uuidsCacheNonEmptyMtx == nil {
-		uuidsCacheNonEmptyMtx = &sync.RWMutex{}
+	if uuidsNonEmptyCacheMtx == nil {
+		uuidsNonEmptyCacheMtx = &sync.RWMutex{}
 	}
-	if uuidsCacheAffsMtx == nil {
-		uuidsCacheAffsMtx = &sync.RWMutex{}
+	if uuidsAffsCacheMtx == nil {
+		uuidsAffsCacheMtx = &sync.RWMutex{}
 	}
 	if identityCacheMtx == nil {
 		identityCacheMtx = &sync.RWMutex{}
@@ -22,6 +27,10 @@ func SetMT() {
 	if i2uCacheMtx == nil {
 		i2uCacheMtx = &sync.RWMutex{}
 	}
+	if emailsCacheMtx == nil {
+		emailsCacheMtx = &sync.RWMutex{}
+	}
+	MT = true
 }
 
 // GetThreadsNum returns the number of available CPUs

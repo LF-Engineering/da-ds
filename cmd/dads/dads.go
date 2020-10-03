@@ -57,6 +57,7 @@ func main() {
 	var ctx lib.Ctx
 	dtStart := time.Now()
 	ctx.Init()
+	defer lib.CacheSummary(&ctx)
 	lib.FatalOnError(ctx.Validate())
 	lib.FatalOnError(runDS(&ctx))
 	dtEnd := time.Now()

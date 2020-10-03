@@ -98,16 +98,24 @@ func FindObject(ctx *Ctx, object, key, id string, fields []string) (obj map[stri
 // GetIdentityUUID - identity's UUID for a given ID
 // uses internal cache
 func GetIdentityUUID(ctx *Ctx, ds DS, id string) (uuid interface{}) {
-	i2uCacheMtx.RLock()
+	if MT {
+		i2uCacheMtx.RLock()
+	}
 	uuid, ok := i2uCache[id]
-	i2uCacheMtx.RUnlock()
+	if MT {
+		i2uCacheMtx.RUnlock()
+	}
 	if ok {
 		return
 	}
 	defer func() {
-		i2uCacheMtx.Lock()
+		if MT {
+			i2uCacheMtx.Lock()
+		}
 		i2uCache[id] = uuid
-		i2uCacheMtx.Unlock()
+		if MT {
+			i2uCacheMtx.Unlock()
+		}
 	}()
 	i, err := FindObject(ctx, "identities", "id", id, []string{"uuid"})
 	if err != nil || i == nil {
@@ -130,16 +138,24 @@ func AffsIdentityIDs(ctx *Ctx, ds DS, identity map[string]interface{}) (ids [2]i
 	sName, okN := name.(string)
 	sUsername, okU := username.(string)
 	k := sEmail + ":" + sName + ":" + sUsername
-	identityCacheMtx.RLock()
+	if MT {
+		identityCacheMtx.RLock()
+	}
 	ids, ok := identityCache[k]
-	identityCacheMtx.RUnlock()
+	if MT {
+		identityCacheMtx.RUnlock()
+	}
 	if ok {
 		return
 	}
 	defer func() {
-		identityCacheMtx.Lock()
+		if MT {
+			identityCacheMtx.Lock()
+		}
 		identityCache[k] = ids
-		identityCacheMtx.Unlock()
+		if MT {
+			identityCacheMtx.Unlock()
+		}
 	}()
 	if !okE {
 		sEmail = Nil
@@ -225,16 +241,24 @@ func GetEnrollments(ctx *Ctx, ds DS, uuid string, dt time.Time, single bool) (or
 		sSep = "s"
 	}
 	k := uuid + sSep + ToYMDDate(dt)
-	rollsCacheMtx.RLock()
+	if MT {
+		rollsCacheMtx.RLock()
+	}
 	orgs, ok := rollsCache[k]
-	rollsCacheMtx.RUnlock()
+	if MT {
+		rollsCacheMtx.RUnlock()
+	}
 	if ok {
 		return
 	}
 	defer func() {
-		rollsCacheMtx.Lock()
+		if MT {
+			rollsCacheMtx.Lock()
+		}
 		rollsCache[k] = orgs
-		rollsCacheMtx.Unlock()
+		if MT {
+			rollsCacheMtx.Unlock()
+		}
 	}()
 	pSlug := ctx.ProjectSlug
 	// Step 1: Try project slug first

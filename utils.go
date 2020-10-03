@@ -5,11 +5,57 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"reflect"
 	"strings"
 	"time"
 
 	jsoniter "github.com/json-iterator/go"
 )
+
+// CacheSummary - display cache summary stats
+func CacheSummary(ctx *Ctx) {
+	if ctx.Debug == 0 {
+		return
+	}
+	if ctx.Debug >= 1 {
+		Printf("identity cache: %d entries\n", len(identityCache))
+		Printf("enrollments cache: %d entries\n", len(rollsCache))
+		Printf("identity uuids cache: %d entries\n", len(i2uCache))
+		Printf("emails cache: %d entries\n", len(emailsCache))
+		Printf("uuids type 1 cache: %d entries\n", len(uuidsNonEmptyCache))
+		Printf("uuids type 2 cache: %d entries\n", len(uuidsAffsCache))
+	}
+	if ctx.Debug >= 2 {
+		Printf("identity cache:\n%s\n", PrintCache(identityCache))
+		Printf("enrollments cache:\n%s\n", PrintCache(rollsCache))
+		Printf("identity uuids cache:\n%s\n", PrintCache(i2uCache))
+		Printf("emails cache:\n%s\n", PrintCache(emailsCache))
+		Printf("uuids type 1 cache:\n%s\n", PrintCache(uuidsNonEmptyCache))
+		Printf("uuids type 2 cache:\n%s\n", PrintCache(uuidsAffsCache))
+	}
+}
+
+// PrintCache - pretty print cache entries
+func PrintCache(iCache interface{}) (s string) {
+	cache := reflect.ValueOf(iCache)
+	if cache.Kind() != reflect.Map {
+		Printf("Error: not a map %+v\n", iCache)
+		return
+	}
+	t := false
+	for i, k := range cache.MapKeys() {
+		v := cache.MapIndex(k)
+		if !t {
+			s += fmt.Sprintf("type: map[%T]%T\n", k.Interface(), v.Interface())
+			t = true
+		}
+		s += fmt.Sprintf("%d) %+v: %+v\n", i+1, k.Interface(), v.Interface())
+	}
+	if s != "" {
+		s = s[:len(s)-1]
+	}
+	return
+}
 
 // KeysOnly - return a corresponding interface contining only keys
 func KeysOnly(i interface{}) (o map[string]interface{}) {

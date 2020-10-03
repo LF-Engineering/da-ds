@@ -234,6 +234,9 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last 
 						profname = &username
 					}
 				}
+				if pemail == nil && pusername != nil && IsValidEmail(username) {
+					pemail = &username
+				}
 				queryU += fmt.Sprintf("(?,now()),")
 				queryI += fmt.Sprintf("(?,?,?,?,?,?,now()),")
 				queryP += fmt.Sprintf("(?,?,?),")

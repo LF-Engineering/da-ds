@@ -11,21 +11,25 @@ import (
 )
 
 var (
-	// uuidsCacheNonEmpty caches UUIDNonEmpty calls
-	uuidsCacheNonEmpty    = map[string]string{}
-	uuidsCacheNonEmptyMtx *sync.RWMutex
-	// uuidsCacheAffs caches UUIDAffs calls
-	uuidsCacheAffs    = map[string]string{}
-	uuidsCacheAffsMtx *sync.RWMutex
+	// uuidsNonEmptyCache caches UUIDNonEmpty calls
+	uuidsNonEmptyCache    = map[string]string{}
+	uuidsNonEmptyCacheMtx *sync.RWMutex
+	// uuidsAffsCache caches UUIDAffs calls
+	uuidsAffsCache    = map[string]string{}
+	uuidsAffsCacheMtx *sync.RWMutex
 )
 
 // UUIDNonEmpty - generate UUID of string args (all must be non-empty)
 // uses internal cache
 func UUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
 	k := strings.Join(args, ":")
-	uuidsCacheNonEmptyMtx.RLock()
-	h, ok := uuidsCacheNonEmpty[k]
-	uuidsCacheNonEmptyMtx.RUnlock()
+	if MT {
+		uuidsNonEmptyCacheMtx.RLock()
+	}
+	h, ok := uuidsNonEmptyCache[k]
+	if MT {
+		uuidsNonEmptyCacheMtx.RUnlock()
+	}
 	if ok {
 		return
 	}
@@ -59,9 +63,13 @@ func UUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
 	_, err := hash.Write([]byte(arg))
 	FatalOnError(err)
 	h = hex.EncodeToString(hash.Sum(nil))
-	uuidsCacheNonEmptyMtx.Lock()
-	uuidsCacheNonEmpty[k] = h
-	uuidsCacheNonEmptyMtx.Unlock()
+	if MT {
+		uuidsNonEmptyCacheMtx.Lock()
+	}
+	uuidsNonEmptyCache[k] = h
+	if MT {
+		uuidsNonEmptyCacheMtx.Unlock()
+	}
 	return
 }
 
@@ -71,9 +79,13 @@ func UUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
 // if argument is Nil "<nil>" replaces with "None"
 func UUIDAffs(ctx *Ctx, args ...string) (h string) {
 	k := strings.Join(args, ":")
-	uuidsCacheAffsMtx.RLock()
-	h, ok := uuidsCacheAffs[k]
-	uuidsCacheAffsMtx.RUnlock()
+	if MT {
+		uuidsAffsCacheMtx.RLock()
+	}
+	h, ok := uuidsAffsCache[k]
+	if MT {
+		uuidsAffsCacheMtx.RUnlock()
+	}
 	if ok {
 		return
 	}
@@ -110,8 +122,12 @@ func UUIDAffs(ctx *Ctx, args ...string) (h string) {
 	_, err := hash.Write([]byte(strings.ToLower(arg)))
 	FatalOnError(err)
 	h = hex.EncodeToString(hash.Sum(nil))
-	uuidsCacheAffsMtx.Lock()
-	uuidsCacheAffs[k] = h
-	uuidsCacheAffsMtx.Unlock()
+	if MT {
+		uuidsAffsCacheMtx.Lock()
+	}
+	uuidsAffsCache[k] = h
+	if MT {
+		uuidsAffsCacheMtx.Unlock()
+	}
 	return
 }
