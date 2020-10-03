@@ -177,7 +177,7 @@ func Request(
 		result, status, err = RequestNoRetry(ctx, url, method, headers, payload, jsonStatuses, errorStatuses, okStatuses)
 		info := func() (inf string) {
 			inf = fmt.Sprintf("%s.%s:%s=%d", method, url, string(payload), status)
-			if ctx.Debug > 0 {
+			if ctx.Debug > 1 {
 				inf += fmt.Sprintf(" error: %+v", err)
 			}
 			return
