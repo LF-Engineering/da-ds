@@ -25,7 +25,7 @@ const (
 	// JiraAPIComment - comments API subpath
 	JiraAPIComment = "/comment"
 	// JiraBackendVersion - backend version
-	JiraBackendVersion = "0.0.1"
+	JiraBackendVersion = "0.0.2"
 	// JiraDefaultSearchField - default search field
 	JiraDefaultSearchField = "item_id"
 	// JiraDropCustomFields - drop custom fields from raw index
