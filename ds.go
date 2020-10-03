@@ -690,7 +690,7 @@ func FetchRaw(ctx *Ctx, ds DS) (err error) {
 		lastUpdate *time.Time
 		offset     *float64
 	)
-	if ds.SupportDateFrom() {
+	if !ctx.ForceFull && ds.SupportDateFrom() {
 		lastUpdate = ctx.DateFrom
 		if lastUpdate == nil {
 			lastUpdate = GetLastUpdate(ctx, ds, true)
@@ -705,7 +705,7 @@ func FetchRaw(ctx *Ctx, ds DS) (err error) {
 			Printf("%s: raw: no start date detected\n", ds.Name())
 		}
 	}
-	if ds.SupportOffsetFrom() {
+	if !ctx.ForceFull && ds.SupportOffsetFrom() {
 		if ctx.OffsetFrom >= 0.0 {
 			offset = &ctx.OffsetFrom
 		}
@@ -762,7 +762,7 @@ func Enrich(ctx *Ctx, ds DS) (err error) {
 		offset     *float64
 		adjusted   bool
 	)
-	if ds.SupportDateFrom() {
+	if !ctx.ForceFull && ds.SupportDateFrom() {
 		if ctx.DateFromDetected {
 			lastUpdate = GetLastUpdate(ctx, ds, false)
 			if lastUpdate != nil && (*lastUpdate).After(*ctx.DateFrom) {
@@ -779,7 +779,7 @@ func Enrich(ctx *Ctx, ds DS) (err error) {
 		}
 		ctx.DateFrom = lastUpdate
 	}
-	if ds.SupportOffsetFrom() {
+	if !ctx.ForceFull && ds.SupportOffsetFrom() {
 		adjusted = false
 		if ctx.OffsetFromDetected {
 			lastOffset := GetLastOffset(ctx, ds, false)
