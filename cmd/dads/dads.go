@@ -46,7 +46,6 @@ func runDS(ctx *lib.Ctx) (err error) {
 }
 
 func main() {
-	// args --only-enrich --refresh-identities --no_incremental --enrich --index jira-raw --index-enrich jira -e (...) --bulk-size 500 --scroll-size 500 --db-host (...) --db-sortinghat (...) --db-user (...) --db-password (...) jira https://jira.opendaylight.org --no-archive --no-ssl-verify
 	// prefix DA_DS_
 	// DA_DS=jira
 	// NO_RAW=1 REFRESH_AFFS=1 FORCE_FULL=1
