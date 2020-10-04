@@ -52,6 +52,7 @@ func UUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
 		cmdLine := []string{"uuid.py", "a"}
 		cmdLine = append(cmdLine, args...)
 		h, err = ExecCommand(ctx, cmdLine)
+		h = h[:len(h)-1]
 		FatalOnError(err)
 		return
 	}
@@ -118,6 +119,7 @@ func UUIDAffs(ctx *Ctx, args ...string) (h string) {
 		cmdLine := []string{"uuid.py", "u"}
 		cmdLine = append(cmdLine, args...)
 		h, err = ExecCommand(ctx, cmdLine)
+		h = h[:len(h)-1]
 		FatalOnError(err)
 		return
 	}
