@@ -38,6 +38,14 @@ func UUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
 			Printf("UUIDNonEmpty(%v) --> %s\n", args, h)
 		}()
 	}
+	if ctx.LegacyUUID {
+		var err error
+		cmdLine := []string{"uuid.py", "a"}
+		cmdLine = append(cmdLine, args...)
+		h, err = ExecCommand(ctx, cmdLine)
+		FatalOnError(err)
+		return
+	}
 	stripF := func(str string) string {
 		isOk := func(r rune) bool {
 			return r < 32 || r >= 127
@@ -93,6 +101,14 @@ func UUIDAffs(ctx *Ctx, args ...string) (h string) {
 		defer func() {
 			Printf("UUIDAffs(%v) --> %s\n", args, h)
 		}()
+	}
+	if ctx.LegacyUUID {
+		var err error
+		cmdLine := []string{"uuid.py", "u"}
+		cmdLine = append(cmdLine, args...)
+		h, err = ExecCommand(ctx, cmdLine)
+		FatalOnError(err)
+		return
 	}
 	stripF := func(str string) string {
 		isOk := func(r rune) bool {

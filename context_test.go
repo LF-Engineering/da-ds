@@ -43,6 +43,7 @@ func copyContext(in *lib.Ctx) *lib.Ctx {
 		RefreshAffs:      in.RefreshAffs,
 		OnlyIdentities:   in.OnlyIdentities,
 		ForceFull:        in.ForceFull,
+		LegacyUUID:       in.LegacyUUID,
 		Project:          in.Project,
 		ProjectSlug:      in.ProjectSlug,
 		Category:         in.Category,
@@ -220,6 +221,7 @@ func TestInit(t *testing.T) {
 		RefreshAffs:      false,
 		OnlyIdentities:   false,
 		ForceFull:        false,
+		LegacyUUID:       false,
 		Project:          "",
 		ProjectSlug:      "",
 		Category:         "",
@@ -397,6 +399,19 @@ func TestInit(t *testing.T) {
 					"RefreshAffs":    true,
 					"OnlyIdentities": true,
 					"ForceFull":      true,
+				},
+			),
+		},
+		{
+			"Setting legacy UUID mode",
+			map[string]string{
+				"DA_DS_LEGACY_UUID": "1",
+			},
+			dynamicSetFields(
+				t,
+				copyContext(&defaultContext),
+				map[string]interface{}{
+					"LegacyUUID": true,
 				},
 			),
 		},

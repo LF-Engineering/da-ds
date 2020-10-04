@@ -47,6 +47,7 @@ type Ctx struct {
 	DateTo             *time.Time // From DA_DS_DATE_TO
 	OffsetFrom         float64    // From DA_DS_OFFSET_FROM
 	OffsetTo           float64    // From DA_DS_OFFSET_TO
+	LegacyUUID         bool       // From DA_DS_LEGACY_UUID - use python code for generating uuids
 	DateFromDetected   bool
 	OffsetFromDetected bool
 	DB                 *sqlx.DB
@@ -186,6 +187,9 @@ func (ctx *Ctx) Init() {
 	ctx.RefreshAffs = ctx.env("REFRESH_AFFS") != ""
 	ctx.OnlyIdentities = ctx.env("ONLY_IDENTITIES") != ""
 	ctx.ForceFull = ctx.env("FORCE_FULL") != ""
+
+	// Legacy UUID
+	ctx.LegacyUUID = ctx.env("LEGACY_UUID") != ""
 
 	// Project, Project slug, Category
 	ctx.Project = ctx.env("PROJECT")
