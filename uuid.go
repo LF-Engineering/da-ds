@@ -38,6 +38,15 @@ func UUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
 			Printf("UUIDNonEmpty(%v) --> %s\n", args, h)
 		}()
 	}
+	defer func() {
+		if MT {
+			uuidsNonEmptyCacheMtx.Lock()
+		}
+		uuidsNonEmptyCache[k] = h
+		if MT {
+			uuidsNonEmptyCacheMtx.Unlock()
+		}
+	}()
 	if ctx.LegacyUUID {
 		var err error
 		cmdLine := []string{"uuid.py", "a"}
@@ -71,13 +80,6 @@ func UUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
 	_, err := hash.Write([]byte(arg))
 	FatalOnError(err)
 	h = hex.EncodeToString(hash.Sum(nil))
-	if MT {
-		uuidsNonEmptyCacheMtx.Lock()
-	}
-	uuidsNonEmptyCache[k] = h
-	if MT {
-		uuidsNonEmptyCacheMtx.Unlock()
-	}
 	return
 }
 
@@ -102,6 +104,15 @@ func UUIDAffs(ctx *Ctx, args ...string) (h string) {
 			Printf("UUIDAffs(%v) --> %s\n", args, h)
 		}()
 	}
+	defer func() {
+		if MT {
+			uuidsAffsCacheMtx.Lock()
+		}
+		uuidsAffsCache[k] = h
+		if MT {
+			uuidsAffsCacheMtx.Unlock()
+		}
+	}()
 	if ctx.LegacyUUID {
 		var err error
 		cmdLine := []string{"uuid.py", "u"}
@@ -138,12 +149,5 @@ func UUIDAffs(ctx *Ctx, args ...string) (h string) {
 	_, err := hash.Write([]byte(strings.ToLower(arg)))
 	FatalOnError(err)
 	h = hex.EncodeToString(hash.Sum(nil))
-	if MT {
-		uuidsAffsCacheMtx.Lock()
-	}
-	uuidsAffsCache[k] = h
-	if MT {
-		uuidsAffsCacheMtx.Unlock()
-	}
 	return
 }
