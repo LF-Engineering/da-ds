@@ -529,31 +529,37 @@ func ForEachESItem(
 			payload,
 			map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses
 			nil,                                 // Error statuses
-			map[[2]int]struct{}{{200, 200}: {}, {500, 500}: {}}, // OK statuses
+			map[[2]int]struct{}{{200, 200}: {}, {404, 404}: {}, {500, 500}: {}}, // OK statuses
 			true,
 		)
-		if scroll != nil && status == 404 && strings.Contains(string(res.([]byte)), NoSearchContextFound) {
-			Printf("Scroll %s probably expired, seeting it to 59m for retry\n", scroll)
-			if ctx.ESScrollWait != "59m" {
-				savedScroll := ctx.ESScrollWait
-				defer func() {
-					ctx.ESScrollWait = savedScroll
-				}()
-			}
-			scroll = nil
-			err = nil
-			continue
-		}
 		FatalOnError(err)
-		if scroll == nil && status == 500 && strings.Contains(string(res.([]byte)), TooManyScrolls) {
-			time.Sleep(5)
-			now := time.Now()
-			elapsed := now.Sub(attemptAt)
-			Printf("%d retrying scroll, first attempt at %+v, elapsed %+v/%.0fs\n", len(res.(map[string]interface{})), attemptAt, elapsed, ctx.ESScrollWaitSecs)
-			if elapsed.Seconds() > ctx.ESScrollWaitSecs {
-				Fatalf("Tried to acquire scroll too many times, first attempt at %v, elapsed %v/%.0fs", attemptAt, elapsed, ctx.ESScrollWaitSecs)
+		if status == 404 {
+			if scroll != nil && strings.Contains(string(res.([]byte)), NoSearchContextFound) {
+				Printf("scroll %s probably expired, seeting it to 59m for retry, you should adjust your config: scroll wait and/or scroll size\n", *scroll)
+				if ctx.ESScrollWait != "59m" {
+					savedScroll := ctx.ESScrollWait
+					defer func() {
+						ctx.ESScrollWait = savedScroll
+					}()
+				}
+				scroll = nil
+				err = nil
+				continue
 			}
-			continue
+			Fatalf("got status 404 but not because of scroll context expiration:\n%s\n", string(res.([]byte)))
+		}
+		if status == 500 {
+			if scroll == nil && status == 500 && strings.Contains(string(res.([]byte)), TooManyScrolls) {
+				time.Sleep(5)
+				now := time.Now()
+				elapsed := now.Sub(attemptAt)
+				Printf("%d retrying scroll, first attempt at %+v, elapsed %+v/%.0fs\n", len(res.(map[string]interface{})), attemptAt, elapsed, ctx.ESScrollWaitSecs)
+				if elapsed.Seconds() > ctx.ESScrollWaitSecs {
+					Fatalf("Tried to acquire scroll too many times, first attempt at %v, elapsed %v/%.0fs", attemptAt, elapsed, ctx.ESScrollWaitSecs)
+				}
+				continue
+			}
+			Fatalf("got status 500 but not because of too many scrolls:\n%s\n", string(res.([]byte)))
 		}
 		sScroll, ok := res.(map[string]interface{})["_scroll_id"].(string)
 		if !ok {
