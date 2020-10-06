@@ -83,6 +83,9 @@ func CommonFields(ds DS, date interface{}, category string) (fields map[string]i
 // last flag signalling that this is the last (so it must flush output then)
 //         there can be no items in input pack in the last flush call
 func ESBulkUploadFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last bool) (e error) {
+	if ctx.Debug > 0 {
+		Printf("ES bulk uploading %d/%d func\n", len(*docs), len(*outDocs))
+	}
 	bulkSize := ctx.ESBulkSize
 	itemID := ds.RichIDField(ctx)
 	run := func() (err error) {
@@ -156,6 +159,9 @@ func ESBulkUploadFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last bool) 
 // last flag signalling that this is the last (so it must flush output then)
 //         there can be no items in input pack in the last flush call
 func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last bool) (e error) {
+	if ctx.Debug > 0 {
+		Printf("bulk uploading %d/%d identities func\n", len(*docs), len(*outDocs))
+	}
 	bulkSize := ctx.DBBulkSize / 6
 	run := func() (err error) {
 		var tx *sql.Tx
@@ -309,6 +315,9 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last 
 // items is a current pack of input items
 // docs is a pointer to where extracted items will be stored
 func StandardItemsFunc(ctx *Ctx, ds DS, items []interface{}, docs *[]interface{}) (err error) {
+	if ctx.Debug > 0 {
+		Printf("standard items %d/%d func\n", len(items), len(*docs))
+	}
 	for _, item := range items {
 		doc, ok := item.(map[string]interface{})["_source"]
 		if !ok {
@@ -325,6 +334,9 @@ func StandardItemsFunc(ctx *Ctx, ds DS, items []interface{}, docs *[]interface{}
 // docs is a pointer to where extracted identities will be stored
 // each identity is [3]string [name, username, email]
 func ItemsIdentitiesFunc(ctx *Ctx, ds DS, items []interface{}, docs *[]interface{}) (err error) {
+	if ctx.Debug > 0 {
+		Printf("items identities %d/%d func\n", len(items), len(*docs))
+	}
 	idents := make(map[[3]string]struct{})
 	for _, doc := range *docs {
 		idents[doc.([3]string)] = struct{}{}
@@ -359,6 +371,9 @@ func ItemsIdentitiesFunc(ctx *Ctx, ds DS, items []interface{}, docs *[]interface
 // items is a current pack of ES rich items
 // docs is a pointer to where updated rich items will be stored
 func ItemsRefreshIdentitiesFunc(ctx *Ctx, ds DS, richItems []interface{}, docs *[]interface{}) (err error) {
+	if ctx.Debug > 0 {
+		Printf("refresh identities %d/%d func\n", len(richItems), len(*docs))
+	}
 	roles := ds.AllRoles(ctx)
 	var values map[string]interface{}
 	for _, richItem := range richItems {
@@ -381,6 +396,7 @@ func ItemsRefreshIdentitiesFunc(ctx *Ctx, ds DS, richItems []interface{}, docs *
 // We assume here that docs maintained my iterator func contains a list of [3]string
 // Each identity is [3]string [name, username, email]
 func UploadIdentities(ctx *Ctx, ds DS) (err error) {
+	Printf("uploading identities\n")
 	err = ForEachESItem(ctx, ds, true, DBUploadIdentitiesFunc, ItemsIdentitiesFunc)
 	return
 }
@@ -388,6 +404,7 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 // RefreshIdentities - refresh identities
 // We iterate over rich index to refresh its affiliation data
 func RefreshIdentities(ctx *Ctx, ds DS) (err error) {
+	Printf("refreshing identities\n")
 	err = ForEachESItem(ctx, ds, false, ESBulkUploadFunc, ItemsRefreshIdentitiesFunc)
 	return
 }

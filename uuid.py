@@ -8,6 +8,8 @@ from sys import argv
 def to_unicode(x, unaccent=False):
     """Convert a string to unicode"""
     s = str(x)
+    if x == '<nil>':
+        s = 'None'
     if unaccent:
         cs = [c for c in normalize('NFD', s)
               if category(c) != 'Mn']

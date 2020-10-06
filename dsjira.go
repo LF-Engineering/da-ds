@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
+	neturl "net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -197,13 +198,15 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 	} else {
 		headers = map[string]string{"Content-Type": "application/json"}
 	}
+	// Encode search params in query for GET requests
+	encodeInQuery := true
 	processIssue := func(c chan error) (e error) {
 		defer func() {
 			if c != nil {
 				c <- e
 			}
 		}()
-		url := j.URL + JiraAPIRoot + JiraAPIIssue + "/" + issueID + JiraAPIComment
+		urlRoot := j.URL + JiraAPIRoot + JiraAPIIssue + "/" + issueID + JiraAPIComment
 		startAt := int64(0)
 		maxResults := int64(j.PageSize)
 		epochMS := from.UnixNano() / 1e6
@@ -213,28 +216,35 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 			if to != nil {
 				epochToMS := (*to).UnixNano() / 1e6
 				if ctx.Project != "" {
-					jql = fmt.Sprintf(`"jql":"project = %s AND updated > %d AND updated < %d order by updated asc"`, ctx.Project, epochMS, epochToMS)
+					jql = fmt.Sprintf(`project = %s AND updated > %d AND updated < %d order by updated asc`, ctx.Project, epochMS, epochToMS)
 				} else {
-					jql = fmt.Sprintf(`"jql":"updated > %d AND updated < %d order by updated asc"`, epochMS, epochToMS)
+					jql = fmt.Sprintf(`updated > %d AND updated < %d order by updated asc`, epochMS, epochToMS)
 				}
 			} else {
 				if ctx.Project != "" {
-					jql = fmt.Sprintf(`"jql":"project = %s AND updated > %d order by updated asc"`, ctx.Project, epochMS)
+					jql = fmt.Sprintf(`project = %s AND updated > %d order by updated asc`, ctx.Project, epochMS)
 				} else {
-					jql = fmt.Sprintf(`"jql":"updated > %d order by updated asc"`, epochMS)
+					jql = fmt.Sprintf(`updated > %d order by updated asc`, epochMS)
 				}
 			}
 		} else {
 			if to != nil {
 				epochToMS := (*to).UnixNano() / 1e6
-				jql = fmt.Sprintf(`"jql":"updated > %d AND updated < %d order by updated asc"`, epochMS, epochToMS)
+				jql = fmt.Sprintf(`updated > %d AND updated < %d order by updated asc`, epochMS, epochToMS)
 			} else {
-				jql = fmt.Sprintf(`"jql":"updated > %d order by updated asc"`, epochMS)
+				jql = fmt.Sprintf(`updated > %d order by updated asc`, epochMS)
 			}
 		}
 		method := Get
 		for {
-			payloadBytes := []byte(fmt.Sprintf(`{"startAt":%d,"maxResults":%d,%s}`, startAt, maxResults, jql))
+			var payloadBytes []byte
+			url := urlRoot
+			if encodeInQuery {
+				// ?startAt=0&maxResults=100&jql=updated+%3E+0+order+by+updated+asc
+				url += fmt.Sprintf(`?startAt=%d&maxResults=%d&jql=`, startAt, maxResults) + neturl.QueryEscape(jql)
+			} else {
+				payloadBytes = []byte(fmt.Sprintf(`{"startAt":%d,"maxResults":%d,"jql":"%s"}`, startAt, maxResults, jql))
+			}
 			var res interface{}
 			res, _, e = Request(
 				ctx,
@@ -908,6 +918,9 @@ func EnrichComments(ctx *Ctx, ds DS, comments []interface{}, item map[string]int
 // items is a current pack of input items
 // docs is a pointer to where extracted identities will be stored
 func JiraEnrichItemsFunc(ctx *Ctx, ds DS, items []interface{}, docs *[]interface{}) (err error) {
+	if ctx.Debug > 0 {
+		Printf("jira enrich items %d/%d func\n", len(items), len(*docs))
+	}
 	dbConfigured := ctx.AffsDBConfigured()
 	var rich map[string]interface{}
 	for _, item := range items {
@@ -958,6 +971,7 @@ func JiraEnrichItemsFunc(ctx *Ctx, ds DS, items []interface{}, docs *[]interface
 
 // EnrichItems - perform the enrichment
 func (j *DSJira) EnrichItems(ctx *Ctx) (err error) {
+	Printf("enriching items\n")
 	err = ForEachESItem(ctx, j, true, ESBulkUploadFunc, JiraEnrichItemsFunc)
 	return
 }
