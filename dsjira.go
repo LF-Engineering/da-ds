@@ -917,53 +917,116 @@ func EnrichComments(ctx *Ctx, ds DS, comments []interface{}, item map[string]int
 // JiraEnrichItemsFunc - iterate items and enrich them
 // items is a current pack of input items
 // docs is a pointer to where extracted identities will be stored
-func JiraEnrichItemsFunc(ctx *Ctx, ds DS, items []interface{}, docs *[]interface{}) (err error) {
+func JiraEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]interface{}) (err error) {
 	if ctx.Debug > 0 {
 		Printf("jira enrich items %d/%d func\n", len(items), len(*docs))
 	}
+	var (
+		mtx *sync.RWMutex
+		ch  chan error
+	)
+	if thrN > 1 {
+		mtx = &sync.RWMutex{}
+		ch = make(chan error)
+	}
 	dbConfigured := ctx.AffsDBConfigured()
+	nThreads := 0
 	var rich map[string]interface{}
-	for _, item := range items {
+	procItem := func(c chan error, idx int) (e error) {
+		if thrN > 1 {
+			mtx.RLock()
+		}
+		item := items[idx]
+		if thrN > 1 {
+			mtx.RUnlock()
+		}
+		defer func() {
+			if c != nil {
+				c <- e
+			}
+		}()
 		src, ok := item.(map[string]interface{})["_source"]
 		if !ok {
-			err = fmt.Errorf("Missing _source in item %+v", DumpKeys(item))
+			e = fmt.Errorf("Missing _source in item %+v", DumpKeys(item))
 			return
 		}
 		doc, ok := src.(map[string]interface{})
 		if !ok {
-			err = fmt.Errorf("Failed to parse document %+v\n", doc)
+			e = fmt.Errorf("Failed to parse document %+v\n", doc)
 			return
 		}
 		var richItem map[string]interface{}
 		for i, author := range []string{"creator", "assignee", "reporter"} {
-			rich, err = ds.EnrichItem(ctx, doc, author, dbConfigured)
-			if err != nil {
+			rich, e = ds.EnrichItem(ctx, doc, author, dbConfigured)
+			if e != nil {
 				return
 			}
-			err = EnrichItem(ctx, ds, rich)
-			if err != nil {
+			e = EnrichItem(ctx, ds, rich)
+			if e != nil {
 				return
+			}
+			if thrN > 1 {
+				mtx.Lock()
 			}
 			*docs = append(*docs, rich)
+			if thrN > 1 {
+				mtx.Unlock()
+			}
 			if i == 0 {
 				richItem = rich
 			}
 		}
 		comms, ok := Dig(doc, []string{"data", "comments_data"}, false, true)
 		if !ok {
-			continue
+			return
 		}
 		comments, _ := comms.([]interface{})
 		if len(comments) == 0 {
-			continue
+			return
 		}
 		var richComments []interface{}
-		richComments, err = EnrichComments(ctx, ds, comments, richItem, dbConfigured)
-		if err != nil {
+		richComments, e = EnrichComments(ctx, ds, comments, richItem, dbConfigured)
+		if e != nil {
 			return
+		}
+		if thrN > 1 {
+			mtx.Lock()
 		}
 		for _, richComment := range richComments {
 			*docs = append(*docs, richComment)
+		}
+		if thrN > 1 {
+			mtx.Unlock()
+		}
+		return
+	}
+	if thrN > 1 {
+		for i := range items {
+			go func(i int) {
+				_ = procItem(ch, i)
+			}(i)
+			nThreads++
+			if nThreads == thrN {
+				err = <-ch
+				if err != nil {
+					return
+				}
+				nThreads--
+			}
+		}
+		for nThreads > 0 {
+			err = <-ch
+			nThreads--
+			if err != nil {
+				return
+			}
+		}
+		return
+	}
+	for i := range items {
+		err = procItem(nil, i)
+		if err != nil {
+			return
 		}
 	}
 	return

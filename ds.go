@@ -82,7 +82,7 @@ func CommonFields(ds DS, date interface{}, category string) (fields map[string]i
 // outDocs is maintained with ES bulk size
 // last flag signalling that this is the last (so it must flush output then)
 //         there can be no items in input pack in the last flush call
-func ESBulkUploadFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last bool) (e error) {
+func ESBulkUploadFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interface{}, last bool) (e error) {
 	if ctx.Debug > 0 {
 		Printf("ES bulk uploading %d/%d func\n", len(*docs), len(*outDocs))
 	}
@@ -158,7 +158,7 @@ func ESBulkUploadFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last bool) 
 // outDocs is maintained with DB bulk size
 // last flag signalling that this is the last (so it must flush output then)
 //         there can be no items in input pack in the last flush call
-func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, docs, outDocs *[]interface{}, last bool) (e error) {
+func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interface{}, last bool) (e error) {
 	if ctx.Debug > 0 {
 		Printf("bulk uploading %d/%d identities func\n", len(*docs), len(*outDocs))
 	}
@@ -333,7 +333,7 @@ func StandardItemsFunc(ctx *Ctx, ds DS, items []interface{}, docs *[]interface{}
 // items is a current pack of ES input items
 // docs is a pointer to where extracted identities will be stored
 // each identity is [3]string [name, username, email]
-func ItemsIdentitiesFunc(ctx *Ctx, ds DS, items []interface{}, docs *[]interface{}) (err error) {
+func ItemsIdentitiesFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]interface{}) (err error) {
 	if ctx.Debug > 0 {
 		Printf("items identities %d/%d func\n", len(items), len(*docs))
 	}
@@ -370,7 +370,7 @@ func ItemsIdentitiesFunc(ctx *Ctx, ds DS, items []interface{}, docs *[]interface
 // ItemsRefreshIdentitiesFunc - refresh input raw items/re-enrich
 // items is a current pack of ES rich items
 // docs is a pointer to where updated rich items will be stored
-func ItemsRefreshIdentitiesFunc(ctx *Ctx, ds DS, richItems []interface{}, docs *[]interface{}) (err error) {
+func ItemsRefreshIdentitiesFunc(ctx *Ctx, ds DS, thrN int, richItems []interface{}, docs *[]interface{}) (err error) {
 	if ctx.Debug > 0 {
 		Printf("refresh identities %d/%d func\n", len(richItems), len(*docs))
 	}
@@ -419,8 +419,8 @@ func ForEachESItem(
 	ctx *Ctx,
 	ds DS,
 	raw bool,
-	ufunct func(*Ctx, DS, *[]interface{}, *[]interface{}, bool) error,
-	uitems func(*Ctx, DS, []interface{}, *[]interface{}) error,
+	ufunct func(*Ctx, DS, int, *[]interface{}, *[]interface{}, bool) error,
+	uitems func(*Ctx, DS, int, []interface{}, *[]interface{}) error,
 ) (err error) {
 	dateField := JSONEscape(ds.DateField(ctx))
 	originField := JSONEscape(ds.OriginField(ctx))
@@ -485,7 +485,7 @@ func ForEachESItem(
 		if thrN > 1 {
 			mtx.Lock()
 		}
-		e = ufunct(ctx, ds, &docs, &outDocs, last)
+		e = ufunct(ctx, ds, thrN, &docs, &outDocs, last)
 		return
 	}
 	needsOrigin := ds.ResumeNeedsOrigin(ctx)
@@ -576,7 +576,7 @@ func ForEachESItem(
 		if thrN > 1 {
 			mtx.Lock()
 		}
-		err = uitems(ctx, ds, items, &docs)
+		err = uitems(ctx, ds, thrN, items, &docs)
 		if err != nil {
 			return
 		}
