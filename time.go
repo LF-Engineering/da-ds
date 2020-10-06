@@ -82,10 +82,15 @@ func TimeParseESSec(dtStr string) (time.Time, error) {
 func TimeParseES(dtStr string) (time.Time, error) {
 	ary := strings.Split(dtStr, "+")
 	ary2 := strings.Split(ary[0], ".")
-	if len(ary2[1]) > 3 {
-		ary2[1] = ary2[1][:3]
+	var s string
+	if len(ary2) == 1 {
+		s = ary2[0] + ".000"
+	} else {
+		if len(ary2[1]) > 3 {
+			ary2[1] = ary2[1][:3]
+		}
+		s = strings.Join(ary2, ".")
 	}
-	s := strings.Join(ary2, ".")
 	return time.Parse("2006-01-02T15:04:05.000", s)
 }
 
