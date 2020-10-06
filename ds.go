@@ -462,6 +462,7 @@ func ForEachESItem(
 		}
 	}()
 	thrN := GetThreadsNum(ctx)
+	Printf("Multithreaded: %v, using %d threads\n", MT, thrN)
 	nThreads := 0
 	var (
 		mtx *sync.Mutex
@@ -532,14 +533,27 @@ func ForEachESItem(
 			map[[2]int]struct{}{{200, 200}: {}, {404, 404}: {}, {500, 500}: {}}, // OK statuses
 			true,
 		)
+		if ctx.Debug > 1 {
+			Printf("%s%s --> %d\n", url, string(payload), status)
+		}
 		FatalOnError(err)
 		if status == 404 {
 			if scroll != nil && strings.Contains(string(res.([]byte)), NoSearchContextFound) {
-				Printf("scroll %s probably expired, seeting it to 59m for retry, you should adjust your config: scroll wait and/or scroll size\n", *scroll)
+				Printf("scroll %s probably expired, seeting it to 20 items/59 minutes for a safe retry, you should adjust your config: scroll wait and/or scroll size\n", *scroll)
+				Printf("note that scroll will now restart, so the same data (with a small pack size 20) will be processed again\n")
+				Printf("all documents should have unique id fields so this should not be an issue\n")
 				if ctx.ESScrollWait != "59m" {
-					savedScroll := ctx.ESScrollWait
+					savedScrollWait := ctx.ESScrollWait
+					ctx.ESScrollWait = "59m"
 					defer func() {
-						ctx.ESScrollWait = savedScroll
+						ctx.ESScrollWait = savedScrollWait
+					}()
+				}
+				if ctx.ESScrollSize > 20 {
+					savedScrollSize := ctx.ESScrollSize
+					ctx.ESScrollSize = 20
+					defer func() {
+						ctx.ESScrollSize = savedScrollSize
 					}()
 				}
 				scroll = nil
