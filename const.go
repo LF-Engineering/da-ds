@@ -57,6 +57,9 @@ const Comment string = "comment"
 // TooManyScrolls - this appearch in error message when too many scrolls are created
 const TooManyScrolls = "Trying to create too many scroll contexts"
 
+// NoSearchContextFound - this appearch when processing takes so long, that the scroll expires
+const NoSearchContextFound = "No search context found for id"
+
 // Nil - common constant string
 const Nil = "<nil>"
 

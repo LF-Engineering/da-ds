@@ -532,6 +532,18 @@ func ForEachESItem(
 			map[[2]int]struct{}{{200, 200}: {}, {500, 500}: {}}, // OK statuses
 			true,
 		)
+		if scroll != nil && status == 404 && strings.Contains(string(res.([]byte)), NoSearchContextFound) {
+			Printf("Scroll %s probably expired, seeting it to 59m for retry\n", scroll)
+			if ctx.ESScrollWait != "59m" {
+				savedScroll := ctx.ESScrollWait
+				defer func() {
+					ctx.ESScrollWait = savedScroll
+				}()
+			}
+			scroll = nil
+			err = nil
+			continue
+		}
 		FatalOnError(err)
 		if scroll == nil && status == 500 && strings.Contains(string(res.([]byte)), TooManyScrolls) {
 			time.Sleep(5)
