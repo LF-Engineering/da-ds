@@ -177,6 +177,7 @@ func ESCacheDeleteExpired(ctx *Ctx) {
 
 // GetESCache - get value from cache - thread safe and support expiration
 func GetESCache(ctx *Ctx, k string) (b []byte, ok bool) {
+	defer MaybeMemCacheCleanup()
 	defer MaybeESCacheCleanup(ctx)
 	if MT {
 		esCacheMtx.RLock()
@@ -214,6 +215,7 @@ func GetESCache(ctx *Ctx, k string) (b []byte, ok bool) {
 
 // SetESCache - set cache value, expiration date and handles multithreading etc
 func SetESCache(ctx *Ctx, k, tg string, b []byte, expires time.Duration) {
+	defer MaybeMemCacheCleanup()
 	defer MaybeESCacheCleanup(ctx)
 	t := time.Now()
 	e := t.Add(expires)

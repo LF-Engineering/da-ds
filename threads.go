@@ -33,6 +33,9 @@ func SetMT() {
 	if esCacheMtx == nil {
 		esCacheMtx = &sync.RWMutex{}
 	}
+	if memCacheMtx == nil {
+		memCacheMtx = &sync.RWMutex{}
+	}
 	MT = true
 }
 

@@ -10,10 +10,55 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	jsoniter "github.com/json-iterator/go"
 )
+
+var (
+	memCacheMtx *sync.RWMutex
+	memCache    = map[string]*MemCacheEntry{}
+)
+
+// MemCacheEntry - single cache entry
+type MemCacheEntry struct {
+	G string    `json:"g"` // cache tag
+	B []byte    `json:"b"` // cache data
+	T time.Time `json:"t"` // when cached
+	E time.Time `json:"e"` // when expires
+}
+
+// MemCacheDeleteExpired - delete expired cache entries
+func MemCacheDeleteExpired() {
+	t := time.Now()
+	ks := []string{}
+	for k, v := range memCache {
+		if t.After(v.E) {
+			ks = append(ks, k)
+		}
+	}
+	for _, k := range ks {
+		delete(memCache, k)
+	}
+}
+
+// MaybeMemCacheCleanup - 10% chance of cleaning expired cache entries
+func MaybeMemCacheCleanup() {
+	// 10% chance for cache cleanup
+	t := time.Now()
+	if t.Second()%10 == 0 {
+		go func() {
+			if MT {
+				memCacheMtx.Lock()
+			}
+			MemCacheDeleteExpired()
+			if MT {
+				memCacheMtx.Unlock()
+			}
+		}()
+	}
+}
 
 // CacheSummary - display cache summary stats
 func CacheSummary(ctx *Ctx) {
