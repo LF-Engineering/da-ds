@@ -149,7 +149,9 @@ func (j *DSJira) GetFields(ctx *Ctx) (customFields map[string]JiraField, err err
 		headers = map[string]string{"Authorization": "Basic " + j.Token}
 	}
 	var resp interface{}
-	resp, _, err = Request(ctx, url, method, headers, nil, nil, nil, map[[2]int]struct{}{{200, 200}: {}}, true)
+	// Week for caching fields, they don't change that often
+	cacheFor := time.Duration(168) * time.Hour
+	resp, _, err = Request(ctx, url, method, headers, nil, nil, nil, map[[2]int]struct{}{{200, 200}: {}}, true, &cacheFor)
 	if err != nil {
 		return
 	}
@@ -200,6 +202,7 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 	}
 	// Encode search params in query for GET requests
 	encodeInQuery := true
+	cacheFor := time.Duration(3) * time.Hour
 	processIssue := func(c chan error) (e error) {
 		defer func() {
 			if c != nil {
@@ -256,6 +259,7 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 				nil,                                 // Error statuses
 				map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
 				true,
+				&cacheFor,
 			)
 			if e != nil {
 				return
@@ -528,6 +532,7 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 	if ctx.Debug > 0 {
 		Printf("requesting issues from: %s\n", from)
 	}
+	cacheFor := time.Duration(3) * time.Hour
 	for {
 		payloadBytes := []byte(fmt.Sprintf(`{"startAt":%d,"maxResults":%d,%s,%s}`, startAt, maxResults, jql, expand))
 		var res interface{}
@@ -541,6 +546,7 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 			nil,                                 // Error statuses
 			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200, 404
 			true,
+			&cacheFor,
 		)
 		if err != nil {
 			return
@@ -1035,7 +1041,7 @@ func JiraEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[
 // EnrichItems - perform the enrichment
 func (j *DSJira) EnrichItems(ctx *Ctx) (err error) {
 	Printf("enriching items\n")
-	err = ForEachESItem(ctx, j, true, ESBulkUploadFunc, JiraEnrichItemsFunc)
+	err = ForEachESItem(ctx, j, true, ESBulkUploadFunc, JiraEnrichItemsFunc, nil)
 	return
 }
 

@@ -58,6 +58,7 @@ func main() {
 	ctx.Init()
 	defer lib.CacheSummary(&ctx)
 	lib.FatalOnError(ctx.Validate())
+	lib.CreateESCache(&ctx)
 	lib.FatalOnError(runDS(&ctx))
 	dtEnd := time.Now()
 	lib.Printf("Took: %v\n", dtEnd.Sub(dtStart))

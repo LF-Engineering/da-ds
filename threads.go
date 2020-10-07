@@ -30,6 +30,9 @@ func SetMT() {
 	if emailsCacheMtx == nil {
 		emailsCacheMtx = &sync.RWMutex{}
 	}
+	if esCacheMtx == nil {
+		esCacheMtx = &sync.RWMutex{}
+	}
 	MT = true
 }
 

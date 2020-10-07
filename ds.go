@@ -397,7 +397,7 @@ func ItemsRefreshIdentitiesFunc(ctx *Ctx, ds DS, thrN int, richItems []interface
 // Each identity is [3]string [name, username, email]
 func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 	Printf("uploading identities\n")
-	err = ForEachESItem(ctx, ds, true, DBUploadIdentitiesFunc, ItemsIdentitiesFunc)
+	err = ForEachESItem(ctx, ds, true, DBUploadIdentitiesFunc, ItemsIdentitiesFunc, nil)
 	return
 }
 
@@ -405,7 +405,7 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 // We iterate over rich index to refresh its affiliation data
 func RefreshIdentities(ctx *Ctx, ds DS) (err error) {
 	Printf("refreshing identities\n")
-	err = ForEachESItem(ctx, ds, false, ESBulkUploadFunc, ItemsRefreshIdentitiesFunc)
+	err = ForEachESItem(ctx, ds, false, ESBulkUploadFunc, ItemsRefreshIdentitiesFunc, nil)
 	return
 }
 
@@ -421,6 +421,7 @@ func ForEachESItem(
 	raw bool,
 	ufunct func(*Ctx, DS, int, *[]interface{}, *[]interface{}, bool) error,
 	uitems func(*Ctx, DS, int, []interface{}, *[]interface{}) error,
+	cacheFor *time.Duration,
 ) (err error) {
 	dateField := JSONEscape(ds.DateField(ctx))
 	originField := JSONEscape(ds.OriginField(ctx))
@@ -455,6 +456,7 @@ func ForEachESItem(
 			nil,                                 // Error statuses
 			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses
 			false,
+			nil,
 		)
 		if err != nil {
 			Printf("Error releasing scroll %s: %+v\n", *scroll, err)
@@ -532,6 +534,7 @@ func ForEachESItem(
 			nil,                                 // Error statuses
 			map[[2]int]struct{}{{200, 200}: {}, {404, 404}: {}, {500, 500}: {}}, // OK statuses
 			true,
+			cacheFor,
 		)
 		if ctx.Debug > 1 {
 			Printf("%s%s --> %d\n", url, string(payload), status)
@@ -542,9 +545,9 @@ func ForEachESItem(
 				Printf("scroll %s probably expired, seeting it to 20 items/59 minutes for a safe retry, you should adjust your config: scroll wait and/or scroll size\n", *scroll)
 				Printf("note that scroll will now restart, so the same data (with a small pack size 20) will be processed again\n")
 				Printf("all documents should have unique id fields so this should not be an issue\n")
-				if ctx.ESScrollWait != "59m" {
+				if ctx.ESScrollWait != Wait59m {
 					savedScrollWait := ctx.ESScrollWait
-					ctx.ESScrollWait = "59m"
+					ctx.ESScrollWait = Wait59m
 					defer func() {
 						ctx.ESScrollWait = savedScrollWait
 					}()
@@ -682,6 +685,7 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 		map[[2]int]struct{}{{401, 599}: {}}, // error statuses: 401-599
 		nil,                                 // OK statuses
 		true,
+		nil,
 	)
 	FatalOnError(err)
 	// DS specific raw index mapping
@@ -702,6 +706,7 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 		nil,
 		map[[2]int]struct{}{{200, 200}: {}},
 		true,
+		nil,
 	)
 	FatalOnError(err)
 	// Global not analyze string mapping
@@ -715,6 +720,7 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 		nil,
 		map[[2]int]struct{}{{200, 200}: {}},
 		true,
+		nil,
 	)
 	FatalOnError(err)
 	return

@@ -2,10 +2,13 @@ package dads
 
 import (
 	"bytes"
+	"crypto/sha1"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -132,7 +135,7 @@ func RequestNoRetry(
 	headers map[string]string,
 	payload []byte,
 	jsonStatuses, errorStatuses, okStatuses map[[2]int]struct{},
-) (result interface{}, status int, err error) {
+) (result interface{}, status int, isJSON bool, err error) {
 	var (
 		payloadBody *bytes.Reader
 		req         *http.Request
@@ -177,6 +180,7 @@ func RequestNoRetry(
 			err = fmt.Errorf("unmarshall request error:%+v for method:%s url:%s headers:%v status:%d payload:%s body:%s", err, method, url, headers, status, string(payload), string(body))
 			return
 		}
+		isJSON = true
 	} else {
 		result = body
 	}
@@ -213,14 +217,68 @@ func Request(
 	payload []byte,
 	jsonStatuses, errorStatuses, okStatuses map[[2]int]struct{},
 	retryRequest bool,
+	cacheFor *time.Duration,
 ) (result interface{}, status int, err error) {
+	var isJSON bool
+	if cacheFor != nil {
+		b := []byte(method + url + fmt.Sprintf("%+v", headers))
+		b = append(b, payload...)
+		hash := sha1.New()
+		_, e := hash.Write(b)
+		if e == nil {
+			hsh := hex.EncodeToString(hash.Sum(nil))
+			cached, ok := GetESCache(ctx, hsh)
+			if ok {
+				ary := bytes.Split(cached, []byte(":"))
+				if len(ary) > 2 {
+					var e error
+					status, e = strconv.Atoi(string(ary[0]))
+					if e == nil {
+						var iJSON int
+						iJSON, e = strconv.Atoi(string(ary[1]))
+						if e == nil {
+							resData := bytes.Join(ary[2:], []byte(":"))
+							if iJSON == 0 {
+								result = resData
+								return
+							}
+							var r interface{}
+							e = jsoniter.Unmarshal(resData, &r)
+							if e == nil {
+								result = r
+								return
+							}
+						}
+					}
+				}
+			}
+			cacheDuration := *cacheFor
+			defer func() {
+				data := []byte(fmt.Sprintf("%d:", status))
+				if isJSON {
+					bts, e := jsoniter.Marshal(result)
+					if e != nil {
+						return
+					}
+					data = append(data, []byte("1:")...)
+					data = append(data, bts...)
+					SetESCache(ctx, hsh, data, cacheDuration)
+					return
+				}
+				data = append(data, []byte("0:")...)
+				data = append(data, result.([]byte)...)
+				SetESCache(ctx, hsh, data, cacheDuration)
+				return
+			}()
+		}
+	}
 	if !retryRequest {
-		result, status, err = RequestNoRetry(ctx, url, method, headers, payload, jsonStatuses, errorStatuses, okStatuses)
+		result, status, isJSON, err = RequestNoRetry(ctx, url, method, headers, payload, jsonStatuses, errorStatuses, okStatuses)
 		return
 	}
 	retry := 0
 	for {
-		result, status, err = RequestNoRetry(ctx, url, method, headers, payload, jsonStatuses, errorStatuses, okStatuses)
+		result, status, isJSON, err = RequestNoRetry(ctx, url, method, headers, payload, jsonStatuses, errorStatuses, okStatuses)
 		info := func() (inf string) {
 			inf = fmt.Sprintf("%s.%s:%s=%d", method, url, string(payload), status)
 			if ctx.Debug > 1 {

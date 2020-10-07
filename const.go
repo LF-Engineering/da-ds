@@ -77,3 +77,6 @@ const ID = "id"
 
 // Unknown - common constant string
 const Unknown = "Unknown"
+
+// Wait59m - common constant string
+const Wait59m = "59m"

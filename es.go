@@ -1,11 +1,280 @@
 package dads
 
 import (
+	"bytes"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"sync"
 	"time"
 
 	jsoniter "github.com/json-iterator/go"
 )
+
+var (
+	esCacheMtx *sync.RWMutex
+)
+
+// ESCacheEntry - single cache entry
+type ESCacheEntry struct {
+	B []byte    `json:"b"`
+	T time.Time `json:"t"`
+	E time.Time `json:"e"`
+	K string    `json:"k"`
+}
+
+// ESCacheGet - get value from cache
+func ESCacheGet(ctx *Ctx, key string) (entry *ESCacheEntry, ok bool) {
+	data := `{"query":{"term":{"k.keyword":{"value": "` + JSONEscape(key) + `"}}}}`
+	payloadBytes := []byte(data)
+	payloadBody := bytes.NewReader(payloadBytes)
+	method := Post
+	url := fmt.Sprintf("%s/dads_cache/_search", ctx.ESURL)
+	req, err := http.NewRequest(method, url, payloadBody)
+	if err != nil {
+		Printf("New request error: %+v for %s url: %s, data: %s\n", err, method, url, data)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		Printf("do request error: %+v for %s url: %s, data: %s\n", err, method, url, data)
+		return
+	}
+	var body []byte
+	body, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		Printf("ReadAll non-ok request error: %+v for %s url: %s, data: %s\n", err, method, url, data)
+		return
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != 200 {
+		Printf("Method:%s url:%s data: %s status:%d\n%s\n", method, url, data, resp.StatusCode, body)
+		return
+	}
+	type R struct {
+		H struct {
+			H []struct {
+				S ESCacheEntry `json:"_source"`
+			} `json:"hits"`
+		} `json:"hits"`
+	}
+	var r R
+	err = jsoniter.Unmarshal(body, &r)
+	if err != nil {
+		Printf("Unmarshal error: %+v\n", err)
+		return
+	}
+	if len(r.H.H) == 0 {
+		return
+	}
+	entry = &(r.H.H[0].S)
+	ok = true
+	return
+}
+
+// ESCacheSet - set cache value
+func ESCacheSet(ctx *Ctx, key string, entry *ESCacheEntry) {
+	entry.K = key
+	payloadBytes, err := jsoniter.Marshal(entry)
+	if err != nil {
+		Printf("json %+v marshal error: %+v\n", entry, err)
+		return
+	}
+	payloadBody := bytes.NewReader(payloadBytes)
+	method := Post
+	url := fmt.Sprintf("%s/dads_cache/_doc?refresh=true", ctx.ESURL)
+	req, err := http.NewRequest(method, url, payloadBody)
+	if err != nil {
+		data := string(payloadBytes)
+		Printf("New request error: %+v for %s url: %s, data: %s\n", err, method, url, data)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		data := string(payloadBytes)
+		Printf("do request error: %+v for %s url: %s, data: %s\n", err, method, url, data)
+		return
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != 201 {
+		data := string(payloadBytes)
+		var body []byte
+		body, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			Printf("ReadAll non-ok request error: %+v for %s url: %s, data: %s\n", err, method, url, data)
+			return
+		}
+		Printf("Method:%s url:%s data: %s status:%d\n%s\n", method, url, data, resp.StatusCode, body)
+		return
+	}
+	return
+}
+
+// ESCacheDelete - delete cache key
+func ESCacheDelete(ctx *Ctx, key string) {
+	data := `{"query":{"term":{"k.keyword":{"value": "` + JSONEscape(key) + `"}}}}`
+	payloadBytes := []byte(data)
+	payloadBody := bytes.NewReader(payloadBytes)
+	method := Post
+	url := fmt.Sprintf("%s/dads_cache/_delete_by_query", ctx.ESURL)
+	req, err := http.NewRequest(method, url, payloadBody)
+	if err != nil {
+		Printf("New request error: %+v for %s url: %s, data: %s\n", err, method, url, data)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		Printf("do request error: %+v for %s url: %s, data: %s\n", err, method, url, data)
+		return
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != 200 {
+		var body []byte
+		body, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			Printf("ReadAll non-ok request error: %+v for %s url: %s, data: %s\n", err, method, url, data)
+			return
+		}
+		Printf("Method:%s url:%s data: %s status:%d\n%s\n", method, url, data, resp.StatusCode, body)
+		return
+	}
+}
+
+// ESCacheDeleteExpired - delete expired cache entries
+func ESCacheDeleteExpired(ctx *Ctx) {
+	data := `{"query":{"range":{"e":{"lte": "now"}}}}`
+	payloadBytes := []byte(data)
+	payloadBody := bytes.NewReader(payloadBytes)
+	method := Post
+	url := fmt.Sprintf("%s/dads_cache/_delete_by_query", ctx.ESURL)
+	req, err := http.NewRequest(method, url, payloadBody)
+	if err != nil {
+		Printf("New request error: %+v for %s url: %s, data: %s\n", err, method, url, data)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		Printf("do request error: %+v for %s url: %s, data: %s\n", err, method, url, data)
+		return
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != 200 {
+		var body []byte
+		body, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			Printf("ReadAll non-ok request error: %+v for %s url: %s, data: %s\n", err, method, url, data)
+			return
+		}
+		Printf("Method:%s url:%s data: %s status:%d\n%s\n", method, url, data, resp.StatusCode, body)
+		return
+	}
+}
+
+// GetESCache - get value from cache - thread safe and support expiration
+func GetESCache(ctx *Ctx, k string) (b []byte, ok bool) {
+	defer MaybeESCacheCleanup(ctx)
+	if MT {
+		esCacheMtx.RLock()
+	}
+	entry, ok := ESCacheGet(ctx, k)
+	if MT {
+		esCacheMtx.RUnlock()
+	}
+	if !ok {
+		if ctx.Debug > 0 {
+			Printf("GetESCache(%s): miss\n", k)
+		}
+		return
+	}
+	if time.Now().After(entry.E) {
+		ok = false
+		if MT {
+			esCacheMtx.Lock()
+		}
+		ESCacheDelete(ctx, k)
+		if MT {
+			esCacheMtx.Unlock()
+		}
+		if ctx.Debug > 0 {
+			Printf("GetESCache(%s): expired\n", k)
+		}
+		return
+	}
+	b = entry.B
+	if ctx.Debug > 0 {
+		Printf("GetESCache(%s): hit\n", k)
+	}
+	return
+}
+
+// SetESCache - set cache value, expiration date and handles multithreading etc
+func SetESCache(ctx *Ctx, k string, b []byte, expires time.Duration) {
+	defer MaybeESCacheCleanup(ctx)
+	t := time.Now()
+	e := t.Add(expires)
+	if MT {
+		esCacheMtx.RLock()
+	}
+	_, ok := ESCacheGet(ctx, k)
+	if MT {
+		esCacheMtx.RUnlock()
+	}
+	if ok {
+		if MT {
+			esCacheMtx.Lock()
+		}
+		ESCacheDelete(ctx, k)
+		ESCacheSet(ctx, k, &ESCacheEntry{B: b, T: t, E: e})
+		if MT {
+			esCacheMtx.Unlock()
+		}
+		if ctx.Debug > 0 {
+			Printf("SetESCache(%s): replaced\n", k)
+		}
+	} else {
+		if MT {
+			esCacheMtx.Lock()
+		}
+		ESCacheSet(ctx, k, &ESCacheEntry{B: b, T: t, E: e})
+		if MT {
+			esCacheMtx.Unlock()
+		}
+		if ctx.Debug > 0 {
+			Printf("SetESCache(%s): added\n", k)
+		}
+	}
+}
+
+// MaybeESCacheCleanup - 10% chance of cleaning expired cache entries
+func MaybeESCacheCleanup(ctx *Ctx) {
+	// 10% chance for cache cleanup
+	t := time.Now()
+	if t.Second()%10 == 0 {
+		go func() {
+			if MT {
+				esCacheMtx.Lock()
+			}
+			ESCacheDeleteExpired(ctx)
+			if MT {
+				esCacheMtx.Unlock()
+			}
+			if ctx.Debug > 0 {
+				Printf("ContributorsCache: deleted expired items\n")
+			}
+		}()
+	}
+}
+
+// CreateESCache - creates dads_cache index needed for caching
+func CreateESCache(ctx *Ctx) {
+	// Create index, ignore if exists (see status 400 is not in error statuses)
+	_, _, err := Request(ctx, ctx.ESURL+"/dads_cache", Put, nil, []byte{}, nil, map[[2]int]struct{}{{401, 599}: {}}, nil, false, nil)
+	FatalOnError(err)
+}
 
 // SendToElastic - send items to ElasticSearch
 func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (err error) {
@@ -50,6 +319,7 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 		map[[2]int]struct{}{{400, 599}: {}}, // error statuses: 400-599
 		nil,                                 // OK statuses
 		true,
+		nil,
 	)
 	if err == nil {
 		if ctx.Debug > 0 {
@@ -82,6 +352,7 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 			map[[2]int]struct{}{{400, 599}: {}}, // error statuses: 400-599
 			map[[2]int]struct{}{{200, 201}: {}}, // OK statuses: 200-201
 			true,
+			nil,
 		)
 	}
 	if ctx.Debug > 0 {
@@ -122,6 +393,7 @@ func GetLastUpdate(ctx *Ctx, ds DS, raw bool) (lastUpdate *time.Time) {
 		nil,                                 // Error statuses
 		map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200, 404
 		true,
+		nil,
 	)
 	FatalOnError(err)
 	type resultStruct struct {
@@ -182,6 +454,7 @@ func GetLastOffset(ctx *Ctx, ds DS, raw bool) (offset float64) {
 		nil,                                 // Error statuses
 		map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200, 404
 		true,
+		nil,
 	)
 	FatalOnError(err)
 	type resultStruct struct {
