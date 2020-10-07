@@ -254,6 +254,9 @@ func Request(
 			}
 			cacheDuration := *cacheFor
 			defer func() {
+				if err != nil {
+					return
+				}
 				data := []byte(fmt.Sprintf("%d:", status))
 				if isJSON {
 					bts, e := jsoniter.Marshal(result)
@@ -262,12 +265,14 @@ func Request(
 					}
 					data = append(data, []byte("1:")...)
 					data = append(data, bts...)
-					SetESCache(ctx, hsh, data, cacheDuration)
+					tag := fmt.Sprintf("%s.%s(#h=%d,pl=%d) -> sts=%d,js=1,resp=%d", method, url, len(headers), len(payload), status, len(bts))
+					SetESCache(ctx, hsh, tag, data, cacheDuration)
 					return
 				}
 				data = append(data, []byte("0:")...)
 				data = append(data, result.([]byte)...)
-				SetESCache(ctx, hsh, data, cacheDuration)
+				tag := fmt.Sprintf("%s.%s(#h=%d,pl=%d) -> sts=%d,js=0,resp=%d", method, url, len(headers), len(payload), status, len(result.([]byte)))
+				SetESCache(ctx, hsh, tag, data, cacheDuration)
 				return
 			}()
 		}

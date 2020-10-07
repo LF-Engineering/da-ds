@@ -17,10 +17,11 @@ var (
 
 // ESCacheEntry - single cache entry
 type ESCacheEntry struct {
-	B []byte    `json:"b"`
-	T time.Time `json:"t"`
-	E time.Time `json:"e"`
-	K string    `json:"k"`
+	K string    `json:"k"` // cache key
+	G string    `json:"g"` // cache tag
+	B []byte    `json:"b"` // cache data
+	T time.Time `json:"t"` // when cached
+	E time.Time `json:"e"` // when expires
 }
 
 // ESCacheGet - get value from cache
@@ -118,7 +119,7 @@ func ESCacheDelete(ctx *Ctx, key string) {
 	payloadBytes := []byte(data)
 	payloadBody := bytes.NewReader(payloadBytes)
 	method := Post
-	url := fmt.Sprintf("%s/dads_cache/_delete_by_query", ctx.ESURL)
+	url := fmt.Sprintf("%s/dads_cache/_delete_by_query?conflicts=proceed&refresh=true", ctx.ESURL)
 	req, err := http.NewRequest(method, url, payloadBody)
 	if err != nil {
 		Printf("New request error: %+v for %s url: %s, data: %s\n", err, method, url, data)
@@ -149,7 +150,7 @@ func ESCacheDeleteExpired(ctx *Ctx) {
 	payloadBytes := []byte(data)
 	payloadBody := bytes.NewReader(payloadBytes)
 	method := Post
-	url := fmt.Sprintf("%s/dads_cache/_delete_by_query", ctx.ESURL)
+	url := fmt.Sprintf("%s/dads_cache/_delete_by_query?conflicts=proceed&refresh=true", ctx.ESURL)
 	req, err := http.NewRequest(method, url, payloadBody)
 	if err != nil {
 		Printf("New request error: %+v for %s url: %s, data: %s\n", err, method, url, data)
@@ -200,19 +201,19 @@ func GetESCache(ctx *Ctx, k string) (b []byte, ok bool) {
 			esCacheMtx.Unlock()
 		}
 		if ctx.Debug > 0 {
-			Printf("GetESCache(%s): expired\n", k)
+			Printf("GetESCache(%s,%s): expired\n", k, entry.G)
 		}
 		return
 	}
 	b = entry.B
 	if ctx.Debug > 0 {
-		Printf("GetESCache(%s): hit\n", k)
+		Printf("GetESCache(%s,%s): hit\n", k, entry.G)
 	}
 	return
 }
 
 // SetESCache - set cache value, expiration date and handles multithreading etc
-func SetESCache(ctx *Ctx, k string, b []byte, expires time.Duration) {
+func SetESCache(ctx *Ctx, k, tg string, b []byte, expires time.Duration) {
 	defer MaybeESCacheCleanup(ctx)
 	t := time.Now()
 	e := t.Add(expires)
@@ -228,23 +229,23 @@ func SetESCache(ctx *Ctx, k string, b []byte, expires time.Duration) {
 			esCacheMtx.Lock()
 		}
 		ESCacheDelete(ctx, k)
-		ESCacheSet(ctx, k, &ESCacheEntry{B: b, T: t, E: e})
+		ESCacheSet(ctx, k, &ESCacheEntry{B: b, T: t, E: e, G: tg})
 		if MT {
 			esCacheMtx.Unlock()
 		}
 		if ctx.Debug > 0 {
-			Printf("SetESCache(%s): replaced\n", k)
+			Printf("SetESCache(%s,%s): replaced\n", k, tg)
 		}
 	} else {
 		if MT {
 			esCacheMtx.Lock()
 		}
-		ESCacheSet(ctx, k, &ESCacheEntry{B: b, T: t, E: e})
+		ESCacheSet(ctx, k, &ESCacheEntry{B: b, T: t, E: e, G: tg})
 		if MT {
 			esCacheMtx.Unlock()
 		}
 		if ctx.Debug > 0 {
-			Printf("SetESCache(%s): added\n", k)
+			Printf("SetESCache(%s,%s): added\n", k, tg)
 		}
 	}
 }
