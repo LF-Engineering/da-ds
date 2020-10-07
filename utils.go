@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -30,7 +31,7 @@ type MemCacheEntry struct {
 }
 
 // MemCacheDeleteExpired - delete expired cache entries
-func MemCacheDeleteExpired() {
+func MemCacheDeleteExpired(ctx *Ctx) {
 	t := time.Now()
 	ks := []string{}
 	for k, v := range memCache {
@@ -38,21 +39,23 @@ func MemCacheDeleteExpired() {
 			ks = append(ks, k)
 		}
 	}
+	if ctx.Debug > 0 {
+		Printf("running MemCacheDeleteExpired - deleting %d entries\n", len(ks))
+	}
 	for _, k := range ks {
 		delete(memCache, k)
 	}
 }
 
-// MaybeMemCacheCleanup - 10% chance of cleaning expired cache entries
-func MaybeMemCacheCleanup() {
-	// 10% chance for cache cleanup
-	t := time.Now()
-	if t.Second()%10 == 0 {
+// MaybeMemCacheCleanup - chance of cleaning expired cache entries
+func MaybeMemCacheCleanup(ctx *Ctx) {
+	// chance for cache cleanup
+	if rand.Intn(100) < CacheCleanupProb {
 		go func() {
 			if MT {
 				memCacheMtx.Lock()
 			}
-			MemCacheDeleteExpired()
+			MemCacheDeleteExpired(ctx)
 			if MT {
 				memCacheMtx.Unlock()
 			}
@@ -272,7 +275,7 @@ func Request(
 		_, e := hash.Write(b)
 		if e == nil {
 			hsh := hex.EncodeToString(hash.Sum(nil))
-			cached, ok := GetESCache(ctx, hsh)
+			cached, ok := GetL2Cache(ctx, hsh)
 			if ok {
 				ary := bytes.Split(cached, []byte(":"))
 				if len(ary) > 2 {
@@ -311,13 +314,13 @@ func Request(
 					data = append(data, []byte("1:")...)
 					data = append(data, bts...)
 					tag := fmt.Sprintf("%s.%s(#h=%d,pl=%d) -> sts=%d,js=1,resp=%d", method, url, len(headers), len(payload), status, len(bts))
-					SetESCache(ctx, hsh, tag, data, cacheDuration)
+					SetL2Cache(ctx, hsh, tag, data, cacheDuration)
 					return
 				}
 				data = append(data, []byte("0:")...)
 				data = append(data, result.([]byte)...)
 				tag := fmt.Sprintf("%s.%s(#h=%d,pl=%d) -> sts=%d,js=0,resp=%d", method, url, len(headers), len(payload), status, len(result.([]byte)))
-				SetESCache(ctx, hsh, tag, data, cacheDuration)
+				SetL2Cache(ctx, hsh, tag, data, cacheDuration)
 				return
 			}()
 		}

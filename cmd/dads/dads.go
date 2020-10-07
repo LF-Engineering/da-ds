@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"time"
 
 	lib "github.com/LF-Engineering/da-ds"
@@ -54,6 +55,7 @@ func main() {
 	// DB_HOST=... DB_NAME=... DB_USER=... DB_PASS=...
 	// DA_JIRA_URL=... DA_JIRA_NO_SSL_VERIFY=1
 	var ctx lib.Ctx
+	rand.Seed(time.Now().UnixNano())
 	dtStart := time.Now()
 	ctx.Init()
 	defer lib.CacheSummary(&ctx)

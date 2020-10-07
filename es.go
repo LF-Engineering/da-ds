@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"sync"
 	"time"
@@ -146,6 +147,9 @@ func ESCacheDelete(ctx *Ctx, key string) {
 
 // ESCacheDeleteExpired - delete expired cache entries
 func ESCacheDeleteExpired(ctx *Ctx) {
+	if ctx.Debug > 0 {
+		Printf("running ESCacheDeleteExpired\n")
+	}
 	data := `{"query":{"range":{"e":{"lte": "now"}}}}`
 	payloadBytes := []byte(data)
 	payloadBody := bytes.NewReader(payloadBytes)
@@ -176,8 +180,7 @@ func ESCacheDeleteExpired(ctx *Ctx) {
 }
 
 // GetESCache - get value from cache - thread safe and support expiration
-func GetESCache(ctx *Ctx, k string) (b []byte, ok bool) {
-	defer MaybeMemCacheCleanup()
+func GetESCache(ctx *Ctx, k string) (b []byte, tg string, expires time.Time, ok bool) {
 	defer MaybeESCacheCleanup(ctx)
 	if MT {
 		esCacheMtx.RLock()
@@ -202,20 +205,90 @@ func GetESCache(ctx *Ctx, k string) (b []byte, ok bool) {
 			esCacheMtx.Unlock()
 		}
 		if ctx.Debug > 0 {
-			Printf("GetESCache(%s,%s): expired\n", k, entry.G)
+			Printf("GetESCache(%s,%s): expired %v\n", k, entry.G, entry.E)
+		}
+		return
+	}
+	b = entry.B
+	tg = entry.G
+	expires = entry.E
+	if ctx.Debug > 0 {
+		Printf("GetESCache(%s,%s): hit (%v)\n", k, tg, expires)
+	}
+	return
+}
+
+// GetL2Cache - get value from cache - thread safe and support expiration
+func GetL2Cache(ctx *Ctx, k string) (b []byte, ok bool) {
+	defer MaybeMemCacheCleanup(ctx)
+	if MT {
+		memCacheMtx.RLock()
+	}
+	entry, ok := memCache[k]
+	if MT {
+		memCacheMtx.RUnlock()
+	}
+	if !ok {
+		if ctx.Debug > 0 {
+			Printf("GetL2Cache(%s): miss\n", k)
+		}
+		var (
+			g string
+			e time.Time
+		)
+		b, g, e, ok = GetESCache(ctx, k)
+		if ok {
+			t := time.Now()
+			if MT {
+				memCacheMtx.Lock()
+			}
+			memCache[k] = &MemCacheEntry{G: g, B: b, T: t, E: e}
+			if MT {
+				memCacheMtx.Unlock()
+			}
+			Printf("GetL2Cache(%s,%s): L2 hit (%v)\n", k, g, e)
+		}
+		return
+	}
+	if time.Now().After(entry.E) {
+		ok = false
+		if MT {
+			memCacheMtx.Lock()
+		}
+		delete(memCache, k)
+		if MT {
+			memCacheMtx.Unlock()
+		}
+		if ctx.Debug > 0 {
+			Printf("GetL2Cache(%s,%s): expired %v\n", k, entry.G, entry.E)
+		}
+		var (
+			g string
+			e time.Time
+		)
+		b, g, e, ok = GetESCache(ctx, k)
+		if ok {
+			t := time.Now()
+			if MT {
+				memCacheMtx.Lock()
+			}
+			memCache[k] = &MemCacheEntry{G: g, B: b, T: t, E: e}
+			if MT {
+				memCacheMtx.Unlock()
+			}
+			Printf("GetL2Cache(%s,%s): L2 hit (%v)\n", k, g, e)
 		}
 		return
 	}
 	b = entry.B
 	if ctx.Debug > 0 {
-		Printf("GetESCache(%s,%s): hit\n", k, entry.G)
+		Printf("GetL2Cache(%s,%s): hit (%v)\n", k, entry.G, entry.E)
 	}
 	return
 }
 
 // SetESCache - set cache value, expiration date and handles multithreading etc
 func SetESCache(ctx *Ctx, k, tg string, b []byte, expires time.Duration) {
-	defer MaybeMemCacheCleanup()
 	defer MaybeESCacheCleanup(ctx)
 	t := time.Now()
 	e := t.Add(expires)
@@ -236,7 +309,7 @@ func SetESCache(ctx *Ctx, k, tg string, b []byte, expires time.Duration) {
 			esCacheMtx.Unlock()
 		}
 		if ctx.Debug > 0 {
-			Printf("SetESCache(%s,%s): replaced\n", k, tg)
+			Printf("SetESCache(%s,%s): replaced (%v)\n", k, tg, e)
 		}
 	} else {
 		if MT {
@@ -247,16 +320,40 @@ func SetESCache(ctx *Ctx, k, tg string, b []byte, expires time.Duration) {
 			esCacheMtx.Unlock()
 		}
 		if ctx.Debug > 0 {
-			Printf("SetESCache(%s,%s): added\n", k, tg)
+			Printf("SetESCache(%s,%s): added (%v)\n", k, tg, e)
 		}
 	}
 }
 
-// MaybeESCacheCleanup - 10% chance of cleaning expired cache entries
-func MaybeESCacheCleanup(ctx *Ctx) {
-	// 10% chance for cache cleanup
+// SetL2Cache - set cache value, expiration date and handles multithreading etc
+func SetL2Cache(ctx *Ctx, k, tg string, b []byte, expires time.Duration) {
+	defer MaybeMemCacheCleanup(ctx)
+	SetESCache(ctx, k, tg, b, expires)
 	t := time.Now()
-	if t.Second()%10 == 0 {
+	e := t.Add(expires)
+	if MT {
+		memCacheMtx.Lock()
+	}
+	_, ok := memCache[k]
+	memCache[k] = &MemCacheEntry{G: tg, B: b, T: t, E: e}
+	if MT {
+		memCacheMtx.Unlock()
+	}
+	if ok {
+		if ctx.Debug > 0 {
+			Printf("SetL2Cache(%s,%s): replaced (%v)\n", k, tg, e)
+		}
+		return
+	}
+	if ctx.Debug > 0 {
+		Printf("SetL2Cache(%s,%s): added (%v)\n", k, tg, e)
+	}
+}
+
+// MaybeESCacheCleanup - chance of cleaning expired cache entries
+func MaybeESCacheCleanup(ctx *Ctx) {
+	// chance for cache cleanup
+	if rand.Intn(100) < CacheCleanupProb {
 		go func() {
 			if MT {
 				esCacheMtx.Lock()
