@@ -151,7 +151,7 @@ func (j *DSJira) GetFields(ctx *Ctx) (customFields map[string]JiraField, err err
 	var resp interface{}
 	// Week for caching fields, they don't change that often
 	cacheFor := time.Duration(168) * time.Hour
-	resp, _, err = Request(ctx, url, method, headers, nil, nil, nil, map[[2]int]struct{}{{200, 200}: {}}, true, &cacheFor)
+	resp, _, err = Request(ctx, url, method, headers, nil, nil, nil, map[[2]int]struct{}{{200, 200}: {}}, true, &cacheFor, false)
 	if err != nil {
 		return
 	}
@@ -258,8 +258,9 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 				map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses
 				nil,                                 // Error statuses
 				map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
-				true,
-				&cacheFor,
+				true,                                // retry
+				&cacheFor,                           // cache duration
+				false,                               // skip in dry-run mode
 			)
 			if e != nil {
 				return
@@ -545,8 +546,9 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 			map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses
 			nil,                                 // Error statuses
 			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200, 404
-			true,
-			&cacheFor,
+			true,                                // retry
+			&cacheFor,                           // cache duration
+			false,                               // skip in dry-run mode
 		)
 		if err != nil {
 			return

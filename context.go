@@ -38,7 +38,7 @@ type Ctx struct {
 	DBConn             string     // From DA_DS_DB_CONN - affiliation DB conn (full connection string - if set no other DB params will be used)
 	NoRaw              bool       // From DA_DS_NO_RAW - do only the enrichment
 	NoCache            bool       // From DA_DS_NO_CACHE - do not use L2(mem, ES) cache for selected requests
-	DryRun             bool       // From DA_DS_DRY_RUN - do only requests that read data, no write to anything
+	DryRun             bool       // From DA_DS_DRY_RUN - do only requests that read data, no write to anything (excluding cache - this one can be written in dry-run mode - still can be disabled with NoCache)
 	RefreshAffs        bool       // From DA_DS_REFRESH_AFFS - refresh affiliation data
 	OnlyIdentities     bool       // From DA_DS_ONLY_IDENTITIES - only add identities to affiliation database
 	ForceFull          bool       // From DA_DS_FORCE_FULL - force running full data source enrichment, do not attempt to detect where to start from

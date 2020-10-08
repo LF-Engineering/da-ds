@@ -187,7 +187,11 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 		nIdents := len(identsAry)
 		defer func() {
 			if tx != nil {
-				Printf("rolling back %d identities insert\n", nIdents)
+				if ctx.DryRun {
+					Printf("dry-run: rolling back %d identities insert (possibly due to dry-run mode)\n", nIdents)
+				} else {
+					Printf("rolling back %d identities insert\n", nIdents)
+				}
 				_ = tx.Rollback()
 			}
 		}()
@@ -273,11 +277,15 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				return
 			}
 		}
-		err = tx.Commit()
-		if err != nil {
-			return
+		// Will not commit in dry-run mode, deferred function will rollback - so we can still test any errors
+		// but the final commit is replaced with rollback
+		if !ctx.DryRun {
+			err = tx.Commit()
+			if err != nil {
+				return
+			}
+			tx = nil
 		}
-		tx = nil
 		return
 	}
 	nDocs := len(*docs)
@@ -461,8 +469,9 @@ func ForEachESItem(
 			nil,
 			nil,                                 // Error statuses
 			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses
-			false,
-			nil,
+			false,                               // retry request
+			nil,                                 // cacheExpire duration
+			false,                               // skip in dry-run mode
 		)
 		if err != nil {
 			Printf("Error releasing scroll %s: %+v\n", *scroll, err)
@@ -541,6 +550,7 @@ func ForEachESItem(
 			map[[2]int]struct{}{{200, 200}: {}, {404, 404}: {}, {500, 500}: {}}, // OK statuses
 			true,
 			cacheFor,
+			false,
 		)
 		if ctx.Debug > 1 {
 			Printf("%s%s --> %d\n", url, string(payload), status)
@@ -690,8 +700,9 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 		nil,                                 // JSON statuses
 		map[[2]int]struct{}{{401, 599}: {}}, // error statuses: 401-599
 		nil,                                 // OK statuses
-		true,
-		nil,
+		true,                                // retry
+		nil,                                 // cache duration
+		true,                                // skip in dry run
 	)
 	FatalOnError(err)
 	// DS specific raw index mapping
@@ -713,6 +724,7 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 		map[[2]int]struct{}{{200, 200}: {}},
 		true,
 		nil,
+		true,
 	)
 	FatalOnError(err)
 	// Global not analyze string mapping
@@ -727,6 +739,7 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 		map[[2]int]struct{}{{200, 200}: {}},
 		true,
 		nil,
+		true,
 	)
 	FatalOnError(err)
 	return

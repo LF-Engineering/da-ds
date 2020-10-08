@@ -269,6 +269,9 @@ func Request(
 	skipInDryRun bool,
 ) (result interface{}, status int, err error) {
 	if skipInDryRun && ctx.DryRun {
+		if ctx.Debug > 0 {
+			Printf("dry-run: %s.%s(#h=%d,pl=%d) skipped in dry-run mode\n", method, url, len(headers), len(payload))
+		}
 		return
 	}
 	var isJSON bool
