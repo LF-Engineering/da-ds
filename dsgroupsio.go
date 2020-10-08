@@ -11,6 +11,8 @@ import (
 const (
 	// GroupsioBackendVersion - backend version
 	GroupsioBackendVersion = "0.0.0"
+	// GroupsioURLRoot - root url for group name origin
+	GroupsioURLRoot = "https://groups.io/g/"
 	// GroupsioDefaultSearchField - default search field
 	// GroupsioDefaultSearchField = "item_id"
 )
@@ -88,7 +90,7 @@ func (j *DSGroupsio) CustomFetchRaw() bool {
 
 // FetchRaw - implement fetch raw data for stub datasource
 func (j *DSGroupsio) FetchRaw(ctx *Ctx) (err error) {
-	Printf("DSGroupsio.FetchRaw\n")
+	Printf("%s should use generic FetchRaw()\n", j.DS)
 	return
 }
 
@@ -99,7 +101,7 @@ func (j *DSGroupsio) CustomEnrich() bool {
 
 // Enrich - implement enrich data for stub datasource
 func (j *DSGroupsio) Enrich(ctx *Ctx) (err error) {
-	Printf("DSGroupsio.Enrich\n")
+	Printf("%s should use generic FetchRaw()\n", j.DS)
 	return
 }
 
@@ -111,7 +113,7 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 
 // SupportDateFrom - does DS support resuming from date?
 func (j *DSGroupsio) SupportDateFrom() bool {
-	return false
+	return true
 }
 
 // SupportOffsetFrom - does DS support resuming from offset?
@@ -140,7 +142,10 @@ func (j *DSGroupsio) OffsetField(*Ctx) string {
 }
 
 // OriginField - return origin field used to detect where to restart from
-func (j *DSGroupsio) OriginField(*Ctx) string {
+func (j *DSGroupsio) OriginField(ctx *Ctx) string {
+	if ctx.Tag != "" {
+		return DefaultTagField
+	}
 	return DefaultOriginField
 }
 
@@ -152,12 +157,15 @@ func (j *DSGroupsio) Categories() map[string]struct{} {
 // ResumeNeedsOrigin - is origin field needed when resuming
 // Origin should be needed when multiple configurations save to the same index
 func (j *DSGroupsio) ResumeNeedsOrigin(ctx *Ctx) bool {
-	return false
+	return j.MultiOrigin
 }
 
 // Origin - return current origin
 func (j *DSGroupsio) Origin(ctx *Ctx) string {
-	return ctx.Tag
+	if ctx.Tag != "" {
+		return ctx.Tag
+	}
+	return GroupsioURLRoot + j.GroupName
 }
 
 // ItemID - return unique identifier for an item
@@ -182,12 +190,12 @@ func (j *DSGroupsio) SearchFields() map[string][]string {
 
 // ElasticRawMapping - Raw index mapping definition
 func (j *DSGroupsio) ElasticRawMapping() []byte {
-	return []byte{}
+	return GroupsioRawMapping
 }
 
 // ElasticRichMapping - Rich index mapping definition
 func (j *DSGroupsio) ElasticRichMapping() []byte {
-	return []byte{}
+	return GroupsioRichMapping
 }
 
 // GetItemIdentities return list of item's identities, each one is [3]string

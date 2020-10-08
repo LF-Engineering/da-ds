@@ -529,7 +529,7 @@ func GetLastOffset(ctx *Ctx, ds DS, raw bool) (offset float64) {
 	offset = -1.0
 	// curl -s -XPOST -H 'Content-type: application/json' '${URL}/index/_search?size=0' -d '{"aggs":{"m":{"max":{"field":"offset_field"}}}}' | jq -r '.aggregations.m.value'
 	offsetField := JSONEscape(ds.OffsetField(ctx))
-	originField := JSONEscape(ds.OffsetField(ctx))
+	originField := JSONEscape(ds.OriginField(ctx))
 	origin := JSONEscape(ds.Origin(ctx))
 	var payloadBytes []byte
 	if ds.ResumeNeedsOrigin(ctx) {
