@@ -64,7 +64,7 @@ type DSJira struct {
 	NoSSLVerify bool   // From DA_JIRA_NO_SSL_VERIFY
 	Token       string // From DA_JIRA_TOKEN
 	PageSize    int    // From DA_JIRA_PAGE_SIZE
-	MultiOrigin bool   // FROM DA_JIRA_MULTI_ORIGIN
+	MultiOrigin bool   // From DA_JIRA_MULTI_ORIGIN
 }
 
 // JiraField - informatin about fields present in issues

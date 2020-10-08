@@ -2,6 +2,7 @@ package dads
 
 import (
 	"fmt"
+	neturl "net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -13,6 +14,12 @@ const (
 	GroupsioBackendVersion = "0.0.0"
 	// GroupsioURLRoot - root url for group name origin
 	GroupsioURLRoot = "https://groups.io/g/"
+	// GroupsioAPIURL - Groups.io API URL
+	GroupsioAPIURL = "https://groups.io/api/v1"
+	// GroupsioAPILogin - login API
+	GroupsioAPILogin = "/login"
+	// GroupsioDefaultArchPath - default path where archives are stored
+	GroupsioDefaultArchPath = "/root/.perceval/mailinglists"
 	// GroupsioDefaultSearchField - default search field
 	// GroupsioDefaultSearchField = "item_id"
 )
@@ -34,7 +41,8 @@ type DSGroupsio struct {
 	Email       string // From DA_GROUPSIO_EMAIL
 	Password    string // From DA_GROUPSIO_PASSWORD
 	PageSize    int    // From DA_GROUPSIO_PAGE_SIZE
-	MultiOrigin bool   // FROM DA_GROUPSIO_MULTI_ORIGIN
+	MultiOrigin bool   // From DA_GROUPSIO_MULTI_ORIGIN - allow multiple groups in a single index
+	ArchPath    string // From DA_GROUPSIO_ARCH_PATH - default GroupsioDefaultArchPath
 }
 
 // ParseArgs - parse stub specific environment variables
@@ -55,6 +63,11 @@ func (j *DSGroupsio) ParseArgs(ctx *Ctx) (err error) {
 		}
 	}
 	j.MultiOrigin = os.Getenv(prefix+"MULTI_ORIGIN") != ""
+	if os.Getenv(prefix+"ARCH_PATH") != "" {
+		j.ArchPath = os.Getenv(prefix + "ARCH_PATH")
+	} else {
+		j.ArchPath = GroupsioDefaultArchPath
+	}
 	if j.NoSSLVerify {
 		NoSSLVerify()
 	}
@@ -71,6 +84,9 @@ func (j *DSGroupsio) Validate() (err error) {
 	j.GroupName = ary[len(ary)-1]
 	if j.GroupName == "" {
 		err = fmt.Errorf("Group name must be set: [https://groups.io/g/]GROUP+channel")
+	}
+	if strings.HasSuffix(j.ArchPath, "/") {
+		j.ArchPath = j.ArchPath[:len(j.ArchPath)-1]
 	}
 	return
 }
@@ -109,7 +125,30 @@ func (j *DSGroupsio) Enrich(ctx *Ctx) (err error) {
 
 // FetchItems - implement enrich data for stub datasource
 func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
-	Printf("DSGroupsio.FetchItems\n")
+	dirPath := j.ArchPath + "/" + GroupsioURLRoot + j.GroupName
+	FatalOnError(EnsurePath(dirPath))
+	Printf("Path to store data: %s\n", dirPath)
+	// Login to groups.io
+	method := Post
+	url := GroupsioAPIURL + GroupsioAPILogin + `?email=` + neturl.QueryEscape(j.Email) + `&password=` + neturl.QueryEscape(j.Password)
+	headers := map[string]string{"Content-Type": "application/json"}
+	cacheDur := time.Duration(1) * time.Hour
+	var res interface{}
+	res, _, err = Request(
+		ctx,
+		url,
+		method,
+		headers,
+		[]byte{},
+		map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses: 200
+		nil,                                 // Error statuses
+		map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
+		false,                               // retry
+		//nil,                               // cache duration
+		&cacheDur, // cache duration
+		false,     // skip in dry-run mode
+	)
+	Printf("Result %d\n", len(res.(map[string]interface{})))
 	return
 }
 

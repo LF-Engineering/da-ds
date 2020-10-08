@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"net/http"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -177,6 +178,20 @@ func Dig(iface interface{}, keys []string, fatal, silent bool) (v interface{}, o
 // NoSSLVerify - turn off SSL validation
 func NoSSLVerify() {
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+}
+
+// EnsurePath - craete archive directory (and all necessary parents as well)
+func EnsurePath(path string) error {
+	ary := strings.Split(path, "/")
+	nonEmpty := []string{}
+	for _, i := range ary {
+		if i == "" {
+			continue
+		}
+		nonEmpty = append(nonEmpty, i)
+	}
+	path = strings.Join(nonEmpty, "/")
+	return os.MkdirAll(path, 0755)
 }
 
 // RequestNoRetry - wrapper to do any HTTP request
