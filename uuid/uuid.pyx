@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+#cython: language_level=3
 
 from hashlib import sha1
 from unicodedata import normalize, category

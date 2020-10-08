@@ -238,9 +238,15 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 						profname = &username
 					}
 				}
+				// if username matches a real email and there is no email set, assume email=username
 				if pemail == nil && pusername != nil && IsValidEmail(username) {
 					pemail = &username
 					email = username
+				}
+				// if name matches a real email and there is no email set, assume email=name
+				if pemail == nil && pname != nil && IsValidEmail(name) {
+					pemail = &name
+					email = name
 				}
 				// uuid(source, email, name, username)
 				uuid := UUIDAffs(ctx, source, email, name, username)

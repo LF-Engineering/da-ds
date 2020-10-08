@@ -266,9 +266,13 @@ func Request(
 	jsonStatuses, errorStatuses, okStatuses map[[2]int]struct{},
 	retryRequest bool,
 	cacheFor *time.Duration,
+	skipInDryRun bool,
 ) (result interface{}, status int, err error) {
+	if skipInDryRun && ctx.DryRun {
+		return
+	}
 	var isJSON bool
-	if cacheFor != nil {
+	if cacheFor != nil && !ctx.NoCache {
 		b := []byte(method + url + fmt.Sprintf("%+v", headers))
 		b = append(b, payload...)
 		hash := sha1.New()
