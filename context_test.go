@@ -40,6 +40,8 @@ func copyContext(in *lib.Ctx) *lib.Ctx {
 		DBConn:           in.DBConn,
 		DBBulkSize:       in.DBBulkSize,
 		NoRaw:            in.NoRaw,
+		NoCache:          in.NoCache,
+		DryRun:           in.DryRun,
 		RefreshAffs:      in.RefreshAffs,
 		OnlyIdentities:   in.OnlyIdentities,
 		ForceFull:        in.ForceFull,
@@ -218,6 +220,8 @@ func TestInit(t *testing.T) {
 		DBConn:           "",
 		DBBulkSize:       1000,
 		NoRaw:            false,
+		NoCache:          false,
+		DryRun:           false,
 		RefreshAffs:      false,
 		OnlyIdentities:   false,
 		ForceFull:        false,
@@ -412,6 +416,21 @@ func TestInit(t *testing.T) {
 				copyContext(&defaultContext),
 				map[string]interface{}{
 					"LegacyUUID": true,
+				},
+			),
+		},
+		{
+			"Setting no-cache/dry-run params",
+			map[string]string{
+				"DA_DS_NO_CACHE": "1",
+				"DA_DS_DRY_RUN":  "1",
+			},
+			dynamicSetFields(
+				t,
+				copyContext(&defaultContext),
+				map[string]interface{}{
+					"NoCache": true,
+					"DryRun":  true,
 				},
 			),
 		},

@@ -37,6 +37,8 @@ type Ctx struct {
 	DBOpts             string     // From DA_DS_DB_OPTS - affiliation DB & separated iURL encoded options, for example "charset=utf8&parseTime=true"
 	DBConn             string     // From DA_DS_DB_CONN - affiliation DB conn (full connection string - if set no other DB params will be used)
 	NoRaw              bool       // From DA_DS_NO_RAW - do only the enrichment
+	NoCache            bool       // From DA_DS_NO_CACHE - do not use L2(mem, ES) cache for selected requests
+	DryRun             bool       // From DA_DS_DRY_RUN - do only requests that read data, no write to anything
 	RefreshAffs        bool       // From DA_DS_REFRESH_AFFS - refresh affiliation data
 	OnlyIdentities     bool       // From DA_DS_ONLY_IDENTITIES - only add identities to affiliation database
 	ForceFull          bool       // From DA_DS_FORCE_FULL - force running full data source enrichment, do not attempt to detect where to start from
@@ -187,6 +189,10 @@ func (ctx *Ctx) Init() {
 	ctx.RefreshAffs = ctx.env("REFRESH_AFFS") != ""
 	ctx.OnlyIdentities = ctx.env("ONLY_IDENTITIES") != ""
 	ctx.ForceFull = ctx.env("FORCE_FULL") != ""
+
+	// No cache & dry-run modes
+	ctx.NoCache = ctx.env("NO_CACHE") != ""
+	ctx.DryRun = ctx.env("DRY_RUN") != ""
 
 	// Legacy UUID
 	ctx.LegacyUUID = ctx.env("LEGACY_UUID") != ""
