@@ -1,9 +1,7 @@
 package dads
 
 import (
-	"crypto/tls"
 	"fmt"
-	"net/http"
 	neturl "net/url"
 	"os"
 	"strconv"
@@ -26,7 +24,7 @@ const (
 	// JiraAPIComment - comments API subpath
 	JiraAPIComment = "/comment"
 	// JiraBackendVersion - backend version
-	JiraBackendVersion = "0.0.2"
+	JiraBackendVersion = "0.1.0"
 	// JiraDefaultSearchField - default search field
 	JiraDefaultSearchField = "item_id"
 	// JiraDropCustomFields - drop custom fields from raw index
@@ -49,9 +47,9 @@ var (
 		"project_name": {"fields", "project", "name"},
 		"issue_key":    {"key"},
 	}
-	// JiraRawMapping - Jira index mapping
+	// JiraRawMapping - Jira raw index mapping
 	JiraRawMapping = []byte(`{"dynamic":true,"properties":{"metadata__updated_on":{"type":"date"},"data":{"properties":{"renderedFields":{"dynamic":false,"properties":{}},"operations":{"dynamic":false,"properties":{}},"fields":{"dynamic":true,"properties":{"description":{"type":"text","index":true},"environment":{"type":"text","index":true}}},"changelog":{"properties":{"histories":{"dynamic":false,"properties":{}}}},"comments_data":{"properties":{"body":{"type":"text","index":true}}}}}}}`)
-	// JiraRichMapping - Jira index mapping
+	// JiraRichMapping - Jira rich index mapping
 	JiraRichMapping = []byte(`{"properties":{"main_description_analyzed":{"type":"text","index":true},"releases":{"type":"keyword"},"body":{"type":"text","index":true}}}`)
 	// JiraRoles - roles defined for Jira backend
 	JiraRoles = []string{"assignee", "reporter", "creator", "author", "updateAuthor"}
@@ -78,21 +76,22 @@ type JiraField struct {
 func (j *DSJira) ParseArgs(ctx *Ctx) (err error) {
 	j.DS = Jira
 	// Jira specific env variables
-	j.URL = os.Getenv("DA_JIRA_URL")
-	j.NoSSLVerify = os.Getenv("DA_JIRA_NO_SSL_VERIFY") != ""
-	j.Token = os.Getenv("DA_JIRA_TOKEN")
-	if os.Getenv("DA_JIRA_PAGE_SIZE") == "" {
+	prefix := "DA_JIRA_"
+	j.URL = os.Getenv(prefix + "URL")
+	j.NoSSLVerify = os.Getenv(prefix+"NO_SSL_VERIFY") != ""
+	j.Token = os.Getenv(prefix + "TOKEN")
+	if os.Getenv(prefix+"PAGE_SIZE") == "" {
 		j.PageSize = 500
 	} else {
-		pageSize, err := strconv.Atoi(os.Getenv("DA_JIRA_PAGE_SIZE"))
+		pageSize, err := strconv.Atoi(os.Getenv(prefix + "PAGE_SIZE"))
 		FatalOnError(err)
 		if pageSize > 0 {
 			j.PageSize = pageSize
 		}
 	}
-	j.MultiOrigin = os.Getenv("DA_JIRA_MULTI_ORIGIN") != ""
+	j.MultiOrigin = os.Getenv(prefix+"MULTI_ORIGIN") != ""
 	if j.NoSSLVerify {
-		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		NoSSLVerify()
 	}
 	return
 }

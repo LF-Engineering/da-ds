@@ -3,6 +3,7 @@ package dads
 import (
 	"bytes"
 	"crypto/sha1"
+	"crypto/tls"
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
@@ -171,6 +172,11 @@ func Dig(iface interface{}, keys []string, fatal, silent bool) (v interface{}, o
 	}
 	ok = !miss
 	return
+}
+
+// NoSSLVerify - turn off SSL validation
+func NoSSLVerify() {
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 }
 
 // RequestNoRetry - wrapper to do any HTTP request

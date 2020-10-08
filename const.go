@@ -9,6 +9,9 @@ const OK string = "ok"
 // DADSOrigin - common constant string
 const DADSOrigin string = "dads"
 
+// Groupsio - common constant string
+const Groupsio string = "groupsio"
+
 // Jira - common constant string
 const Jira string = "jira"
 
