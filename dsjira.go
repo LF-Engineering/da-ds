@@ -152,7 +152,7 @@ func (j *DSJira) GetFields(ctx *Ctx) (customFields map[string]JiraField, err err
 	var resp interface{}
 	// Week for caching fields, they don't change that often
 	cacheFor := time.Duration(168) * time.Hour
-	resp, _, err = Request(ctx, url, method, headers, nil, nil, nil, map[[2]int]struct{}{{200, 200}: {}}, true, &cacheFor, false)
+	resp, _, _, err = Request(ctx, url, method, headers, []byte{}, []string{}, nil, nil, map[[2]int]struct{}{{200, 200}: {}}, true, &cacheFor, false)
 	if err != nil {
 		return
 	}
@@ -250,12 +250,13 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 				payloadBytes = []byte(fmt.Sprintf(`{"startAt":%d,"maxResults":%d,"jql":"%s"}`, startAt, maxResults, jql))
 			}
 			var res interface{}
-			res, _, e = Request(
+			res, _, _, e = Request(
 				ctx,
 				url,
 				method,
 				headers,
 				payloadBytes,
+				[]string{},
 				map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses
 				nil,                                 // Error statuses
 				map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
@@ -538,12 +539,13 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 	for {
 		payloadBytes := []byte(fmt.Sprintf(`{"startAt":%d,"maxResults":%d,%s,%s}`, startAt, maxResults, jql, expand))
 		var res interface{}
-		res, _, err = Request(
+		res, _, _, err = Request(
 			ctx,
 			url,
 			method,
 			headers,
 			payloadBytes,
+			[]string{},
 			map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses
 			nil,                                 // Error statuses
 			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200, 404

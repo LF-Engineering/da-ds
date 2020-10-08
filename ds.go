@@ -460,12 +460,13 @@ func ForEachESItem(
 		}
 		url := ctx.ESURL + "/_search/scroll"
 		payload := []byte(`{"scroll_id":"` + *scroll + `"}`)
-		_, _, err := Request(
+		_, _, _, err := Request(
 			ctx,
 			url,
 			Delete,
 			headers,
 			payload,
+			[]string{},
 			nil,
 			nil,                                 // Error statuses
 			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses
@@ -539,12 +540,13 @@ func ForEachESItem(
 			url = ctx.ESURL + "/_search/scroll"
 			payload = []byte(`{"scroll":"` + ctx.ESScrollWait + `","scroll_id":"` + *scroll + `"}`)
 		}
-		res, status, err = Request(
+		res, status, _, err = Request(
 			ctx,
 			url,
 			Post,
 			headers,
 			payload,
+			[]string{},
 			map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses
 			nil,                                 // Error statuses
 			map[[2]int]struct{}{{200, 200}: {}, {404, 404}: {}, {500, 500}: {}}, // OK statuses
@@ -691,12 +693,13 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 	} else {
 		url = ctx.ESURL + "/" + ctx.RichIndex
 	}
-	_, _, err = Request(
+	_, _, _, err = Request(
 		ctx,
 		url,
 		Put,
 		nil,                                 // headers
 		[]byte{},                            // payload
+		[]string{},                          // cookies
 		nil,                                 // JSON statuses
 		map[[2]int]struct{}{{401, 599}: {}}, // error statuses: 401-599
 		nil,                                 // OK statuses
@@ -713,12 +716,13 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 		mapping = ds.ElasticRichMapping()
 	}
 	url += "/_mapping"
-	_, _, err = Request(
+	_, _, _, err = Request(
 		ctx,
 		url,
 		Put,
 		map[string]string{"Content-Type": "application/json"},
 		mapping,
+		[]string{},
 		nil,
 		nil,
 		map[[2]int]struct{}{{200, 200}: {}},
@@ -728,12 +732,13 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 	)
 	FatalOnError(err)
 	// Global not analyze string mapping
-	_, _, err = Request(
+	_, _, _, err = Request(
 		ctx,
 		url,
 		Put,
 		map[string]string{"Content-Type": "application/json"},
 		MappingNotAnalyzeString,
+		[]string{},
 		nil,
 		nil,
 		map[[2]int]struct{}{{200, 200}: {}},

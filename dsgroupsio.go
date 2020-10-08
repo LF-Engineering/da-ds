@@ -133,24 +133,59 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 	// Login to groups.io
 	method := Post
 	url := GroupsioAPIURL + GroupsioAPILogin + `?email=` + neturl.QueryEscape(j.Email) + `&password=` + neturl.QueryEscape(j.Password)
-	headers := map[string]string{"Content-Type": "application/json"}
-	cacheDur := time.Duration(1) * time.Hour
+	//headers := map[string]string{"Content-Type": "application/json"}
+	// By checking cookie expiration data I know that I can (probably) cache this even for 14 days
+	// In that case other dads groupsio instances will reuse login data from L2 cache :-D
+	cacheDur := time.Duration(24) * time.Hour
 	var res interface{}
-	res, _, err = Request(
+	var cookies []string
+	res, _, cookies, err = Request(
 		ctx,
 		url,
 		method,
-		headers,
+		nil,
 		[]byte{},
+		[]string{},                          // cookies
 		map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses: 200
 		nil,                                 // Error statuses
 		map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
 		false,                               // retry
-		//nil,                               // cache duration
-		&cacheDur, // cache duration
-		false,     // skip in dry-run mode
+		&cacheDur,                           // cache duration
+		false,                               // skip in dry-run mode
 	)
-	Printf("Result %d\n", len(res.(map[string]interface{})))
+	if err != nil {
+		Printf("Result %d\n", len(res.([]byte)))
+	} else {
+		Printf("Result %d\n", len(res.(map[string]interface{})))
+	}
+	if err != nil {
+		return
+	}
+	// Printf("Result %d\nCookies %s\n", len(res.(map[string]interface{})), cookies)
+	// We do have cookies now (from either real request or from the L2 cache)
+	// we *could* call getsubs now, but login already returns that data
+	// so I will restructur this to make use of login result to find Group ID/Name
+	// and store cookies for future/other requests that require them
+	url = GroupsioAPIURL + "/getsubs"
+	res, _, _, err = Request(
+		ctx,
+		url,
+		method,
+		nil,
+		[]byte{},
+		cookies,
+		map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses: 200
+		nil,                                 // Error statuses
+		map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
+		false,                               // retry
+		nil,                                 // cache duration
+		false,                               // skip in dry-run mode
+	)
+	if err != nil {
+		Printf("Result %d\n", len(res.([]byte)))
+	} else {
+		Printf("Result %d\n", len(res.(map[string]interface{})))
+	}
 	return
 }
 

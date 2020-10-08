@@ -372,7 +372,7 @@ func MaybeESCacheCleanup(ctx *Ctx) {
 // CreateESCache - creates dads_cache index needed for caching
 func CreateESCache(ctx *Ctx) {
 	// Create index, ignore if exists (see status 400 is not in error statuses)
-	_, _, err := Request(ctx, ctx.ESURL+"/dads_cache", Put, nil, []byte{}, nil, map[[2]int]struct{}{{401, 599}: {}}, nil, false, nil, false)
+	_, _, _, err := Request(ctx, ctx.ESURL+"/dads_cache", Put, nil, []byte{}, []string{}, nil, map[[2]int]struct{}{{401, 599}: {}}, nil, false, nil, false)
 	FatalOnError(err)
 }
 
@@ -409,12 +409,13 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 		payloads = append(payloads, doc...)
 		payloads = append(payloads, newLine...)
 	}
-	_, _, err = Request(
+	_, _, _, err = Request(
 		ctx,
 		url,
 		Post,
 		map[string]string{"Content-Type": "application/x-ndjson"},
 		payloads,
+		[]string{},
 		nil,                                 // JSON statuses
 		map[[2]int]struct{}{{400, 599}: {}}, // error statuses: 400-599
 		nil,                                 // OK statuses
@@ -443,12 +444,13 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 	for _, item := range items {
 		doc, _ = jsoniter.Marshal(item)
 		id, _ := item.(map[string]interface{})[key].(string)
-		_, _, err = Request(
+		_, _, _, err = Request(
 			ctx,
 			url+id,
 			Put,
 			headers,
 			doc,
+			[]string{},
 			nil,                                 // JSON statuses
 			map[[2]int]struct{}{{400, 599}: {}}, // error statuses: 400-599
 			map[[2]int]struct{}{{200, 201}: {}}, // OK statuses: 200-201
@@ -485,12 +487,13 @@ func GetLastUpdate(ctx *Ctx, ds DS, raw bool) (lastUpdate *time.Time) {
 		Printf("resume from date query raw=%v: %s\n", raw, string(payloadBytes))
 	}
 	method := Post
-	resp, _, err := Request(
+	resp, _, _, err := Request(
 		ctx,
 		url,
 		method,
 		map[string]string{"Content-Type": "application/json"}, // headers
 		payloadBytes,                        // payload
+		[]string{},                          // cookies
 		nil,                                 // JSON statuses
 		nil,                                 // Error statuses
 		map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200, 404
@@ -547,12 +550,13 @@ func GetLastOffset(ctx *Ctx, ds DS, raw bool) (offset float64) {
 		Printf("resume from offset query raw=%v: %s\n", raw, string(payloadBytes))
 	}
 	method := Post
-	resp, _, err := Request(
+	resp, _, _, err := Request(
 		ctx,
 		url,
 		method,
 		map[string]string{"Content-Type": "application/json"}, // headers
 		payloadBytes,                        // payload
+		[]string{},                          // cookies
 		nil,                                 // JSON statuses
 		nil,                                 // Error statuses
 		map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200, 404
