@@ -181,17 +181,17 @@ func NoSSLVerify() {
 }
 
 // EnsurePath - craete archive directory (and all necessary parents as well)
-func EnsurePath(path string) error {
+func EnsurePath(path string) (string, error) {
 	ary := strings.Split(path, "/")
 	nonEmpty := []string{}
-	for _, i := range ary {
-		if i == "" {
+	for i, dir := range ary {
+		if i > 0 && dir == "" {
 			continue
 		}
-		nonEmpty = append(nonEmpty, i)
+		nonEmpty = append(nonEmpty, dir)
 	}
 	path = strings.Join(nonEmpty, "/")
-	return os.MkdirAll(path, 0755)
+	return path, os.MkdirAll(path, 0755)
 }
 
 // RequestNoRetry - wrapper to do any HTTP request

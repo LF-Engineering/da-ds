@@ -19,7 +19,7 @@ const (
 	// GroupsioAPILogin - login API
 	GroupsioAPILogin = "/login"
 	// GroupsioDefaultArchPath - default path where archives are stored
-	GroupsioDefaultArchPath = "/root/.perceval/mailinglists"
+	GroupsioDefaultArchPath = "$HOME/.perceval/mailinglists"
 	// GroupsioDefaultSearchField - default search field
 	// GroupsioDefaultSearchField = "item_id"
 )
@@ -85,6 +85,7 @@ func (j *DSGroupsio) Validate() (err error) {
 	if j.GroupName == "" {
 		err = fmt.Errorf("Group name must be set: [https://groups.io/g/]GROUP+channel")
 	}
+	j.ArchPath = os.ExpandEnv(j.ArchPath)
 	if strings.HasSuffix(j.ArchPath, "/") {
 		j.ArchPath = j.ArchPath[:len(j.ArchPath)-1]
 	}
@@ -126,8 +127,9 @@ func (j *DSGroupsio) Enrich(ctx *Ctx) (err error) {
 // FetchItems - implement enrich data for stub datasource
 func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 	dirPath := j.ArchPath + "/" + GroupsioURLRoot + j.GroupName
-	FatalOnError(EnsurePath(dirPath))
-	Printf("Path to store data: %s\n", dirPath)
+	dirPath, err = EnsurePath(dirPath)
+	FatalOnError(err)
+	Printf("Path to store mailing archives: %s\n", dirPath)
 	// Login to groups.io
 	method := Post
 	url := GroupsioAPIURL + GroupsioAPILogin + `?email=` + neturl.QueryEscape(j.Email) + `&password=` + neturl.QueryEscape(j.Password)
