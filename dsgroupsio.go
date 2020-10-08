@@ -22,12 +22,14 @@ var (
 	GroupsioRawMapping = []byte(`{"dynamic":true,"properties":{"metadata__updated_on":{"type":"date"},"data":{"properties":{"body":{"dynamic":false,"properties":{}}}}}}`)
 	// GroupsioRichMapping - Groupsio rich index mapping
 	GroupsioRichMapping = []byte(`{"properties":{"Subject_analyzed":{"type":"text","fielddata":true,"index":true},"body":{"type":"text","index":true}}}`)
+	// GroupsioCategories - categories defined for Groupsio
+	GroupsioCategories = map[string]struct{}{"message": {}}
 )
 
 // DSGroupsio - DS implementation for stub - does nothing at all, just presents a skeleton code
 type DSGroupsio struct {
 	DS          string
-	GroupName   string // From DA_GROUPSIO_URL - Jira URL
+	GroupName   string // From DA_GROUPSIO_URL - Group name like GROUP-topic
 	NoSSLVerify bool   // From DA_GROUPSIO_NO_SSL_VERIFY
 	Email       string // From DA_GROUPSIO_EMAIL
 	Password    string // From DA_GROUPSIO_PASSWORD
@@ -151,7 +153,7 @@ func (j *DSGroupsio) OriginField(ctx *Ctx) string {
 
 // Categories - return a set of configured categories
 func (j *DSGroupsio) Categories() map[string]struct{} {
-	return map[string]struct{}{}
+	return GroupsioCategories
 }
 
 // ResumeNeedsOrigin - is origin field needed when resuming
@@ -226,7 +228,7 @@ func (j *DSGroupsio) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role
 	return map[string]interface{}{"name": nil, "username": nil, "email": nil}
 }
 
-// AllRoles - return all roles defined for Jira backend
+// AllRoles - return all roles defined for Groupsio backend
 func (j *DSGroupsio) AllRoles(ctx *Ctx) []string {
 	return []string{"author"}
 }

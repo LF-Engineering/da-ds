@@ -23,25 +23,25 @@ func runDS(ctx *lib.Ctx) (err error) {
 	}
 	err = ds.ParseArgs(ctx)
 	if err != nil {
-		lib.Printf("%s: ParseArgs(%s) error: %v, allowing continue\n", ds.Info(), ctx.Info(), err)
+		lib.Printf("%s: ParseArgs(%s) error: %v\n", ds.Info(), ctx.Info(), err)
 		return
 	}
 	err = ds.Validate()
 	if err != nil {
-		lib.Printf("%s: Validate error: %v, allowing continue\n", ds.Info(), err)
+		lib.Printf("%s: Validate error: %v\n", ds.Info(), err)
 		return
 	}
 	if !ctx.NoRaw {
 		err = lib.FetchRaw(ctx, ds)
 		if err != nil {
-			lib.Printf("%s: FetchRaw(%s) error: %v, allowing continue\n", ds.Info(), ctx.Info(), err)
+			lib.Printf("%s: FetchRaw(%s) error: %v\n", ds.Info(), ctx.Info(), err)
 			return
 		}
 	}
 	if ctx.Enrich {
 		err = lib.Enrich(ctx, ds)
 		if err != nil {
-			lib.Printf("%s: Enrich(%s) error: %v, allowing continue\n", ds.Info(), ctx.Info(), err)
+			lib.Printf("%s: Enrich(%s) error: %v\n", ds.Info(), ctx.Info(), err)
 			return
 		}
 	}

@@ -53,6 +53,8 @@ var (
 	JiraRichMapping = []byte(`{"properties":{"main_description_analyzed":{"type":"text","index":true},"releases":{"type":"keyword"},"body":{"type":"text","index":true}}}`)
 	// JiraRoles - roles defined for Jira backend
 	JiraRoles = []string{"assignee", "reporter", "creator", "author", "updateAuthor"}
+	// JiraCategories - categories defined for Jira
+	JiraCategories = map[string]struct{}{"issue": {}}
 )
 
 // DSJira - DS implementation for Jira
@@ -695,7 +697,7 @@ func (j *DSJira) OffsetField(*Ctx) string {
 
 //Categories - return a set of configured categories
 func (j *DSJira) Categories() map[string]struct{} {
-	return map[string]struct{}{"issue": {}}
+	return JiraCategories
 }
 
 // OriginField - return origin field used to detect where to restart from
