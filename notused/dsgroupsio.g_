@@ -1,0 +1,27 @@
+	// Printf("Result %d\nCookies %s\n", len(res.(map[string]interface{})), cookies)
+	// We do have cookies now (from either real request or from the L2 cache)
+	// we *could* call getsubs now, but login already returns that data
+	// so I will restructur this to make use of login result to find Group ID/Name
+	// and store cookies for future/other requests that require them
+	/*
+		url = GroupsioAPIURL + GroupsioAPIGetsubs
+		res, _, _, err = Request(
+			ctx,
+			url,
+			method,
+			nil,
+			[]byte{},
+			cookies,
+			map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses: 200
+			nil,                                 // Error statuses
+			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
+			false,                               // retry
+			nil,                                 // cache duration
+			false,                               // skip in dry-run mode
+		)
+		if err != nil {
+			Printf("Result %d\n", len(res.([]byte)))
+		} else {
+			Printf("Result %d\n", len(res.(map[string]interface{})))
+		}
+	*/

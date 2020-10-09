@@ -4,9 +4,12 @@ import (
 	"fmt"
 	neturl "net/url"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	jsoniter "github.com/json-iterator/go"
 )
 
 const (
@@ -20,6 +23,8 @@ const (
 	GroupsioAPILogin = "/login"
 	// GroupsioAPIGetsubs - getsubs API
 	GroupsioAPIGetsubs = "/getsubs"
+	// GroupsioAPIDownloadArchives - download archives API
+	GroupsioAPIDownloadArchives = "/downloadarchives"
 	// GroupsioDefaultArchPath - default path where archives are stored
 	GroupsioDefaultArchPath = "$HOME/.perceval/mailinglists"
 	// GroupsioDefaultSearchField - default search field
@@ -137,12 +142,13 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 	FatalOnError(err)
 	Printf("Path to store mailing archives: %s\n", dirPath)
 	// Login to groups.io
-	method := Post
+	method := Get
 	url := GroupsioAPIURL + GroupsioAPILogin + `?email=` + neturl.QueryEscape(j.Email) + `&password=` + neturl.QueryEscape(j.Password)
-	//headers := map[string]string{"Content-Type": "application/json"}
+	// headers := map[string]string{"Content-Type": "application/json"}
 	// By checking cookie expiration data I know that I can (probably) cache this even for 14 days
 	// In that case other dads groupsio instances will reuse login data from L2 cache :-D
-	cacheDur := time.Duration(24) * time.Hour
+	// But we cache for 48 hours at most, because new subscriptions are added
+	cacheLoginDur := time.Duration(48) * time.Hour
 	var res interface{}
 	var cookies []string
 	res, _, cookies, err = Request(
@@ -152,27 +158,66 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 		nil,
 		[]byte{},
 		[]string{},                          // cookies
-		map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses: 200
+		nil,                                 // JSON statuses
 		nil,                                 // Error statuses
 		map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
 		false,                               // retry
-		&cacheDur,                           // cache duration
+		&cacheLoginDur,                      // cache duration
 		false,                               // skip in dry-run mode
 	)
 	if err != nil {
-		Printf("Result %d\n", len(res.([]byte)))
-	} else {
-		Printf("Result %d\n", len(res.(map[string]interface{})))
-	}
-	if err != nil {
 		return
 	}
-	// Printf("Result %d\nCookies %s\n", len(res.(map[string]interface{})), cookies)
+	type Result struct {
+		User struct {
+			Token string `json:"csrf_token"`
+			Subs  []struct {
+				GroupID   int64  `json:"group_id"`
+				GroupName string `json:"group_name"`
+				Perms     struct {
+					DownloadArchives bool `json:"download_archives"`
+				} `json:"perms"`
+			} `json:"subscriptions"`
+		} `json:"user"`
+	}
+	var result Result
+	err = jsoniter.Unmarshal(res.([]byte), &result)
+	if err != nil {
+		Printf("Cannot unmarshal result from %s\n", string(res.([]byte)))
+		return
+	}
+	groupID := int64(-1)
+	for _, sub := range result.User.Subs {
+		if sub.GroupName == j.GroupName {
+			if !sub.Perms.DownloadArchives {
+				Fatalf("download archives not enabled on %s (group id %d)\n", sub.GroupName, sub.GroupID)
+				return
+			}
+			groupID = sub.GroupID
+			break
+		}
+	}
+	if groupID < 0 {
+		subs := []string{}
+		for _, sub := range result.User.Subs {
+			subs = append(subs, sub.GroupName)
+		}
+		sort.Strings(subs)
+		Fatalf("you are not subscribed to %s, your subscriptions(%d): %v\n", j.GroupName, len(subs), strings.Join(subs, ", "))
+		return
+	}
+	Printf("Found group ID %d\n", groupID)
 	// We do have cookies now (from either real request or from the L2 cache)
-	// we *could* call getsubs now, but login already returns that data
-	// so I will restructur this to make use of login result to find Group ID/Name
-	// and store cookies for future/other requests that require them
-	url = GroupsioAPIURL + GroupsioAPIGetsubs
+	//url := GroupsioAPIURL + GroupsioAPILogin + `?email=` + neturl.QueryEscape(j.Email) + `&password=` + neturl.QueryEscape(j.Password)
+	url = GroupsioAPIURL + GroupsioAPIDownloadArchives + `?group_id=` + fmt.Sprintf("%d", groupID)
+	var from time.Time
+	if ctx.DateFrom != nil {
+		from = *ctx.DateFrom
+		from = from.Add(-1 * time.Second)
+		url += `&start_time=` + neturl.QueryEscape(ToYMDTHMSZDate(from))
+	}
+	Printf("fetching messages from: %s\n", url)
+	cacheMsgDur := time.Duration(8) * time.Hour
 	res, _, _, err = Request(
 		ctx,
 		url,
@@ -180,18 +225,14 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 		nil,
 		[]byte{},
 		cookies,
-		map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses: 200
+		nil,
 		nil,                                 // Error statuses
 		map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
 		false,                               // retry
-		nil,                                 // cache duration
+		&cacheMsgDur,                        // cache duration
 		false,                               // skip in dry-run mode
 	)
-	if err != nil {
-		Printf("Result %d\n", len(res.([]byte)))
-	} else {
-		Printf("Result %d\n", len(res.(map[string]interface{})))
-	}
+	Printf("Error: %+v result bytes %d\n", err, len(res.([]byte)))
 	return
 }
 

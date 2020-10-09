@@ -42,9 +42,14 @@ func ToYMDHMSDate(dt time.Time) string {
 	return fmt.Sprintf("%04d-%02d-%02d %02d:%02d:%02d", dt.Year(), dt.Month(), dt.Day(), dt.Hour(), dt.Minute(), dt.Second())
 }
 
-// ToESDate - return time formatted as YYYY-MM-DD HH:MI:SS YYYY-MM-DDTHH:MI:SS.uuuuuu+00:00
+// ToESDate - return time formatted as YYYY-MM-DDTHH:MI:SS.uuuuuu+00:00
 func ToESDate(dt time.Time) string {
 	return fmt.Sprintf("%04d-%02d-%02dT%02d:%02d:%02d.%06.0f+00:00", dt.Year(), dt.Month(), dt.Day(), dt.Hour(), dt.Minute(), dt.Second(), float64(dt.Nanosecond())/1.0e3)
+}
+
+// ToYMDTHMSZDate - return time formatted as YYYY-MM-DDTHH:MI:SSZ
+func ToYMDTHMSZDate(dt time.Time) string {
+	return fmt.Sprintf("%04d-%02d-%02dT%02d:%02d:%02dZ", dt.Year(), dt.Month(), dt.Day(), dt.Hour(), dt.Minute(), dt.Second())
 }
 
 // TimeParseAny - attempts to parse time from string YYYY-MM-DD HH:MI:SS
