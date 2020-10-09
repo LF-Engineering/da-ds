@@ -190,7 +190,7 @@ func GetESCache(ctx *Ctx, k string) (b []byte, tg string, expires time.Time, ok 
 		esCacheMtx.RUnlock()
 	}
 	if !ok {
-		if ctx.Debug > 0 {
+		if ctx.Debug > 1 {
 			Printf("GetESCache(%s): miss\n", k)
 		}
 		return
@@ -204,7 +204,7 @@ func GetESCache(ctx *Ctx, k string) (b []byte, tg string, expires time.Time, ok 
 		if MT {
 			esCacheMtx.Unlock()
 		}
-		if ctx.Debug > 0 {
+		if ctx.Debug > 1 {
 			Printf("GetESCache(%s,%s): expired %v\n", k, entry.G, entry.E)
 		}
 		return
@@ -212,7 +212,7 @@ func GetESCache(ctx *Ctx, k string) (b []byte, tg string, expires time.Time, ok 
 	b = entry.B
 	tg = entry.G
 	expires = entry.E
-	if ctx.Debug > 0 {
+	if ctx.Debug > 1 {
 		Printf("GetESCache(%s,%s): hit (%v)\n", k, tg, expires)
 	}
 	return
@@ -229,7 +229,7 @@ func GetL2Cache(ctx *Ctx, k string) (b []byte, ok bool) {
 		memCacheMtx.RUnlock()
 	}
 	if !ok {
-		if ctx.Debug > 0 {
+		if ctx.Debug > 1 {
 			Printf("GetL2Cache(%s): miss\n", k)
 		}
 		var (
@@ -246,7 +246,9 @@ func GetL2Cache(ctx *Ctx, k string) (b []byte, ok bool) {
 			if MT {
 				memCacheMtx.Unlock()
 			}
-			Printf("GetL2Cache(%s,%s): L2 hit (%v)\n", k, g, e)
+      if ctx.Debug > 1 {
+			  Printf("GetL2Cache(%s,%s): L2 hit (%v)\n", k, g, e)
+      }
 		}
 		return
 	}
@@ -259,7 +261,7 @@ func GetL2Cache(ctx *Ctx, k string) (b []byte, ok bool) {
 		if MT {
 			memCacheMtx.Unlock()
 		}
-		if ctx.Debug > 0 {
+		if ctx.Debug > 1 {
 			Printf("GetL2Cache(%s,%s): expired %v\n", k, entry.G, entry.E)
 		}
 		var (
@@ -276,12 +278,14 @@ func GetL2Cache(ctx *Ctx, k string) (b []byte, ok bool) {
 			if MT {
 				memCacheMtx.Unlock()
 			}
-			Printf("GetL2Cache(%s,%s): L2 hit (%v)\n", k, g, e)
+      if ctx.Debug > 1 {
+			  Printf("GetL2Cache(%s,%s): L2 hit (%v)\n", k, g, e)
+      }
 		}
 		return
 	}
 	b = entry.B
-	if ctx.Debug > 0 {
+	if ctx.Debug > 1 {
 		Printf("GetL2Cache(%s,%s): hit (%v)\n", k, entry.G, entry.E)
 	}
 	return
@@ -308,7 +312,7 @@ func SetESCache(ctx *Ctx, k, tg string, b []byte, expires time.Duration) {
 		if MT {
 			esCacheMtx.Unlock()
 		}
-		if ctx.Debug > 0 {
+		if ctx.Debug > 1 {
 			Printf("SetESCache(%s,%s): replaced (%v)\n", k, tg, e)
 		}
 	} else {
@@ -319,7 +323,7 @@ func SetESCache(ctx *Ctx, k, tg string, b []byte, expires time.Duration) {
 		if MT {
 			esCacheMtx.Unlock()
 		}
-		if ctx.Debug > 0 {
+		if ctx.Debug > 1 {
 			Printf("SetESCache(%s,%s): added (%v)\n", k, tg, e)
 		}
 	}
@@ -340,12 +344,12 @@ func SetL2Cache(ctx *Ctx, k, tg string, b []byte, expires time.Duration) {
 		memCacheMtx.Unlock()
 	}
 	if ok {
-		if ctx.Debug > 0 {
+		if ctx.Debug > 1 {
 			Printf("SetL2Cache(%s,%s): replaced (%v)\n", k, tg, e)
 		}
 		return
 	}
-	if ctx.Debug > 0 {
+	if ctx.Debug > 1 {
 		Printf("SetL2Cache(%s,%s): added (%v)\n", k, tg, e)
 	}
 }
