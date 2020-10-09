@@ -1,7 +1,11 @@
 package dads
 
 import (
+	"archive/zip"
+	"bytes"
 	"fmt"
+	"io"
+	"io/ioutil"
 	neturl "net/url"
 	"os"
 	"sort"
@@ -27,6 +31,8 @@ const (
 	GroupsioAPIDownloadArchives = "/downloadarchives"
 	// GroupsioDefaultArchPath - default path where archives are stored
 	GroupsioDefaultArchPath = "$HOME/.perceval/mailinglists"
+	// GroupsioMBoxFile - default messages file name
+	GroupsioMBoxFile = "messages.zip"
 	// GroupsioDefaultSearchField - default search field
 	// GroupsioDefaultSearchField = "item_id"
 )
@@ -42,14 +48,15 @@ var (
 
 // DSGroupsio - DS implementation for stub - does nothing at all, just presents a skeleton code
 type DSGroupsio struct {
-	DS          string
-	GroupName   string // From DA_GROUPSIO_URL - Group name like GROUP-topic
-	NoSSLVerify bool   // From DA_GROUPSIO_NO_SSL_VERIFY
-	Email       string // From DA_GROUPSIO_EMAIL
-	Password    string // From DA_GROUPSIO_PASSWORD
-	PageSize    int    // From DA_GROUPSIO_PAGE_SIZE
-	MultiOrigin bool   // From DA_GROUPSIO_MULTI_ORIGIN - allow multiple groups in a single index
-	ArchPath    string // From DA_GROUPSIO_ARCH_PATH - default GroupsioDefaultArchPath
+	DS           string
+	GroupName    string // From DA_GROUPSIO_URL - Group name like GROUP-topic
+	NoSSLVerify  bool   // From DA_GROUPSIO_NO_SSL_VERIFY
+	Email        string // From DA_GROUPSIO_EMAIL
+	Password     string // From DA_GROUPSIO_PASSWORD
+	PageSize     int    // From DA_GROUPSIO_PAGE_SIZE
+	MultiOrigin  bool   // From DA_GROUPSIO_MULTI_ORIGIN - allow multiple groups in a single index
+	SaveArchives bool   // From DA_GROUPSIO_SAVE_ARCHIVES
+	ArchPath     string // From DA_GROUPSIO_ARCH_PATH - default GroupsioDefaultArchPath
 }
 
 // ParseArgs - parse stub specific environment variables
@@ -74,6 +81,7 @@ func (j *DSGroupsio) ParseArgs(ctx *Ctx) (err error) {
 		}
 	}
 	j.MultiOrigin = os.Getenv(prefix+"MULTI_ORIGIN") != ""
+	j.SaveArchives = os.Getenv(prefix+"SAVE_ARCHIVES") != ""
 	if os.Getenv(prefix+"ARCH_PATH") != "" {
 		j.ArchPath = os.Getenv(prefix + "ARCH_PATH")
 	} else {
@@ -137,10 +145,15 @@ func (j *DSGroupsio) Enrich(ctx *Ctx) (err error) {
 
 // FetchItems - implement enrich data for stub datasource
 func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
-	dirPath := j.ArchPath + "/" + GroupsioURLRoot + j.GroupName
-	dirPath, err = EnsurePath(dirPath)
-	FatalOnError(err)
-	Printf("Path to store mailing archives: %s\n", dirPath)
+	var dirPath string
+	if j.SaveArchives {
+		dirPath := j.ArchPath + "/" + GroupsioURLRoot + j.GroupName
+		dirPath, err = EnsurePath(dirPath)
+		FatalOnError(err)
+		Printf("path to store mailing archives: %s\n", dirPath)
+	} else {
+		Printf("processing erchives in memory, archive file not saved\n")
+	}
 	// Login to groups.io
 	method := Get
 	url := GroupsioAPIURL + GroupsioAPILogin + `?email=` + neturl.QueryEscape(j.Email) + `&password=` + neturl.QueryEscape(j.Password)
@@ -206,7 +219,7 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 		Fatalf("you are not subscribed to %s, your subscriptions(%d): %v\n", j.GroupName, len(subs), strings.Join(subs, ", "))
 		return
 	}
-	Printf("Found group ID %d\n", groupID)
+	Printf("found group ID %d\n", groupID)
 	// We do have cookies now (from either real request or from the L2 cache)
 	//url := GroupsioAPIURL + GroupsioAPILogin + `?email=` + neturl.QueryEscape(j.Email) + `&password=` + neturl.QueryEscape(j.Password)
 	url = GroupsioAPIURL + GroupsioAPIDownloadArchives + `?group_id=` + fmt.Sprintf("%d", groupID)
@@ -232,7 +245,40 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 		&cacheMsgDur,                        // cache duration
 		false,                               // skip in dry-run mode
 	)
-	Printf("Error: %+v result bytes %d\n", err, len(res.([]byte)))
+	if err != nil {
+		return
+	}
+	nBytes := int64(len(res.([]byte)))
+	if j.SaveArchives {
+		path := dirPath + "/" + GroupsioMBoxFile
+		err = ioutil.WriteFile(path, res.([]byte), 0644)
+		if err != nil {
+			return
+		}
+		Printf("written %s (%d bytes)\n", path, nBytes)
+	} else {
+		Printf("read %d bytes\n", nBytes)
+	}
+	bytesReader := bytes.NewReader(res.([]byte))
+	var zipReader *zip.Reader
+	zipReader, err = zip.NewReader(bytesReader, nBytes)
+	if err != nil {
+		return
+	}
+	for _, file := range zipReader.File {
+		var rc io.ReadCloser
+		rc, err = file.Open()
+		if err != nil {
+			return
+		}
+		var data []byte
+		data, err = ioutil.ReadAll(rc)
+		_ = rc.Close()
+		if err != nil {
+			return
+		}
+		Printf("%s uncomressed %d bytes\n", file.Name, len(data))
+	}
 	return
 }
 
@@ -295,6 +341,8 @@ func (j *DSGroupsio) Origin(ctx *Ctx) string {
 
 // ItemID - return unique identifier for an item
 func (j *DSGroupsio) ItemID(item interface{}) string {
+	// IMPL:
+	// Message-ID ?
 	return fmt.Sprintf("%d", time.Now().UnixNano())
 }
 
