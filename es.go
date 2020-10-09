@@ -147,7 +147,7 @@ func ESCacheDelete(ctx *Ctx, key string) {
 
 // ESCacheDeleteExpired - delete expired cache entries
 func ESCacheDeleteExpired(ctx *Ctx) {
-	if ctx.Debug > 0 {
+	if ctx.Debug > 1 {
 		Printf("running ESCacheDeleteExpired\n")
 	}
 	data := `{"query":{"range":{"e":{"lte": "now"}}}}`
@@ -246,9 +246,9 @@ func GetL2Cache(ctx *Ctx, k string) (b []byte, ok bool) {
 			if MT {
 				memCacheMtx.Unlock()
 			}
-      if ctx.Debug > 1 {
-			  Printf("GetL2Cache(%s,%s): L2 hit (%v)\n", k, g, e)
-      }
+			if ctx.Debug > 1 {
+				Printf("GetL2Cache(%s,%s): L2 hit (%v)\n", k, g, e)
+			}
 		}
 		return
 	}
@@ -278,9 +278,9 @@ func GetL2Cache(ctx *Ctx, k string) (b []byte, ok bool) {
 			if MT {
 				memCacheMtx.Unlock()
 			}
-      if ctx.Debug > 1 {
-			  Printf("GetL2Cache(%s,%s): L2 hit (%v)\n", k, g, e)
-      }
+			if ctx.Debug > 1 {
+				Printf("GetL2Cache(%s,%s): L2 hit (%v)\n", k, g, e)
+			}
 		}
 		return
 	}

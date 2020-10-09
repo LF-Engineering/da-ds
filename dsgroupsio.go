@@ -526,7 +526,7 @@ func (j *DSGroupsio) Origin(ctx *Ctx) string {
 func (j *DSGroupsio) ItemID(item interface{}) string {
 	id, ok := item.(map[string]interface{})[GroupsioMessageIDField].(string)
 	if !ok {
-		Fatalf("%s: ItemID() - cannot extract %s from %+v", j.DS, GroupsioMessageIDField, jDumpKeys(item))
+		Fatalf("%s: ItemID() - cannot extract %s from %+v", j.DS, GroupsioMessageIDField, DumpKeys(item))
 	}
 	return id
 }

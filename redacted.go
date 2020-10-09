@@ -33,6 +33,9 @@ func AddRedacted(newRedacted string, useMutex bool) {
 
 // FilterRedacted - filter out all known redacted starings
 func FilterRedacted(str string) string {
+	if GRedactedStrings == nil {
+		return str
+	}
 	GRedactedMtx.RLock()
 	defer func() {
 		GRedactedMtx.RUnlock()
@@ -45,6 +48,9 @@ func FilterRedacted(str string) string {
 
 // GetRedacted - get redacted
 func GetRedacted() (str string) {
+	if GRedactedStrings == nil {
+		return "[]"
+	}
 	GRedactedMtx.RLock()
 	defer func() {
 		GRedactedMtx.RUnlock()
