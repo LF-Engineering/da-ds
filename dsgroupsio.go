@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	jsoniter "github.com/json-iterator/go"
@@ -33,6 +34,8 @@ const (
 	GroupsioDefaultArchPath = "$HOME/.perceval/mailinglists"
 	// GroupsioMBoxFile - default messages file name
 	GroupsioMBoxFile = "messages.zip"
+	// GroupsioMBoxMsgSeparator - used to split mbox file into separate messages
+	GroupsioMBoxMsgSeparator = "\nFrom "
 	// GroupsioDefaultSearchField - default search field
 	// GroupsioDefaultSearchField = "item_id"
 )
@@ -230,7 +233,8 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 		url += `&start_time=` + neturl.QueryEscape(ToYMDTHMSZDate(from))
 	}
 	Printf("fetching messages from: %s\n", url)
-	cacheMsgDur := time.Duration(8) * time.Hour
+	// FIXME: remove caching or lower to 3 hours at most
+	cacheMsgDur := time.Duration(48) * time.Hour
 	res, _, _, err = Request(
 		ctx,
 		url,
@@ -265,6 +269,7 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 	if err != nil {
 		return
 	}
+	var messages [][]byte
 	for _, file := range zipReader.File {
 		var rc io.ReadCloser
 		rc, err = file.Open()
@@ -278,6 +283,151 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 			return
 		}
 		Printf("%s uncomressed %d bytes\n", file.Name, len(data))
+		ary := bytes.Split(data, []byte(GroupsioMBoxMsgSeparator))
+		Printf("%s # of messages: %d\n", file.Name, len(ary))
+		messages = append(messages, ary...)
+	}
+	Printf("number of messages to parse: %d\n", len(messages))
+	// Process messages (possibly in threads)
+	var (
+		ch         chan error
+		allMsgs    []interface{}
+		allMsgsMtx *sync.Mutex
+		escha      []chan error
+		eschaMtx   *sync.Mutex
+	)
+	thrN := GetThreadsNum(ctx)
+	if thrN > 1 {
+		ch = make(chan error)
+		allMsgsMtx = &sync.Mutex{}
+		eschaMtx = &sync.Mutex{}
+	}
+	nThreads := 0
+	processMsg := func(c chan error, msg []byte) (wch chan error, e error) {
+		defer func() {
+			if c != nil {
+				c <- e
+			}
+		}()
+		// starts with? GroupsioMBoxMsgSeparator
+		// FIXME: actual parse
+		if ctx.Debug > 1 {
+			Printf("message length %d\n", len(msg))
+		}
+		// Real data processing here
+		if allMsgsMtx != nil {
+			allMsgsMtx.Lock()
+		}
+		// FIXME: add item
+		allMsgs = append(allMsgs, map[string]interface{}{"id": time.Now().UnixNano(), "name": "xyz"})
+		nMsgs := len(allMsgs)
+		if nMsgs >= ctx.ESBulkSize {
+			sendToElastic := func(c chan error) (ee error) {
+				defer func() {
+					if c != nil {
+						c <- ee
+					}
+				}()
+				if ctx.Debug > 0 {
+					Printf("sending %d items to elastic\n", len(allMsgs))
+				}
+				// FIXME
+				/*
+					ee = SendToElastic(ctx, j, true, "FIXME", allMsgs)
+					if ee != nil {
+						Printf("error %v sending %d messages to ElasticSearch\n", ee, len(allMsgs))
+					}
+				*/
+				allMsgs = []interface{}{}
+				if allMsgsMtx != nil {
+					allMsgsMtx.Unlock()
+				}
+				return
+			}
+			if thrN > 1 {
+				wch = make(chan error)
+				go func() {
+					_ = sendToElastic(wch)
+				}()
+			} else {
+				e = sendToElastic(nil)
+				if e != nil {
+					return
+				}
+			}
+		} else {
+			if allMsgsMtx != nil {
+				allMsgsMtx.Unlock()
+			}
+		}
+		return
+	}
+	if thrN > 1 {
+		for _, message := range messages {
+			go func(msg []byte) {
+				var esch chan error
+				esch, err = processMsg(ch, msg)
+				if err != nil {
+					return
+				}
+				if esch != nil {
+					if eschaMtx != nil {
+						eschaMtx.Lock()
+					}
+					escha = append(escha, esch)
+					if eschaMtx != nil {
+						eschaMtx.Unlock()
+					}
+				}
+			}(message)
+			nThreads++
+			if nThreads == thrN {
+				err = <-ch
+				if err != nil {
+					return
+				}
+				nThreads--
+			}
+		}
+		if ctx.Debug > 0 {
+			Printf("joining %d threads\n", nThreads)
+		}
+		for nThreads > 0 {
+			err = <-ch
+			nThreads--
+			if err != nil {
+				return
+			}
+		}
+	} else {
+		for _, message := range messages {
+			_, err = processMsg(nil, message)
+			if err != nil {
+				return
+			}
+		}
+	}
+	if ctx.Debug > 0 {
+		Printf("%d wait channels\n", len(escha))
+	}
+	for _, esch := range escha {
+		err = <-esch
+		if err != nil {
+			return
+		}
+	}
+	nMsgs := len(allMsgs)
+	if ctx.Debug > 0 {
+		Printf("%d remaining messages to send to ES\n", nMsgs)
+	}
+	if nMsgs > 0 {
+		// FIXME
+		/*
+			err = SendToElastic(ctx, j, true, "FIXME", allMsgs)
+			if err != nil {
+				Printf("Error %v sending %d messages to ES\n", err, len(allMsgs))
+			}
+		*/
 	}
 	return
 }

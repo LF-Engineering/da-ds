@@ -2,6 +2,7 @@ package dads
 
 import (
 	"fmt"
+	"sync"
 	"time"
 )
 
@@ -59,6 +60,130 @@ func (j *DSStub) Enrich(ctx *Ctx) (err error) {
 // FetchItems - implement enrich data for stub datasource
 func (j *DSStub) FetchItems(ctx *Ctx) (err error) {
 	// IMPL:
+	var messages [][]byte
+	// Process messages (possibly in threads)
+	var (
+		ch         chan error
+		allMsgs    []interface{}
+		allMsgsMtx *sync.Mutex
+		escha      []chan error
+		eschaMtx   *sync.Mutex
+	)
+	thrN := GetThreadsNum(ctx)
+	if thrN > 1 {
+		ch = make(chan error)
+		allMsgsMtx = &sync.Mutex{}
+		eschaMtx = &sync.Mutex{}
+	}
+	nThreads := 0
+	processMsg := func(c chan error, msg []byte) (wch chan error, e error) {
+		defer func() {
+			if c != nil {
+				c <- e
+			}
+		}()
+		// FIXME: Real data processing here
+		if allMsgsMtx != nil {
+			allMsgsMtx.Lock()
+		}
+		// FIXME: add item
+		allMsgs = append(allMsgs, map[string]interface{}{"id": time.Now().UnixNano(), "name": "xyz"})
+		nMsgs := len(allMsgs)
+		if nMsgs >= ctx.ESBulkSize {
+			sendToElastic := func(c chan error) (ee error) {
+				defer func() {
+					if c != nil {
+						c <- ee
+					}
+				}()
+				// FIXME: item ID column name
+				ee = SendToElastic(ctx, j, true, "FIXME", allMsgs)
+				if ee != nil {
+					Printf("error %v sending %d messages to ElasticSearch\n", ee, len(allMsgs))
+				}
+				allMsgs = []interface{}{}
+				if allMsgsMtx != nil {
+					allMsgsMtx.Unlock()
+				}
+				return
+			}
+			if thrN > 1 {
+				wch = make(chan error)
+				go func() {
+					_ = sendToElastic(wch)
+				}()
+			} else {
+				e = sendToElastic(nil)
+				if e != nil {
+					return
+				}
+			}
+		} else {
+			if allMsgsMtx != nil {
+				allMsgsMtx.Unlock()
+			}
+		}
+		return
+	}
+	if thrN > 1 {
+		for _, message := range messages {
+			go func(msg []byte) {
+				var esch chan error
+				esch, err = processMsg(ch, msg)
+				if err != nil {
+					return
+				}
+				if esch != nil {
+					if eschaMtx != nil {
+						eschaMtx.Lock()
+					}
+					escha = append(escha, esch)
+					if eschaMtx != nil {
+						eschaMtx.Unlock()
+					}
+				}
+			}(message)
+			nThreads++
+			if nThreads == thrN {
+				err = <-ch
+				if err != nil {
+					return
+				}
+				nThreads--
+			}
+		}
+		for nThreads > 0 {
+			err = <-ch
+			nThreads--
+			if err != nil {
+				return
+			}
+		}
+	} else {
+		for _, message := range messages {
+			_, err = processMsg(nil, message)
+			if err != nil {
+				return
+			}
+		}
+	}
+	for _, esch := range escha {
+		err = <-esch
+		if err != nil {
+			return
+		}
+	}
+	nMsgs := len(allMsgs)
+	if ctx.Debug > 0 {
+		Printf("%d remaining messages to send to ES\n", nMsgs)
+	}
+	if nMsgs > 0 {
+		// FIXME: id item name
+		err = SendToElastic(ctx, j, true, "FIXME", allMsgs)
+		if err != nil {
+			Printf("Error %v sending %d messages to ES\n", err, len(allMsgs))
+		}
+	}
 	return
 }
 
