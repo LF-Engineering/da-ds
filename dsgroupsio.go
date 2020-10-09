@@ -18,6 +18,8 @@ const (
 	GroupsioAPIURL = "https://groups.io/api/v1"
 	// GroupsioAPILogin - login API
 	GroupsioAPILogin = "/login"
+	// GroupsioAPIGetsubs - getsubs API
+	GroupsioAPIGetsubs = "/getsubs"
 	// GroupsioDefaultArchPath - default path where archives are stored
 	GroupsioDefaultArchPath = "$HOME/.perceval/mailinglists"
 	// GroupsioDefaultSearchField - default search field
@@ -53,6 +55,10 @@ func (j *DSGroupsio) ParseArgs(ctx *Ctx) (err error) {
 	j.NoSSLVerify = os.Getenv(prefix+"NO_SSL_VERIFY") != ""
 	j.Email = os.Getenv(prefix + "EMAIL")
 	j.Password = os.Getenv(prefix + "PASSWORD")
+	AddRedacted(j.Email, false)
+	AddRedacted(j.Password, false)
+	AddRedacted(neturl.QueryEscape(j.Email), false)
+	AddRedacted(neturl.QueryEscape(j.Password), false)
 	if os.Getenv(prefix+"PAGE_SIZE") == "" {
 		j.PageSize = 500
 	} else {
@@ -166,7 +172,7 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 	// we *could* call getsubs now, but login already returns that data
 	// so I will restructur this to make use of login result to find Group ID/Name
 	// and store cookies for future/other requests that require them
-	url = GroupsioAPIURL + "/getsubs"
+	url = GroupsioAPIURL + GroupsioAPIGetsubs
 	res, _, _, err = Request(
 		ctx,
 		url,

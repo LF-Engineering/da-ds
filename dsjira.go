@@ -82,6 +82,7 @@ func (j *DSJira) ParseArgs(ctx *Ctx) (err error) {
 	j.URL = os.Getenv(prefix + "URL")
 	j.NoSSLVerify = os.Getenv(prefix+"NO_SSL_VERIFY") != ""
 	j.Token = os.Getenv(prefix + "TOKEN")
+	AddRedacted(j.Token, false)
 	if os.Getenv(prefix+"PAGE_SIZE") == "" {
 		j.PageSize = 500
 	} else {

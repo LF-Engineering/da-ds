@@ -86,6 +86,7 @@ func CacheSummary(ctx *Ctx) {
 		Printf("emails cache:\n%s\n", PrintCache(emailsCache))
 		Printf("uuids type 1 cache:\n%s\n", PrintCache(uuidsNonEmptyCache))
 		Printf("uuids type 2 cache:\n%s\n", PrintCache(uuidsAffsCache))
+		PrintfNoRedacted("Redacted data: %s\n", GetRedacted())
 	}
 }
 
@@ -365,7 +366,7 @@ func Request(
 ) (result interface{}, status int, outCookies []string, err error) {
 	if skipInDryRun && ctx.DryRun {
 		if ctx.Debug > 0 {
-			Printf("dry-run: %s.%s(#h=%d,pl=%d) skipped in dry-run mode\n", method, url, len(headers), len(payload))
+			Printf("dry-run: %s.%s(#h=%d,pl=%d,cks=%d) skipped in dry-run mode\n", method, url, len(headers), len(payload), len(cookies))
 		}
 		return
 	}
@@ -373,6 +374,7 @@ func Request(
 	if cacheFor != nil && !ctx.NoCache {
 		b := []byte(method + url + fmt.Sprintf("%+v", headers))
 		b = append(b, payload...)
+		b = append(b, []byte(strings.Join(cookies, "==="))...)
 		hash := sha1.New()
 		_, e := hash.Write(b)
 		if e == nil {
@@ -423,7 +425,7 @@ func Request(
 					data = append(data, b64cookies...)
 					data = append(data, []byte(":")...)
 					data = append(data, bts...)
-					tag := fmt.Sprintf("%s.%s(#h=%d,pl=%d) -> sts=%d,js=1,resp=%d,cks=%d", method, url, len(headers), len(payload), status, len(bts), len(outCookies))
+					tag := FilterRedacted(fmt.Sprintf("%s.%s(#h=%d,pl=%d,cks=%d) -> sts=%d,js=1,resp=%d,cks=%d", method, url, len(headers), len(payload), len(cookies), status, len(bts), len(outCookies)))
 					SetL2Cache(ctx, hsh, tag, data, cacheDuration)
 					return
 				}
@@ -431,7 +433,7 @@ func Request(
 				data = append(data, b64cookies...)
 				data = append(data, []byte(":")...)
 				data = append(data, result.([]byte)...)
-				tag := fmt.Sprintf("%s.%s(#h=%d,pl=%d) -> sts=%d,js=0,resp=%d,cks=%d", method, url, len(headers), len(payload), status, len(result.([]byte)), len(outCookies))
+				tag := FilterRedacted(fmt.Sprintf("%s.%s(#h=%d,pl=%d,cks=%d) -> sts=%d,js=0,resp=%d,cks=%d", method, url, len(headers), len(payload), len(cookies), status, len(result.([]byte)), len(outCookies)))
 				SetL2Cache(ctx, hsh, tag, data, cacheDuration)
 				return
 			}()

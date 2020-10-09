@@ -86,3 +86,6 @@ const Unknown = "Unknown"
 
 // Wait59m - common constant string
 const Wait59m = "59m"
+
+// Redacted - [redacted]
+const Redacted string = "[redacted]"
