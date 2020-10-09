@@ -50,9 +50,9 @@ type DS interface {
 	RichAuthorField(*Ctx) string
 	ItemUpdatedOn(interface{}) time.Time
 	ItemCategory(interface{}) string
-	SearchFields() map[string][]string
 	ElasticRawMapping() []byte
 	ElasticRichMapping() []byte
+	AddMetadata(*Ctx, interface{}) map[string]interface{}
 	GetItemIdentities(*Ctx, interface{}) (map[[3]string]struct{}, error)
 	EnrichItems(*Ctx) error
 	EnrichItem(*Ctx, map[string]interface{}, string, bool) (map[string]interface{}, error)

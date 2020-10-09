@@ -89,3 +89,6 @@ const Wait59m = "59m"
 
 // Redacted - [redacted]
 const Redacted string = "[redacted]"
+
+// Message - common constant string
+const Message = "message"

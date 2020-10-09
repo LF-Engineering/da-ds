@@ -83,11 +83,16 @@ func (j *DSStub) FetchItems(ctx *Ctx) (err error) {
 			}
 		}()
 		// FIXME: Real data processing here
+		item := map[string]interface{}{"id": time.Now().UnixNano(), "name": "xyz"}
+		esItem := j.AddMetadata(ctx, item)
+		if ctx.Project != "" {
+			item["project"] = ctx.Project
+		}
+		esItem["data"] = item
 		if allMsgsMtx != nil {
 			allMsgsMtx.Lock()
 		}
-		// FIXME: add item
-		allMsgs = append(allMsgs, map[string]interface{}{"id": time.Now().UnixNano(), "name": "xyz"})
+		allMsgs = append(allMsgs, item)
 		nMsgs := len(allMsgs)
 		if nMsgs >= ctx.ESBulkSize {
 			sendToElastic := func(c chan error) (ee error) {
@@ -96,8 +101,7 @@ func (j *DSStub) FetchItems(ctx *Ctx) (err error) {
 						c <- ee
 					}
 				}()
-				// FIXME: item ID column name
-				ee = SendToElastic(ctx, j, true, "FIXME", allMsgs)
+				ee = SendToElastic(ctx, j, true, UUID, allMsgs)
 				if ee != nil {
 					Printf("error %v sending %d messages to ElasticSearch\n", ee, len(allMsgs))
 				}
@@ -178,8 +182,7 @@ func (j *DSStub) FetchItems(ctx *Ctx) (err error) {
 		Printf("%d remaining messages to send to ES\n", nMsgs)
 	}
 	if nMsgs > 0 {
-		// FIXME: id item name
-		err = SendToElastic(ctx, j, true, "FIXME", allMsgs)
+		err = SendToElastic(ctx, j, true, UUID, allMsgs)
 		if err != nil {
 			Printf("Error %v sending %d messages to ES\n", err, len(allMsgs))
 		}
@@ -251,6 +254,34 @@ func (j *DSStub) ItemID(item interface{}) string {
 	return fmt.Sprintf("%d", time.Now().UnixNano())
 }
 
+// AddMetadata - add metadata to the item
+func (j *DSStub) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string]interface{}) {
+	// IMPL:
+	mItem = make(map[string]interface{})
+	origin := "TODO"
+	tag := ctx.Tag
+	if tag == "" {
+		tag = origin
+	}
+	itemID := j.ItemID(item)
+	updatedOn := j.ItemUpdatedOn(item)
+	uuid := UUIDNonEmpty(ctx, origin, itemID)
+	timestamp := time.Now()
+	mItem["backend_name"] = j.DS
+	mItem["backend_version"] = "0.0.0"
+	mItem["timestamp"] = fmt.Sprintf("%.06f", float64(timestamp.UnixNano())/1.0e3)
+	mItem[UUID] = uuid
+	mItem[DefaultOriginField] = origin
+	mItem[DefaultTagField] = tag
+	mItem["updated_on"] = updatedOn
+	mItem["category"] = j.ItemCategory(item)
+	//mItem["search_fields"] = j.GenSearchFields(ctx, issue, uuid)
+	//mItem["search_fields"] = make(map[string]interface{})
+	mItem[DefaultDateField] = ToESDate(updatedOn)
+	mItem[DefaultTimestampField] = ToESDate(timestamp)
+	return
+}
+
 // ItemUpdatedOn - return updated on date for an item
 func (j *DSStub) ItemUpdatedOn(item interface{}) time.Time {
 	// IMPL:
@@ -261,11 +292,6 @@ func (j *DSStub) ItemUpdatedOn(item interface{}) time.Time {
 func (j *DSStub) ItemCategory(item interface{}) string {
 	// IMPL:
 	return fmt.Sprintf("%d", time.Now().UnixNano())
-}
-
-// SearchFields - define (optional) search fields to be returned
-func (j *DSStub) SearchFields() map[string][]string {
-	return map[string][]string{}
 }
 
 // ElasticRawMapping - Raw index mapping definition

@@ -177,6 +177,38 @@ func Dig(iface interface{}, keys []string, fatal, silent bool) (v interface{}, o
 	return
 }
 
+// DeepSet - set deep property of non-type decoded interface
+func DeepSet(m interface{}, ks []string, v interface{}, create bool) (err error) {
+	c, ok := m.(map[string]interface{})
+	if !ok {
+		err = fmt.Errorf("cannot access %v as a string map", DumpKeys(m))
+		return
+	}
+	last := len(ks) - 1
+	for i, k := range ks {
+		if i < last {
+			obj, ok := c[k]
+			if !ok {
+				if create {
+					c[k] = make(map[string]interface{})
+					obj = c[k]
+				} else {
+					err = fmt.Errorf("cannot access #%d key %s from %v, all keys %v", i+1, k, DumpKeys(c), ks)
+					return
+				}
+			}
+			c, ok = obj.(map[string]interface{})
+			if !ok {
+				err = fmt.Errorf("cannot access %v as a string map, #%d key %s, all keys %v", DumpKeys(c), i+1, k, ks)
+				return
+			}
+			continue
+		}
+		c[k] = v
+	}
+	return
+}
+
 // NoSSLVerify - turn off SSL validation
 func NoSSLVerify() {
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}

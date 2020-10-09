@@ -9,7 +9,6 @@ import (
 	neturl "net/url"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -34,10 +33,12 @@ const (
 	GroupsioDefaultArchPath = "$HOME/.perceval/mailinglists"
 	// GroupsioMBoxFile - default messages file name
 	GroupsioMBoxFile = "messages.zip"
-	// GroupsioMBoxMsgSeparator - used to split mbox file into separate messages
-	GroupsioMBoxMsgSeparator = "\nFrom "
+	// GroupsioMessageIDField - message ID field from email
+	GroupsioMessageIDField = "Message-ID"
+	// GroupsioMessageDateField - message ID field from email
+	GroupsioMessageDateField = "Date"
 	// GroupsioDefaultSearchField - default search field
-	// GroupsioDefaultSearchField = "item_id"
+	GroupsioDefaultSearchField = "item_id"
 )
 
 var (
@@ -47,6 +48,8 @@ var (
 	GroupsioRichMapping = []byte(`{"properties":{"Subject_analyzed":{"type":"text","fielddata":true,"index":true},"body":{"type":"text","index":true}}}`)
 	// GroupsioCategories - categories defined for Groupsio
 	GroupsioCategories = map[string]struct{}{"message": {}}
+	// GroupsioMBoxMsgSeparator - used to split mbox file into separate messages
+	GroupsioMBoxMsgSeparator = []byte("\nFrom ")
 )
 
 // DSGroupsio - DS implementation for stub - does nothing at all, just presents a skeleton code
@@ -56,7 +59,6 @@ type DSGroupsio struct {
 	NoSSLVerify  bool   // From DA_GROUPSIO_NO_SSL_VERIFY
 	Email        string // From DA_GROUPSIO_EMAIL
 	Password     string // From DA_GROUPSIO_PASSWORD
-	PageSize     int    // From DA_GROUPSIO_PAGE_SIZE
 	MultiOrigin  bool   // From DA_GROUPSIO_MULTI_ORIGIN - allow multiple groups in a single index
 	SaveArchives bool   // From DA_GROUPSIO_SAVE_ARCHIVES
 	ArchPath     string // From DA_GROUPSIO_ARCH_PATH - default GroupsioDefaultArchPath
@@ -74,15 +76,6 @@ func (j *DSGroupsio) ParseArgs(ctx *Ctx) (err error) {
 	AddRedacted(j.Password, false)
 	AddRedacted(neturl.QueryEscape(j.Email), false)
 	AddRedacted(neturl.QueryEscape(j.Password), false)
-	if os.Getenv(prefix+"PAGE_SIZE") == "" {
-		j.PageSize = 500
-	} else {
-		pageSize, err := strconv.Atoi(os.Getenv(prefix + "PAGE_SIZE"))
-		FatalOnError(err)
-		if pageSize > 0 {
-			j.PageSize = pageSize
-		}
-	}
 	j.MultiOrigin = os.Getenv(prefix+"MULTI_ORIGIN") != ""
 	j.SaveArchives = os.Getenv(prefix+"SAVE_ARCHIVES") != ""
 	if os.Getenv(prefix+"ARCH_PATH") != "" {
@@ -143,6 +136,34 @@ func (j *DSGroupsio) CustomEnrich() bool {
 // Enrich - implement enrich data for stub datasource
 func (j *DSGroupsio) Enrich(ctx *Ctx) (err error) {
 	Printf("%s should use generic FetchRaw()\n", j.DS)
+	return
+}
+
+// AddMetadata - add metadata to the item
+func (j *DSGroupsio) AddMetadata(ctx *Ctx, msg interface{}) (mItem map[string]interface{}) {
+	mItem = make(map[string]interface{})
+	origin := GroupsioURLRoot + j.GroupName
+	tag := ctx.Tag
+	if tag == "" {
+		tag = origin
+	}
+	msgID := j.ItemID(msg)
+	updatedOn := j.ItemUpdatedOn(msg)
+	uuid := UUIDNonEmpty(ctx, origin, msgID)
+	timestamp := time.Now()
+	mItem["backend_name"] = j.DS
+	mItem["backend_version"] = GroupsioBackendVersion
+	mItem["timestamp"] = fmt.Sprintf("%.06f", float64(timestamp.UnixNano())/1.0e3)
+	mItem[UUID] = uuid
+	mItem[DefaultOriginField] = origin
+	mItem[DefaultTagField] = tag
+	mItem["updated_on"] = updatedOn
+	mItem["category"] = j.ItemCategory(msg)
+	mItem["search_fields"] = make(map[string]interface{})
+	FatalOnError(DeepSet(mItem, []string{"search_fields", GroupsioDefaultSearchField}, msgID, false))
+	FatalOnError(DeepSet(mItem, []string{"search_fields", "group_name"}, j.GroupName, false))
+	mItem[DefaultDateField] = ToESDate(updatedOn)
+	mItem[DefaultTimestampField] = ToESDate(timestamp)
 	return
 }
 
@@ -283,7 +304,7 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 			return
 		}
 		Printf("%s uncomressed %d bytes\n", file.Name, len(data))
-		ary := bytes.Split(data, []byte(GroupsioMBoxMsgSeparator))
+		ary := bytes.Split(data, GroupsioMBoxMsgSeparator)
 		Printf("%s # of messages: %d\n", file.Name, len(ary))
 		messages = append(messages, ary...)
 	}
@@ -309,17 +330,35 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 				c <- e
 			}
 		}()
-		// starts with? GroupsioMBoxMsgSeparator
-		// FIXME: actual parse
+		nBytes := len(msg)
+		if nBytes < len(GroupsioMBoxMsgSeparator) {
+			return
+		}
+		if !bytes.HasPrefix(msg, GroupsioMBoxMsgSeparator[1:]) {
+			msg = append(GroupsioMBoxMsgSeparator[1:], msg...)
+		}
 		if ctx.Debug > 1 {
 			Printf("message length %d\n", len(msg))
 		}
+		var (
+			valid   bool
+			message map[string]interface{}
+		)
+		// FIXME: implement
+		message, valid, e = ParseMBoxMsg(msg)
+		if e != nil || !valid {
+			return
+		}
+		esItem := j.AddMetadata(ctx, message)
+		if ctx.Project != "" {
+			message["project"] = ctx.Project
+		}
+		esItem["data"] = message
 		// Real data processing here
 		if allMsgsMtx != nil {
 			allMsgsMtx.Lock()
 		}
-		// FIXME: add item
-		allMsgs = append(allMsgs, map[string]interface{}{"id": time.Now().UnixNano(), "name": "xyz"})
+		allMsgs = append(allMsgs, esItem)
 		nMsgs := len(allMsgs)
 		if nMsgs >= ctx.ESBulkSize {
 			sendToElastic := func(c chan error) (ee error) {
@@ -331,13 +370,10 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 				if ctx.Debug > 0 {
 					Printf("sending %d items to elastic\n", len(allMsgs))
 				}
-				// FIXME
-				/*
-					ee = SendToElastic(ctx, j, true, "FIXME", allMsgs)
-					if ee != nil {
-						Printf("error %v sending %d messages to ElasticSearch\n", ee, len(allMsgs))
-					}
-				*/
+				ee = SendToElastic(ctx, j, true, UUID, allMsgs)
+				if ee != nil {
+					Printf("error %v sending %d messages to ElasticSearch\n", ee, len(allMsgs))
+				}
 				allMsgs = []interface{}{}
 				if allMsgsMtx != nil {
 					allMsgsMtx.Unlock()
@@ -421,13 +457,10 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 		Printf("%d remaining messages to send to ES\n", nMsgs)
 	}
 	if nMsgs > 0 {
-		// FIXME
-		/*
-			err = SendToElastic(ctx, j, true, "FIXME", allMsgs)
-			if err != nil {
-				Printf("Error %v sending %d messages to ES\n", err, len(allMsgs))
-			}
-		*/
+		err = SendToElastic(ctx, j, true, UUID, allMsgs)
+		if err != nil {
+			Printf("Error %v sending %d messages to ES\n", err, len(allMsgs))
+		}
 	}
 	return
 }
@@ -491,24 +524,28 @@ func (j *DSGroupsio) Origin(ctx *Ctx) string {
 
 // ItemID - return unique identifier for an item
 func (j *DSGroupsio) ItemID(item interface{}) string {
-	// IMPL:
-	// Message-ID ?
-	return fmt.Sprintf("%d", time.Now().UnixNano())
+	id, ok := item.(map[string]interface{})[GroupsioMessageIDField].(string)
+	if !ok {
+		Fatalf("%s: ItemID() - cannot extract %s from %+v", j.DS, GroupsioMessageIDField, jDumpKeys(item))
+	}
+	return id
 }
 
 // ItemUpdatedOn - return updated on date for an item
 func (j *DSGroupsio) ItemUpdatedOn(item interface{}) time.Time {
-	return time.Now()
+	iUpdated, _ := Dig(item, []string{GroupsioMessageDateField}, true, false)
+	sUpdated, ok := iUpdated.(string)
+	if !ok {
+		Fatalf("%s: ItemUpdatedOn() - cannot extract %s from %+v", j.DS, GroupsioMessageDateField, DumpKeys(item))
+	}
+	updated, err := TimeParseES(sUpdated)
+	FatalOnError(err)
+	return updated
 }
 
 // ItemCategory - return unique identifier for an item
 func (j *DSGroupsio) ItemCategory(item interface{}) string {
-	return fmt.Sprintf("%d", time.Now().UnixNano())
-}
-
-// SearchFields - define (optional) search fields to be returned
-func (j *DSGroupsio) SearchFields() map[string][]string {
-	return map[string][]string{}
+	return Message
 }
 
 // ElasticRawMapping - Raw index mapping definition

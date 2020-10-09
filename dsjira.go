@@ -189,6 +189,32 @@ func (j *DSJira) GenSearchFields(ctx *Ctx, issue interface{}, uuid string) (fiel
 	return
 }
 
+// AddMetadata - add metadata to the item
+func (j *DSJira) AddMetadata(ctx *Ctx, issue interface{}) (mItem map[string]interface{}) {
+	mItem = make(map[string]interface{})
+	origin := j.URL
+	tag := ctx.Tag
+	if tag == "" {
+		tag = origin
+	}
+	issueID := j.ItemID(issue)
+	updatedOn := j.ItemUpdatedOn(issue)
+	uuid := UUIDNonEmpty(ctx, origin, issueID)
+	timestamp := time.Now()
+	mItem["backend_name"] = j.DS
+	mItem["backend_version"] = JiraBackendVersion
+	mItem["timestamp"] = fmt.Sprintf("%.06f", float64(timestamp.UnixNano())/1.0e3)
+	mItem[UUID] = uuid
+	mItem[DefaultOriginField] = origin
+	mItem[DefaultTagField] = tag
+	mItem["updated_on"] = updatedOn
+	mItem["category"] = j.ItemCategory(issue)
+	mItem["search_fields"] = j.GenSearchFields(ctx, issue, uuid)
+	mItem[DefaultDateField] = ToESDate(updatedOn)
+	mItem[DefaultTimestampField] = ToESDate(timestamp)
+	return
+}
+
 // ProcessIssue - process a single issue
 func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *sync.Mutex, issue interface{}, customFields map[string]JiraField, from time.Time, to *time.Time, thrN int) (wch chan error, err error) {
 	var mtx *sync.RWMutex
@@ -372,27 +398,10 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 		}
 	}
 	// Extra fields
-	esItem := make(map[string]interface{})
-	origin := j.URL
-	tag := ctx.Tag
-	if tag == "" {
-		tag = origin
-	}
-	uuid := UUIDNonEmpty(ctx, origin, issueID)
-	timestamp := time.Now()
-	esItem["backend_name"] = j.DS
-	esItem["backend_version"] = JiraBackendVersion
-	esItem["timestamp"] = fmt.Sprintf("%.06f", float64(timestamp.UnixNano())/1.0e3)
-	esItem[UUID] = uuid
-	esItem[DefaultOriginField] = origin
-	esItem[DefaultTagField] = tag
 	if thrN > 1 {
 		mtx.Lock()
 	}
-	updatedOn := j.ItemUpdatedOn(issue)
-	esItem["updated_on"] = updatedOn
-	esItem["category"] = j.ItemCategory(issue)
-	esItem["search_fields"] = j.GenSearchFields(ctx, issue, uuid)
+	esItem := j.AddMetadata(ctx, issue)
 	// Seems like it doesn't make sense, because we just added those custom fields
 	if JiraDropCustomFields {
 		for k := range issueFields {
@@ -401,8 +410,6 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 			}
 		}
 	}
-	esItem[DefaultDateField] = ToESDate(updatedOn)
-	esItem[DefaultTimestampField] = ToESDate(timestamp)
 	if ctx.Project != "" {
 		issue.(map[string]interface{})["project"] = ctx.Project
 	}
@@ -740,11 +747,11 @@ func (j *DSJira) ItemID(item interface{}) string {
 func (j *DSJira) ItemUpdatedOn(item interface{}) time.Time {
 	fields, ok := item.(map[string]interface{})["fields"].(map[string]interface{})
 	if !ok {
-		Fatalf("%s: ItemUpdatedOn() - cannot extract fields from %+v", j.DS, item)
+		Fatalf("%s: ItemUpdatedOn() - cannot extract fields from %+v", j.DS, DumpKeys(item))
 	}
 	sUpdated, ok := fields["updated"].(string)
 	if !ok {
-		Fatalf("%s: ItemUpdatedOn() - cannot extract updated from %+v", j.DS, fields)
+		Fatalf("%s: ItemUpdatedOn() - cannot extract updated from %+v", j.DS, DumpKeys(fields))
 	}
 	updated, err := TimeParseES(sUpdated)
 	FatalOnError(err)
