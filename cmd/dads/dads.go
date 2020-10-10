@@ -66,6 +66,10 @@ func main() {
 	// FIXME
 	//data, _ := ioutil.ReadFile("3212.mbox")
 	//_, _, _ = lib.ParseMBoxMsg(&ctx, data)
+	//data, _ = ioutil.ReadFile("8201.mbox")
+	//_, _, _ = lib.ParseMBoxMsg(&ctx, data)
+	//data, _ = ioutil.ReadFile("1426647.mbox")
+	//_, _, _ = lib.ParseMBoxMsg(&ctx, data)
 	//os.Exit(1)
 	lib.FatalOnError(runDS(&ctx))
 	dtEnd := time.Now()
