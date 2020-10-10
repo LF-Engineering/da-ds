@@ -7,7 +7,9 @@ import (
 
 var (
 	// MT -are we running in multiple threading mode?
-	MT = false
+	MT      = false
+	thrN    = 0
+	thrNMtx = &sync.Mutex{}
 )
 
 // SetMT - we're in multithreaded mode, setup global caches mutexes
@@ -43,6 +45,12 @@ func SetMT() {
 // If environment variable GHA_ST is set it retuns 1
 // It can be used to debug single threaded verion
 func GetThreadsNum(ctx *Ctx) int {
+	thrNMtx.Lock()
+	defer thrNMtx.Unlock()
+	if thrN > 0 {
+		return thrN
+	}
+	defer func() { Printf("using %d threads\n", thrN) }()
 	// Use environment variable to have singlethreaded version
 	if ctx.NCPUs > 0 {
 		n := int(float64(runtime.NumCPU()) * ctx.NCPUsScale)
@@ -50,15 +58,17 @@ func GetThreadsNum(ctx *Ctx) int {
 			ctx.NCPUs = n
 		}
 		runtime.GOMAXPROCS(ctx.NCPUs)
-		if ctx.NCPUs > 1 {
+		thrN = ctx.NCPUs
+		if thrN > 1 {
 			SetMT()
 		}
-		return ctx.NCPUs
+		return thrN
 	}
 	if ctx.ST {
-		return 1
+		thrN = 1
+		return thrN
 	}
-	thrN := int(float64(runtime.NumCPU()) * ctx.NCPUsScale)
+	thrN = int(float64(runtime.NumCPU()) * ctx.NCPUsScale)
 	runtime.GOMAXPROCS(thrN)
 	if thrN > 1 {
 		SetMT()

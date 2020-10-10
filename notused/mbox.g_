@@ -1,0 +1,75 @@
+package dads
+
+import (
+	"io"
+	"os"
+	"sync"
+
+	"github.com/blabber/mbox"
+	"github.com/spf13/afero"
+)
+
+// ParseMBoxMsg - parse a raw MBox message into object to be inserte dinto raw ES
+func ParseMBoxMsg(ctx *Ctx, mfs *afero.Fs, mtx *sync.Mutex, msg []byte) (item map[string]interface{}, valid bool, err error) {
+	var f afero.File
+	//var f *os.File
+	if mtx != nil {
+		mtx.Lock()
+		defer mtx.Unlock()
+	}
+	f, err = afero.TempFile(*mfs, "groupsio", "mbox")
+	//f, err = ioutil.TempFile("", "mbox")
+	if err != nil {
+		Printf("tempfile error: %v\n", err)
+		return
+	}
+	defer func() { _ = f.Close() }()
+	_, err = f.Write(msg)
+	if err != nil {
+		Printf("write error: %v\n", err)
+		return
+	}
+	_, err = f.Seek(0, io.SeekStart)
+	if err != nil {
+		Printf("seek error: %v\n", err)
+		return
+	}
+	if ctx.Debug > 1 {
+		Printf("message length %d, file: %s\n", len(msg), f.Name())
+	}
+	reader := mbox.NewReader(f)
+	for {
+		var msgReader io.Reader
+		msgReader, err = reader.NextMessage()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			Printf("fetch next message error: %v\n", err)
+			return
+		}
+		Printf("msgReader: %v\n", msgReader)
+	}
+	os.Exit(1)
+	/*
+		  if len(mbox.Messages) == 0 {
+					var st os.FileInfo
+					st, err = f.Stat()
+					if err != nil {
+		        printf("stat failed: %v\n", err)
+						return
+					}
+					data := make([]byte, st.Size())
+					_, err = f.Read(data)
+					if err != nil {
+		        printf("read failed: %v\n", err)
+						return
+					}
+					Printf("nothing parsed from:\n%s\n", string(data))
+					os.Exit(1)
+		  }
+	*/
+	// FIXME: continue
+	// valid = true
+	return
+}

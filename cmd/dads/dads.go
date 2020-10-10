@@ -31,6 +31,7 @@ func runDS(ctx *lib.Ctx) (err error) {
 		lib.Printf("%s: Validate error: %v\n", ds.Info(), err)
 		return
 	}
+	_ = lib.GetThreadsNum(ctx)
 	if !ctx.NoRaw {
 		err = lib.FetchRaw(ctx, ds)
 		if err != nil {
@@ -60,10 +61,14 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 	dtStart := time.Now()
 	ctx.Init()
-	defer lib.CacheSummary(&ctx)
 	lib.FatalOnError(ctx.Validate())
 	lib.CreateESCache(&ctx)
+	// FIXME
+	//data, _ := ioutil.ReadFile("3212.mbox")
+	//_, _, _ = lib.ParseMBoxMsg(&ctx, data)
+	//os.Exit(1)
 	lib.FatalOnError(runDS(&ctx))
 	dtEnd := time.Now()
+	lib.CacheSummary(&ctx)
 	lib.Printf("Took: %v\n", dtEnd.Sub(dtStart))
 }

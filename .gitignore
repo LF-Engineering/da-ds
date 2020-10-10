@@ -19,6 +19,7 @@
 /dads
 /out
 *.secret
+*.mbox
 /data
 /local.sql
 /dads.json

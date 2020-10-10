@@ -132,9 +132,13 @@ func (j *DSStub) FetchItems(ctx *Ctx) (err error) {
 	if thrN > 1 {
 		for _, message := range messages {
 			go func(msg []byte) {
-				var esch chan error
-				esch, err = processMsg(ch, msg)
-				if err != nil {
+				var (
+					e    error
+					esch chan error
+				)
+				esch, e = processMsg(ch, msg)
+				if e != nil {
+					Printf("process error: %v\n", e)
 					return
 				}
 				if esch != nil {

@@ -50,6 +50,8 @@ var (
 	GroupsioCategories = map[string]struct{}{"message": {}}
 	// GroupsioMBoxMsgSeparator - used to split mbox file into separate messages
 	GroupsioMBoxMsgSeparator = []byte("\nFrom ")
+	// GroupsioMsgLineSeparator - used to split mbox message into its separate lines
+	GroupsioMsgLineSeparator = []byte("\r\n")
 )
 
 // DSGroupsio - DS implementation for stub - does nothing at all, just presents a skeleton code
@@ -188,6 +190,7 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 	cacheLoginDur := time.Duration(48) * time.Hour
 	var res interface{}
 	var cookies []string
+	Printf("groupsio login via: %s\n", url)
 	res, _, cookies, err = Request(
 		ctx,
 		url,
@@ -247,7 +250,10 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 	// We do have cookies now (from either real request or from the L2 cache)
 	//url := GroupsioAPIURL + GroupsioAPILogin + `?email=` + neturl.QueryEscape(j.Email) + `&password=` + neturl.QueryEscape(j.Password)
 	url = GroupsioAPIURL + GroupsioAPIDownloadArchives + `?group_id=` + fmt.Sprintf("%d", groupID)
-	var from time.Time
+	var (
+		from   time.Time
+		status int
+	)
 	if ctx.DateFrom != nil {
 		from = *ctx.DateFrom
 		from = from.Add(-1 * time.Second)
@@ -256,7 +262,7 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 	Printf("fetching messages from: %s\n", url)
 	// FIXME: remove caching or lower to 3 hours at most
 	cacheMsgDur := time.Duration(48) * time.Hour
-	res, _, _, err = Request(
+	res, status, _, err = Request(
 		ctx,
 		url,
 		method,
@@ -270,6 +276,10 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 		&cacheMsgDur,                        // cache duration
 		false,                               // skip in dry-run mode
 	)
+	if status == 429 {
+		Fatalf("Too many requests for %s, aborted\n", url)
+		return
+	}
 	if err != nil {
 		return
 	}
@@ -337,15 +347,11 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 		if !bytes.HasPrefix(msg, GroupsioMBoxMsgSeparator[1:]) {
 			msg = append(GroupsioMBoxMsgSeparator[1:], msg...)
 		}
-		if ctx.Debug > 1 {
-			Printf("message length %d\n", len(msg))
-		}
 		var (
 			valid   bool
 			message map[string]interface{}
 		)
-		// FIXME: implement
-		message, valid, e = ParseMBoxMsg(msg)
+		message, valid, e = ParseMBoxMsg(ctx, msg)
 		if e != nil || !valid {
 			return
 		}
@@ -401,9 +407,13 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 	if thrN > 1 {
 		for _, message := range messages {
 			go func(msg []byte) {
-				var esch chan error
-				esch, err = processMsg(ch, msg)
-				if err != nil {
+				var (
+					e    error
+					esch chan error
+				)
+				esch, e = processMsg(ch, msg)
+				if e != nil {
+					Printf("process message error: %v\n", e)
 					return
 				}
 				if esch != nil {
