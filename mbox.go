@@ -83,7 +83,7 @@ func ParseMBoxMsg(ctx *Ctx, msg []byte) (item map[string]interface{}, valid bool
 				//Printf("#%d addBody '%s' --> (%s,%s,%d,%v)\n", i, string(line), string(currContentType), DumpKeys(currProperties), len(currData), added)
 				//Printf("Body:\n%s\n", string(currData))
 				// FIXME: remove this
-				fmt.Printf("%s\n", string(currData))
+				fmt.Printf("message: '%s'\n", string(currData))
 			}
 			currContentType = []byte{}
 			currProperties = make(map[string][]byte)
@@ -160,6 +160,10 @@ func ParseMBoxMsg(ctx *Ctx, msg []byte) (item map[string]interface{}, valid bool
 				}
 				_ = addBody(i, line)
 				last = true
+			}
+			// FIXME: Should we just add a new line here?
+			if bodyHeadersParsed {
+				currData = append(currData, []byte("\n")...)
 			}
 			continue
 		}
