@@ -2,6 +2,7 @@ package dads
 
 import (
 	"bytes"
+	"fmt"
 	"sort"
 )
 
@@ -81,9 +82,10 @@ func ParseMBoxMsg(ctx *Ctx, msg []byte) (item map[string]interface{}, valid bool
 				//Printf("#%d addBody '%s' --> (%s,%s,%d,%v)\n", i, string(line), string(currContentType), currProperties, len(currData), added)
 				//Printf("#%d addBody '%s' --> (%s,%s,%d,%v)\n", i, string(line), string(currContentType), DumpKeys(currProperties), len(currData), added)
 				//Printf("Body:\n%s\n", string(currData))
+				// FIXME: remove this
+				fmt.Printf("%s\n", string(currData))
 			}
 			currContentType = []byte{}
-			// FIXME
 			currProperties = make(map[string][]byte)
 			currData = []byte{}
 		}()
@@ -212,6 +214,7 @@ func ParseMBoxMsg(ctx *Ctx, msg []byte) (item map[string]interface{}, valid bool
 			}
 			//Printf("#%d body line, boundary %s\n", i, string(boundary))
 			currData = append(currData, line...)
+			// FIXME: do we actually know if we need to add newlines or not, MBOX seems to limit line length to 80 chars
 			continue
 		}
 		cont := isContinue(i, line)
