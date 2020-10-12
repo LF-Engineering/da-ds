@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"regexp"
 	"sort"
+	"strings"
 )
 
 // ParseMBoxMsg - parse a raw MBox message into object to be inserte dinto raw ES
@@ -67,7 +68,7 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 			}()
 		}
 		val = bytes.TrimLeft(line, " \t")
-		ok = len(val) > 0
+		ok = len(val) > 0 || len(line) > 0
 		return
 	}
 	isBoundarySep := func(i int, line []byte) (is, isEnd bool) {
@@ -111,6 +112,7 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		s = s[:len(s)-1] + "}"
 		return
 	}
+	boundarySep := []byte("boundary=")
 	addBody := func(i int, line []byte) (added bool) {
 		if len(currContentType) == 0 || len(currData) == 0 {
 			return
@@ -119,13 +121,13 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 			if bytes.HasSuffix(currData, []byte("\n")) {
 				currData = currData[:len(currData)-1]
 			}
-			if bytes.Contains(currData, []byte("boundary=")) {
-				Printf("should not contain boundary marker(%d): message(%s,%s): '%s'\n", len(msg), string(currContentType), propertiesString(currProperties), string(currData))
+			if bytes.Contains(currData, []byte(boundarySep)) {
+				Printf("should not contain boundary= marker(%d): message(%s,%s): '%s'\n", len(msg), string(currContentType), propertiesString(currProperties), string(currData))
 			}
 			if ctx.Debug > 2 {
 				//Printf("#%d addBody '%s' --> (%s,%s,%d,%v)\n", i, string(line), string(currContentType), currProperties, len(currData), added)
 				//Printf("#%d addBody '%s' --> (%s,%s,%d,%v)\n", i, string(line), string(currContentType), DumpKeys(currProperties), len(currData), added)
-				Printf("message(%s,%s): '%s'\n", string(currContentType), propertiesString(currProperties), string(currData))
+				Printf("message(%d,%s,%s): '%s'\n", len(msg), string(currContentType), propertiesString(currProperties), string(currData))
 			}
 			currContentType = []byte{}
 			currProperties = make(map[string][]byte)
@@ -146,6 +148,10 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 	}
 	pop := func() {
 		n := len(savedContentType) - 1
+		if n < 0 {
+			Printf("cannot pop from an empty stack\n")
+			return
+		}
 		boundary = savedBoundary[n]
 		currContentType = savedContentType[n]
 		currProperties = savedProperties[n]
@@ -153,12 +159,13 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		savedContentType = savedContentType[:n]
 		savedProperties = savedProperties[:n]
 	}
-	possibleBodyProperties := []string{"Content-Type", "Content-Transfer-Encoding", "Content-Language"}
+	possibleBodyProperties := []string{ContentType, "Content-Transfer-Encoding", "Content-Language"}
 	currKey := ""
 	body := false
 	bodyHeadersParsed := false
 	nLines := len(lines)
 	nSkip := 0
+	var mainMultipart *bool
 	for idx, line := range lines {
 		if nSkip > 0 {
 			//Printf("skipping line, remain %d\n", nSkip)
@@ -188,13 +195,16 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		}
 		if len(line) == 0 {
 			if !body {
-				contentType, ok := raw["Content-Type"]
+				contentType, ok := raw[ContentType]
 				if !ok {
-					contentType = []byte("text/plain")
-					raw["Content-Type"] = contentType
+					contentType, ok = raw[LowerContentType]
+					if !ok {
+						contentType = []byte("text/plain")
+						raw[LowerContentType] = contentType
+					}
+					raw[ContentType] = contentType
 				}
 				//Printf("#%d empty: mode change, current content type: %s\n", i, contentType)
-				boundarySep := []byte("boundary=")
 				if bytes.Contains(contentType, boundarySep) {
 					ary := bytes.Split(contentType, boundarySep)
 					if len(ary) > 1 {
@@ -207,8 +217,12 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 						}
 					}
 					if len(boundary) == 0 {
-						Printf("#%d cannot find multipart message boundary '%s'\n", i, string(contentType))
+						Printf("#%d cannot find multipart message boundary(%d) '%s'\n", i, len(msg), string(contentType))
 						break
+					}
+					if mainMultipart == nil {
+						dummy := true
+						mainMultipart = &dummy
 					}
 				} else {
 					currContentType = contentType
@@ -216,7 +230,16 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 						propertyVal, ok := raw[bodyProperty]
 						if ok {
 							currProperties[bodyProperty] = propertyVal
+						} else {
+							propertyVal, ok := raw[strings.ToLower(bodyProperty)]
+							if ok {
+								currProperties[bodyProperty] = propertyVal
+							}
 						}
+					}
+					if mainMultipart == nil {
+						dummy := false
+						mainMultipart = &dummy
 					}
 					//Printf("#%d no-multipart email, content type: %s, transfer encoding: %v\n", i, currContentType, currProperties)
 					bodyHeadersParsed = true
@@ -232,9 +255,52 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 			continue
 		}
 		if body {
-			boundarySep, end := isBoundarySep(i, line)
-			//Printf("#%d %v,%v,%v\n", i, bodyHeadersParsed, boundarySep, end)
-			if boundarySep {
+			// We can attempt to parse buggy mbox file - they contain header data in body - only try to find boundary separator and never fail due to this
+			if len(boundary) == 0 {
+				key, val, ok := getHeader(i, line)
+				if ok {
+					lowerKey := strings.ToLower(key)
+					//Printf("#%d got header data in single body mode\n", i)
+					if lowerKey == LowerContentType {
+						//Printf("#%d got content-type data in single body mode\n", i)
+						lIdx := idx + 1
+						for {
+							lI := lIdx + 2
+							if lIdx >= nLines {
+								break
+							}
+							c := isContinue(lI, lines[lIdx])
+							if !c {
+								break
+							}
+							cVal, ok := getContinuation(lI, lines[lIdx])
+							if ok {
+								val = append(val, cVal...)
+							}
+							lIdx++
+							nSkip++
+						}
+						if bytes.Contains(val, boundarySep) {
+							ary := bytes.Split(val, boundarySep)
+							if len(ary) > 1 {
+								ary2 := bytes.Split(ary[1], []byte(`"`))
+								if len(ary2) > 2 {
+									boundary = ary2[1]
+								} else {
+									ary2 := bytes.Split(ary[1], []byte(`;`))
+									boundary = ary2[0]
+								}
+							}
+							if mainMultipart != nil && !*mainMultipart {
+								//Printf("#%d got a new boundary setting in single-body mode(%d)\n", i, len(msg))
+							}
+						}
+					}
+				}
+			}
+			isBoundarySep, end := isBoundarySep(i, line)
+			//Printf("#%d %v,%v,%v\n", i, bodyHeadersParsed, isBoundarySep, end)
+			if isBoundarySep {
 				bodyHeadersParsed = false
 				_ = addBody(i, line)
 				if end {
@@ -260,19 +326,17 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 							break
 						}
 						cVal, ok := getContinuation(lI, lines[lIdx])
-						if !ok {
-							Printf("#%d->%d no header %s continuation data in line %s\n", i, lI, key, lines[lIdx])
-							break
+						if ok {
+							val = append(val, cVal...)
 						}
-						val = append(val, cVal...)
 						lIdx++
 						nSkip++
 						//Printf("added header %s continuation: %s --> %s\n", key, string(cVal), string(val))
 					}
-					if key == "Content-Type" {
+					lowerKey := strings.ToLower(key)
+					if lowerKey == LowerContentType {
 						//Printf("%s -> %s\n", currContentType, val)
 						currContentType = val
-						boundarySep := []byte("boundary=")
 						if bytes.Contains(currContentType, boundarySep) {
 							ary := bytes.Split(currContentType, boundarySep)
 							if len(ary) > 1 {
@@ -286,7 +350,7 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 								}
 							}
 							if len(boundary) == 0 {
-								Printf("#%d cannot find multiboundary message boundary\n", i)
+								Printf("#%d cannot find multiboundary message boundary(%d)\n", i, len(msg))
 								break
 							}
 						}
@@ -307,7 +371,7 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		cont := isContinue(i, line)
 		if cont {
 			if currKey == "" {
-				Printf("#%d no current key\n", i)
+				Printf("#%d no current key(%d)\n", i, len(msg))
 				break
 			}
 			currVal, ok := raw[currKey]
@@ -316,14 +380,16 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 				break
 			}
 			val, ok := getContinuation(i, line)
-			if !ok {
-				Printf("#%d no continuation data in line %s\n", i, line)
+			if ok {
+				raw[currKey] = append(currVal, val...)
+				if strings.ToLower(currKey) == LowerContentType {
+					raw[LowerContentType] = raw[currKey]
+				}
 			}
-			raw[currKey] = append(currVal, val...)
 		} else {
 			key, val, ok := getHeader(i, line)
 			if !ok {
-				Printf("#%d incorrect header\n", i)
+				Printf("#%d incorrect header(%d)\n", i, len(msg))
 				break
 			}
 			currVal, ok := raw[key]
@@ -335,6 +401,9 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 				raw[key] = val
 			}
 			currKey = key
+			if strings.ToLower(currKey) == LowerContentType {
+				raw[LowerContentType] = raw[currKey]
+			}
 		}
 	}
 	if len(boundary) == 0 {

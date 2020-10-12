@@ -105,6 +105,17 @@ func BytesToStringTrunc(data []byte, maxLen int) (str string) {
 	return
 }
 
+// InterfaceToStringTrunc - truncate interface representation
+func InterfaceToStringTrunc(iface interface{}, maxLen int) (str string) {
+	data := fmt.Sprintf("%+v", iface)
+	if len(data) <= maxLen {
+		return data
+	}
+	half := maxLen >> 1
+	str = data[:half] + "(...)" + data[len(data)-half:]
+	return
+}
+
 // PrintCache - pretty print cache entries
 func PrintCache(iCache interface{}) (s string) {
 	cache := reflect.ValueOf(iCache)

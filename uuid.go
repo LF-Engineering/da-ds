@@ -52,8 +52,8 @@ func UUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
 		cmdLine := []string{"uuid.py", "a"}
 		cmdLine = append(cmdLine, args...)
 		h, err = ExecCommand(ctx, cmdLine)
-		h = h[:len(h)-1]
 		FatalOnError(err)
+		h = h[:len(h)-1]
 		return
 	}
 	stripF := func(str string) string {

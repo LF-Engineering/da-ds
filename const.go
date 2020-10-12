@@ -92,3 +92,9 @@ const Redacted string = "[redacted]"
 
 // Message - common constant string
 const Message = "message"
+
+// ContentType - common constant string
+const ContentType = "Content-Type"
+
+// LowerContentType - common constant string
+const LowerContentType = "content-type"
