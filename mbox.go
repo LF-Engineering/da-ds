@@ -2,11 +2,15 @@ package dads
 
 import (
 	"bytes"
+	"fmt"
+	"io/ioutil"
 	"sort"
 )
 
 // ParseMBoxMsg - parse a raw MBox message into object to be inserte dinto raw ES
-func ParseMBoxMsg(ctx *Ctx, msg []byte) (item map[string]interface{}, valid bool, err error) {
+func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]interface{}, valid bool, err error) {
+  // FIXME
+	_ = ioutil.WriteFile(fmt.Sprintf("%s_%d.mbox", groupName, len(msg)), msg, 0644)
 	item = make(map[string]interface{})
 	raw := make(map[string][]byte)
 	lines := bytes.Split(msg, GroupsioMsgLineSeparator)
@@ -72,6 +76,23 @@ func ParseMBoxMsg(ctx *Ctx, msg []byte) (item map[string]interface{}, valid bool
 	currContentType := []byte{}
 	currProperties := make(map[string][]byte)
 	currData := []byte{}
+	propertiesString := func(props map[string][]byte) (s string) {
+		s = "{"
+		ks := []string{}
+		for k := range props {
+			ks = append(ks, k)
+		}
+		if len(ks) == 0 {
+			s = "{}"
+			return
+		}
+		sort.Strings(ks)
+		for _, k := range ks {
+			s += k + ":" + string(props[k]) + " "
+		}
+		s = s[:len(s)-1] + "}"
+		return
+	}
 	addBody := func(i int, line []byte) (added bool) {
 		if len(currContentType) == 0 || len(currData) == 0 {
 			return
@@ -80,11 +101,13 @@ func ParseMBoxMsg(ctx *Ctx, msg []byte) (item map[string]interface{}, valid bool
 			if bytes.HasSuffix(currData, []byte("\n")) {
 				currData = currData[:len(currData)-1]
 			}
-			if ctx.Debug > 1 {
+      if bytes.Contains(currData, []byte("boundary=")) {
+        Printf("should not contain boundary marker: message(%s,%s): '%s'\n", string(currContentType), propertiesString(currProperties), string(currData))
+      }
+			if ctx.Debug > 2 {
 				//Printf("#%d addBody '%s' --> (%s,%s,%d,%v)\n", i, string(line), string(currContentType), currProperties, len(currData), added)
 				//Printf("#%d addBody '%s' --> (%s,%s,%d,%v)\n", i, string(line), string(currContentType), DumpKeys(currProperties), len(currData), added)
-				//Printf("Body:\n%s\n", string(currData))
-				//Printf("message %s: '%s'\n", string(currContentType), string(currData))
+				Printf("message(%s,%s): '%s'\n", string(currContentType), propertiesString(currProperties), string(currData))
 			}
 			currContentType = []byte{}
 			currProperties = make(map[string][]byte)
@@ -94,9 +117,9 @@ func ParseMBoxMsg(ctx *Ctx, msg []byte) (item map[string]interface{}, valid bool
 		added = true
 		return
 	}
+	possibleBodyProperties := []string{"Content-Type", "Content-Transfer-Encoding", "Content-Language"}
 	currKey := ""
 	body := false
-	last := false
 	savedBoundary := []byte{}
 	savedContentType := []byte{}
 	bodyHeadersParsed := false
@@ -131,8 +154,8 @@ func ParseMBoxMsg(ctx *Ctx, msg []byte) (item map[string]interface{}, valid bool
 			if !body {
 				contentType, ok := raw["Content-Type"]
 				if !ok {
-					Printf("#%d no Content-Type defined, only headers will be parsed\n", i)
-					break
+					contentType = []byte("text/plain")
+					raw["Content-Type"] = contentType
 				}
 				//Printf("#%d empty: mode change, current content type: %s\n", i, contentType)
 				boundarySep := []byte("boundary=")
@@ -150,24 +173,17 @@ func ParseMBoxMsg(ctx *Ctx, msg []byte) (item map[string]interface{}, valid bool
 					}
 				} else {
 					currContentType = contentType
-					currProperties["Content-Transfer-Encoding"], ok = raw["Content-Transfer-Encoding"]
-					if !ok {
-						Printf("#%d no Content-Transfer-Encoding defined, only headers will be parsed\n", i)
-						break
+					for _, bodyProperty := range possibleBodyProperties {
+						propertyVal, ok := raw[bodyProperty]
+						if ok {
+							currProperties[bodyProperty] = propertyVal
+						}
 					}
 					//Printf("#%d no-multipart email, content type: %s, transfer encoding: %v\n", i, currContentType, currProperties)
 					bodyHeadersParsed = true
 				}
 				body = true
 				continue
-			}
-			if len(boundary) == 0 {
-				if last {
-					Printf("#%d extra empty line in body mode when no multi part boundary is set\n", i)
-					continue
-				}
-				_ = addBody(i, line)
-				last = true
 			}
 			if bodyHeadersParsed {
 				currData = append(currData, []byte("\n")...)
@@ -281,6 +297,10 @@ func ParseMBoxMsg(ctx *Ctx, msg []byte) (item map[string]interface{}, valid bool
 			currKey = key
 		}
 	}
+	if len(boundary) == 0 {
+		//Printf("flush body\n")
+		_ = addBody(nLines, []byte{})
+	}
 	ks := []string{}
 	for k, v := range raw {
 		item[k] = string(v)
@@ -288,9 +308,9 @@ func ParseMBoxMsg(ctx *Ctx, msg []byte) (item map[string]interface{}, valid bool
 	}
 	sort.Strings(ks)
 	/*
-			for i, k := range ks {
-				Printf("#%d %s: %s\n", i+1, k, item[k])
-			}
+		for i, k := range ks {
+			Printf("#%d %s: %s\n", i+1, k, item[k])
+		}
 		for i, body := range bodies {
 			//Printf("#%d: %s %s %d\n", i, string(body.ContentType), DumpKeys(body.Properties), len(body.Data))
 			Printf("#%d: %s %s %d\n", i, string(body.ContentType), body.Properties, len(body.Data))

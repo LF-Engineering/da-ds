@@ -356,7 +356,7 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 			valid   bool
 			message map[string]interface{}
 		)
-		message, valid, e = ParseMBoxMsg(ctx, msg)
+		message, valid, e = ParseMBoxMsg(ctx, j.GroupName, msg)
 		if e != nil || !valid {
 			return
 		}

@@ -20,6 +20,11 @@ import (
 	jsoniter "github.com/json-iterator/go"
 )
 
+const (
+	// MaxPayloadPrintfLen - truncate messages longer than this
+	MaxPayloadPrintfLen = 0x2000
+)
+
 var (
 	memCacheMtx *sync.RWMutex
 	memCache    = map[string]*MemCacheEntry{}
@@ -88,6 +93,16 @@ func CacheSummary(ctx *Ctx) {
 		Printf("uuids type 2 cache:\n%s\n", PrintCache(uuidsAffsCache))
 		PrintfNoRedacted("Redacted data: %s\n", GetRedacted())
 	}
+}
+
+// BytesToStringTrunc - truncate bytes stream to no more than maxLen
+func BytesToStringTrunc(data []byte, maxLen int) (str string) {
+	if len(data) <= maxLen {
+		return string(data)
+	}
+	half := maxLen >> 1
+	str = string(data[:half]) + "(...)" + string(data[len(data)-half:])
+	return
 }
 
 // PrintCache - pretty print cache entries
@@ -315,7 +330,8 @@ func RequestNoRetry(
 		req, err = http.NewRequest(method, url, nil)
 	}
 	if err != nil {
-		err = fmt.Errorf("new request error:%+v for method:%s url:%s payload:%s", err, method, url, string(payload))
+		sPayload := BytesToStringTrunc(payload, MaxPayloadPrintfLen)
+		err = fmt.Errorf("new request error:%+v for method:%s url:%s payload:%s", err, method, url, sPayload)
 		return
 	}
 	for _, cookieStr := range cookies {
@@ -328,13 +344,15 @@ func RequestNoRetry(
 	var resp *http.Response
 	resp, err = http.DefaultClient.Do(req)
 	if err != nil {
-		err = fmt.Errorf("do request error:%+v for method:%s url:%s headers:%v payload:%s", err, method, url, headers, string(payload))
+		sPayload := BytesToStringTrunc(payload, MaxPayloadPrintfLen)
+		err = fmt.Errorf("do request error:%+v for method:%s url:%s headers:%v payload:%s", err, method, url, headers, sPayload)
 		return
 	}
 	var body []byte
 	body, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
-		err = fmt.Errorf("read request body error:%+v for method:%s url:%s headers:%v payload:%s", err, method, url, headers, string(payload))
+		sPayload := BytesToStringTrunc(payload, MaxPayloadPrintfLen)
+		err = fmt.Errorf("read request body error:%+v for method:%s url:%s headers:%v payload:%s", err, method, url, headers, sPayload)
 		return
 	}
 	_ = resp.Body.Close()
@@ -352,7 +370,9 @@ func RequestNoRetry(
 	if hit {
 		err = jsoniter.Unmarshal(body, &result)
 		if err != nil {
-			err = fmt.Errorf("unmarshall request error:%+v for method:%s url:%s headers:%v status:%d payload:%s body:%s", err, method, url, headers, status, string(payload), string(body))
+			sPayload := BytesToStringTrunc(payload, MaxPayloadPrintfLen)
+			sBody := BytesToStringTrunc(payload, MaxPayloadPrintfLen)
+			err = fmt.Errorf("unmarshall request error:%+v for method:%s url:%s headers:%v status:%d payload:%s body:%s", err, method, url, headers, status, sPayload, sBody)
 			return
 		}
 		isJSON = true
@@ -367,7 +387,9 @@ func RequestNoRetry(
 		}
 	}
 	if hit {
-		err = fmt.Errorf("status error:%+v for method:%s url:%s headers:%v status:%d payload:%s body:%s result:%+v", err, method, url, headers, status, string(payload), string(body), result)
+		sPayload := BytesToStringTrunc(payload, MaxPayloadPrintfLen)
+		sBody := BytesToStringTrunc(payload, MaxPayloadPrintfLen)
+		err = fmt.Errorf("status error:%+v for method:%s url:%s headers:%v status:%d payload:%s body:%s result:%+v", err, method, url, headers, status, sPayload, sBody, result)
 	}
 	if len(okStatuses) > 0 {
 		hit = false
@@ -378,7 +400,9 @@ func RequestNoRetry(
 			}
 		}
 		if !hit {
-			err = fmt.Errorf("status not success:%+v for method:%s url:%s headers:%v status:%d payload:%s body:%s result:%+v", err, method, url, headers, status, string(payload), string(body), result)
+			sPayload := BytesToStringTrunc(payload, MaxPayloadPrintfLen)
+			sBody := BytesToStringTrunc(payload, MaxPayloadPrintfLen)
+			err = fmt.Errorf("status not success:%+v for method:%s url:%s headers:%v status:%d payload:%s body:%s result:%+v", err, method, url, headers, status, sPayload, sBody, result)
 		}
 	}
 	return
@@ -479,7 +503,7 @@ func Request(
 	for {
 		result, status, isJSON, outCookies, err = RequestNoRetry(ctx, url, method, headers, payload, cookies, jsonStatuses, errorStatuses, okStatuses)
 		info := func() (inf string) {
-			inf = fmt.Sprintf("%s.%s:%s=%d", method, url, string(payload), status)
+			inf = fmt.Sprintf("%s.%s:%s=%d", method, url, BytesToStringTrunc(payload, MaxPayloadPrintfLen), status)
 			if ctx.Debug > 1 {
 				inf += fmt.Sprintf(" error: %+v", err)
 			}
