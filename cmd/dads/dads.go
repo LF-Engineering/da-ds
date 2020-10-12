@@ -83,6 +83,8 @@ func main() {
 			_, _, _ = lib.ParseMBoxMsg(&ctx, "xxx", data)
 			data, _ = ioutil.ReadFile("spdx+Spdx-tech_11160.mbox")
 			_, _, _ = lib.ParseMBoxMsg(&ctx, "xxx", data)
+		  data, _ = ioutil.ReadFile("tungsten+marketing_66343.mbox")
+		  _, _, _ = lib.ParseMBoxMsg(&ctx, "xxx", data)
 			os.Exit(1)
 	*/
 	lib.FatalOnError(ctx.Validate())

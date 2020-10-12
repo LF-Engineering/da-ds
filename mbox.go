@@ -38,6 +38,12 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		sep := []byte(": ")
 		ary := bytes.Split(line, sep)
 		if len(ary) == 1 {
+			ary2 := bytes.Split(line, []byte(":"))
+			if len(ary2) == 2 {
+				key = string(ary2[0])
+				val = ary2[1]
+				ok = true
+			}
 			return
 		}
 		key = string(ary[0])
@@ -219,11 +225,9 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 				continue
 			}
 			//Printf("#%d empty line in body mode, headers parsed %v\n", i, bodyHeadersParsed)
+			// we could possibly assume that header is parsed when empty line is met, but this is not so simple
 			if bodyHeadersParsed {
 				currData = append(currData, []byte("\n")...)
-			} else {
-				// FIXME: is this ok?
-				// bodyHeadersParsed = true
 			}
 			continue
 		}
@@ -236,12 +240,7 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 				if end {
 					if len(savedBoundary) > 0 {
 						// Printf("restore saved: %s -> %s, %s -> %s\n", string(savedBoundary), string(boundary), string(savedContentType), string(currContentType))
-						//boundary = savedBoundary
-						//currContentType = savedContentType
-						//savedBoundary = []byte{}
-						//savedContentType = []byte{}
 						pop()
-						// should we also store/restore properties map?
 					}
 				}
 				continue
@@ -280,9 +279,6 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 								ary2 := bytes.Split(ary[1], []byte(`"`))
 								if len(ary2) > 2 {
 									// Printf("save multi boundary: %s, %s\n", string(boundary), string(currContentType))
-									// savedBoundary = boundary
-									// savedContentType = currContentType
-									// boundary = ary2[1]
 									push(ary2[1])
 								} else {
 									ary2 := bytes.Split(ary[1], []byte(`;`))
