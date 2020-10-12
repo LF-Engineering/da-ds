@@ -173,7 +173,7 @@ func (j *DSGroupsio) AddMetadata(ctx *Ctx, msg interface{}) (mItem map[string]in
 func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 	var dirPath string
 	if j.SaveArchives {
-		dirPath := j.ArchPath + "/" + GroupsioURLRoot + j.GroupName
+		dirPath = j.ArchPath + "/" + GroupsioURLRoot + j.GroupName
 		dirPath, err = EnsurePath(dirPath)
 		FatalOnError(err)
 		Printf("path to store mailing archives: %s\n", dirPath)

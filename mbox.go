@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"regexp"
 	"sort"
 )
 
 // ParseMBoxMsg - parse a raw MBox message into object to be inserte dinto raw ES
 func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]interface{}, valid bool, err error) {
-  // FIXME
+	// FIXME
 	_ = ioutil.WriteFile(fmt.Sprintf("%s_%d.mbox", groupName, len(msg)), msg, 0644)
 	item = make(map[string]interface{})
 	raw := make(map[string][]byte)
@@ -27,6 +28,7 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		is = bytes.HasPrefix(line, []byte(" ")) || bytes.HasPrefix(line, []byte("\t"))
 		return
 	}
+	keyRE := regexp.MustCompile(`^[\w-]+$`)
 	getHeader := func(i int, line []byte) (key string, val []byte, ok bool) {
 		if ctx.Debug > 1 {
 			defer func() {
@@ -39,6 +41,15 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 			return
 		}
 		key = string(ary[0])
+		if len(key) > 160 {
+			return
+		}
+		match := keyRE.MatchString(string(key))
+		//Printf("(%d,%v,%s)\n", len(key), match, string(key))
+		if !match {
+			//Printf("invalid key: %s\n", key)
+			return
+		}
 		val = bytes.Join(ary[1:], sep)
 		ok = true
 		return
@@ -63,6 +74,7 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		expect = append(expect, boundary...)
 		is = bytes.HasPrefix(line, expect)
 		if is {
+			//Printf("HasPrefix %s\n", string(append(expect, []byte("--")...)))
 			isEnd = bytes.HasPrefix(line, append(expect, []byte("--")...))
 		}
 		return
@@ -101,9 +113,9 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 			if bytes.HasSuffix(currData, []byte("\n")) {
 				currData = currData[:len(currData)-1]
 			}
-      if bytes.Contains(currData, []byte("boundary=")) {
-        Printf("should not contain boundary marker: message(%s,%s): '%s'\n", string(currContentType), propertiesString(currProperties), string(currData))
-      }
+			if bytes.Contains(currData, []byte("boundary=")) {
+				Printf("should not contain boundary marker(%d): message(%s,%s): '%s'\n", len(msg), string(currContentType), propertiesString(currProperties), string(currData))
+			}
 			if ctx.Debug > 2 {
 				//Printf("#%d addBody '%s' --> (%s,%s,%d,%v)\n", i, string(line), string(currContentType), currProperties, len(currData), added)
 				//Printf("#%d addBody '%s' --> (%s,%s,%d,%v)\n", i, string(line), string(currContentType), DumpKeys(currProperties), len(currData), added)
@@ -117,11 +129,27 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		added = true
 		return
 	}
+	savedBoundary := [][]byte{}
+	savedContentType := [][]byte{}
+	savedProperties := []map[string][]byte{}
+	push := func(newBoundary []byte) {
+		savedBoundary = append(savedBoundary, boundary)
+		savedContentType = append(savedContentType, currContentType)
+		savedProperties = append(savedProperties, currProperties)
+		boundary = newBoundary
+	}
+	pop := func() {
+		n := len(savedContentType) - 1
+		boundary = savedBoundary[n]
+		currContentType = savedContentType[n]
+		currProperties = savedProperties[n]
+		savedBoundary = savedBoundary[:n]
+		savedContentType = savedContentType[:n]
+		savedProperties = savedProperties[:n]
+	}
 	possibleBodyProperties := []string{"Content-Type", "Content-Transfer-Encoding", "Content-Language"}
 	currKey := ""
 	body := false
-	savedBoundary := []byte{}
-	savedContentType := []byte{}
 	bodyHeadersParsed := false
 	nLines := len(lines)
 	nSkip := 0
@@ -132,7 +160,7 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 			continue
 		}
 		i := idx + 2
-		if i == 0 {
+		if idx == 0 {
 			sep := []byte("\n")
 			ary := bytes.Split(line, sep)
 			if len(ary) > 1 {
@@ -149,6 +177,8 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 					}
 				}
 			}
+			//Printf("line0: %s\nline1: %s\n", string(ary[0]), string(ary[1]))
+			line = ary[1]
 		}
 		if len(line) == 0 {
 			if !body {
@@ -165,10 +195,13 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 						ary2 := bytes.Split(ary[1], []byte(`"`))
 						if len(ary2) > 2 {
 							boundary = ary2[1]
+						} else {
+							ary2 := bytes.Split(ary[1], []byte(`;`))
+							boundary = ary2[0]
 						}
 					}
 					if len(boundary) == 0 {
-						Printf("#%d cannot find multipart message boundary\n", i)
+						Printf("#%d cannot find multipart message boundary '%s'\n", i, string(contentType))
 						break
 					}
 				} else {
@@ -185,8 +218,12 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 				body = true
 				continue
 			}
+			//Printf("#%d empty line in body mode, headers parsed %v\n", i, bodyHeadersParsed)
 			if bodyHeadersParsed {
 				currData = append(currData, []byte("\n")...)
+			} else {
+				// FIXME: is this ok?
+				// bodyHeadersParsed = true
 			}
 			continue
 		}
@@ -199,10 +236,11 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 				if end {
 					if len(savedBoundary) > 0 {
 						// Printf("restore saved: %s -> %s, %s -> %s\n", string(savedBoundary), string(boundary), string(savedContentType), string(currContentType))
-						boundary = savedBoundary
-						currContentType = savedContentType
-						savedBoundary = []byte{}
-						savedContentType = []byte{}
+						//boundary = savedBoundary
+						//currContentType = savedContentType
+						//savedBoundary = []byte{}
+						//savedContentType = []byte{}
+						pop()
 						// should we also store/restore properties map?
 					}
 				}
@@ -210,6 +248,7 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 			}
 			if !bodyHeadersParsed {
 				key, val, ok := getHeader(i, line)
+				//Printf("#%d getHeader -> %v,%s,%s\n", i, ok, key, string(val))
 				if ok {
 					lIdx := idx + 1
 					for {
@@ -241,10 +280,13 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 								ary2 := bytes.Split(ary[1], []byte(`"`))
 								if len(ary2) > 2 {
 									// Printf("save multi boundary: %s, %s\n", string(boundary), string(currContentType))
-									savedBoundary = boundary
-									savedContentType = currContentType
-									boundary = ary2[1]
-									// save properties map too?
+									// savedBoundary = boundary
+									// savedContentType = currContentType
+									// boundary = ary2[1]
+									push(ary2[1])
+								} else {
+									ary2 := bytes.Split(ary[1], []byte(`;`))
+									push(ary2[0])
 								}
 							}
 							if len(boundary) == 0 {
@@ -258,12 +300,14 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 					currProperties[key] = val
 					continue
 				}
+				//Printf("#%d setting body headers passed\n", i)
 				bodyHeadersParsed = true
 			}
 			//Printf("#%d body line, boundary %s\n", i, string(boundary))
 			currData = append(currData, line...)
 			continue
 		}
+		//Printf("header mode #%d\n", i)
 		cont := isContinue(i, line)
 		if cont {
 			if currKey == "" {

@@ -2,9 +2,7 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math/rand"
-	"os"
 	"time"
 
 	lib "github.com/LF-Engineering/da-ds"
@@ -63,24 +61,30 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 	dtStart := time.Now()
 	ctx.Init()
-  /*
-  // FIXME
-	data, _ := ioutil.ReadFile("yocto+meta-arm_3753.mbox")
-	_, _, _ = lib.ParseMBoxMsg(&ctx, "xxx", data)
-	data, _ = ioutil.ReadFile("yocto+meta-arm_4915.mbox")
-	_, _, _ = lib.ParseMBoxMsg(&ctx, "xxx", data)
-	data, _ = ioutil.ReadFile("3212.mbox")
-	_, _, _ = lib.ParseMBoxMsg(&ctx, "xxx", data)
-	data, _ = ioutil.ReadFile("8201.mbox")
-	_, _, _ = lib.ParseMBoxMsg(&ctx, "xxx", data)
-	data, _ = ioutil.ReadFile("1426647.mbox")
-	_, _, _ = lib.ParseMBoxMsg(&ctx, "xxx", data)
-	data, _ = ioutil.ReadFile("62454.mbox")
-	_, _, _ = lib.ParseMBoxMsg(&ctx, "xxx", data)
-	data, _ = ioutil.ReadFile("yocto+meta-arm_2742.mbox")
-	_, _, _ = lib.ParseMBoxMsg(&ctx, "xxx", data)
-	os.Exit(1)
-  */
+	// FIXME
+	/*
+		  data, _ := ioutil.ReadFile("yocto+meta-arm_3753.mbox")
+			_, _, _ = lib.ParseMBoxMsg(&ctx, "xxx", data)
+			data, _ = ioutil.ReadFile("yocto+meta-arm_4915.mbox")
+			_, _, _ = lib.ParseMBoxMsg(&ctx, "xxx", data)
+			data, _ = ioutil.ReadFile("3212.mbox")
+			_, _, _ = lib.ParseMBoxMsg(&ctx, "xxx", data)
+			data, _ = ioutil.ReadFile("8201.mbox")
+			_, _, _ = lib.ParseMBoxMsg(&ctx, "xxx", data)
+			data, _ = ioutil.ReadFile("1426647.mbox")
+			_, _, _ = lib.ParseMBoxMsg(&ctx, "xxx", data)
+			data, _ = ioutil.ReadFile("62454.mbox")
+			_, _, _ = lib.ParseMBoxMsg(&ctx, "xxx", data)
+			data, _ = ioutil.ReadFile("yocto+meta-arm_2742.mbox")
+			_, _, _ = lib.ParseMBoxMsg(&ctx, "xxx", data)
+			data, _ = ioutil.ReadFile("risc-v+tech-virt-mem_77768.mbox")
+			_, _, _ = lib.ParseMBoxMsg(&ctx, "xxx", data)
+			data, _ = ioutil.ReadFile("spdx+Spdx-tech_12382.mbox")
+			_, _, _ = lib.ParseMBoxMsg(&ctx, "xxx", data)
+			data, _ = ioutil.ReadFile("spdx+Spdx-tech_11160.mbox")
+			_, _, _ = lib.ParseMBoxMsg(&ctx, "xxx", data)
+			os.Exit(1)
+	*/
 	lib.FatalOnError(ctx.Validate())
 	lib.CreateESCache(&ctx)
 	lib.FatalOnError(runDS(&ctx))
