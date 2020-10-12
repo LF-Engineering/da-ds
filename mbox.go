@@ -209,6 +209,7 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 					ary := bytes.Split(contentType, boundarySep)
 					if len(ary) > 1 {
 						ary2 := bytes.Split(ary[1], []byte(`"`))
+						// Possibly even >= is enough here? - would fix possible buggy MBox data
 						if len(ary2) > 2 {
 							boundary = ary2[1]
 						} else {

@@ -81,9 +81,9 @@ func ESCacheSet(ctx *Ctx, key string, entry *ESCacheEntry) {
 	entry.K = key
 	payloadBytes, err := jsoniter.Marshal(entry)
 	if err != nil {
-		sEntry = "<nil>"
+		sEntry := "<nil>"
 		if entry != nil {
-			sEntry := InterfaceToStringTrunc(*entry, MaxPayloadPrintfLen)
+			sEntry = InterfaceToStringTrunc(*entry, MaxPayloadPrintfLen)
 		}
 		Printf("json %s marshal error: %+v\n", sEntry, err)
 		return
