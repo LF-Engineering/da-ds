@@ -85,12 +85,24 @@ func CacheSummary(ctx *Ctx) {
 		Printf("uuids type 2 cache: %d entries\n", len(uuidsAffsCache))
 	}
 	if ctx.Debug >= 2 {
-		Printf("identity cache:\n%s\n", PrintCache(identityCache))
-		Printf("enrollments cache:\n%s\n", PrintCache(rollsCache))
-		Printf("identity uuids cache:\n%s\n", PrintCache(i2uCache))
-		Printf("emails cache:\n%s\n", PrintCache(emailsCache))
-		Printf("uuids type 1 cache:\n%s\n", PrintCache(uuidsNonEmptyCache))
-		Printf("uuids type 2 cache:\n%s\n", PrintCache(uuidsAffsCache))
+		if len(identityCache) > 0 {
+			Printf("identity cache:\n%s\n", PrintCache(identityCache))
+		}
+		if len(rollsCache) > 0 {
+			Printf("enrollments cache:\n%s\n", PrintCache(rollsCache))
+		}
+		if len(i2uCache) > 0 {
+			Printf("identity uuids cache:\n%s\n", PrintCache(i2uCache))
+		}
+		if len(emailsCache) > 0 {
+			Printf("emails cache:\n%s\n", PrintCache(emailsCache))
+		}
+		if len(uuidsNonEmptyCache) > 0 {
+			Printf("uuids type 1 cache:\n%s\n", PrintCache(uuidsNonEmptyCache))
+		}
+		if len(uuidsAffsCache) > 0 {
+			Printf("uuids type 2 cache:\n%s\n", PrintCache(uuidsAffsCache))
+		}
 		PrintfNoRedacted("Redacted data: %s\n", GetRedacted())
 	}
 }
