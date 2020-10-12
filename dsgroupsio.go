@@ -239,11 +239,16 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 	}
 	if groupID < 0 {
 		subs := []string{}
+		dls := []string{}
 		for _, sub := range result.User.Subs {
 			subs = append(subs, sub.GroupName)
+			if sub.Perms.DownloadArchives {
+				dls = append(dls, sub.GroupName)
+			}
 		}
 		sort.Strings(subs)
-		Fatalf("you are not subscribed to %s, your subscriptions(%d): %v\n", j.GroupName, len(subs), strings.Join(subs, ", "))
+		sort.Strings(dls)
+		Fatalf("you are not subscribed to %s, your subscriptions(%d): %s\ndownload allowed for(%d): %s", j.GroupName, len(subs), strings.Join(subs, ", "), len(dls), strings.Join(dls, ", "))
 		return
 	}
 	Printf("found group ID %d\n", groupID)

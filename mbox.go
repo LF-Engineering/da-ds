@@ -2,7 +2,6 @@ package dads
 
 import (
 	"bytes"
-	"fmt"
 	"sort"
 )
 
@@ -78,12 +77,14 @@ func ParseMBoxMsg(ctx *Ctx, msg []byte) (item map[string]interface{}, valid bool
 			return
 		}
 		defer func() {
+			if bytes.HasSuffix(currData, []byte("\n")) {
+				currData = currData[:len(currData)-1]
+			}
 			if ctx.Debug > 1 {
 				//Printf("#%d addBody '%s' --> (%s,%s,%d,%v)\n", i, string(line), string(currContentType), currProperties, len(currData), added)
 				//Printf("#%d addBody '%s' --> (%s,%s,%d,%v)\n", i, string(line), string(currContentType), DumpKeys(currProperties), len(currData), added)
 				//Printf("Body:\n%s\n", string(currData))
-				// FIXME: remove this
-				fmt.Printf("message: '%s'\n", string(currData))
+				//Printf("message %s: '%s'\n", string(currContentType), string(currData))
 			}
 			currContentType = []byte{}
 			currProperties = make(map[string][]byte)
@@ -93,14 +94,20 @@ func ParseMBoxMsg(ctx *Ctx, msg []byte) (item map[string]interface{}, valid bool
 		added = true
 		return
 	}
-	//last := false
 	currKey := ""
 	body := false
 	last := false
 	savedBoundary := []byte{}
 	savedContentType := []byte{}
 	bodyHeadersParsed := false
+	nLines := len(lines)
+	nSkip := 0
 	for idx, line := range lines {
+		if nSkip > 0 {
+			//Printf("skipping line, remain %d\n", nSkip)
+			nSkip--
+			continue
+		}
 		i := idx + 2
 		if i == 0 {
 			sep := []byte("\n")
@@ -122,12 +129,12 @@ func ParseMBoxMsg(ctx *Ctx, msg []byte) (item map[string]interface{}, valid bool
 		}
 		if len(line) == 0 {
 			if !body {
-				//Printf("#%d empty: mode change\n", i)
 				contentType, ok := raw["Content-Type"]
 				if !ok {
 					Printf("#%d no Content-Type defined, only headers will be parsed\n", i)
 					break
 				}
+				//Printf("#%d empty: mode change, current content type: %s\n", i, contentType)
 				boundarySep := []byte("boundary=")
 				if bytes.Contains(contentType, boundarySep) {
 					ary := bytes.Split(contentType, boundarySep)
@@ -149,6 +156,7 @@ func ParseMBoxMsg(ctx *Ctx, msg []byte) (item map[string]interface{}, valid bool
 						break
 					}
 					//Printf("#%d no-multipart email, content type: %s, transfer encoding: %v\n", i, currContentType, currProperties)
+					bodyHeadersParsed = true
 				}
 				body = true
 				continue
@@ -161,7 +169,6 @@ func ParseMBoxMsg(ctx *Ctx, msg []byte) (item map[string]interface{}, valid bool
 				_ = addBody(i, line)
 				last = true
 			}
-			// FIXME: Should we just add a new line here?
 			if bodyHeadersParsed {
 				currData = append(currData, []byte("\n")...)
 			}
@@ -169,6 +176,7 @@ func ParseMBoxMsg(ctx *Ctx, msg []byte) (item map[string]interface{}, valid bool
 		}
 		if body {
 			boundarySep, end := isBoundarySep(i, line)
+			//Printf("#%d %v,%v,%v\n", i, bodyHeadersParsed, boundarySep, end)
 			if boundarySep {
 				bodyHeadersParsed = false
 				_ = addBody(i, line)
@@ -187,8 +195,28 @@ func ParseMBoxMsg(ctx *Ctx, msg []byte) (item map[string]interface{}, valid bool
 			if !bodyHeadersParsed {
 				key, val, ok := getHeader(i, line)
 				if ok {
+					lIdx := idx + 1
+					for {
+						lI := lIdx + 2
+						if lIdx >= nLines {
+							break
+						}
+						c := isContinue(lI, lines[lIdx])
+						if !c {
+							break
+						}
+						cVal, ok := getContinuation(lI, lines[lIdx])
+						if !ok {
+							Printf("#%d->%d no header %s continuation data in line %s\n", i, lI, key, lines[lIdx])
+							break
+						}
+						val = append(val, cVal...)
+						lIdx++
+						nSkip++
+						//Printf("added header %s continuation: %s --> %s\n", key, string(cVal), string(val))
+					}
 					if key == "Content-Type" {
-						// Printf("%s -> %s\n", currContentType, val)
+						//Printf("%s -> %s\n", currContentType, val)
 						currContentType = val
 						boundarySep := []byte("boundary=")
 						if bytes.Contains(currContentType, boundarySep) {
@@ -218,7 +246,6 @@ func ParseMBoxMsg(ctx *Ctx, msg []byte) (item map[string]interface{}, valid bool
 			}
 			//Printf("#%d body line, boundary %s\n", i, string(boundary))
 			currData = append(currData, line...)
-			// FIXME: do we actually know if we need to add newlines or not, MBOX seems to limit line length to 80 chars
 			continue
 		}
 		cont := isContinue(i, line)
