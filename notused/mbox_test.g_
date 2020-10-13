@@ -26,7 +26,6 @@ data, _ = ioutil.ReadFile("openswitch+dev_164359.mbox")
 _, _, _ = lib.ParseMBoxMsg(&ctx, "xxx", data)
 os.Exit(1)
 
-	// FIXME: start
 	dbg := ctx.Debug
 	ctx.Debug = 0
 	fns, err := lib.ExecCommand(&ctx, []string{"find", ".", "-iname", "*.mbox"})
@@ -45,4 +44,22 @@ os.Exit(1)
 		_, _, _ = lib.ParseMBoxMsg(&ctx, "xxx", data)
 	}
 	os.Exit(1)
-	// FIXME: end
+
+	sdts := []string{
+		"Mon, 30  Sep 2019  15:15:39 +0000",
+		"TUE, 1 oCt 2019   15:15:39 -1200",
+		"23 Dec  2013 14:51:30 gmt",
+		"> Tue, 02 Jul 2013 02:28:30 GMT",
+		"2017-04-03 09:52:03 -0700",
+		"2017-11-19 09:52:03 -1000",
+		">>\t Wed,  29  Jan  2003 16:55 +0000 (Pacific Standard Time)",
+	}
+	for _, sdt := range sdts {
+		dt, ok := lib.ParseMBoxDate(sdt)
+		if !ok {
+			lib.Printf("unable to parse date from '%s'\n", sdt)
+		} else {
+			lib.Printf("'%s' parsed to %v\n", sdt, dt)
+		}
+	}
+	os.Exit(1)

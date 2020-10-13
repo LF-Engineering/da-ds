@@ -331,6 +331,7 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 		allMsgsMtx *sync.Mutex
 		escha      []chan error
 		eschaMtx   *sync.Mutex
+		statMtx    *sync.Mutex
 	)
 	thrN := GetThreadsNum(ctx)
 	if thrN > 1 {
@@ -339,6 +340,29 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 		eschaMtx = &sync.Mutex{}
 	}
 	nThreads := 0
+	empty := 0
+	warns := 0
+	invalid := 0
+	if thrN > 1 {
+		statMtx = &sync.Mutex{}
+	}
+	stat := func(emp, warn, valid bool) {
+		if thrN > 1 {
+			statMtx.Lock()
+		}
+		if emp {
+			empty++
+		}
+		if warn {
+			warns++
+		}
+		if !valid {
+			invalid++
+		}
+		if thrN > 1 {
+			statMtx.Unlock()
+		}
+	}
 	processMsg := func(c chan error, msg []byte) (wch chan error, e error) {
 		defer func() {
 			if c != nil {
@@ -347,6 +371,7 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 		}()
 		nBytes := len(msg)
 		if nBytes < len(GroupsioMBoxMsgSeparator) {
+			stat(true, false, false)
 			return
 		}
 		if !bytes.HasPrefix(msg, GroupsioMBoxMsgSeparator[1:]) {
@@ -354,10 +379,12 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 		}
 		var (
 			valid   bool
+			warn    bool
 			message map[string]interface{}
 		)
-		message, valid, e = ParseMBoxMsg(ctx, j.GroupName, msg)
-		if e != nil || !valid {
+		message, valid, warn = ParseMBoxMsg(ctx, j.GroupName, msg)
+		stat(false, warn, valid)
+		if !valid {
 			return
 		}
 		esItem := j.AddMetadata(ctx, message)
@@ -476,6 +503,15 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 		if err != nil {
 			Printf("Error %v sending %d messages to ES\n", err, len(allMsgs))
 		}
+	}
+	if empty > 0 {
+		Printf("%d empty messages\n", empty)
+	}
+	if warns > 0 {
+		Printf("%d parse message warnings\n", warns)
+	}
+	if invalid > 0 {
+		Printf("%d invalid messages\n", invalid)
 	}
 	return
 }

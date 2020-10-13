@@ -50,39 +50,10 @@ func runDS(ctx *lib.Ctx) (err error) {
 }
 
 func main() {
-	// prefix DA_DS_
-	// DA_DS=jira
-	// NO_RAW=1 REFRESH_AFFS=1 FORCE_FULL=1
-	// ENRICH=1 RAW_INDEX=sds-ds-raw RICH_INDEX=sds-ds-rich
-	// ES_URL=... ES_BULK_SIZE=500 ES_SCROLL_SIZE=500
-	// DB_HOST=... DB_NAME=... DB_USER=... DB_PASS=...
-	// DA_JIRA_URL=... DA_JIRA_NO_SSL_VERIFY=1
 	var ctx lib.Ctx
 	rand.Seed(time.Now().UnixNano())
 	dtStart := time.Now()
 	ctx.Init()
-	// FIXME: start
-	/*
-		dbg := ctx.Debug
-		ctx.Debug = 0
-		fns, err := lib.ExecCommand(&ctx, []string{"find", ".", "-iname", "*.mbox"})
-		lib.FatalOnError(err)
-		ctx.Debug = dbg
-		for _, fn := range strings.Split(fns, "\n") {
-			if fn == "" {
-				continue
-			}
-			if strings.HasPrefix(fn, "xxx") {
-				continue
-			}
-			data, err := ioutil.ReadFile(fn)
-			lib.FatalOnError(err)
-			fmt.Printf("%s\n", fn)
-			_, _, _ = lib.ParseMBoxMsg(&ctx, "xxx", data)
-		}
-		os.Exit(1)
-	*/
-	// FIXME: end
 	lib.FatalOnError(ctx.Validate())
 	lib.CreateESCache(&ctx)
 	lib.FatalOnError(runDS(&ctx))

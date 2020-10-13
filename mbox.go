@@ -2,59 +2,105 @@ package dads
 
 import (
 	"bytes"
-	"fmt"
-	"io/ioutil"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
+	"time"
+)
+
+var (
+	// LowerDayNames - downcased 3 letter US day names
+	LowerDayNames = map[string]struct{}{
+		"mon": {},
+		"tue": {},
+		"wed": {},
+		"thu": {},
+		"fri": {},
+		"sat": {},
+		"sun": {},
+	}
+	// LowerMonthNames - map lower month names
+	LowerMonthNames = map[string]string{
+		"jan": "Jan",
+		"feb": "Feb",
+		"mar": "Mar",
+		"apr": "Apr",
+		"may": "May",
+		"jun": "Jun",
+		"jul": "Jul",
+		"aug": "Aug",
+		"sep": "Sep",
+		"oct": "Oct",
+		"nov": "Nov",
+		"dec": "Dec",
+	}
+	// SpacesRE - match 1 or more space characters
+	SpacesRE = regexp.MustCompile(`\s+`)
 )
 
 // ParseMBoxMsg - parse a raw MBox message into object to be inserte dinto raw ES
-func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]interface{}, valid bool, err error) {
-	// FIXME
-	_ = ioutil.WriteFile(fmt.Sprintf("%s_%d.mbox", groupName, len(msg)), msg, 0644)
+func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]interface{}, valid, warn bool) {
 	item = make(map[string]interface{})
-	raw := make(map[string][]byte)
-	lines := bytes.Split(msg, GroupsioMsgLineSeparator)
-	if ctx.Debug > 1 {
-		//Printf("%d bytes, %d lines\n", len(msg), len(lines))
+	raw := make(map[string][][]byte)
+	addRaw := func(k string, v []byte, replace int) {
+		// replace: 0-add new item, 1-replace current, 2-replace all
+		// Printf("addRaw(%s,%d,%d) '%s'\n", k, len(v), replace, string(v))
+		a, ok := raw[k]
+		if ok {
+			switch replace {
+			case 0:
+				raw[k] = append(a, v)
+			case 1:
+				l := len(a)
+				raw[k][l-1] = v
+			case 2:
+				raw[k] = [][]byte{v}
+			default:
+				Printf("addRaw called with an unsupported replace mode(%s,%d)\n", groupName, len(msg))
+			}
+			return
+		}
+		raw[k] = [][]byte{v}
 	}
+	getRaw := func(k string) (v []byte, ok bool) {
+		a, ok := raw[k]
+		if !ok {
+			return
+		}
+		v = a[len(a)-1]
+		return
+	}
+	mustGetRaw := func(k string) (v []byte) {
+		a, ok := raw[k]
+		if !ok {
+			return
+		}
+		v = a[len(a)-1]
+		return
+	}
+	lines := bytes.Split(msg, GroupsioMsgLineSeparator)
 	boundary := []byte("")
 	isContinue := func(i int, line []byte) (is bool) {
-		if ctx.Debug > 1 {
-			defer func() {
-				//Printf("#%d isContinue '%s' --> %v\n", i, string(line), is)
-			}()
-		}
 		is = bytes.HasPrefix(line, []byte(" ")) || bytes.HasPrefix(line, []byte("\t"))
 		return
 	}
-	keyRE := regexp.MustCompile(`^[\w-]+$`)
+	keyRE := regexp.MustCompile(`^[\w_.-]+$`)
 	getHeader := func(i int, line []byte) (key string, val []byte, ok bool) {
-		if ctx.Debug > 1 {
-			defer func() {
-				//Printf("#%d getHeader '%s' --> %s, %s, %v\n", i, line, key, string(val), ok)
-			}()
-		}
 		sep := []byte(": ")
 		ary := bytes.Split(line, sep)
 		if len(ary) == 1 {
-			ary2 := bytes.Split(line, []byte(":"))
-			if len(ary2) == 2 {
-				key = string(ary2[0])
-				val = ary2[1]
-				ok = true
+			ary := bytes.Split(line, []byte(":"))
+			if len(ary) == 1 {
+				return
 			}
-			return
 		}
 		key = string(ary[0])
 		if len(key) > 160 {
 			return
 		}
 		match := keyRE.MatchString(string(key))
-		//Printf("(%d,%v,%s)\n", len(key), match, string(key))
 		if !match {
-			//Printf("invalid key: %s\n", key)
 			return
 		}
 		val = bytes.Join(ary[1:], sep)
@@ -62,26 +108,15 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		return
 	}
 	getContinuation := func(i int, line []byte) (val []byte, ok bool) {
-		if ctx.Debug > 1 {
-			defer func() {
-				//Printf("#%d getContinuation '%s' --> %s, %v\n", i, line, string(val), ok)
-			}()
-		}
 		val = bytes.TrimLeft(line, " \t")
 		ok = len(val) > 0 || len(line) > 0
 		return
 	}
 	isBoundarySep := func(i int, line []byte) (is, isEnd bool) {
-		if ctx.Debug > 1 {
-			defer func() {
-				//Printf("#%d isBoundarySep '%s' --> %v,%v\n", i, string(line), is, isEnd)
-			}()
-		}
 		expect := []byte("--")
 		expect = append(expect, boundary...)
 		is = bytes.HasPrefix(line, expect)
 		if is {
-			//Printf("HasPrefix %s\n", string(append(expect, []byte("--")...)))
 			isEnd = bytes.HasPrefix(line, append(expect, []byte("--")...))
 		}
 		return
@@ -121,12 +156,7 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 			if bytes.HasSuffix(currData, []byte("\n")) {
 				currData = currData[:len(currData)-1]
 			}
-			if bytes.Contains(currData, []byte(boundarySep)) {
-				Printf("should not contain boundary= marker(%d): message(%s,%s): '%s'\n", len(msg), string(currContentType), propertiesString(currProperties), string(currData))
-			}
 			if ctx.Debug > 2 {
-				//Printf("#%d addBody '%s' --> (%s,%s,%d,%v)\n", i, string(line), string(currContentType), currProperties, len(currData), added)
-				//Printf("#%d addBody '%s' --> (%s,%s,%d,%v)\n", i, string(line), string(currContentType), DumpKeys(currProperties), len(currData), added)
 				Printf("message(%d,%s,%s): '%s'\n", len(msg), string(currContentType), propertiesString(currProperties), string(currData))
 			}
 			currContentType = []byte{}
@@ -149,7 +179,8 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 	pop := func() {
 		n := len(savedContentType) - 1
 		if n < 0 {
-			Printf("cannot pop from an empty stack\n")
+			Printf("%s(%d): cannot pop from an empty stack\n", groupName, len(msg))
+			warn = true
 			return
 		}
 		boundary = savedBoundary[n]
@@ -168,7 +199,6 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 	var mainMultipart *bool
 	for idx, line := range lines {
 		if nSkip > 0 {
-			//Printf("skipping line, remain %d\n", nSkip)
 			nSkip--
 			continue
 		}
@@ -183,28 +213,26 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 					spaceSep := []byte(" ")
 					ary2 := bytes.Split(data, spaceSep)
 					if len(ary2) == 1 {
-						raw["Mbox-From"] = data
+						addRaw("Mbox-From", data, 2)
 					} else {
-						raw["Mbox-From"] = ary2[0]
-						raw["Mbox-Date"] = bytes.Join(ary2[1:], spaceSep)
+						addRaw("Mbox-From", ary2[0], 2)
+						addRaw("Mbox-Date", bytes.Join(ary2[1:], spaceSep), 2)
 					}
 				}
 			}
-			//Printf("line0: %s\nline1: %s\n", string(ary[0]), string(ary[1]))
 			line = ary[1]
 		}
 		if len(line) == 0 {
 			if !body {
-				contentType, ok := raw[ContentType]
+				contentType, ok := getRaw(ContentType)
 				if !ok {
-					contentType, ok = raw[LowerContentType]
+					contentType, ok = getRaw(LowerContentType)
 					if !ok {
 						contentType = []byte("text/plain")
-						raw[LowerContentType] = contentType
+						addRaw(LowerContentType, contentType, 0)
 					}
-					raw[ContentType] = contentType
+					addRaw(ContentType, contentType, 0)
 				}
-				//Printf("#%d empty: mode change, current content type: %s\n", i, contentType)
 				if bytes.Contains(contentType, boundarySep) {
 					ary := bytes.Split(contentType, boundarySep)
 					if len(ary) > 1 {
@@ -218,8 +246,8 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 						}
 					}
 					if len(boundary) == 0 {
-						Printf("#%d cannot find multipart message boundary(%d) '%s'\n", i, len(msg), string(contentType))
-						break
+						Printf("#%d cannot find multipart message boundary(%s,%d) '%s'\n", i, groupName, len(msg), string(contentType))
+						warn = true
 					}
 					if mainMultipart == nil {
 						dummy := true
@@ -228,11 +256,11 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 				} else {
 					currContentType = contentType
 					for _, bodyProperty := range possibleBodyProperties {
-						propertyVal, ok := raw[bodyProperty]
+						propertyVal, ok := getRaw(bodyProperty)
 						if ok {
 							currProperties[bodyProperty] = propertyVal
 						} else {
-							propertyVal, ok := raw[strings.ToLower(bodyProperty)]
+							propertyVal, ok := getRaw(strings.ToLower(bodyProperty))
 							if ok {
 								currProperties[bodyProperty] = propertyVal
 							}
@@ -242,13 +270,11 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 						dummy := false
 						mainMultipart = &dummy
 					}
-					//Printf("#%d no-multipart email, content type: %s, transfer encoding: %v\n", i, currContentType, currProperties)
 					bodyHeadersParsed = true
 				}
 				body = true
 				continue
 			}
-			//Printf("#%d empty line in body mode, headers parsed %v\n", i, bodyHeadersParsed)
 			// we could possibly assume that header is parsed when empty line is met, but this is not so simple
 			if bodyHeadersParsed {
 				currData = append(currData, []byte("\n")...)
@@ -261,9 +287,7 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 				key, val, ok := getHeader(i, line)
 				if ok {
 					lowerKey := strings.ToLower(key)
-					//Printf("#%d got header data in single body mode\n", i)
 					if lowerKey == LowerContentType {
-						//Printf("#%d got content-type data in single body mode\n", i)
 						lIdx := idx + 1
 						for {
 							lI := lIdx + 2
@@ -292,21 +316,16 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 									boundary = ary2[0]
 								}
 							}
-							if mainMultipart != nil && !*mainMultipart {
-								//Printf("#%d got a new boundary setting in single-body mode(%d)\n", i, len(msg))
-							}
 						}
 					}
 				}
 			}
 			isBoundarySep, end := isBoundarySep(i, line)
-			//Printf("#%d %v,%v,%v\n", i, bodyHeadersParsed, isBoundarySep, end)
 			if isBoundarySep {
 				bodyHeadersParsed = false
 				_ = addBody(i, line)
 				if end {
 					if len(savedBoundary) > 0 {
-						// Printf("restore saved: %s -> %s, %s -> %s\n", string(savedBoundary), string(boundary), string(savedContentType), string(currContentType))
 						pop()
 					}
 				}
@@ -314,7 +333,6 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 			}
 			if !bodyHeadersParsed {
 				key, val, ok := getHeader(i, line)
-				//Printf("#%d getHeader -> %v,%s,%s\n", i, ok, key, string(val))
 				if ok {
 					lIdx := idx + 1
 					for {
@@ -332,18 +350,15 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 						}
 						lIdx++
 						nSkip++
-						//Printf("added header %s continuation: %s --> %s\n", key, string(cVal), string(val))
 					}
 					lowerKey := strings.ToLower(key)
 					if lowerKey == LowerContentType {
-						//Printf("%s -> %s\n", currContentType, val)
 						currContentType = val
 						if bytes.Contains(currContentType, boundarySep) {
 							ary := bytes.Split(currContentType, boundarySep)
 							if len(ary) > 1 {
 								ary2 := bytes.Split(ary[1], []byte(`"`))
 								if len(ary2) > 2 {
-									// Printf("save multi boundary: %s, %s\n", string(boundary), string(currContentType))
 									push(ary2[1])
 								} else {
 									ary2 := bytes.Split(ary[1], []byte(`;`))
@@ -351,82 +366,203 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 								}
 							}
 							if len(boundary) == 0 {
-								Printf("#%d cannot find multiboundary message boundary(%d)\n", i, len(msg))
-								break
+								Printf("#%d cannot find multiboundary message boundary(%s,%d)\n", i, groupName, len(msg))
+								warn = true
 							}
 						}
 						continue
 					}
-					// Printf("assigning %s %s\n", key, string(val))
 					currProperties[key] = val
 					continue
 				}
-				//Printf("#%d setting body headers passed\n", i)
 				bodyHeadersParsed = true
 			}
-			//Printf("#%d body line, boundary %s\n", i, string(boundary))
 			currData = append(currData, line...)
 			continue
 		}
-		//Printf("header mode #%d\n", i)
 		cont := isContinue(i, line)
 		if cont {
 			if currKey == "" {
-				Printf("#%d no current key(%d)\n", i, len(msg))
+				Printf("#%d no current key(%s,%d)\n", i, groupName, len(msg))
+				warn = true
 				break
 			}
-			currVal, ok := raw[currKey]
+			currVal, ok := getRaw(currKey)
 			if !ok {
 				Printf("#%d missing %s key in %v\n", i, currKey, DumpKeys(raw))
+				warn = true
 				break
 			}
 			val, ok := getContinuation(i, line)
 			if ok {
-				raw[currKey] = append(currVal, val...)
+				addRaw(currKey, append(currVal, val...), 1)
 				if strings.ToLower(currKey) == LowerContentType {
-					raw[LowerContentType] = raw[currKey]
+					addRaw(LowerContentType, mustGetRaw(currKey), 1)
 				}
 			}
 		} else {
 			key, val, ok := getHeader(i, line)
 			if !ok {
-				Printf("#%d incorrect header(%d)\n", i, len(msg))
+				Printf("#%d incorrect header(%s,%d)\n", i, groupName, len(msg))
+				warn = true
 				break
 			}
-			currVal, ok := raw[key]
-			if ok {
-				//Printf("#%d duplicated key %s, appending all of them with new line separator\n", i, key)
-				currVal = append(currVal, []byte("\n")...)
-				raw[key] = append(currVal, val...)
-			} else {
-				raw[key] = val
-			}
+			// FIXME - no more needed in [][]byte raw mode?
+			/*
+				currVal, ok := getRaw(key)
+				if ok {
+					currVal = append(currVal, []byte("\n")...)
+					addRaw(key, append(currVal, val...), 0)
+				} else {
+					addRaw(key, val, 0)
+				}
+			*/
+			addRaw(key, val, 0)
 			currKey = key
 			if strings.ToLower(currKey) == LowerContentType {
-				raw[LowerContentType] = raw[currKey]
+				addRaw(LowerContentType, mustGetRaw(currKey), 0)
 			}
 		}
 	}
 	if len(boundary) == 0 {
-		//Printf("flush body\n")
 		_ = addBody(nLines, []byte{})
 	}
 	ks := []string{}
-	for k, v := range raw {
-		item[k] = string(v)
+	for k := range raw {
+		lk := strings.ToLower(k)
+		sv := string(mustGetRaw(k))
+		item[k] = sv
+		if (lk == "message-id" || lk == "date") && lk != k {
+			item[lk] = sv
+			ks = append(ks, lk)
+		}
+		if lk == "received" && lk != k {
+			raw[lk] = raw[k]
+		}
 		ks = append(ks, k)
 	}
-	sort.Strings(ks)
-	/*
+	if ctx.Debug > 2 {
+		sort.Strings(ks)
 		for i, k := range ks {
 			Printf("#%d %s: %s\n", i+1, k, item[k])
 		}
 		for i, body := range bodies {
-			//Printf("#%d: %s %s %d\n", i, string(body.ContentType), DumpKeys(body.Properties), len(body.Data))
-			Printf("#%d: %s %s %d\n", i, string(body.ContentType), body.Properties, len(body.Data))
+			Printf("#%d: %s %s %d\n", i, string(body.ContentType), propertiesString(body.Properties), len(body.Data))
 		}
-	*/
+	}
+	mid, ok := item["message-id"]
+	if !ok {
+		Printf("%s(%d): missing Message-ID field\n", groupName, len(msg))
+		return
+	}
+	item["Message-ID"] = mid
+	var dt time.Time
+	found := false
+	mdt, ok := item["date"]
+	if !ok {
+		rcvs, ok := raw["received"]
+		if !ok {
+			Printf("%s(%d): missing Date & Received fields\n", groupName, len(msg))
+		}
+		var dts []time.Time
+		for _, rcv := range rcvs {
+			ary := strings.Split(string(rcv), ";")
+			sdt := ary[len(ary)-1]
+			dt, ok := ParseMBoxDate(sdt)
+			if ok {
+				dts = append(dts, dt)
+			}
+		}
+		nDts := len(dts)
+		if nDts == 0 {
+			Printf("%s(%d): missing Date field and cannot parse date from Received field(s)\n", groupName, len(msg))
+			return
+		}
+		if nDts > 1 {
+			sort.Slice(dts, func(i, j int) bool { return dts[i].After(dts[j]) })
+		}
+		dt = dts[0]
+		found = true
+	}
+	if !found {
+		dt, ok = ParseMBoxDate(mdt.(string))
+		if !ok {
+			Printf("%s(%d): unable to parse date from '%s'\n", groupName, len(msg), mdt)
+			return
+		}
+	}
+	//Printf("dt=%v\n", dt)
+	item["Date"] = dt
 	// FIXME: continue
 	// valid = true
+	return
+}
+
+// ParseMBoxDate - try to parse mbox date
+func ParseMBoxDate(sdt string) (dt time.Time, valid bool) {
+	// https://www.broobles.com/eml2mbox/mbox.html
+	// but the real world is not that simple
+	for _, r := range []string{">", "\t", ",", ")", "("} {
+		sdt = strings.Replace(sdt, r, "", -1)
+	}
+	for _, split := range []string{"+0", "+1", "."} {
+		ary := strings.Split(sdt, split)
+		sdt = ary[0]
+	}
+	for _, split := range []string{"-0", "-1"} {
+		ary := strings.Split(sdt, split)
+		lAry := len(ary)
+		if lAry > 1 {
+			_, err := strconv.Atoi(ary[lAry-1])
+			if err == nil {
+				sdt = strings.Join(ary[:lAry-1], split)
+			}
+		}
+	}
+	sdt = SpacesRE.ReplaceAllString(sdt, " ")
+	sdt = strings.ToLower(strings.TrimSpace(sdt))
+	ary := strings.Split(sdt, " ")
+	day := ary[0]
+	if len(day) > 3 {
+		day = day[:3]
+	}
+	_, ok := LowerDayNames[day]
+	if ok {
+		sdt = strings.Join(ary[1:], " ")
+	}
+	sdt = strings.TrimSpace(sdt)
+	for lm, m := range LowerMonthNames {
+		sdt = strings.Replace(sdt, lm, m, -1)
+	}
+	ary = strings.Split(sdt, " ")
+	if len(ary) > 4 {
+		sdt = strings.Join(ary[:4], " ")
+	}
+	formats := []string{
+		"2 Jan 2006 15:04:05",
+		"02 Jan 2006 15:04:05",
+		"2 Jan 06 15:04:05",
+		"02 Jan 06 15:04:05",
+		"2 Jan 2006 15:04",
+		"02 Jan 2006 15:04",
+		"2 Jan 06 15:04",
+		"02 Jan 06 15:04",
+		"2006-01-02 15:04:05",
+	}
+	var (
+		err  error
+		errs []error
+	)
+	for _, format := range formats {
+		dt, err = time.Parse(format, sdt)
+		if err == nil {
+			// Printf("Parsed %v\n", dt)
+			valid = true
+			return
+		}
+		errs = append(errs, err)
+	}
+	Printf("errors: %+v\n", errs)
+	Printf("sdt: %s, day: %s\n", sdt, day)
 	return
 }
