@@ -318,9 +318,97 @@ func (j *DSStub) GetItemIdentities(ctx *Ctx, doc interface{}) (map[[3]string]str
 	return map[[3]string]struct{}{}, nil
 }
 
+// StubEnrichItemsFunc - iterate items and enrich them
+// items is a current pack of input items
+// docs is a pointer to where extracted identities will be stored
+func StubEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]interface{}) (err error) {
+	// IMPL:
+	if ctx.Debug > 0 {
+		Printf("stub enrich items %d/%d func\n", len(items), len(*docs))
+	}
+	var (
+		mtx *sync.RWMutex
+		ch  chan error
+	)
+	if thrN > 1 {
+		mtx = &sync.RWMutex{}
+		ch = make(chan error)
+	}
+	dbConfigured := ctx.AffsDBConfigured()
+	nThreads := 0
+	var rich map[string]interface{}
+	procItem := func(c chan error, idx int) (e error) {
+		if thrN > 1 {
+			mtx.RLock()
+		}
+		item := items[idx]
+		if thrN > 1 {
+			mtx.RUnlock()
+		}
+		defer func() {
+			if c != nil {
+				c <- e
+			}
+		}()
+		src, ok := item.(map[string]interface{})["_source"]
+		if !ok {
+			e = fmt.Errorf("Missing _source in item %+v", DumpKeys(item))
+			return
+		}
+		doc, ok := src.(map[string]interface{})
+		if !ok {
+			e = fmt.Errorf("Failed to parse document %+v\n", doc)
+			return
+		}
+		Printf("(%v,%v)\n", DumpKeys(rich), dbConfigured)
+		// Actual item enrichment
+		/*
+			if thrN > 1 {
+				mtx.Lock()
+			}
+			*docs = append(*docs, rich)
+			if thrN > 1 {
+				mtx.Unlock()
+			}
+		*/
+		return
+	}
+	if thrN > 1 {
+		for i := range items {
+			go func(i int) {
+				_ = procItem(ch, i)
+			}(i)
+			nThreads++
+			if nThreads == thrN {
+				err = <-ch
+				if err != nil {
+					return
+				}
+				nThreads--
+			}
+		}
+		for nThreads > 0 {
+			err = <-ch
+			nThreads--
+			if err != nil {
+				return
+			}
+		}
+		return
+	}
+	for i := range items {
+		err = procItem(nil, i)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
 // EnrichItems - perform the enrichment
 func (j *DSStub) EnrichItems(ctx *Ctx) (err error) {
-	// IMPL:
+	Printf("enriching items\n")
+	err = ForEachESItem(ctx, j, true, ESBulkUploadFunc, StubEnrichItemsFunc, nil)
 	return
 }
 
@@ -343,7 +431,7 @@ func (j *DSStub) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role str
 	return map[string]interface{}{"name": nil, "username": nil, "email": nil}
 }
 
-// AllRoles - return all roles defined for Jira backend
+// AllRoles - return all roles defined for the backend
 func (j *DSStub) AllRoles(ctx *Ctx) []string {
 	// IMPL:
 	return []string{"author"}

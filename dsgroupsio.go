@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/mail"
 	neturl "net/url"
 	"os"
 	"sort"
@@ -626,12 +627,176 @@ func (j *DSGroupsio) ElasticRichMapping() []byte {
 // GetItemIdentities return list of item's identities, each one is [3]string
 // (name, username, email) tripples, special value Nil "<nil>" means null
 // we use string and not *string which allows nil to allow usage as a map key
-func (j *DSGroupsio) GetItemIdentities(ctx *Ctx, doc interface{}) (map[[3]string]struct{}, error) {
-	return map[[3]string]struct{}{}, nil
+func (j *DSGroupsio) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3]string]struct{}, err error) {
+	init := false
+	props := []string{"From", "To"}
+	for _, prop := range props {
+		ifroms, ok := Dig(doc, []string{"data", prop}, false, true)
+		if !ok {
+			Printf("cannot get identities: cannot dig %s in %v\n", prop, DumpKeys(doc))
+			continue
+		}
+		froms, ok := ifroms.([]interface{})
+		if !ok {
+			Printf("cannot get identities: cannot read interface array from %v\n", ifroms)
+			continue
+		}
+		patterns := []string{" at ", "_at_", " en "}
+		for _, ifrom := range froms {
+			from, ok := ifrom.(string)
+			if !ok {
+				Printf("cannot get identities: cannot read string from %v\n", ifrom)
+				continue
+			}
+			from = strings.TrimSpace(from)
+			for _, pattern := range patterns {
+				from = strings.Replace(from, pattern, "@", -1)
+			}
+			emails, e := mail.ParseAddressList(from)
+			if e != nil {
+				Printf("cannot get identities: cannot read email address(es) from %s\n", from)
+				continue
+			}
+			for _, obj := range emails {
+				if !init {
+					identities = make(map[[3]string]struct{})
+					init = true
+				}
+				identities[[3]string{obj.Name, Nil, obj.Address}] = struct{}{}
+			}
+		}
+	}
+	return
+}
+
+// GroupsioEnrichItemsFunc - iterate items and enrich them
+// items is a current pack of input items
+// docs is a pointer to where extracted identities will be stored
+func GroupsioEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]interface{}) (err error) {
+	if ctx.Debug > 0 {
+		Printf("groupsio enrich items %d/%d func\n", len(items), len(*docs))
+	}
+	var (
+		mtx *sync.RWMutex
+		ch  chan error
+	)
+	if thrN > 1 {
+		mtx = &sync.RWMutex{}
+		ch = make(chan error)
+	}
+	dbConfigured := ctx.AffsDBConfigured()
+	nThreads := 0
+	var rich map[string]interface{}
+	procItem := func(c chan error, idx int) (e error) {
+		if thrN > 1 {
+			mtx.RLock()
+		}
+		item := items[idx]
+		if thrN > 1 {
+			mtx.RUnlock()
+		}
+		defer func() {
+			if c != nil {
+				c <- e
+			}
+		}()
+		src, ok := item.(map[string]interface{})["_source"]
+		if !ok {
+			e = fmt.Errorf("Missing _source in item %+v", DumpKeys(item))
+			return
+		}
+		doc, ok := src.(map[string]interface{})
+		if !ok {
+			e = fmt.Errorf("Failed to parse document %+v\n", doc)
+			return
+		}
+		// FIXME: continue
+		if 1 == 0 {
+			Printf("(%v,%v)\n", DumpKeys(rich), dbConfigured)
+		}
+		/*
+				var richItem map[string]interface{}
+				for i, author := range []string{"creator", "assignee", "reporter"} {
+					rich, e = ds.EnrichItem(ctx, doc, author, dbConfigured)
+					if e != nil {
+						return
+					}
+					e = EnrichItem(ctx, ds, rich)
+					if e != nil {
+						return
+					}
+					if thrN > 1 {
+						mtx.Lock()
+					}
+					*docs = append(*docs, rich)
+					if thrN > 1 {
+						mtx.Unlock()
+					}
+					if i == 0 {
+						richItem = rich
+					}
+				}
+				comms, ok := Dig(doc, []string{"data", "comments_data"}, false, true)
+				if !ok {
+					return
+				}
+				comments, _ := comms.([]interface{})
+				if len(comments) == 0 {
+					return
+				}
+				var richComments []interface{}
+				richComments, e = EnrichComments(ctx, ds, comments, richItem, dbConfigured)
+				if e != nil {
+					return
+				}
+				if thrN > 1 {
+					mtx.Lock()
+				}
+				for _, richComment := range richComments {
+					*docs = append(*docs, richComment)
+				}
+			  if thrN > 1 {
+				  mtx.Unlock()
+			  }
+		*/
+		return
+	}
+	if thrN > 1 {
+		for i := range items {
+			go func(i int) {
+				_ = procItem(ch, i)
+			}(i)
+			nThreads++
+			if nThreads == thrN {
+				err = <-ch
+				if err != nil {
+					return
+				}
+				nThreads--
+			}
+		}
+		for nThreads > 0 {
+			err = <-ch
+			nThreads--
+			if err != nil {
+				return
+			}
+		}
+		return
+	}
+	for i := range items {
+		err = procItem(nil, i)
+		if err != nil {
+			return
+		}
+	}
+	return
 }
 
 // EnrichItems - perform the enrichment
 func (j *DSGroupsio) EnrichItems(ctx *Ctx) (err error) {
+	Printf("enriching items\n")
+	err = ForEachESItem(ctx, j, true, ESBulkUploadFunc, GroupsioEnrichItemsFunc, nil)
 	return
 }
 
