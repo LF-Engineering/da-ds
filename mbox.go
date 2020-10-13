@@ -45,7 +45,6 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 	raw := make(map[string][][]byte)
 	addRaw := func(k string, v []byte, replace int) {
 		// replace: 0-add new item, 1-replace current, 2-replace all
-		// Printf("addRaw(%s,%d,%d) '%s'\n", k, len(v), replace, string(v))
 		a, ok := raw[k]
 		if ok {
 			switch replace {
@@ -407,16 +406,6 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 				warn = true
 				break
 			}
-			// FIXME - no more needed in [][]byte raw mode?
-			/*
-				currVal, ok := getRaw(key)
-				if ok {
-					currVal = append(currVal, []byte("\n")...)
-					addRaw(key, append(currVal, val...), 0)
-				} else {
-					addRaw(key, val, 0)
-				}
-			*/
 			addRaw(key, val, 0)
 			currKey = key
 			if strings.ToLower(currKey) == LowerContentType {
@@ -427,16 +416,34 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 	if len(boundary) == 0 {
 		_ = addBody(nLines, []byte{})
 	}
+	getRawStrings := func(k string) (sa []string) {
+		a, ok := raw[k]
+		if !ok {
+			return
+		}
+		l := len(a)
+		for i := l - 1; i >= 0; i-- {
+			sa = append(sa, string(a[i]))
+		}
+		return
+	}
 	ks := []string{}
 	for k := range raw {
 		lk := strings.ToLower(k)
 		sv := string(mustGetRaw(k))
-		item[k] = sv
-		if (lk == "message-id" || lk == "date") && lk != k {
+		sa := getRawStrings(k)
+		item[k] = sa
+		if lk == GroupsioMessageIDField || lk == GroupsioMessageDateField {
 			item[lk] = sv
-			ks = append(ks, lk)
+			if lk != k {
+				ks = append(ks, lk)
+			} else {
+				nk := k + "-raw"
+				item[nk] = sa
+				ks = append(ks, nk)
+			}
 		}
-		if lk == "received" && lk != k {
+		if lk == GroupsioMessageReceivedField && lk != k {
 			raw[lk] = raw[k]
 		}
 		ks = append(ks, k)
@@ -444,23 +451,27 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 	if ctx.Debug > 2 {
 		sort.Strings(ks)
 		for i, k := range ks {
-			Printf("#%d %s: %s\n", i+1, k, item[k])
+			if k == GroupsioMessageReceivedField || k == GroupsioMessageIDField || k == GroupsioMessageDateField {
+				Printf("#%d %s: %s\n", i+1, k, item[k])
+			} else {
+				Printf("#%d %s: %d %v\n", i+1, k, len(item[k].([]string)), item[k])
+			}
 		}
 		for i, body := range bodies {
 			Printf("#%d: %s %s %d\n", i, string(body.ContentType), propertiesString(body.Properties), len(body.Data))
 		}
 	}
-	mid, ok := item["message-id"]
+	mid, ok := item[GroupsioMessageIDField]
 	if !ok {
 		Printf("%s(%d): missing Message-ID field\n", groupName, len(msg))
 		return
 	}
-	item["Message-ID"] = mid
+	item[GroupsioMessageIDField] = mid
 	var dt time.Time
 	found := false
-	mdt, ok := item["date"]
+	mdt, ok := item[GroupsioMessageDateField]
 	if !ok {
-		rcvs, ok := raw["received"]
+		rcvs, ok := raw[GroupsioMessageReceivedField]
 		if !ok {
 			Printf("%s(%d): missing Date & Received fields\n", groupName, len(msg))
 		}
@@ -485,16 +496,52 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		found = true
 	}
 	if !found {
-		dt, ok = ParseMBoxDate(mdt.(string))
+		sdt, ok := mdt.(string)
 		if !ok {
-			Printf("%s(%d): unable to parse date from '%s'\n", groupName, len(msg), mdt)
+			Printf("%s(%d): non-string date field %v\n", groupName, len(msg), mdt)
+		}
+		dt, ok = ParseMBoxDate(sdt)
+		if !ok {
+			Printf("%s(%d): unable to parse date from '%s'\n", groupName, len(msg), sdt)
 			return
 		}
 	}
-	//Printf("dt=%v\n", dt)
-	item["Date"] = dt
-	// FIXME: continue
-	// valid = true
+	item[GroupsioMessageDateField] = dt
+	bodyKeys := make(map[string]struct{})
+	item["data"] = make(map[string]interface{})
+	for i, body := range bodies {
+		contentType := string(body.ContentType)
+		ary := strings.Split(contentType, ";")
+		contentType = strings.TrimSpace(ary[0])
+		props := strings.Split(contentType, "/")
+		for i := range props {
+			props[i] = strings.TrimSpace(props[i])
+		}
+		sBody := BytesToStringTrunc(body.Data, MaxMessageBodyLength)
+		m := make(map[string]interface{})
+		m["data"] = sBody
+		m["content-type"] = string(body.ContentType)
+		m["headers"] = make(map[string]string)
+		for k, v := range body.Properties {
+			m["headers"].(map[string]string)[k] = string(v)
+		}
+		m["num"] = i
+		path := []string{"data"}
+		path = append(path, props...)
+		key := strings.Join(path, "/")
+		_, ok := bodyKeys[key]
+		if !ok {
+			FatalOnError(DeepSet(item, path, []interface{}{m}, true))
+			bodyKeys[key] = struct{}{}
+		} else {
+			iface, _ := Dig(item, path, true, false)
+			ifary, _ := iface.([]interface{})
+			ifary = append(ifary, m)
+			FatalOnError(DeepSet(item, path, ifary, true))
+		}
+		//Printf("#%d: %s %s %d\n", i, string(body.ContentType), propertiesString(body.Properties), len(body.Data))
+	}
+	valid = true
 	return
 }
 

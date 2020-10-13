@@ -63,3 +63,23 @@ os.Exit(1)
 		}
 	}
 	os.Exit(1)
+
+	// FIXME: start
+	dbg := ctx.Debug
+	ctx.Debug = 0
+	fns, err := lib.ExecCommand(&ctx, []string{"find", "/root/mbox/", "-iname", "*.mbox"})
+	lib.FatalOnError(err)
+	ctx.Debug = dbg
+	for _, fn := range strings.Split(fns, "\n") {
+		if fn == "" {
+			continue
+		}
+		if strings.HasPrefix(fn, "xxx") {
+			continue
+		}
+		data, err := ioutil.ReadFile(fn)
+		lib.FatalOnError(err)
+		_, _, _ = lib.ParseMBoxMsg(&ctx, fn, data)
+	}
+	os.Exit(1)
+	// FIXME: end

@@ -34,11 +34,15 @@ const (
 	// GroupsioMBoxFile - default messages file name
 	GroupsioMBoxFile = "messages.zip"
 	// GroupsioMessageIDField - message ID field from email
-	GroupsioMessageIDField = "Message-ID"
+	GroupsioMessageIDField = "message-id"
 	// GroupsioMessageDateField - message ID field from email
-	GroupsioMessageDateField = "Date"
+	GroupsioMessageDateField = "date"
+	// GroupsioMessageReceivedField - message Received filed
+	GroupsioMessageReceivedField = "received"
 	// GroupsioDefaultSearchField - default search field
 	GroupsioDefaultSearchField = "item_id"
+	// MaxMessageBodyLength - trucacte message bodies longer than this (per each multi-body email part)
+	MaxMessageBodyLength = 1000
 )
 
 var (
@@ -343,10 +347,11 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 	empty := 0
 	warns := 0
 	invalid := 0
+	filtered := 0
 	if thrN > 1 {
 		statMtx = &sync.Mutex{}
 	}
-	stat := func(emp, warn, valid bool) {
+	stat := func(emp, warn, valid, oor bool) {
 		if thrN > 1 {
 			statMtx.Lock()
 		}
@@ -358,6 +363,9 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 		}
 		if !valid {
 			invalid++
+		}
+		if oor {
+			filtered++
 		}
 		if thrN > 1 {
 			statMtx.Unlock()
@@ -371,7 +379,7 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 		}()
 		nBytes := len(msg)
 		if nBytes < len(GroupsioMBoxMsgSeparator) {
-			stat(true, false, false)
+			stat(true, false, false, false)
 			return
 		}
 		if !bytes.HasPrefix(msg, GroupsioMBoxMsgSeparator[1:]) {
@@ -383,8 +391,13 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 			message map[string]interface{}
 		)
 		message, valid, warn = ParseMBoxMsg(ctx, j.GroupName, msg)
-		stat(false, warn, valid)
+		stat(false, warn, valid, false)
 		if !valid {
+			return
+		}
+		updatedOn := j.ItemUpdatedOn(message)
+		if ctx.DateFrom != nil && updatedOn.Before(from) {
+			stat(false, false, false, true)
 			return
 		}
 		esItem := j.AddMetadata(ctx, message)
@@ -512,6 +525,9 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 	}
 	if invalid > 0 {
 		Printf("%d invalid messages\n", invalid)
+	}
+	if filtered > 0 {
+		Printf("%d filtered messages (updated before %v)\n", invalid, from)
 	}
 	return
 }
