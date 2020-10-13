@@ -601,12 +601,10 @@ func (j *DSGroupsio) ItemID(item interface{}) string {
 // ItemUpdatedOn - return updated on date for an item
 func (j *DSGroupsio) ItemUpdatedOn(item interface{}) time.Time {
 	iUpdated, _ := Dig(item, []string{GroupsioMessageDateField}, true, false)
-	sUpdated, ok := iUpdated.(string)
+	updated, ok := iUpdated.(time.Time)
 	if !ok {
 		Fatalf("%s: ItemUpdatedOn() - cannot extract %s from %+v", j.DS, GroupsioMessageDateField, DumpKeys(item))
 	}
-	updated, err := TimeParseES(sUpdated)
-	FatalOnError(err)
 	return updated
 }
 
