@@ -743,7 +743,6 @@ func GroupsioEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, doc
 	}
 	dbConfigured := ctx.AffsDBConfigured()
 	nThreads := 0
-	var rich map[string]interface{}
 	groupsio, _ := ds.(*DSGroupsio)
 	procItem := func(c chan error, idx int) (e error) {
 		if thrN > 1 {
@@ -788,9 +787,9 @@ func GroupsioEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, doc
 			}
 			return
 		}
+		var rich map[string]interface{}
 		for identity, origin := range identities {
 			auth := getAuthorPrefix(origin)
-			Printf("enriching %v origin=%v author=%s\n", origin, auth)
 			rich, e = ds.EnrichItem(ctx, doc, auth, dbConfigured, identity)
 			if e != nil {
 				return

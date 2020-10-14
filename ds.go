@@ -889,7 +889,7 @@ func Enrich(ctx *Ctx, ds DS) (err error) {
 		}
 		return
 	}
-	if ctx.AffsDBConfigured() {
+	if ctx.AffsDBConfigured() && !ctx.NoIdentities {
 		err = UploadIdentities(ctx, ds)
 		if err != nil {
 			Fatalf(ds.Name()+": UploadIdentities error: %+v\n", err)

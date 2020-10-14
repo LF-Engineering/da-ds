@@ -336,7 +336,6 @@ func StubEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[
 	}
 	dbConfigured := ctx.AffsDBConfigured()
 	nThreads := 0
-	var rich map[string]interface{}
 	procItem := func(c chan error, idx int) (e error) {
 		if thrN > 1 {
 			mtx.RLock()
@@ -360,16 +359,19 @@ func StubEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[
 			e = fmt.Errorf("Failed to parse document %+v\n", doc)
 			return
 		}
-		Printf("(%v,%v)\n", DumpKeys(rich), dbConfigured)
+		if 1 == 0 {
+			Printf("%v\n", dbConfigured)
+		}
 		// Actual item enrichment
 		/*
-			if thrN > 1 {
-				mtx.Lock()
-			}
-			*docs = append(*docs, rich)
-			if thrN > 1 {
-				mtx.Unlock()
-			}
+    var rich map[string]interface{}
+		if thrN > 1 {
+			mtx.Lock()
+		}
+		*docs = append(*docs, rich)
+		if thrN > 1 {
+			mtx.Unlock()
+		}
 		*/
 		return
 	}

@@ -950,7 +950,6 @@ func JiraEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[
 	}
 	dbConfigured := ctx.AffsDBConfigured()
 	nThreads := 0
-	var rich map[string]interface{}
 	procItem := func(c chan error, idx int) (e error) {
 		if thrN > 1 {
 			mtx.RLock()
@@ -974,7 +973,10 @@ func JiraEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[
 			e = fmt.Errorf("Failed to parse document %+v\n", doc)
 			return
 		}
-		var richItem map[string]interface{}
+		var (
+			rich     map[string]interface{}
+			richItem map[string]interface{}
+		)
 		for i, author := range []string{"creator", "assignee", "reporter"} {
 			rich, e = ds.EnrichItem(ctx, doc, author, dbConfigured, nil)
 			if e != nil {
