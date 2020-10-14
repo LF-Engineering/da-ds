@@ -20,7 +20,7 @@ import (
 
 const (
 	// GroupsioBackendVersion - backend version
-	GroupsioBackendVersion = "0.0.0"
+	GroupsioBackendVersion = "0.1.0"
 	// GroupsioURLRoot - root url for group name origin
 	GroupsioURLRoot = "https://groups.io/g/"
 	// GroupsioAPIURL - Groups.io API URL
