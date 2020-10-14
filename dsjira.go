@@ -52,7 +52,7 @@ var (
 	// JiraRichMapping - Jira rich index mapping
 	JiraRichMapping = []byte(`{"properties":{"main_description_analyzed":{"type":"text","index":true},"releases":{"type":"keyword"},"body":{"type":"text","index":true}}}`)
 	// JiraRoles - roles defined for Jira backend
-	JiraRoles = []string{"assignee", "reporter", "creator", "author", "updateAuthor"}
+	JiraRoles = []string{"assignee", "reporter", "creator", Author, "updateAuthor"}
 	// JiraCategories - categories defined for Jira
 	JiraCategories = map[string]struct{}{"issue": {}}
 )
@@ -824,7 +824,7 @@ func (j *DSJira) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3
 			err = fmt.Errorf("Cannot parse %+v\n", rawComment)
 			return
 		}
-		for _, field := range []string{"author", "updateAuthor"} {
+		for _, field := range []string{Author, "updateAuthor"} {
 			f, ok := comment[field].(map[string]interface{})
 			if !ok {
 				// Printf("Field %s not found\n", field)
@@ -868,7 +868,7 @@ func EnrichComments(ctx *Ctx, ds DS, comments []interface{}, item map[string]int
 		richComment["issue_key"] = item["key"]
 		richComment["issue_url"] = item["url"]
 
-		authors := []string{"author", "updateAuthor"}
+		authors := []string{Author, "updateAuthor"}
 		for _, a := range authors {
 			author, ok := Dig(comment, []string{a}, false, true)
 			if ok {
@@ -913,7 +913,7 @@ func EnrichComments(ctx *Ctx, ds DS, comments []interface{}, item map[string]int
 		if affs {
 			var affsItems map[string]interface{}
 			itemComment := map[string]interface{}{"data": map[string]interface{}{"fields": comment}}
-			affsItems, err = ds.AffsItems(ctx, itemComment, []string{"author", "updateAuthor"}, created)
+			affsItems, err = ds.AffsItems(ctx, itemComment, []string{Author, "updateAuthor"}, created)
 			if err != nil {
 				return
 			}
@@ -976,7 +976,7 @@ func JiraEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[
 		}
 		var richItem map[string]interface{}
 		for i, author := range []string{"creator", "assignee", "reporter"} {
-			rich, e = ds.EnrichItem(ctx, doc, author, dbConfigured)
+			rich, e = ds.EnrichItem(ctx, doc, author, dbConfigured, nil)
 			if e != nil {
 				return
 			}
@@ -1059,7 +1059,7 @@ func (j *DSJira) EnrichItems(ctx *Ctx) (err error) {
 }
 
 // EnrichItem - return rich item from raw item for a given author type
-func (j *DSJira) EnrichItem(ctx *Ctx, item map[string]interface{}, author string, affs bool) (rich map[string]interface{}, err error) {
+func (j *DSJira) EnrichItem(ctx *Ctx, item map[string]interface{}, author string, affs bool, extra interface{}) (rich map[string]interface{}, err error) {
 	// copy RawFields
 	rich = make(map[string]interface{})
 	for _, field := range RawFields {
@@ -1311,7 +1311,7 @@ func (j *DSJira) EnrichItem(ctx *Ctx, item map[string]interface{}, author string
 		}
 		suffs := []string{"_id", "_uuid", "_name", "_user_name", "_domain", "_gender", "_gender_acc", "_org_name", "_bot"}
 		for _, suff := range suffs {
-			rich["author"+suff] = rich[author+suff]
+			rich[Author+suff] = rich[author+suff]
 		}
 		orgsKey := author + MultiOrgNames
 		_, ok := Dig(rich, []string{orgsKey}, false, true)

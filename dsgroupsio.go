@@ -10,6 +10,7 @@ import (
 	neturl "net/url"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -624,16 +625,17 @@ func (j *DSGroupsio) ElasticRichMapping() []byte {
 	return GroupsioRichMapping
 }
 
-// GetItemIdentities return list of item's identities, each one is [3]string
+// GetItemIdentitiesEx return list of item's identities, each one is [3]string
 // (name, username, email) tripples, special value Nil "<nil>" means null
 // we use string and not *string which allows nil to allow usage as a map key
-func (j *DSGroupsio) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3]string]struct{}, err error) {
+// This one (Ex) also returns information about identity's origin (from or to)
+func (j *DSGroupsio) GetItemIdentitiesEx(ctx *Ctx, doc interface{}) (identities map[[3]string]string) {
 	init := false
 	props := []string{"From", "To"}
 	for _, prop := range props {
+		lProp := strings.ToLower(prop)
 		ifroms, ok := Dig(doc, []string{"data", prop}, false, true)
 		if !ok {
-			lProp := strings.ToLower(prop)
 			ifroms, ok = Dig(doc, []string{"data", lProp}, false, true)
 			if !ok {
 				if ctx.Debug > 1 {
@@ -699,12 +701,27 @@ func (j *DSGroupsio) GetItemIdentities(ctx *Ctx, doc interface{}) (identities ma
 					continue
 				}
 				if !init {
-					identities = make(map[[3]string]struct{})
+					identities = make(map[[3]string]string)
 					init = true
 				}
-				identities[[3]string{obj.Name, Nil, obj.Address}] = struct{}{}
+				identities[[3]string{obj.Name, Nil, obj.Address}] = lProp
 			}
 		}
+	}
+	return
+}
+
+// GetItemIdentities return list of item's identities, each one is [3]string
+// (name, username, email) tripples, special value Nil "<nil>" means null
+// we use string and not *string which allows nil to allow usage as a map key
+func (j *DSGroupsio) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3]string]struct{}, err error) {
+	sIdentities := j.GetItemIdentitiesEx(ctx, doc)
+	if sIdentities == nil || len(sIdentities) == 0 {
+		return
+	}
+	identities = make(map[[3]string]struct{})
+	for k := range sIdentities {
+		identities[k] = struct{}{}
 	}
 	return
 }
@@ -727,6 +744,7 @@ func GroupsioEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, doc
 	dbConfigured := ctx.AffsDBConfigured()
 	nThreads := 0
 	var rich map[string]interface{}
+	groupsio, _ := ds.(*DSGroupsio)
 	procItem := func(c chan error, idx int) (e error) {
 		if thrN > 1 {
 			mtx.RLock()
@@ -750,55 +768,45 @@ func GroupsioEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, doc
 			e = fmt.Errorf("Failed to parse document %+v\n", doc)
 			return
 		}
-		// FIXME: continue
-		if 1 == 0 {
-			Printf("(%v,%v)\n", DumpKeys(rich), dbConfigured)
+		identities := groupsio.GetItemIdentitiesEx(ctx, doc)
+		if identities == nil || len(identities) == 0 {
+			Printf("no identities to enrich in %v\n", doc)
+			return
 		}
-		/*
-				var richItem map[string]interface{}
-				for i, author := range []string{"creator", "assignee", "reporter"} {
-					rich, e = ds.EnrichItem(ctx, doc, author, dbConfigured)
-					if e != nil {
-						return
-					}
-					e = EnrichItem(ctx, ds, rich)
-					if e != nil {
-						return
-					}
-					if thrN > 1 {
-						mtx.Lock()
-					}
-					*docs = append(*docs, rich)
-					if thrN > 1 {
-						mtx.Unlock()
-					}
-					if i == 0 {
-						richItem = rich
-					}
-				}
-				comms, ok := Dig(doc, []string{"data", "comments_data"}, false, true)
-				if !ok {
-					return
-				}
-				comments, _ := comms.([]interface{})
-				if len(comments) == 0 {
-					return
-				}
-				var richComments []interface{}
-				richComments, e = EnrichComments(ctx, ds, comments, richItem, dbConfigured)
-				if e != nil {
-					return
-				}
-				if thrN > 1 {
-					mtx.Lock()
-				}
-				for _, richComment := range richComments {
-					*docs = append(*docs, richComment)
-				}
-			  if thrN > 1 {
-				  mtx.Unlock()
-			  }
-		*/
+		counts := make(map[string]int)
+		getAuthorPrefix := func(origin string) (author string) {
+			origin = strings.ToLower(origin)
+			cnt, _ := counts[origin]
+			cnt++
+			counts[origin] = cnt
+			author = Author
+			if origin != "from" {
+				author = "recipient"
+			}
+			if cnt > 1 {
+				author += strconv.Itoa(cnt)
+			}
+			return
+		}
+		for identity, origin := range identities {
+			auth := getAuthorPrefix(origin)
+			Printf("enriching %v origin=%v author=%s\n", origin, auth)
+			rich, e = ds.EnrichItem(ctx, doc, auth, dbConfigured, identity)
+			if e != nil {
+				return
+			}
+			e = EnrichItem(ctx, ds, rich)
+			if e != nil {
+				return
+			}
+			if thrN > 1 {
+				mtx.Lock()
+			}
+			*docs = append(*docs, rich)
+			if thrN > 1 {
+				mtx.Unlock()
+			}
+		}
 		return
 	}
 	if thrN > 1 {
@@ -841,7 +849,7 @@ func (j *DSGroupsio) EnrichItems(ctx *Ctx) (err error) {
 }
 
 // EnrichItem - return rich item from raw item for a given author type
-func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, author string, affs bool) (rich map[string]interface{}, err error) {
+func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, author string, affs bool, extra interface{}) (rich map[string]interface{}, err error) {
 	rich = item
 	return
 }
@@ -858,5 +866,5 @@ func (j *DSGroupsio) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role
 
 // AllRoles - return all roles defined for Groupsio backend
 func (j *DSGroupsio) AllRoles(ctx *Ctx) []string {
-	return []string{"author"}
+	return []string{Author}
 }

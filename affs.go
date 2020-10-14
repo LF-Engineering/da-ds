@@ -507,8 +507,8 @@ func AffsDataForRoles(ctx *Ctx, ds DS, rich map[string]interface{}, roles []stri
 			data[prop] = value
 		}
 	}
-	if idAuthor != nil && authorField != "author" {
-		affsIdentity := IdenityAffsData(ctx, ds, nil, idAuthor, date, "author")
+	if idAuthor != nil && authorField != Author {
+		affsIdentity := IdenityAffsData(ctx, ds, nil, idAuthor, date, Author)
 		for prop, value := range affsIdentity {
 			data[prop] = value
 		}

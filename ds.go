@@ -55,7 +55,7 @@ type DS interface {
 	AddMetadata(*Ctx, interface{}) map[string]interface{}
 	GetItemIdentities(*Ctx, interface{}) (map[[3]string]struct{}, error)
 	EnrichItems(*Ctx) error
-	EnrichItem(*Ctx, map[string]interface{}, string, bool) (map[string]interface{}, error)
+	EnrichItem(*Ctx, map[string]interface{}, string, bool, interface{}) (map[string]interface{}, error)
 	AffsItems(*Ctx, map[string]interface{}, []string, interface{}) (map[string]interface{}, error)
 	GetRoleIdentity(*Ctx, map[string]interface{}, string) map[string]interface{}
 	AllRoles(*Ctx) []string

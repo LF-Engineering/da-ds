@@ -413,7 +413,7 @@ func (j *DSStub) EnrichItems(ctx *Ctx) (err error) {
 }
 
 // EnrichItem - return rich item from raw item for a given author type
-func (j *DSStub) EnrichItem(ctx *Ctx, item map[string]interface{}, author string, affs bool) (rich map[string]interface{}, err error) {
+func (j *DSStub) EnrichItem(ctx *Ctx, item map[string]interface{}, author string, affs bool, extra interface{}) (rich map[string]interface{}, err error) {
 	// IMPL:
 	rich = item
 	return
@@ -434,5 +434,5 @@ func (j *DSStub) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role str
 // AllRoles - return all roles defined for the backend
 func (j *DSStub) AllRoles(ctx *Ctx) []string {
 	// IMPL:
-	return []string{"author"}
+	return []string{Author}
 }
