@@ -43,6 +43,12 @@ var (
 func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]interface{}, valid, warn bool) {
 	item = make(map[string]interface{})
 	raw := make(map[string][][]byte)
+	defer func() {
+		item["MBox-Valid"] = valid
+		item["MBox-Warn"] = warn
+	}()
+	item["MBox-Bytes-Length"] = len(msg)
+	item["MBox-Group-Name"] = groupName
 	addRaw := func(k string, v []byte, replace int) {
 		// replace: 0-add new item, 1-replace current, 2-replace all
 		a, ok := raw[k]
@@ -79,6 +85,7 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		return
 	}
 	lines := bytes.Split(msg, GroupsioMsgLineSeparator)
+	item["MBox-N-Lines"] = len(lines)
 	boundary := []byte("")
 	isContinue := func(i int, line []byte) (is bool) {
 		is = bytes.HasPrefix(line, []byte(" ")) || bytes.HasPrefix(line, []byte("\t"))
@@ -122,14 +129,14 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 	}
 	type Body struct {
 		ContentType []byte
-		Properties  map[string][]byte
+		Properties  map[string][][]byte
 		Data        []byte
 	}
 	bodies := []Body{}
 	currContentType := []byte{}
-	currProperties := make(map[string][]byte)
+	currProperties := make(map[string][][]byte)
 	currData := []byte{}
-	propertiesString := func(props map[string][]byte) (s string) {
+	propertiesString := func(props map[string][][]byte) (s string) {
 		s = "{"
 		ks := []string{}
 		for k := range props {
@@ -141,7 +148,17 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		}
 		sort.Strings(ks)
 		for _, k := range ks {
-			s += k + ":" + string(props[k]) + " "
+			prop := props[k]
+			if len(prop) == 1 {
+				s += k + ":" + string(prop[0]) + " "
+			} else {
+				s2 := "["
+				for _, p := range prop {
+					s2 += string(p) + " "
+				}
+				s2 = s2[:len(s2)-1] + "]"
+				s += k + ":" + s2 + " "
+			}
 		}
 		s = s[:len(s)-1] + "}"
 		return
@@ -159,7 +176,7 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 				Printf("message(%d,%s,%s): '%s'\n", len(msg), string(currContentType), propertiesString(currProperties), string(currData))
 			}
 			currContentType = []byte{}
-			currProperties = make(map[string][]byte)
+			currProperties = make(map[string][][]byte)
 			currData = []byte{}
 		}()
 		bodies = append(bodies, Body{ContentType: currContentType, Properties: currProperties, Data: currData})
@@ -168,7 +185,7 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 	}
 	savedBoundary := [][]byte{}
 	savedContentType := [][]byte{}
-	savedProperties := []map[string][]byte{}
+	savedProperties := []map[string][][]byte{}
 	push := func(newBoundary []byte) {
 		savedBoundary = append(savedBoundary, boundary)
 		savedContentType = append(savedContentType, currContentType)
@@ -212,10 +229,10 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 					spaceSep := []byte(" ")
 					ary2 := bytes.Split(data, spaceSep)
 					if len(ary2) == 1 {
-						addRaw("Mbox-From", data, 2)
+						addRaw("MBox-From", data, 2)
 					} else {
-						addRaw("Mbox-From", ary2[0], 2)
-						addRaw("Mbox-Date", bytes.Join(ary2[1:], spaceSep), 2)
+						addRaw("MBox-From", ary2[0], 2)
+						addRaw("MBox-Date", bytes.Join(ary2[1:], spaceSep), 2)
 					}
 				}
 			}
@@ -255,11 +272,12 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 				} else {
 					currContentType = contentType
 					for _, bodyProperty := range possibleBodyProperties {
-						propertyVal, ok := getRaw(bodyProperty)
+						//propertyVal, ok := getRaw(bodyProperty)
+						propertyVal, ok := raw[bodyProperty]
 						if ok {
 							currProperties[bodyProperty] = propertyVal
 						} else {
-							propertyVal, ok := getRaw(strings.ToLower(bodyProperty))
+							propertyVal, ok := raw[strings.ToLower(bodyProperty)]
 							if ok {
 								currProperties[bodyProperty] = propertyVal
 							}
@@ -371,7 +389,12 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 						}
 						continue
 					}
-					currProperties[key] = val
+					vals, ok := currProperties[key]
+					if !ok {
+						currProperties[key] = [][]byte{val}
+						continue
+					}
+					currProperties[key] = append(vals, val)
 					continue
 				}
 				bodyHeadersParsed = true
@@ -432,7 +455,12 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		lk := strings.ToLower(k)
 		sv := string(mustGetRaw(k))
 		sa := getRawStrings(k)
-		item[k] = sa
+		lsa := len(sa)
+		if lsa == 1 {
+			item[k] = sa[0]
+		} else {
+			item[k] = sa
+		}
 		if lk == GroupsioMessageIDField || lk == GroupsioMessageDateField {
 			item[lk] = sv
 			if lk != k {
@@ -440,6 +468,11 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 			} else {
 				nk := k + "-raw"
 				item[nk] = sa
+				if lsa == 1 {
+					item[nk] = sa[0]
+				} else {
+					item[nk] = sa
+				}
 				ks = append(ks, nk)
 			}
 		}
@@ -452,21 +485,25 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		sort.Strings(ks)
 		for i, k := range ks {
 			if k == GroupsioMessageReceivedField || k == GroupsioMessageIDField || k == GroupsioMessageDateField {
-				Printf("#%d %s: %s\n", i+1, k, item[k])
+				Printf("#%d %s: %v\n", i+1, k, item[k])
 			} else {
-				Printf("#%d %s: %d %v\n", i+1, k, len(item[k].([]string)), item[k])
+				a, ok := item[k].([]string)
+				if ok {
+					Printf("#%d %s: %d %v\n", i+1, k, len(a), a)
+				} else {
+					Printf("#%d %s: %v\n", i+1, k, item[k])
+				}
 			}
 		}
 		for i, body := range bodies {
 			Printf("#%d: %s %s %d\n", i, string(body.ContentType), propertiesString(body.Properties), len(body.Data))
 		}
 	}
-	mid, ok := item[GroupsioMessageIDField]
+	_, ok := item[GroupsioMessageIDField]
 	if !ok {
 		Printf("%s(%d): missing Message-ID field\n", groupName, len(msg))
 		return
 	}
-	item[GroupsioMessageIDField] = mid
 	var dt time.Time
 	found := false
 	mdt, ok := item[GroupsioMessageDateField]
@@ -507,6 +544,7 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		}
 	}
 	item[GroupsioMessageDateField] = dt
+	item["MBox-N-Bodies"] = len(bodies)
 	bodyKeys := make(map[string]struct{})
 	item["data"] = make(map[string]interface{})
 	for i, body := range bodies {
@@ -521,9 +559,17 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		m := make(map[string]interface{})
 		m["data"] = sBody
 		m["content-type"] = string(body.ContentType)
-		m["headers"] = make(map[string]string)
+		m["headers"] = make(map[string]interface{})
 		for k, v := range body.Properties {
-			m["headers"].(map[string]string)[k] = string(v)
+			if len(v) == 1 {
+				m["headers"].(map[string]interface{})[k] = string(v[0])
+			} else {
+				a := []string{}
+				for _, vi := range v {
+					a = append(a, string(vi))
+				}
+				m["headers"].(map[string]interface{})[k] = a
+			}
 		}
 		m["num"] = i
 		path := []string{"data"}

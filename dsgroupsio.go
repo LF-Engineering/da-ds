@@ -256,7 +256,7 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 		Fatalf("you are not subscribed to %s, your subscriptions(%d): %s\ndownload allowed for(%d): %s", j.GroupName, len(subs), strings.Join(subs, ", "), len(dls), strings.Join(dls, ", "))
 		return
 	}
-	Printf("found group ID %d\n", groupID)
+	Printf("%s found group ID %d\n", j.GroupName, groupID)
 	// We do have cookies now (from either real request or from the L2 cache)
 	//url := GroupsioAPIURL + GroupsioAPILogin + `?email=` + neturl.QueryEscape(j.Email) + `&password=` + neturl.QueryEscape(j.Password)
 	url = GroupsioAPIURL + GroupsioAPIDownloadArchives + `?group_id=` + fmt.Sprintf("%d", groupID)
@@ -633,13 +633,25 @@ func (j *DSGroupsio) GetItemIdentities(ctx *Ctx, doc interface{}) (identities ma
 	for _, prop := range props {
 		ifroms, ok := Dig(doc, []string{"data", prop}, false, true)
 		if !ok {
-			Printf("cannot get identities: cannot dig %s in %v\n", prop, DumpKeys(doc))
-			continue
+			lProp := strings.ToLower(prop)
+			ifroms, ok = Dig(doc, []string{"data", lProp}, false, true)
+			if !ok {
+				if ctx.Debug > 1 {
+					Printf("cannot get identities: cannot dig %s/%s in %v\n", prop, lProp, doc)
+				}
+				continue
+			}
 		}
+		// Property can be an array
 		froms, ok := ifroms.([]interface{})
 		if !ok {
-			Printf("cannot get identities: cannot read interface array from %v\n", ifroms)
-			continue
+			// Or can be a string
+			sfroms, ok := ifroms.(string)
+			if !ok {
+				Printf("cannot get identities: cannot read string or interface array from %v\n", ifroms)
+				continue
+			}
+			froms = []interface{}{sfroms}
 		}
 		patterns := []string{" at ", "_at_", " en "}
 		for _, ifrom := range froms {
@@ -654,10 +666,38 @@ func (j *DSGroupsio) GetItemIdentities(ctx *Ctx, doc interface{}) (identities ma
 			}
 			emails, e := mail.ParseAddressList(from)
 			if e != nil {
-				Printf("cannot get identities: cannot read email address(es) from %s\n", from)
-				continue
+				nFrom := strings.Replace(from, `"`, "", -1)
+				emails, e = mail.ParseAddressList(nFrom)
+				if e != nil {
+					emails = []*mail.Address{}
+					ary := strings.Split(nFrom, ",")
+					for _, f := range ary {
+						f = strings.TrimSpace(f)
+						email, e := mail.ParseAddress(f)
+						if e == nil {
+							emails = append(emails, email)
+							if ctx.Debug > 1 {
+								Printf("unable to parse '%s' but '%s' parsed to %v ('%s','%s')\n", nFrom, f, email, email.Name, email.Address)
+							}
+						}
+					}
+					if len(emails) == 0 {
+						if ctx.Debug > 1 {
+							Printf("cannot get identities: cannot read email address(es) from %s\n", from)
+						}
+						continue
+					}
+				}
 			}
 			for _, obj := range emails {
+				// remove leading/trailing ' "
+				// skip if starts with =?
+				// should we allow empty name?
+				obj.Name = strings.Trim(obj.Name, `"'`)
+				obj.Address = strings.Trim(obj.Address, `"'`)
+				if strings.HasPrefix(obj.Name, "=?") {
+					continue
+				}
 				if !init {
 					identities = make(map[[3]string]struct{})
 					init = true
