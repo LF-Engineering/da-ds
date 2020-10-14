@@ -700,6 +700,10 @@ func (j *DSGroupsio) GetItemIdentitiesEx(ctx *Ctx, doc interface{}) (identities 
 				obj.Name = strings.Trim(obj.Name, `"'`)
 				obj.Address = strings.Trim(obj.Address, `"'`)
 				if strings.HasPrefix(obj.Name, "=?") {
+					if ctx.Debug > 0 {
+						Printf("%s clearing buggy name '%s'\n", lProp, obj.Name)
+					}
+					obj.Name = ""
 					continue
 				}
 				if !init {
@@ -822,7 +826,11 @@ func GroupsioEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, doc
 			}
 		}
 		if !authorFound {
-			e = fmt.Errorf("no author found in\n%v\n%v\n", identities, item)
+			if ctx.Debug > 1 {
+				Printf("no author found in\n%v\n%v\n", identities, item)
+			} else {
+				Printf("skipping email due to missing usable from email %v\n", identities)
+			}
 			return
 		}
 		e = EnrichItem(ctx, ds, rich)
