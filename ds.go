@@ -58,7 +58,7 @@ type DS interface {
 	EnrichItem(*Ctx, map[string]interface{}, string, bool, interface{}) (map[string]interface{}, error)
 	AffsItems(*Ctx, map[string]interface{}, []string, interface{}) (map[string]interface{}, error)
 	GetRoleIdentity(*Ctx, map[string]interface{}, string) map[string]interface{}
-	AllRoles(*Ctx) []string
+	AllRoles(*Ctx, map[string]interface{}) ([]string, bool)
 }
 
 // CommonFields - common rich item fields
@@ -388,7 +388,7 @@ func ItemsRefreshIdentitiesFunc(ctx *Ctx, ds DS, thrN int, richItems []interface
 	if ctx.Debug > 0 {
 		Printf("refresh identities %d/%d func\n", len(richItems), len(*docs))
 	}
-	roles := ds.AllRoles(ctx)
+	roles, staticRoles := ds.AllRoles(ctx, nil)
 	var values map[string]interface{}
 	for _, richItem := range richItems {
 		doc, ok := richItem.(map[string]interface{})["_source"]
@@ -397,6 +397,9 @@ func ItemsRefreshIdentitiesFunc(ctx *Ctx, ds DS, thrN int, richItems []interface
 			return
 		}
 		rich, _ := doc.(map[string]interface{})
+		if !staticRoles {
+			roles, _ = ds.AllRoles(ctx, rich)
+		}
 		values = AffsDataForRoles(ctx, ds, rich, roles)
 		for prop, val := range values {
 			rich[prop] = val

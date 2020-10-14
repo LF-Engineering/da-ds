@@ -434,7 +434,10 @@ func (j *DSStub) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role str
 }
 
 // AllRoles - return all roles defined for the backend
-func (j *DSStub) AllRoles(ctx *Ctx) []string {
+// roles can be static (always the same) or dynamic (per item)
+// second return parameter is static mode (true/false)
+// dynamic roles will use item to get its roles
+func (j *DSStub) AllRoles(ctx *Ctx, item map[string]interface{}) ([]string, bool) {
 	// IMPL:
-	return []string{Author}
+	return []string{Author}, true
 }

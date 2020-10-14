@@ -1378,6 +1378,9 @@ func (j *DSJira) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role str
 }
 
 // AllRoles - return all roles defined for Jira backend
-func (j *DSJira) AllRoles(ctx *Ctx) []string {
-	return JiraRoles
+// roles can be static (always the same) or dynamic (per item)
+// second return parameter is static mode (true/false)
+// dynamic roles will use item to get its roles
+func (j *DSJira) AllRoles(ctx *Ctx, item map[string]interface{}) ([]string, bool) {
+	return JiraRoles, true
 }

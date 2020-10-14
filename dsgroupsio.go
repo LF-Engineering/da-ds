@@ -273,8 +273,8 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 		url += `&start_time=` + neturl.QueryEscape(ToYMDTHMSZDate(from))
 	}
 	Printf("fetching messages from: %s\n", url)
-  // Groups.io blocks downloading archives more often than 24 hours
-	cacheMsgDur := time.Duration(24) * time.Hour + time.Duration(5) * time.Minute
+	// Groups.io blocks downloading archives more often than 24 hours
+	cacheMsgDur := time.Duration(24)*time.Hour + time.Duration(5)*time.Minute
 	res, status, _, err = Request(
 		ctx,
 		url,
@@ -787,7 +787,7 @@ func GroupsioEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, doc
 			counts[origin] = cnt
 			author = Author
 			if origin != From {
-				author = "recipient"
+				author = Recipient
 			}
 			if cnt > 1 {
 				author += strconv.Itoa(cnt)
@@ -1025,6 +1025,10 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 			rich["body_extract"] = ""
 		}
 		rich["tz"] = nil
+		rich["mbox_parse_warning"], _ = Dig(msg, []string{"MBox-Warn"}, true, false)
+		rich["mbox_bytes_length"], _ = Dig(msg, []string{"MBox-Bytes-Length"}, true, false)
+		rich["mbox_n_lines"], _ = Dig(msg, []string{"MBox-N-Lines"}, true, false)
+		rich["mbox_n_bodies"], _ = Dig(msg, []string{"MBox-N-Bodies"}, true, false)
 		for prop, value := range CommonFields(j, msgDate, Message) {
 			rich[prop] = value
 		}
@@ -1079,6 +1083,28 @@ func (j *DSGroupsio) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role
 }
 
 // AllRoles - return all roles defined for Groupsio backend
-func (j *DSGroupsio) AllRoles(ctx *Ctx) []string {
-	return []string{Author}
+// roles can be static (always the same) or dynamic (per item)
+// second return parameter is static mode (true/false)
+// dynamic roles will use item to get its roles
+func (j *DSGroupsio) AllRoles(ctx *Ctx, rich map[string]interface{}) (roles []string, static bool) {
+	roles = []string{Author}
+	if rich == nil {
+		return
+	}
+	_, ok := Dig(rich, []string{"recipient_uuid"}, false, true)
+	if !ok {
+		return
+	}
+	roles = append(roles, Recipient)
+	i := 2
+	for {
+		role := Recipient + strconv.Itoa(i)
+		_, ok := Dig(rich, []string{role + "_uuid"}, false, true)
+		if !ok {
+			break
+		}
+		roles = append(roles, role)
+		i++
+	}
+	return
 }
