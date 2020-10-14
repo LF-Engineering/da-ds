@@ -849,7 +849,102 @@ func (j *DSGroupsio) EnrichItems(ctx *Ctx) (err error) {
 
 // EnrichItem - return rich item from raw item for a given author type
 func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, author string, affs bool, extra interface{}) (rich map[string]interface{}, err error) {
-	rich = item
+	// copy RawFields
+	rich = make(map[string]interface{})
+	for _, field := range RawFields {
+		v, _ := item[field]
+		rich[field] = v
+	}
+	msg, ok := item["data"].(map[string]interface{})
+	if !ok {
+		err = fmt.Errorf("missing data field in item %+v", DumpKeys(item))
+		return
+	}
+	getStr := func(i interface{}) (o string, ok bool) {
+		o, ok = i.(string)
+		if ok {
+			Printf("getStr(%v) -> string:%s\n", i, o)
+			return
+		}
+		var a []interface{}
+		a, ok = i.([]interface{})
+		if !ok {
+			Printf("getStr(%v) -> neither string nor []interface{}: %T\n", i, i)
+			return
+		}
+		if len(a) == 0 {
+			ok = false
+			Printf("getStr(%v) -> empty array\n", i)
+			return
+		}
+		o, ok = a[0].(string)
+		Printf("getStr(%v) -> string[0]:%s\n", i, o)
+		return
+	}
+	getStringValue := func(it map[string]interface{}, key string) (val string, ok bool) {
+		var i interface{}
+		i, ok = Dig(it, []string{key}, false, true)
+		if ok {
+			val, ok = getStr(i)
+			if ok {
+				Printf("getStringValue(%v) -> string:%s\n", key, val)
+				return
+			}
+			Printf("getStringValue(%v) - was not able to get string from %v\n", key, i)
+		}
+		lKey := strings.ToLower(key)
+		Printf("getStringValue(%v) -> key not found, trying %s\n", key, lKey)
+		for k := range it {
+			if k == key {
+				continue
+			}
+			lK := strings.ToLower(k)
+			if lK == lKey {
+				Printf("getStringValue(%v) -> %s matches\n", key, k)
+				i, ok = Dig(it, []string{k}, false, true)
+				if ok {
+					val, ok = getStr(i)
+					if ok {
+						Printf("getStringValue(%v) -> %s string:%s\n", key, k, val)
+						return
+					}
+					Printf("getStringValue(%v) - %s was not able to get string from %v\n", key, k, i)
+				}
+			}
+		}
+		Printf("getStringValue(%v) -> key not found\n", key)
+		return
+	}
+	getIValue := func(it map[string]interface{}, key string) (i interface{}, ok bool) {
+		i, ok = Dig(it, []string{key}, false, true)
+		if ok {
+			Printf("getIValue(%v) -> %T:%v\n", key, i, i)
+			return
+		}
+		lKey := strings.ToLower(key)
+		Printf("getIValue(%v) -> key not found, trying %s\n", key, lKey)
+		for k := range it {
+			if k == key {
+				continue
+			}
+			lK := strings.ToLower(k)
+			if lK == lKey {
+				Printf("getIValue(%v) -> %s matches\n", key, k)
+				i, ok = Dig(it, []string{k}, false, true)
+				if ok {
+					Printf("getIValue(%v) -> %s %T:%v\n", key, k, i, i)
+					return
+				}
+			}
+		}
+		Printf("getIValue(%v) -> key not found\n", key)
+		return
+	}
+	rich["Message-ID"], _ = Dig(msg, []string{GroupsioMessageIDField}, true, false)
+	rich["Date"], _ = Dig(msg, []string{GroupsioMessageDateField}, true, false)
+	rich["Subject_analyzed"], ok = getStringValue(msg, "Subject")
+	rich["email_date"], ok = getIValue(item, DefaultDateField)
+	os.Exit(1)
 	return
 }
 

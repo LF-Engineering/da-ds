@@ -83,3 +83,11 @@ os.Exit(1)
 	}
 	os.Exit(1)
 	// FIXME: end
+  /*
+	rich["Received"], ok = getIValue("received")
+	rich["Received"], ok = getIValue("RECEIVED")
+	rich["Received"], ok = getIValue("xxx")
+	rich["Received"], ok = getIValue("date")
+	rich["Received"], ok = getIValue("MBox-Valid")
+	rich["Received"], ok = getIValue("mbox-n-lines")
+  */

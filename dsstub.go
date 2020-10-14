@@ -364,14 +364,14 @@ func StubEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[
 		}
 		// Actual item enrichment
 		/*
-    var rich map[string]interface{}
-		if thrN > 1 {
-			mtx.Lock()
-		}
-		*docs = append(*docs, rich)
-		if thrN > 1 {
-			mtx.Unlock()
-		}
+			    var rich map[string]interface{}
+					if thrN > 1 {
+						mtx.Lock()
+					}
+					*docs = append(*docs, rich)
+					if thrN > 1 {
+						mtx.Unlock()
+					}
 		*/
 		return
 	}
