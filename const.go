@@ -101,3 +101,6 @@ const LowerContentType = "content-type"
 
 // Author - default author field
 const Author string = "author"
+
+// From - common constant string
+const From = "from"

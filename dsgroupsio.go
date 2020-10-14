@@ -45,6 +45,8 @@ const (
 	GroupsioDefaultSearchField = "item_id"
 	// MaxMessageBodyLength - trucacte message bodies longer than this (per each multi-body email part)
 	MaxMessageBodyLength = 1000
+	// MaxRichMessageLines - maximum numbe rof message text/plain lines copied to rich index
+	MaxRichMessageLines = 10
 )
 
 var (
@@ -271,8 +273,8 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 		url += `&start_time=` + neturl.QueryEscape(ToYMDTHMSZDate(from))
 	}
 	Printf("fetching messages from: %s\n", url)
-	// FIXME: remove caching or lower to 3 hours at most
-	cacheMsgDur := time.Duration(48) * time.Hour
+  // Groups.io blocks downloading archives more often than 24 hours
+	cacheMsgDur := time.Duration(24) * time.Hour + time.Duration(5) * time.Minute
 	res, status, _, err = Request(
 		ctx,
 		url,
@@ -551,7 +553,7 @@ func (j *DSGroupsio) DateField(*Ctx) string {
 
 // RichIDField - return rich ID field name
 func (j *DSGroupsio) RichIDField(*Ctx) string {
-	return DefaultIDField
+	return UUID
 }
 
 // RichAuthorField - return rich ID field name
@@ -629,7 +631,7 @@ func (j *DSGroupsio) ElasticRichMapping() []byte {
 // (name, username, email) tripples, special value Nil "<nil>" means null
 // we use string and not *string which allows nil to allow usage as a map key
 // This one (Ex) also returns information about identity's origin (from or to)
-func (j *DSGroupsio) GetItemIdentitiesEx(ctx *Ctx, doc interface{}) (identities map[[3]string]string) {
+func (j *DSGroupsio) GetItemIdentitiesEx(ctx *Ctx, doc interface{}) (identities map[[3]string]map[string]struct{}) {
 	init := false
 	props := []string{"From", "To"}
 	for _, prop := range props {
@@ -638,7 +640,7 @@ func (j *DSGroupsio) GetItemIdentitiesEx(ctx *Ctx, doc interface{}) (identities 
 		if !ok {
 			ifroms, ok = Dig(doc, []string{"data", lProp}, false, true)
 			if !ok {
-				if ctx.Debug > 1 {
+				if ctx.Debug > 1 || lProp == From {
 					Printf("cannot get identities: cannot dig %s/%s in %v\n", prop, lProp, doc)
 				}
 				continue
@@ -701,10 +703,15 @@ func (j *DSGroupsio) GetItemIdentitiesEx(ctx *Ctx, doc interface{}) (identities 
 					continue
 				}
 				if !init {
-					identities = make(map[[3]string]string)
+					identities = make(map[[3]string]map[string]struct{})
 					init = true
 				}
-				identities[[3]string{obj.Name, Nil, obj.Address}] = lProp
+				identity := [3]string{obj.Name, Nil, obj.Address}
+				_, ok := identities[identity]
+				if !ok {
+					identities[identity] = make(map[string]struct{})
+				}
+				identities[identity][lProp] = struct{}{}
 			}
 		}
 	}
@@ -779,7 +786,7 @@ func GroupsioEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, doc
 			cnt++
 			counts[origin] = cnt
 			author = Author
-			if origin != "from" {
+			if origin != From {
 				author = "recipient"
 			}
 			if cnt > 1 {
@@ -788,23 +795,46 @@ func GroupsioEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, doc
 			return
 		}
 		var rich map[string]interface{}
-		for identity, origin := range identities {
-			auth := getAuthorPrefix(origin)
-			rich, e = ds.EnrichItem(ctx, doc, auth, dbConfigured, identity)
-			if e != nil {
-				return
+		authorFound := false
+		for identity, origins := range identities {
+			for origin := range origins {
+				var richPart map[string]interface{}
+				auth := getAuthorPrefix(origin)
+				if rich == nil {
+					rich, e = ds.EnrichItem(ctx, doc, auth, dbConfigured, identity)
+				} else {
+					richPart, e = ds.EnrichItem(ctx, doc, auth, dbConfigured, identity)
+				}
+				if e != nil {
+					return
+				}
+				if auth == Author {
+					authorFound = true
+				}
+				if richPart != nil {
+					for k, v := range richPart {
+						_, ok := rich[k]
+						if !ok {
+							rich[k] = v
+						}
+					}
+				}
 			}
-			e = EnrichItem(ctx, ds, rich)
-			if e != nil {
-				return
-			}
-			if thrN > 1 {
-				mtx.Lock()
-			}
-			*docs = append(*docs, rich)
-			if thrN > 1 {
-				mtx.Unlock()
-			}
+		}
+		if !authorFound {
+			e = fmt.Errorf("no author found in\n%v\n%v\n", identities, item)
+			return
+		}
+		e = EnrichItem(ctx, ds, rich)
+		if e != nil {
+			return
+		}
+		if thrN > 1 {
+			mtx.Lock()
+		}
+		*docs = append(*docs, rich)
+		if thrN > 1 {
+			mtx.Unlock()
 		}
 		return
 	}
@@ -847,104 +877,194 @@ func (j *DSGroupsio) EnrichItems(ctx *Ctx) (err error) {
 	return
 }
 
-// EnrichItem - return rich item from raw item for a given author type
-func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, author string, affs bool, extra interface{}) (rich map[string]interface{}, err error) {
+// EnrichItem - return rich item from raw item for a given author type/role
+func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role string, affs bool, extra interface{}) (rich map[string]interface{}, err error) {
 	// copy RawFields
 	rich = make(map[string]interface{})
-	for _, field := range RawFields {
-		v, _ := item[field]
-		rich[field] = v
-	}
 	msg, ok := item["data"].(map[string]interface{})
 	if !ok {
 		err = fmt.Errorf("missing data field in item %+v", DumpKeys(item))
 		return
 	}
-	getStr := func(i interface{}) (o string, ok bool) {
-		o, ok = i.(string)
-		if ok {
-			Printf("getStr(%v) -> string:%s\n", i, o)
-			return
+	msgDate, _ := Dig(msg, []string{GroupsioMessageDateField}, true, false)
+	if role == Author {
+		for _, field := range RawFields {
+			v, _ := item[field]
+			rich[field] = v
 		}
-		var a []interface{}
-		a, ok = i.([]interface{})
-		if !ok {
-			Printf("getStr(%v) -> neither string nor []interface{}: %T\n", i, i)
-			return
-		}
-		if len(a) == 0 {
-			ok = false
-			Printf("getStr(%v) -> empty array\n", i)
-			return
-		}
-		o, ok = a[0].(string)
-		Printf("getStr(%v) -> string[0]:%s\n", i, o)
-		return
-	}
-	getStringValue := func(it map[string]interface{}, key string) (val string, ok bool) {
-		var i interface{}
-		i, ok = Dig(it, []string{key}, false, true)
-		if ok {
-			val, ok = getStr(i)
+		getStr := func(i interface{}) (o string, ok bool) {
+			o, ok = i.(string)
 			if ok {
-				Printf("getStringValue(%v) -> string:%s\n", key, val)
+				//Printf("getStr(%v) -> string:%s\n", i, o)
 				return
 			}
-			Printf("getStringValue(%v) - was not able to get string from %v\n", key, i)
-		}
-		lKey := strings.ToLower(key)
-		Printf("getStringValue(%v) -> key not found, trying %s\n", key, lKey)
-		for k := range it {
-			if k == key {
-				continue
+			var a []interface{}
+			a, ok = i.([]interface{})
+			if !ok {
+				//Printf("getStr(%v) -> neither string nor []interface{}: %T\n", i, i)
+				return
 			}
-			lK := strings.ToLower(k)
-			if lK == lKey {
-				Printf("getStringValue(%v) -> %s matches\n", key, k)
-				i, ok = Dig(it, []string{k}, false, true)
-				if ok {
-					val, ok = getStr(i)
-					if ok {
-						Printf("getStringValue(%v) -> %s string:%s\n", key, k, val)
-						return
-					}
-					Printf("getStringValue(%v) - %s was not able to get string from %v\n", key, k, i)
-				}
+			if len(a) == 0 {
+				ok = false
+				//Printf("getStr(%v) -> empty array\n", i)
+				return
 			}
-		}
-		Printf("getStringValue(%v) -> key not found\n", key)
-		return
-	}
-	getIValue := func(it map[string]interface{}, key string) (i interface{}, ok bool) {
-		i, ok = Dig(it, []string{key}, false, true)
-		if ok {
-			Printf("getIValue(%v) -> %T:%v\n", key, i, i)
+			la := len(a)
+			o, ok = a[la-1].(string)
+			//Printf("getStr(%v) -> string[0]:%s\n", i, o)
 			return
 		}
-		lKey := strings.ToLower(key)
-		Printf("getIValue(%v) -> key not found, trying %s\n", key, lKey)
-		for k := range it {
-			if k == key {
-				continue
-			}
-			lK := strings.ToLower(k)
-			if lK == lKey {
-				Printf("getIValue(%v) -> %s matches\n", key, k)
-				i, ok = Dig(it, []string{k}, false, true)
+		getStringValue := func(it map[string]interface{}, key string) (val string, ok bool) {
+			var i interface{}
+			i, ok = Dig(it, []string{key}, false, true)
+			if ok {
+				val, ok = getStr(i)
 				if ok {
-					Printf("getIValue(%v) -> %s %T:%v\n", key, k, i, i)
+					//Printf("getStringValue(%v) -> string:%s\n", key, val)
 					return
+				}
+				//Printf("getStringValue(%v) - was not able to get string from %v\n", key, i)
+			}
+			lKey := strings.ToLower(key)
+			//Printf("getStringValue(%v) -> key not found, trying %s\n", key, lKey)
+			for k := range it {
+				if k == key {
+					continue
+				}
+				lK := strings.ToLower(k)
+				if lK == lKey {
+					//Printf("getStringValue(%v) -> %s matches\n", key, k)
+					i, ok = Dig(it, []string{k}, false, true)
+					if ok {
+						val, ok = getStr(i)
+						if ok {
+							//Printf("getStringValue(%v) -> %s string:%s\n", key, k, val)
+							return
+						}
+						//Printf("getStringValue(%v) - %s was not able to get string from %v\n", key, k, i)
+					}
+				}
+			}
+			//Printf("getStringValue(%v) -> key not found\n", key)
+			return
+		}
+		getIValue := func(it map[string]interface{}, key string) (i interface{}, ok bool) {
+			i, ok = Dig(it, []string{key}, false, true)
+			if ok {
+				//Printf("getIValue(%v) -> %T:%v\n", key, i, i)
+				return
+			}
+			lKey := strings.ToLower(key)
+			//Printf("getIValue(%v) -> key not found, trying %s\n", key, lKey)
+			for k := range it {
+				if k == key {
+					continue
+				}
+				lK := strings.ToLower(k)
+				if lK == lKey {
+					//Printf("getIValue(%v) -> %s matches\n", key, k)
+					i, ok = Dig(it, []string{k}, false, true)
+					if ok {
+						//Printf("getIValue(%v) -> %s %T:%v\n", key, k, i, i)
+						return
+					}
+				}
+			}
+			//Printf("getIValue(%v) -> key not found\n", key)
+			return
+		}
+		rich["Message-ID"], _ = Dig(msg, []string{GroupsioMessageIDField}, true, false)
+		rich["Date"] = msgDate
+		subj, _ := getStringValue(msg, "Subject")
+		rich["Subject_analyzed"] = subj
+		if len(subj) > MaxMessageBodyLength {
+			subj = subj[:MaxMessageBodyLength]
+		}
+		rich["Subject"] = subj
+		rich["email_date"], _ = getIValue(item, DefaultDateField)
+		rich["list"], _ = getStringValue(item, "origin")
+		lks := make(map[string]struct{})
+		for k := range msg {
+			lks[strings.ToLower(k)] = struct{}{}
+		}
+		_, ok = lks["in-reply-to"]
+		rich["root"] = !ok
+		var (
+			plain interface{}
+			text  string
+			found bool
+		)
+		plain, ok = Dig(msg, []string{"data", "text", "plain"}, false, true)
+		if ok {
+			a, ok := plain.([]interface{})
+			if ok {
+				if len(a) > 0 {
+					body, ok := a[0].(map[string]interface{})
+					if ok {
+						data, ok := body["data"]
+						if ok {
+							text, found = data.(string)
+						}
+					}
 				}
 			}
 		}
-		Printf("getIValue(%v) -> key not found\n", key)
-		return
+		if found {
+			rich["size"] = len(text)
+			ary := strings.Split(text, "\n")
+			if len(ary) > MaxRichMessageLines {
+				ary = ary[:MaxRichMessageLines]
+			}
+			text = strings.Join(ary, "\n")
+			if len(text) > MaxMessageBodyLength {
+				text = text[:MaxMessageBodyLength]
+			}
+			rich["body_extract"] = text
+		} else {
+			rich["size"] = nil
+			rich["body_extract"] = ""
+		}
+		rich["tz"] = nil
+		for prop, value := range CommonFields(j, msgDate, Message) {
+			rich[prop] = value
+		}
 	}
-	rich["Message-ID"], _ = Dig(msg, []string{GroupsioMessageIDField}, true, false)
-	rich["Date"], _ = Dig(msg, []string{GroupsioMessageDateField}, true, false)
-	rich["Subject_analyzed"], ok = getStringValue(msg, "Subject")
-	rich["email_date"], ok = getIValue(item, DefaultDateField)
-	os.Exit(1)
+	if affs {
+		affsData := make(map[string]interface{})
+		var dt time.Time
+		dt, err = TimeParseInterfaceString(msgDate)
+		if err != nil {
+			Printf("cannot parse date %s\n", msgDate)
+			return
+		}
+		ary, _ := extra.([3]string)
+		// (name, username, email)
+		identity := map[string]interface{}{
+			"name":     ary[0],
+			"username": ary[1],
+			"email":    ary[2],
+		}
+		affsIdentity := IdenityAffsData(ctx, j, identity, nil, dt, role)
+		for prop, value := range affsIdentity {
+			affsData[prop] = value
+		}
+		suffs := []string{"_org_name", "_name", "_user_name"}
+		for _, suff := range suffs {
+			k := role + suff
+			_, ok := affsIdentity[k]
+			if !ok {
+				affsIdentity[k] = Unknown
+			}
+		}
+		for prop, value := range affsData {
+			rich[prop] = value
+		}
+		orgsKey := role + MultiOrgNames
+		_, ok := Dig(rich, []string{orgsKey}, false, true)
+		if !ok {
+			rich[orgsKey] = []interface{}{}
+		}
+	}
 	return
 }
 

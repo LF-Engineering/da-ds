@@ -85,6 +85,7 @@ func TimeParseESSec(dtStr string) (time.Time, error) {
 
 // TimeParseES - parse datetime in ElasticSearch output format
 func TimeParseES(dtStr string) (time.Time, error) {
+	dtStr = strings.TrimSpace(strings.Replace(dtStr, "Z", "", -1))
 	ary := strings.Split(dtStr, "+")
 	ary2 := strings.Split(ary[0], ".")
 	var s string
