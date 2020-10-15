@@ -592,10 +592,11 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 }
 
 // ParseMBoxDate - try to parse mbox date
-func ParseMBoxDate(sdt string) (dt time.Time, valid bool) {
+func ParseMBoxDate(indt string) (dt time.Time, valid bool) {
+	sdt := indt
 	// https://www.broobles.com/eml2mbox/mbox.html
 	// but the real world is not that simple
-	for _, r := range []string{">", "\t", ",", ")", "("} {
+	for _, r := range []string{">", ",", ")", "("} {
 		sdt = strings.Replace(sdt, r, "", -1)
 	}
 	for _, split := range []string{"+0", "+1", "."} {
@@ -632,6 +633,10 @@ func ParseMBoxDate(sdt string) (dt time.Time, valid bool) {
 		sdt = strings.Join(ary[:4], " ")
 	}
 	formats := []string{
+		"2006-01-02 15:04:05",
+		"2006-01-02t15:04:05",
+		"2006-01-02 15:04:05z",
+		"2006-01-02t15:04:05z",
 		"2 Jan 2006 15:04:05",
 		"02 Jan 2006 15:04:05",
 		"2 Jan 06 15:04:05",
@@ -640,7 +645,14 @@ func ParseMBoxDate(sdt string) (dt time.Time, valid bool) {
 		"02 Jan 2006 15:04",
 		"2 Jan 06 15:04",
 		"02 Jan 06 15:04",
-		"2006-01-02 15:04:05",
+    "Jan 2 15:04:05 2006",
+    "Jan 02 15:04:05 2006",
+    "Jan 2 15:04:05 06",
+    "Jan 02 15:04:05 06",
+    "Jan 2 15:04 2006",
+    "Jan 02 15:04 2006",
+    "Jan 2 15:04 06",
+    "Jan 02 15:04 06",
 	}
 	var (
 		err  error
@@ -655,7 +667,7 @@ func ParseMBoxDate(sdt string) (dt time.Time, valid bool) {
 		}
 		errs = append(errs, err)
 	}
-	Printf("errors: %+v\n", errs)
-	Printf("sdt: %s, day: %s\n", sdt, day)
+	Printf("ParseMBoxDate: errors: %+v\n", errs)
+	Printf("ParseMBoxDate: '%s' -> '%s', day: %s\n", indt, sdt, day)
 	return
 }

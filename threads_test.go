@@ -15,6 +15,7 @@ func TestGetThreadsNum(t *testing.T) {
 
 	// Get actual number of threads available
 	nThreads := lib.GetThreadsNum(&ctx)
+	lib.ResetThreadsNum(&ctx)
 
 	// Set context's ST/NCPUs manually (don't need to repeat tests from context_test.go)
 	var testCases = []struct {

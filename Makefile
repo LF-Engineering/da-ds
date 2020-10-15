@@ -1,6 +1,6 @@
 GO_LIB_FILES=affs.go context.go const.go ds.go dsgroupsio.go dsjira.go dsstub.go email.go es.go error.go exec.go json.go log.go mbox.go redacted.go sql.go threads.go time.go utils.go uuid.go
 GO_BIN_FILES=cmd/dads/dads.go
-GO_TEST_FILES=context_test.go threads_test.go
+GO_TEST_FILES=context_test.go threads_test.go mbox_test.go
 GO_LIBTEST_FILES=test/time.go
 GO_BIN_CMDS=github.com/LF-Engineering/da-ds/cmd/dads
 #for race CGO_ENABLED=1
