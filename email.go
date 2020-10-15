@@ -85,6 +85,22 @@ func ParseAddresses(ctx *Ctx, addrs string) (emails []*mail.Address, ok bool) {
 					if ctx.Debug > 1 {
 						Printf("unable to parse '%s' but '%s' parsed to %v ('%s','%s')\n", addrs, f, email, email.Name, email.Address)
 					}
+					continue
+				}
+				a := strings.Split(f, "@")
+				if len(a) == 3 {
+					// name@domain <name@domain> -> ['name', 'domain <name', 'domain>']
+					// name@domain name@domain -> ['name', 'domain name', 'domain']
+					name := a[0]
+					domain := strings.Replace(a[2], ">", "", -1)
+					nf := name + " <" + name + "@" + domain + ">"
+					email, e := mail.ParseAddress(nf)
+					if e == nil {
+						emails = append(emails, email)
+						if ctx.Debug > 1 {
+							Printf("unable to parse '%s' but '%s' -> '%s' parsed to %v ('%s','%s')\n", addrs, f, nf, email, email.Name, email.Address)
+						}
+					}
 				}
 			}
 			if len(emails) == 0 {
