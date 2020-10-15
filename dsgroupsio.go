@@ -704,7 +704,10 @@ func (j *DSGroupsio) GetItemIdentitiesEx(ctx *Ctx, doc interface{}) (identities 
 						Printf("%s clearing buggy name '%s'\n", lProp, obj.Name)
 					}
 					obj.Name = ""
-					continue
+				}
+				if obj.Name == "" || obj.Name == obj.Address {
+					ary := strings.Split(obj.Address, "@")
+					obj.Name = ary[0]
 				}
 				if !init {
 					identities = make(map[[3]string]map[string]struct{})
@@ -1037,6 +1040,20 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 		rich["mbox_bytes_length"], _ = Dig(msg, []string{"MBox-Bytes-Length"}, true, false)
 		rich["mbox_n_lines"], _ = Dig(msg, []string{"MBox-N-Lines"}, true, false)
 		rich["mbox_n_bodies"], _ = Dig(msg, []string{"MBox-N-Bodies"}, true, false)
+		rich["mbox_from"], _ = Dig(msg, []string{"MBox-From"}, true, false)
+		rich["mbox_date"] = nil
+		rich["mbox_date_str"] = ""
+		dtStr, ok := Dig(msg, []string{"MBox-Date"}, true, false)
+		if ok {
+			sdt, ok := dtStr.(string)
+			if ok {
+				rich["mbox_date_str"] = sdt
+				dt, valid := ParseMBoxDate(sdt)
+				if valid {
+					rich["mbox_date"] = dt
+				}
+			}
+		}
 		for prop, value := range CommonFields(j, msgDate, Message) {
 			rich[prop] = value
 		}
