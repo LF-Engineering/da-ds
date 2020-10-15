@@ -17,6 +17,8 @@ func runDS(ctx *lib.Ctx) (err error) {
 		ds = &lib.DSJira{}
 	case lib.Groupsio:
 		ds = &lib.DSGroupsio{}
+	case lib.Dockerhub:
+		ds = &lib.DSDockerhub{}
 	default:
 		err = fmt.Errorf("unknown data source type: " + ctx.DS)
 		return
