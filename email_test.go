@@ -48,8 +48,16 @@ func TestParseAddresses(t *testing.T) {
 		{addr: " Lukasz  Gryglicki\t  <lgryglicki at cncf.io>", expectedOK: true, expectedEmails: []*mail.Address{{Name: "Lukasz Gryglicki", Address: "lgryglicki@cncf.io"}}},
 		{addr: "Lukasz Gryglicki <lgryglicki_at_cncf.io>", expectedOK: true, expectedEmails: []*mail.Address{{Name: "Lukasz Gryglicki", Address: "lgryglicki@cncf.io"}}},
 		{addr: "Lukasz Gryglicki <lgryglicki en cncf.io>", expectedOK: true, expectedEmails: []*mail.Address{{Name: "Lukasz Gryglicki", Address: "lgryglicki@cncf.io"}}},
-		{addr: "Lukasz Gryglicki<lgryglicki@cncf.io>,Justyna Gryglicka<jgryglicka@cncf.io>", expectedOK: true, expectedEmails: []*mail.Address{{Name: "Lukasz Gryglicki", Address: "lgryglicki@cncf.io"}, {Name: "Justyna Gryglicka", Address: "jgryglicka@cncf.io"}}},
-		{addr: "Lukasz Gryglicki<lgryglicki@cncf.io>\t , \tJustyna Gryglicka<jgryglicka@cncf.io>", expectedOK: true, expectedEmails: []*mail.Address{{Name: "Lukasz Gryglicki", Address: "lgryglicki@cncf.io"}, {Name: "Justyna Gryglicka", Address: "jgryglicka@cncf.io"}}},
+		{
+			addr:           "Lukasz Gryglicki<lgryglicki@cncf.io>,Justyna Gryglicka<jgryglicka@cncf.io>",
+			expectedOK:     true,
+			expectedEmails: []*mail.Address{{Name: "Lukasz Gryglicki", Address: "lgryglicki@cncf.io"}, {Name: "Justyna Gryglicka", Address: "jgryglicka@cncf.io"}},
+		},
+		{
+			addr:           "Lukasz Gryglicki<lgryglicki@cncf.io>\t , \tJustyna Gryglicka<jgryglicka@cncf.io>",
+			expectedOK:     true,
+			expectedEmails: []*mail.Address{{Name: "Lukasz Gryglicki", Address: "lgryglicki@cncf.io"}, {Name: "Justyna Gryglicka", Address: "jgryglicka@cncf.io"}},
+		},
 		{addr: "a<b@c>,d<e@f>", expectedOK: true, expectedEmails: []*mail.Address{{Name: "d", Address: "e@f"}, {Name: "a", Address: "b@c"}}},
 		{addr: `a"b<ab@my.com>`, expectedOK: true, expectedEmails: []*mail.Address{{Name: "ab", Address: "ab@my.com"}}},
 		{addr: "me@domain.com", expectedOK: true, expectedEmails: []*mail.Address{{Name: "me", Address: "me@domain.com"}}},
@@ -70,6 +78,12 @@ func TestParseAddresses(t *testing.T) {
 		{addr: "=?iso-8859-2?Q?Michal_=C8marada?= <michal.cmarada@pantheon.tech>", expectedOK: false, expectedEmails: []*mail.Address{}},
 		{addr: "=?Windows-1252?Q?Ivan_Hra=9Ako?= <ivan.hrasko@pantheon.tech>", expectedOK: false, expectedEmails: []*mail.Address{}},
 		{addr: "=?iso-8859-2?Q?Radek_Krej=E8a?= <ops-dev@lists.openswitch.net>", expectedOK: false, expectedEmails: []*mail.Address{}},
+		{addr: `robert.konc@controlmatik.eu <robert.konc@controlmatik.eu>`, expectedOK: true, expectedEmails: []*mail.Address{{Name: "robert.konc", Address: "robert.konc@controlmatik.eu"}}},
+		{
+			addr:           ` =?windows-1257?Q?B=B8e=2C_Sebastian?= <Sebastian.Boe@nordicsemi.no>,"robert.konc@controlmatik.eu" <robert.konc@controlmatik.eu>,"devel@lists.zephyrproject.org" <devel@lists.zephyrproject.org>`,
+			expectedOK:     true,
+			expectedEmails: []*mail.Address{{Name: "robert.konc", Address: "robert.konc@controlmatik.eu"}, {Name: "devel", Address: "devel@lists.zephyrproject.org"}},
+		},
 	}
 	for index, test := range testCases {
 		gotEmails, gotOK := lib.ParseAddresses(&ctx, test.addr)

@@ -418,7 +418,7 @@ func RequestNoRetry(
 		err = jsoniter.Unmarshal(body, &result)
 		if err != nil {
 			sPayload := BytesToStringTrunc(payload, MaxPayloadPrintfLen)
-			sBody := BytesToStringTrunc(payload, MaxPayloadPrintfLen)
+			sBody := BytesToStringTrunc(body, MaxPayloadPrintfLen)
 			err = fmt.Errorf("unmarshall request error:%+v for method:%s url:%s headers:%v status:%d payload:%s body:%s", err, method, url, headers, status, sPayload, sBody)
 			return
 		}
@@ -435,7 +435,7 @@ func RequestNoRetry(
 	}
 	if hit {
 		sPayload := BytesToStringTrunc(payload, MaxPayloadPrintfLen)
-		sBody := BytesToStringTrunc(payload, MaxPayloadPrintfLen)
+		sBody := BytesToStringTrunc(body, MaxPayloadPrintfLen)
 		err = fmt.Errorf("status error:%+v for method:%s url:%s headers:%v status:%d payload:%s body:%s result:%+v", err, method, url, headers, status, sPayload, sBody, result)
 	}
 	if len(okStatuses) > 0 {
@@ -448,7 +448,7 @@ func RequestNoRetry(
 		}
 		if !hit {
 			sPayload := BytesToStringTrunc(payload, MaxPayloadPrintfLen)
-			sBody := BytesToStringTrunc(payload, MaxPayloadPrintfLen)
+			sBody := BytesToStringTrunc(body, MaxPayloadPrintfLen)
 			err = fmt.Errorf("status not success:%+v for method:%s url:%s headers:%v status:%d payload:%s body:%s result:%+v", err, method, url, headers, status, sPayload, sBody, result)
 		}
 	}

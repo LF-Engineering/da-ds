@@ -52,7 +52,7 @@ var (
 	// GroupsioRawMapping - Groupsio raw index mapping
 	GroupsioRawMapping = []byte(`{"dynamic":true,"properties":{"metadata__updated_on":{"type":"date"},"data":{"properties":{"body":{"dynamic":false,"properties":{}}}}}}`)
 	// GroupsioRichMapping - Groupsio rich index mapping
-	GroupsioRichMapping = []byte(`{"properties":{"Subject_analyzed":{"type":"text","fielddata":true,"index":true},"body":{"type":"text","index":true}}}`)
+	GroupsioRichMapping = []byte(`{"properties":{"metadata__updated_on":{"type":"date"},"Subject_analyzed":{"type":"text","fielddata":true,"index":true},"body":{"type":"text","index":true}}}`)
 	// GroupsioCategories - categories defined for Groupsio
 	GroupsioCategories = map[string]struct{}{"message": {}}
 	// GroupsioMBoxMsgSeparator - used to split mbox file into separate messages
@@ -665,7 +665,7 @@ func (j *DSGroupsio) GetItemIdentitiesEx(ctx *Ctx, doc interface{}) (identities 
 			}
 			emails, ok := ParseAddresses(ctx, from)
 			if !ok {
-				if ctx.Debug > 0 {
+				if ctx.Debug > 1 {
 					Printf("cannot get identities: cannot read email address(es) from %s\n", from)
 				}
 				continue
@@ -795,7 +795,7 @@ func GroupsioEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, doc
 		if !authorFound {
 			if ctx.Debug > 1 {
 				Printf("no author found in\n%v\n%v\n", identities, item)
-			} else {
+			} else if ctx.Debug > 0 {
 				Printf("skipping email due to missing usable from email %v\n", identities)
 			}
 			return
@@ -1057,6 +1057,10 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 		if !ok {
 			rich[orgsKey] = []interface{}{}
 		}
+	}
+	if role == Author {
+		rich["mbox_author_domain"], _ = Dig(rich, []string{"author_domain"}, false, true)
+		CopyAffsRoleData(rich, Author, "From")
 	}
 	return
 }

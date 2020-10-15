@@ -36,6 +36,21 @@ var (
 		"nov": "Nov",
 		"dec": "Dec",
 	}
+	// LowerFullMonthNames - map lower month names (full)
+	LowerFullMonthNames = map[string]string{
+		"january":   "Jan",
+		"february":  "Feb",
+		"march":     "Mar",
+		"april":     "Apr",
+		"may":       "May",
+		"june":      "Jun",
+		"july":      "Jul",
+		"august":    "Aug",
+		"september": "Sep",
+		"october":   "Oct",
+		"november":  "Nov",
+		"decdember": "Dec",
+	}
 	// SpacesRE - match 1 or more space characters
 	SpacesRE = regexp.MustCompile(`\s+`)
 )
@@ -635,6 +650,9 @@ func ParseMBoxDate(indt string) (dt time.Time, valid bool) {
 		sdt = strings.Join(ary[1:], " ")
 	}
 	sdt = strings.TrimSpace(sdt)
+	for lm, m := range LowerFullMonthNames {
+		sdt = strings.Replace(sdt, lm, m, -1)
+	}
 	for lm, m := range LowerMonthNames {
 		sdt = strings.Replace(sdt, lm, m, -1)
 	}
