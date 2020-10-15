@@ -36,7 +36,7 @@ func (j *DSDockerhub) ParseArgs(ctx *Ctx) (err error) {
 	// IMPL:
 	j.DS = Dockerhub
 	// Dockerhub specific env variables
-	prefix := "DA_DOCKERHUB_"
+	//prefix := "DA_DOCKERHUB_"
 	if j.NoSSLVerify {
 		NoSSLVerify()
 	}
@@ -342,10 +342,10 @@ func (j *DSDockerhub) GetItemIdentities(ctx *Ctx, doc interface{}) (map[[3]strin
 	return map[[3]string]struct{}{}, nil
 }
 
-// StubEnrichItemsFunc - iterate items and enrich them
+// DockerhubEnrichItemsFunc - iterate items and enrich them
 // items is a current pack of input items
 // docs is a pointer to where extracted identities will be stored
-func StubEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]interface{}) (err error) {
+func DockerhubEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]interface{}) (err error) {
 	// IMPL:
 	if ctx.Debug > 0 {
 		Printf("stub enrich items %d/%d func\n", len(items), len(*docs))
@@ -434,7 +434,7 @@ func StubEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[
 // EnrichItems - perform the enrichment
 func (j *DSDockerhub) EnrichItems(ctx *Ctx) (err error) {
 	Printf("enriching items\n")
-	err = ForEachESItem(ctx, j, true, ESBulkUploadFunc, StubEnrichItemsFunc, nil)
+	err = ForEachESItem(ctx, j, true, ESBulkUploadFunc, DockerhubEnrichItemsFunc, nil)
 	return
 }
 
