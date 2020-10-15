@@ -52,7 +52,7 @@ var (
 	// GroupsioRawMapping - Groupsio raw index mapping
 	GroupsioRawMapping = []byte(`{"dynamic":true,"properties":{"metadata__updated_on":{"type":"date"},"data":{"properties":{"body":{"dynamic":false,"properties":{}}}}}}`)
 	// GroupsioRichMapping - Groupsio rich index mapping
-	GroupsioRichMapping = []byte(`{"properties":{"Subject_analyzed":{"type":"text","fielddata":true,"index":true},"body":{"type":"text","index":true}}}`)
+	GroupsioRichMapping = []byte(`{"properties":{"metadata__updated_on":{"type":"date"},"Subject_analyzed":{"type":"text","fielddata":true,"index":true},"body":{"type":"text","index":true}}}`)
 	// GroupsioCategories - categories defined for Groupsio
 	GroupsioCategories = map[string]struct{}{"message": {}}
 	// GroupsioMBoxMsgSeparator - used to split mbox file into separate messages
