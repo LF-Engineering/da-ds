@@ -1060,7 +1060,7 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 	}
 	if role == Author {
 		rich["mbox_author_domain"], _ = Dig(rich, []string{"author_domain"}, false, true)
-		CopyAffsRoleData(rich, Author, From)
+		CopyAffsRoleData(rich, Author, "From")
 	}
 	return
 }
