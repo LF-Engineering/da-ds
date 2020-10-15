@@ -9,25 +9,24 @@ import (
 const (
 	// DockerhubAPIURL - dockerhub API URL
 	DockerhubAPIURL = "https://hub.docker.com/v2"
-
 )
 
 var (
 	// JiraSearchFields - extra search fields
 	DockerhubSearchFields = map[string][]string{
-		"name": {"name"},
+		"name":      {"name"},
 		"namespace": {"namespace"},
 	}
 	// DockerhubRawMapping - Jira raw index mapping
 	DockerhubRawMapping = []byte(`{"dynamic":true,"properties":{"metadata__updated_on":{"type":"date"},"data":{"properties":{"description":{"type":"text","index":true},"full_description":{"type":"text","index":true}}}}}`)
 	// DockerhubRichMapping - Jira rich index mapping
-	DockerhubRichMapping = []byte(`{"properties":{"description":{"type":"text","index":true},"description_analyzed":{"type":"text","index":true},"full_description_analyzed":{"type":"text","index":true}}}`)
+	DockerhubRichMapping = []byte(`{"properties":{"metadata__updated_on":{"type":"date"},"description":{"type":"text","index":true},"description_analyzed":{"type":"text","index":true},"full_description_analyzed":{"type":"text","index":true}}}`)
 )
 
 // DSDockerhub - DS implementation for stub - does nothing at all, just presents a skeleton code
 type DSDockerhub struct {
 	DS          string
-	NoSSLVerify bool   // From DA_DOCKERHUB_NO_SSL_VERIFY
+	NoSSLVerify bool // From DA_DOCKERHUB_NO_SSL_VERIFY
 	MultiOrigin bool // can we store multiple endpoints in a single index?
 }
 
