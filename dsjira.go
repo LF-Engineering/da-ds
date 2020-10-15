@@ -1311,8 +1311,7 @@ func (j *DSJira) EnrichItem(ctx *Ctx, item map[string]interface{}, author string
 		for prop, value := range affsItems {
 			rich[prop] = value
 		}
-		suffs := []string{"_id", "_uuid", "_name", "_user_name", "_domain", "_gender", "_gender_acc", "_org_name", "_bot"}
-		for _, suff := range suffs {
+		for _, suff := range AffsFields {
 			rich[Author+suff] = rich[author+suff]
 		}
 		orgsKey := author + MultiOrgNames

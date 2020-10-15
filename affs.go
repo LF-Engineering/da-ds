@@ -14,6 +14,8 @@ const (
 )
 
 var (
+	// AffsFields - all properties added by affiliations (excluding multi org name)
+	AffsFields       = []string{"_id", "_uuid", "_name", "_user_name", "_domain", "_gender", "_gender_acc", "_org_name", "_bot"}
 	identityCache    = map[string][2]interface{}{}
 	identityCacheMtx *sync.RWMutex
 	rollsCache       = map[string][]string{}
@@ -392,6 +394,14 @@ func GetEnrollmentsMulti(ctx *Ctx, ds DS, uuid string, dt time.Time) (orgs []str
 	return
 }
 
+// CopyAffsRoleData - copy affiliations fields from source role to dest role
+func CopyAffsRoleData(item map[string]interface{}, fromRole, toRole string) {
+	for _, suff := range AffsFields {
+		item[toRole+suff], _ = Dig(item, []string{fromRole + suff}, false, true)
+	}
+	item[toRole+MultiOrgNames], _ = Dig(item, []string{fromRole + MultiOrgNames}, false, true)
+}
+
 // IdenityAffsData - add affiliations related data
 // identity - full identity
 // aid identity ID value (which is uuis), for example from "author_id", "creator_id" etc.
@@ -404,13 +414,15 @@ func IdenityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, aid inter
 		outItem[role+"_id"] = ids[0]
 		outItem[role+"_uuid"] = ids[1]
 		name, _ := identity["name"]
-		if name == nil {
+		sName, _ := name.(string)
+		if name == nil || sName == Nil {
 			outItem[role+"_name"] = ""
 		} else {
 			outItem[role+"_name"] = name
 		}
 		username, _ := identity["username"]
-		if username == nil {
+		sUsername, _ := username.(string)
+		if username == nil || sUsername == Nil {
 			outItem[role+"_user_name"] = ""
 		} else {
 			outItem[role+"_user_name"] = username
