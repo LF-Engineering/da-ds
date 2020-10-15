@@ -2,6 +2,7 @@ package dads
 
 import (
 	"bytes"
+	"io/ioutil"
 	"regexp"
 	"sort"
 	"strconv"
@@ -49,6 +50,10 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 	}()
 	item["MBox-Bytes-Length"] = len(msg)
 	item["MBox-Group-Name"] = groupName
+	dumpMBox := func() {
+		fn := groupName + "_" + strconv.Itoa(len(msg)) + ".mbox"
+		_ = ioutil.WriteFile(fn, msg, 0644)
+	}
 	addRaw := func(k string, v []byte, replace int) {
 		// replace: 0-add new item, 1-replace current, 2-replace all
 		a, ok := raw[k]
@@ -456,6 +461,8 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		sv := string(mustGetRaw(k))
 		sa := getRawStrings(k)
 		lsa := len(sa)
+		// Consider skipping adding all items with lk starting with x-
+		// Possible ES error due to > 1000 fields (but this seems not to be an issue with ES 7.x)
 		if lsa == 1 {
 			item[k] = sa[0]
 		} else {
@@ -502,6 +509,7 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 	_, ok := item[GroupsioMessageIDField]
 	if !ok {
 		Printf("%s(%d): missing Message-ID field\n", groupName, len(msg))
+		dumpMBox()
 		return
 	}
 	var dt time.Time
@@ -524,6 +532,7 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		nDts := len(dts)
 		if nDts == 0 {
 			Printf("%s(%d): missing Date field and cannot parse date from Received field(s)\n", groupName, len(msg))
+			dumpMBox()
 			return
 		}
 		if nDts > 1 {
@@ -540,6 +549,7 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		dt, ok = ParseMBoxDate(sdt)
 		if !ok {
 			Printf("%s(%d): unable to parse date from '%s'\n", groupName, len(msg), sdt)
+			dumpMBox()
 			return
 		}
 	}

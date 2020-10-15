@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net/mail"
 	neturl "net/url"
 	"os"
 	"sort"
@@ -658,58 +657,20 @@ func (j *DSGroupsio) GetItemIdentitiesEx(ctx *Ctx, doc interface{}) (identities 
 			}
 			froms = []interface{}{sfroms}
 		}
-		patterns := []string{" at ", "_at_", " en "}
 		for _, ifrom := range froms {
 			from, ok := ifrom.(string)
 			if !ok {
 				Printf("cannot get identities: cannot read string from %v\n", ifrom)
 				continue
 			}
-			from = strings.TrimSpace(from)
-			for _, pattern := range patterns {
-				from = strings.Replace(from, pattern, "@", -1)
-			}
-			emails, e := mail.ParseAddressList(from)
-			if e != nil {
-				nFrom := strings.Replace(from, `"`, "", -1)
-				emails, e = mail.ParseAddressList(nFrom)
-				if e != nil {
-					emails = []*mail.Address{}
-					ary := strings.Split(nFrom, ",")
-					for _, f := range ary {
-						f = strings.TrimSpace(f)
-						email, e := mail.ParseAddress(f)
-						if e == nil {
-							emails = append(emails, email)
-							if ctx.Debug > 1 {
-								Printf("unable to parse '%s' but '%s' parsed to %v ('%s','%s')\n", nFrom, f, email, email.Name, email.Address)
-							}
-						}
-					}
-					if len(emails) == 0 {
-						if ctx.Debug > 1 {
-							Printf("cannot get identities: cannot read email address(es) from %s\n", from)
-						}
-						continue
-					}
+			emails, ok := ParseAddresses(ctx, from)
+			if !ok {
+				if ctx.Debug > 0 {
+					Printf("cannot get identities: cannot read email address(es) from %s\n", from)
 				}
+				continue
 			}
 			for _, obj := range emails {
-				// remove leading/trailing ' "
-				// skip if starts with =?
-				// should we allow empty name?
-				obj.Name = strings.Trim(obj.Name, `"'`)
-				obj.Address = strings.Trim(obj.Address, `"'`)
-				if strings.HasPrefix(obj.Name, "=?") {
-					if ctx.Debug > 0 {
-						Printf("%s clearing buggy name '%s'\n", lProp, obj.Name)
-					}
-					obj.Name = ""
-				}
-				if obj.Name == "" || obj.Name == obj.Address {
-					ary := strings.Split(obj.Address, "@")
-					obj.Name = ary[0]
-				}
 				if !init {
 					identities = make(map[[3]string]map[string]struct{})
 					init = true
@@ -784,7 +745,9 @@ func GroupsioEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, doc
 		}
 		identities := groupsio.GetItemIdentitiesEx(ctx, doc)
 		if identities == nil || len(identities) == 0 {
-			Printf("no identities to enrich in %v\n", doc)
+			if ctx.Debug > 1 {
+				Printf("no identities to enrich in %v\n", doc)
+			}
 			return
 		}
 		counts := make(map[string]int)
