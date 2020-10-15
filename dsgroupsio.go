@@ -665,7 +665,7 @@ func (j *DSGroupsio) GetItemIdentitiesEx(ctx *Ctx, doc interface{}) (identities 
 			}
 			emails, ok := ParseAddresses(ctx, from)
 			if !ok {
-				if ctx.Debug > 0 {
+				if ctx.Debug > 1 {
 					Printf("cannot get identities: cannot read email address(es) from %s\n", from)
 				}
 				continue

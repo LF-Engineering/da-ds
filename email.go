@@ -104,7 +104,7 @@ func ParseAddresses(ctx *Ctx, addrs string) (emails []*mail.Address, ok bool) {
 				}
 			}
 			if len(emails) == 0 {
-				if ctx.Debug > 0 {
+				if ctx.Debug > 1 {
 					Printf("cannot get identities: cannot read email address(es) from %s\n", addrs)
 				}
 				return
