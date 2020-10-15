@@ -55,5 +55,6 @@ func TestGetThreadsNum(t *testing.T) {
 				index+1, expected, got, nThreads,
 			)
 		}
+		lib.ResetThreadsNum(&ctx)
 	}
 }

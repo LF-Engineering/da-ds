@@ -79,15 +79,15 @@ func (j *DSGroupsio) ParseArgs(ctx *Ctx) (err error) {
 	j.DS = Groupsio
 	prefix := "DA_GROUPSIO_"
 	j.GroupName = os.Getenv(prefix + "GROUP_NAME")
-	j.NoSSLVerify = os.Getenv(prefix+"NO_SSL_VERIFY") != ""
+	j.NoSSLVerify = StringToBool(os.Getenv(prefix + "NO_SSL_VERIFY"))
 	j.Email = os.Getenv(prefix + "EMAIL")
 	j.Password = os.Getenv(prefix + "PASSWORD")
 	AddRedacted(j.Email, false)
 	AddRedacted(j.Password, false)
 	AddRedacted(neturl.QueryEscape(j.Email), false)
 	AddRedacted(neturl.QueryEscape(j.Password), false)
-	j.MultiOrigin = os.Getenv(prefix+"MULTI_ORIGIN") != ""
-	j.SaveArchives = os.Getenv(prefix+"SAVE_ARCHIVES") != ""
+	j.MultiOrigin = StringToBool(os.Getenv(prefix + "MULTI_ORIGIN"))
+	j.SaveArchives = StringToBool(os.Getenv(prefix + "SAVE_ARCHIVES"))
 	if os.Getenv(prefix+"ARCH_PATH") != "" {
 		j.ArchPath = os.Getenv(prefix + "ARCH_PATH")
 	} else {
@@ -194,8 +194,8 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 	// headers := map[string]string{"Content-Type": "application/json"}
 	// By checking cookie expiration data I know that I can (probably) cache this even for 14 days
 	// In that case other dads groupsio instances will reuse login data from L2 cache :-D
-	// But we cache for 48 hours at most, because new subscriptions are added
-	cacheLoginDur := time.Duration(48) * time.Hour
+	// But we cache for 24:05 hours at most, because new subscriptions are added
+	cacheLoginDur := time.Duration(24)*time.Hour + time.Duration(5)*time.Minute
 	var res interface{}
 	var cookies []string
 	Printf("groupsio login via: %s\n", url)
@@ -553,6 +553,7 @@ func (j *DSGroupsio) DateField(*Ctx) string {
 
 // RichIDField - return rich ID field name
 func (j *DSGroupsio) RichIDField(*Ctx) string {
+	// Because in groups.io one raw item generates no more than 1 rich item
 	return UUID
 }
 
@@ -630,7 +631,7 @@ func (j *DSGroupsio) ElasticRichMapping() []byte {
 // GetItemIdentitiesEx return list of item's identities, each one is [3]string
 // (name, username, email) tripples, special value Nil "<nil>" means null
 // we use string and not *string which allows nil to allow usage as a map key
-// This one (Ex) also returns information about identity's origin (from or to)
+// This one (Ex) also returns information about identity's origins (from, to, or both)
 func (j *DSGroupsio) GetItemIdentitiesEx(ctx *Ctx, doc interface{}) (identities map[[3]string]map[string]struct{}) {
 	init := false
 	props := []string{"From", "To"}

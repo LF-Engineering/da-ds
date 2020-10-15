@@ -57,8 +57,18 @@ type Ctx struct {
 	ESScrollWaitSecs   float64
 }
 
-func (ctx *Ctx) env(v string) string {
+// Env - get env value using current DS prefix
+func (ctx *Ctx) Env(v string) string {
 	return os.Getenv(ctx.DSPrefix + v)
+}
+
+// BoolEnv - parses env variable as bool
+// returns false for anything that was parsed as false, zero, empty etc:
+// f, F, false, False, fALSe, 0, "", 0.00
+// else returns true
+func (ctx *Ctx) BoolEnv(k string) bool {
+	v := os.Getenv(ctx.DSPrefix + k)
+	return StringToBool(v)
 }
 
 // Init - get context from environment variables
@@ -72,19 +82,19 @@ func (ctx *Ctx) Init() {
 	ctx.DSPrefix = "DA_" + strings.ToUpper(ctx.DS) + "_"
 
 	// Debug
-	if ctx.env("DEBUG") == "" {
+	if !ctx.BoolEnv("DEBUG") {
 		ctx.Debug = 0
 	} else {
-		debugLevel, err := strconv.Atoi(ctx.env("DEBUG"))
+		debugLevel, err := strconv.Atoi(ctx.Env("DEBUG"))
 		FatalOnError(err)
 		if debugLevel != 0 {
 			ctx.Debug = debugLevel
 		}
 	}
-	if ctx.env("DEBUG_SQL") == "" {
+	if !ctx.BoolEnv("DEBUG_SQL") {
 		ctx.DebugSQL = 0
 	} else {
-		debugLevel, err := strconv.Atoi(ctx.env("DEBUG_SQL"))
+		debugLevel, err := strconv.Atoi(ctx.Env("DEBUG_SQL"))
 		FatalOnError(err)
 		if debugLevel != 0 {
 			ctx.DebugSQL = debugLevel
@@ -92,10 +102,10 @@ func (ctx *Ctx) Init() {
 	}
 
 	// Retry
-	if ctx.env("RETRY") == "" {
+	if !ctx.BoolEnv("RETRY") {
 		ctx.Retry = 5
 	} else {
-		retry, err := strconv.Atoi(ctx.env("RETRY"))
+		retry, err := strconv.Atoi(ctx.Env("RETRY"))
 		FatalOnError(err)
 		if retry != 0 {
 			ctx.Retry = retry
@@ -103,12 +113,12 @@ func (ctx *Ctx) Init() {
 	}
 
 	// Threading
-	ctx.ST = ctx.env("ST") != ""
+	ctx.ST = ctx.BoolEnv("ST")
 	// NCPUs
-	if ctx.env("NCPUS") == "" {
+	if !ctx.BoolEnv("NCPUS") {
 		ctx.NCPUs = 0
 	} else {
-		nCPUs, err := strconv.Atoi(ctx.env("NCPUS"))
+		nCPUs, err := strconv.Atoi(ctx.Env("NCPUS"))
 		FatalOnError(err)
 		if nCPUs > 0 {
 			ctx.NCPUs = nCPUs
@@ -117,10 +127,10 @@ func (ctx *Ctx) Init() {
 			}
 		}
 	}
-	if ctx.env("NCPUS_SCALE") == "" {
+	if !ctx.BoolEnv("NCPUS_SCALE") {
 		ctx.NCPUsScale = 1.0
 	} else {
-		nCPUsScale, err := strconv.ParseFloat(ctx.env("NCPUS_SCALE"), 64)
+		nCPUsScale, err := strconv.ParseFloat(ctx.Env("NCPUS_SCALE"), 64)
 		FatalOnError(err)
 		if nCPUsScale > 0 {
 			ctx.NCPUsScale = nCPUsScale
@@ -128,19 +138,19 @@ func (ctx *Ctx) Init() {
 	}
 
 	// Enrich
-	ctx.Enrich = ctx.env("ENRICH") != ""
+	ctx.Enrich = ctx.BoolEnv("ENRICH")
 
 	// Raw & Rich index names
-	ctx.RawIndex = ctx.env("RAW_INDEX")
-	ctx.RichIndex = ctx.env("RICH_INDEX")
+	ctx.RawIndex = ctx.Env("RAW_INDEX")
+	ctx.RichIndex = ctx.Env("RICH_INDEX")
 
 	// Tag
-	ctx.Tag = ctx.env("TAG")
+	ctx.Tag = ctx.Env("TAG")
 
 	// Elastic search params
-	ctx.ESURL = ctx.env("ES_URL")
-	if ctx.env("ES_BULK_SIZE") != "" {
-		bulkSize, err := strconv.Atoi(ctx.env("ES_BULK_SIZE"))
+	ctx.ESURL = ctx.Env("ES_URL")
+	if ctx.Env("ES_BULK_SIZE") != "" {
+		bulkSize, err := strconv.Atoi(ctx.Env("ES_BULK_SIZE"))
 		FatalOnError(err)
 		if bulkSize > 0 {
 			ctx.ESBulkSize = bulkSize
@@ -148,8 +158,8 @@ func (ctx *Ctx) Init() {
 	} else {
 		ctx.ESBulkSize = 1000
 	}
-	if ctx.env("ES_SCROLL_SIZE") != "" {
-		scrollSize, err := strconv.Atoi(ctx.env("ES_SCROLL_SIZE"))
+	if ctx.Env("ES_SCROLL_SIZE") != "" {
+		scrollSize, err := strconv.Atoi(ctx.Env("ES_SCROLL_SIZE"))
 		FatalOnError(err)
 		if scrollSize > 0 {
 			ctx.ESScrollSize = scrollSize
@@ -157,7 +167,7 @@ func (ctx *Ctx) Init() {
 	} else {
 		ctx.ESScrollSize = 1000
 	}
-	ctx.ESScrollWait = ctx.env("ES_SCROLL_WAIT")
+	ctx.ESScrollWait = ctx.Env("ES_SCROLL_WAIT")
 	if ctx.ESScrollWait == "" {
 		ctx.ESScrollWait = "10m"
 		ctx.ESScrollWaitSecs = 600.0
@@ -168,15 +178,15 @@ func (ctx *Ctx) Init() {
 	}
 
 	// Affiliation DB params
-	ctx.DBHost = ctx.env("DB_HOST")
-	ctx.DBName = ctx.env("DB_NAME")
-	ctx.DBUser = ctx.env("DB_USER")
-	ctx.DBPass = ctx.env("DB_PASS")
-	ctx.DBPort = ctx.env("DB_PORT")
-	ctx.DBOpts = ctx.env("DB_OPTS")
-	ctx.DBConn = ctx.env("DB_CONN")
-	if ctx.env("DB_BULK_SIZE") != "" {
-		bulkSize, err := strconv.Atoi(ctx.env("DB_BULK_SIZE"))
+	ctx.DBHost = ctx.Env("DB_HOST")
+	ctx.DBName = ctx.Env("DB_NAME")
+	ctx.DBUser = ctx.Env("DB_USER")
+	ctx.DBPass = ctx.Env("DB_PASS")
+	ctx.DBPort = ctx.Env("DB_PORT")
+	ctx.DBOpts = ctx.Env("DB_OPTS")
+	ctx.DBConn = ctx.Env("DB_CONN")
+	if ctx.Env("DB_BULK_SIZE") != "" {
+		bulkSize, err := strconv.Atoi(ctx.Env("DB_BULK_SIZE"))
 		FatalOnError(err)
 		if bulkSize > 0 {
 			ctx.DBBulkSize = bulkSize
@@ -186,50 +196,50 @@ func (ctx *Ctx) Init() {
 	}
 
 	// Affiliations re-enrich special flags
-	ctx.NoRaw = ctx.env("NO_RAW") != ""
-	ctx.RefreshAffs = ctx.env("REFRESH_AFFS") != ""
-	ctx.OnlyIdentities = ctx.env("ONLY_IDENTITIES") != ""
-	ctx.ForceFull = ctx.env("FORCE_FULL") != ""
-	ctx.NoIdentities = ctx.env("NO_IDENTITIES") != ""
+	ctx.NoRaw = ctx.BoolEnv("NO_RAW")
+	ctx.RefreshAffs = ctx.BoolEnv("REFRESH_AFFS")
+	ctx.OnlyIdentities = ctx.BoolEnv("ONLY_IDENTITIES")
+	ctx.ForceFull = ctx.BoolEnv("FORCE_FULL")
+	ctx.NoIdentities = ctx.BoolEnv("NO_IDENTITIES")
 
 	// No cache & dry-run modes
-	ctx.NoCache = ctx.env("NO_CACHE") != ""
-	ctx.DryRun = ctx.env("DRY_RUN") != ""
+	ctx.NoCache = ctx.BoolEnv("NO_CACHE")
+	ctx.DryRun = ctx.BoolEnv("DRY_RUN")
 
 	// Legacy UUID
-	ctx.LegacyUUID = ctx.env("LEGACY_UUID") != ""
+	ctx.LegacyUUID = ctx.BoolEnv("LEGACY_UUID")
 
 	// Project, Project slug, Category
-	ctx.Project = ctx.env("PROJECT")
-	ctx.ProjectSlug = ctx.env("PROJECT_SLUG")
-	ctx.Category = ctx.env("CATEGORY")
+	ctx.Project = ctx.Env("PROJECT")
+	ctx.ProjectSlug = ctx.Env("PROJECT_SLUG")
+	ctx.Category = ctx.Env("CATEGORY")
 
 	// Date from/to (optional)
-	if ctx.env("DATE_FROM") != "" {
-		t, err := TimeParseAny(ctx.env("DATE_FROM"))
+	if ctx.Env("DATE_FROM") != "" {
+		t, err := TimeParseAny(ctx.Env("DATE_FROM"))
 		FatalOnError(err)
 		ctx.DateFrom = &t
 	}
-	if ctx.env("DATE_TO") != "" {
-		t, err := TimeParseAny(ctx.env("DATE_TO"))
+	if ctx.Env("DATE_TO") != "" {
+		t, err := TimeParseAny(ctx.Env("DATE_TO"))
 		FatalOnError(err)
 		ctx.DateTo = &t
 	}
 
 	// Offset from/to (optional)
-	if ctx.env("OFFSET_FROM") == "" {
+	if ctx.Env("OFFSET_FROM") == "" {
 		ctx.OffsetFrom = -1.0
 	} else {
-		offset, err := strconv.ParseFloat(ctx.env("OFFSET_FROM"), 64)
+		offset, err := strconv.ParseFloat(ctx.Env("OFFSET_FROM"), 64)
 		FatalOnError(err)
 		if offset >= 0.0 {
 			ctx.OffsetFrom = offset
 		}
 	}
-	if ctx.env("OFFSET_TO") == "" {
+	if ctx.Env("OFFSET_TO") == "" {
 		ctx.OffsetTo = -1.0
 	} else {
-		offset, err := strconv.ParseFloat(ctx.env("OFFSET_TO"), 64)
+		offset, err := strconv.ParseFloat(ctx.Env("OFFSET_TO"), 64)
 		FatalOnError(err)
 		if offset >= 0.0 {
 			ctx.OffsetTo = offset

@@ -80,7 +80,7 @@ func (j *DSJira) ParseArgs(ctx *Ctx) (err error) {
 	// Jira specific env variables
 	prefix := "DA_JIRA_"
 	j.URL = os.Getenv(prefix + "URL")
-	j.NoSSLVerify = os.Getenv(prefix+"NO_SSL_VERIFY") != ""
+	j.NoSSLVerify = StringToBool(os.Getenv(prefix + "NO_SSL_VERIFY"))
 	j.Token = os.Getenv(prefix + "TOKEN")
 	AddRedacted(j.Token, false)
 	if os.Getenv(prefix+"PAGE_SIZE") == "" {
@@ -92,7 +92,7 @@ func (j *DSJira) ParseArgs(ctx *Ctx) (err error) {
 			j.PageSize = pageSize
 		}
 	}
-	j.MultiOrigin = os.Getenv(prefix+"MULTI_ORIGIN") != ""
+	j.MultiOrigin = StringToBool(os.Getenv(prefix + "MULTI_ORIGIN"))
 	if j.NoSSLVerify {
 		NoSSLVerify()
 	}
