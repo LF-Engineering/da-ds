@@ -795,7 +795,7 @@ func GroupsioEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, doc
 		if !authorFound {
 			if ctx.Debug > 1 {
 				Printf("no author found in\n%v\n%v\n", identities, item)
-			} else {
+			} else if ctx.Debug > 0 {
 				Printf("skipping email due to missing usable from email %v\n", identities)
 			}
 			return
