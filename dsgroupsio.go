@@ -1062,6 +1062,7 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 				err = fmt.Errorf("cannot parse date %T %v\n", vdt, vdt)
 				return
 			}
+			err = nil
 		}
 		ary, _ := extra.([3]string)
 		// (name, username, email)
