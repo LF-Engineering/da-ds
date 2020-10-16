@@ -580,7 +580,7 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		for i := range props {
 			props[i] = strings.TrimSpace(props[i])
 		}
-		sBody := BytesToStringTrunc(body.Data, MaxMessageBodyLength)
+		sBody := BytesToStringTrunc(body.Data, MaxMessageBodyLength, false)
 		m := make(map[string]interface{})
 		m["data"] = sBody
 		m["content-type"] = string(body.ContentType)

@@ -51,7 +51,7 @@ func ESCacheGet(ctx *Ctx, key string) (entry *ESCacheEntry, ok bool) {
 	}
 	_ = resp.Body.Close()
 	if resp.StatusCode != 200 {
-		sBody := BytesToStringTrunc(body, MaxPayloadPrintfLen)
+		sBody := BytesToStringTrunc(body, MaxPayloadPrintfLen, true)
 		Printf("Method:%s url:%s data: %s status:%d\n%s\n", method, url, data, resp.StatusCode, sBody)
 		return
 	}
@@ -83,7 +83,7 @@ func ESCacheSet(ctx *Ctx, key string, entry *ESCacheEntry) {
 	if err != nil {
 		sEntry := "<nil>"
 		if entry != nil {
-			sEntry = InterfaceToStringTrunc(*entry, MaxPayloadPrintfLen)
+			sEntry = InterfaceToStringTrunc(*entry, MaxPayloadPrintfLen, true)
 		}
 		Printf("json %s marshal error: %+v\n", sEntry, err)
 		return
@@ -93,27 +93,27 @@ func ESCacheSet(ctx *Ctx, key string, entry *ESCacheEntry) {
 	url := fmt.Sprintf("%s/dads_cache/_doc?refresh=true", ctx.ESURL)
 	req, err := http.NewRequest(method, url, payloadBody)
 	if err != nil {
-		sData := BytesToStringTrunc(payloadBytes, MaxPayloadPrintfLen)
+		sData := BytesToStringTrunc(payloadBytes, MaxPayloadPrintfLen, true)
 		Printf("New request error: %+v for %s url: %s, data: %s\n", err, method, url, sData)
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		sData := BytesToStringTrunc(payloadBytes, MaxPayloadPrintfLen)
+		sData := BytesToStringTrunc(payloadBytes, MaxPayloadPrintfLen, true)
 		Printf("do request error: %+v for %s url: %s, data: %s\n", err, method, url, sData)
 		return
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != 201 {
-		sData := BytesToStringTrunc(payloadBytes, MaxPayloadPrintfLen)
+		sData := BytesToStringTrunc(payloadBytes, MaxPayloadPrintfLen, true)
 		var body []byte
 		body, err = ioutil.ReadAll(resp.Body)
 		if err != nil {
 			Printf("ReadAll non-ok request error: %+v for %s url: %s, data: %s\n", err, method, url, sData)
 			return
 		}
-		sBody := BytesToStringTrunc(body, MaxPayloadPrintfLen)
+		sBody := BytesToStringTrunc(body, MaxPayloadPrintfLen, true)
 		Printf("Method:%s url:%s data: %s status:%d\n%s\n", method, url, sData, resp.StatusCode, sBody)
 		return
 	}
@@ -146,7 +146,7 @@ func ESCacheDelete(ctx *Ctx, key string) {
 			Printf("ReadAll non-ok request error: %+v for %s url: %s, data: %s\n", err, method, url, data)
 			return
 		}
-		sBody := BytesToStringTrunc(body, MaxPayloadPrintfLen)
+		sBody := BytesToStringTrunc(body, MaxPayloadPrintfLen, true)
 		Printf("Method:%s url:%s data: %s status:%d\n%s\n", method, url, data, resp.StatusCode, sBody)
 		return
 	}
@@ -181,7 +181,7 @@ func ESCacheDeleteExpired(ctx *Ctx) {
 			Printf("ReadAll non-ok request error: %+v for %s url: %s, data: %s\n", err, method, url, data)
 			return
 		}
-		sBody := BytesToStringTrunc(body, MaxPayloadPrintfLen)
+		sBody := BytesToStringTrunc(body, MaxPayloadPrintfLen, true)
 		Printf("Method:%s url:%s data: %s status:%d\n%s\n", method, url, data, resp.StatusCode, sBody)
 		return
 	}
