@@ -861,7 +861,15 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 		err = fmt.Errorf("missing data field in item %+v", DumpKeys(item))
 		return
 	}
-	msgDate, _ := Dig(msg, []string{GroupsioMessageDateField}, true, false)
+	msgDate, ok := Dig(msg, []string{GroupsioMessageDateField}, false, true)
+	// original raw format support
+	if !ok {
+		msgDate, ok = Dig(msg, []string{"Date"}, false, true)
+		if !ok {
+			Fatalf("cannot find date/Date field in %+v\n", DumpKeys(msg))
+			return
+		}
+	}
 	if role == Author {
 		for _, field := range RawFields {
 			v, _ := item[field]
@@ -948,7 +956,15 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 			//Printf("getIValue(%v) -> key not found\n", key)
 			return
 		}
-		rich["Message-ID"], _ = Dig(msg, []string{GroupsioMessageIDField}, true, false)
+		rich["Message-ID"], ok = Dig(msg, []string{GroupsioMessageIDField}, false, true)
+		// original raw format support
+		if !ok {
+			rich["Message-ID"], ok = Dig(msg, []string{"Message-ID"}, false, true)
+			if !ok {
+				Fatalf("cannot find message-id/Message-ID field in %v\n", DumpKeys(msg))
+				return
+			}
+		}
 		rich["Date"] = msgDate
 		subj, _ := getStringValue(msg, "Subject")
 		rich["Subject_analyzed"] = subj
@@ -983,6 +999,12 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 					}
 				}
 			}
+		} else {
+			// original raw format support
+			plain, ok = Dig(msg, []string{"body", "plain"}, false, true)
+			if ok {
+				text, found = plain.(string)
+			}
 		}
 		if found {
 			rich["size"] = len(text)
@@ -1000,14 +1022,14 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 			rich["body_extract"] = ""
 		}
 		rich["tz"] = nil
-		rich["mbox_parse_warning"], _ = Dig(msg, []string{"MBox-Warn"}, true, false)
-		rich["mbox_bytes_length"], _ = Dig(msg, []string{"MBox-Bytes-Length"}, true, false)
-		rich["mbox_n_lines"], _ = Dig(msg, []string{"MBox-N-Lines"}, true, false)
-		rich["mbox_n_bodies"], _ = Dig(msg, []string{"MBox-N-Bodies"}, true, false)
-		rich["mbox_from"], _ = Dig(msg, []string{"MBox-From"}, true, false)
+		rich["mbox_parse_warning"], _ = Dig(msg, []string{"MBox-Warn"}, false, true)
+		rich["mbox_bytes_length"], _ = Dig(msg, []string{"MBox-Bytes-Length"}, false, true)
+		rich["mbox_n_lines"], _ = Dig(msg, []string{"MBox-N-Lines"}, false, true)
+		rich["mbox_n_bodies"], _ = Dig(msg, []string{"MBox-N-Bodies"}, false, true)
+		rich["mbox_from"], _ = Dig(msg, []string{"MBox-From"}, false, true)
 		rich["mbox_date"] = nil
 		rich["mbox_date_str"] = ""
-		dtStr, ok := Dig(msg, []string{"MBox-Date"}, true, false)
+		dtStr, ok := Dig(msg, []string{"MBox-Date"}, false, true)
 		if ok {
 			sdt, ok := dtStr.(string)
 			if ok {
@@ -1027,8 +1049,19 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 		var dt time.Time
 		dt, err = TimeParseInterfaceString(msgDate)
 		if err != nil {
-			Printf("cannot parse date %s\n", msgDate)
-			return
+			switch vdt := msgDate.(type) {
+			case string:
+				dt, ok = ParseMBoxDate(vdt)
+				if !ok {
+					err = fmt.Errorf("cannot parse date %s\n", vdt)
+					return
+				}
+			case time.Time:
+				dt = vdt
+			default:
+				err = fmt.Errorf("cannot parse date %T %v\n", vdt, vdt)
+				return
+			}
 		}
 		ary, _ := extra.([3]string)
 		// (name, username, email)

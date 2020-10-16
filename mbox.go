@@ -568,6 +568,7 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 			return
 		}
 	}
+	// item["Date"] = dt
 	item[GroupsioMessageDateField] = dt
 	item["MBox-N-Bodies"] = len(bodies)
 	bodyKeys := make(map[string]struct{})
