@@ -374,7 +374,7 @@ func MaybeESCacheCleanup(ctx *Ctx) {
 			if MT {
 				esCacheMtx.Unlock()
 			}
-			if ctx.Debug > 0 {
+			if ctx.Debug > 2 {
 				Printf("ContributorsCache: deleted expired items\n")
 			}
 		}()
