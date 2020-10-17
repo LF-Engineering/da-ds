@@ -2,17 +2,22 @@ package dads
 
 import (
 	"fmt"
+	jsoniter "github.com/json-iterator/go"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 )
 
 const (
 	// DockerhubAPIURL - dockerhub API URL
-	DockerhubAPIURL = "https://hub.docker.com/v2"
+	DockerhubAPIURL          = "https://hub.docker.com/v2"
+	DockerhubAPILogin        = "/users/login"
+	DockerhubAPIRepositories = "repositories"
 )
 
 var (
-	// JiraSearchFields - extra search fields
+	// DockerhubSearchFields - extra search fields
 	DockerhubSearchFields = map[string][]string{
 		"name":      {"name"},
 		"namespace": {"namespace"},
@@ -26,16 +31,39 @@ var (
 // DSDockerhub - DS implementation for stub - does nothing at all, just presents a skeleton code
 type DSDockerhub struct {
 	DS          string
+	UserName    string
+	Password    string
+	Owner       string
+	Repository  string
+	PageSize    int
+	Archive     bool
 	NoSSLVerify bool // From DA_DOCKERHUB_NO_SSL_VERIFY
 	MultiOrigin bool // can we store multiple endpoints in a single index?
 }
 
 // ParseArgs - parse stub specific environment variables
 func (j *DSDockerhub) ParseArgs(ctx *Ctx) (err error) {
-	// IMPL:
 	j.DS = Dockerhub
 	// Dockerhub specific env variables
-	//prefix := "DA_DOCKERHUB_"
+	prefix := "DA_DOCKERHUB_"
+
+	// Authentication for jwt
+	j.UserName = os.Getenv(prefix + "UserName")
+	j.Password = os.Getenv(prefix + "PASSWORD")
+
+	j.NoSSLVerify = StringToBool(os.Getenv(prefix + "NO_SSL_VERIFY"))
+	j.Owner = os.Getenv(prefix + "OWNER")
+	j.Repository = os.Getenv(prefix + "REPOSITORY")
+	if os.Getenv(prefix+"PAGE_SIZE") == "" {
+		j.PageSize = 500
+	} else {
+		pageSize, err := strconv.Atoi(os.Getenv(prefix + "PAGE_SIZE"))
+		FatalOnError(err)
+		if pageSize > 0 {
+			j.PageSize = pageSize
+		}
+	}
+	j.MultiOrigin = StringToBool(os.Getenv(prefix + "MULTI_ORIGIN"))
 	if j.NoSSLVerify {
 		NoSSLVerify()
 	}
@@ -44,7 +72,9 @@ func (j *DSDockerhub) ParseArgs(ctx *Ctx) (err error) {
 
 // Validate - is current DS configuration OK?
 func (j *DSDockerhub) Validate() (err error) {
-	// IMPL:
+	if j.Owner == "" {
+		err = fmt.Errorf("Owner name must be set")
+	}
 	return
 }
 
@@ -82,7 +112,48 @@ func (j *DSDockerhub) Enrich(ctx *Ctx) (err error) {
 
 // FetchItems - implement enrich data for stub datasource
 func (j *DSDockerhub) FetchItems(ctx *Ctx) (err error) {
-	// IMPL:
+	// Login to groups.io
+	method := Post
+	url := DockerhubAPIURL + DockerhubAPILogin
+	// headers := map[string]string{"Content-Type": "application/json"}
+	// By checking cookie expiration data I know that I can (probably) cache this even for 14 days
+	// In that case other dads groupsio instances will reuse login data from L2 cache :-D
+	// But we cache for 24:05 hours at most, because new subscriptions are added
+	cacheLoginDur := time.Duration(24)*time.Hour + time.Duration(5)*time.Minute
+	var res interface{}
+	var body string = "{username:` + neturl.QueryEscape(j.UserName) + `,password:` + neturl.QueryEscape(j.Password)}"
+
+	Printf("dockerhub login via: %s\n", url)
+	res, _, _, err = Request(
+		ctx,
+		url,
+		method,
+		map[string]string{"Content": "Content-Type: application/json"},
+		[]byte(body),
+		[]string{},                          // cookies
+		nil,                                 // JSON statuses
+		nil,                                 // Error statuses
+		map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
+		false,                               // retry
+		&cacheLoginDur,                      // cache duration
+		false,                               // skip in dry-run mode
+	)
+	if err != nil {
+		return
+	}
+
+	type Result struct {
+		User struct {
+			Token string `json:"token"`
+		} `json:"user"`
+	}
+	var result Result
+	err = jsoniter.Unmarshal(res.([]byte), &result)
+	if err != nil {
+		Printf("Cannot unmarshal result from %s\n", string(res.([]byte)))
+		return
+	}
+
 	var messages [][]byte
 	// Process messages (possibly in threads)
 	var (
