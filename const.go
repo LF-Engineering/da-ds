@@ -9,9 +9,6 @@ const OK string = "ok"
 // DADSOrigin - common constant string
 const DADSOrigin string = "dads"
 
-// Dockerhub - common constant string
-const Dockerhub string = "dockerhub"
-
 // Groupsio - common constant string
 const Groupsio string = "groupsio"
 

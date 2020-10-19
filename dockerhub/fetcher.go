@@ -1,10 +1,11 @@
-package dads
+package dockerhub
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	jsoniter "github.com/json-iterator/go"
-	"os"
-	"strconv"
+	"net/http"
 	"sync"
 	"time"
 )
@@ -12,8 +13,11 @@ import (
 const (
 	// DockerhubAPIURL - dockerhub API URL
 	DockerhubAPIURL          = "https://hub.docker.com/v2"
-	DockerhubAPILogin        = "/users/login"
+	DockerhubAPILogin        = "users/login"
 	DockerhubAPIRepositories = "repositories"
+
+	// Dockerhub - common constant string
+	Dockerhub string = "dockerhub"
 )
 
 var (
@@ -28,86 +32,119 @@ var (
 	DockerhubRichMapping = []byte(`{"properties":{"metadata__updated_on":{"type":"date"},"description":{"type":"text","index":true},"description_analyzed":{"type":"text","index":true},"full_description_analyzed":{"type":"text","index":true}}}`)
 )
 
-// DSDockerhub - DS implementation for stub - does nothing at all, just presents a skeleton code
-type DSDockerhub struct {
-	DS          string
-	UserName    string
-	Password    string
-	Owner       string
-	Repository  string
-	PageSize    int
-	Archive     bool
-	NoSSLVerify bool // From DA_DOCKERHUB_NO_SSL_VERIFY
-	MultiOrigin bool // can we store multiple endpoints in a single index?
+// Fetcher contains dockerhub datasource fetch logic
+type Fetcher struct {
+	DSName             string // Datasource will be used as key for ES
+	UserName           string // UserName is repository owner name
+	Password           string
+	IncludeArchived    bool
+	MultiOrigin        bool // can we store multiple endpoints in a single index?
+	HttpClientProvider HttpClientProvider
 }
 
-// ParseArgs - parse stub specific environment variables
-func (j *DSDockerhub) ParseArgs(ctx *Ctx) (err error) {
-	j.DS = Dockerhub
-	// Dockerhub specific env variables
-	prefix := "DA_DOCKERHUB_"
-
-	// Authentication for jwt
-	j.UserName = os.Getenv(prefix + "UserName")
-	j.Password = os.Getenv(prefix + "PASSWORD")
-
-	j.NoSSLVerify = StringToBool(os.Getenv(prefix + "NO_SSL_VERIFY"))
-	j.Owner = os.Getenv(prefix + "OWNER")
-	j.Repository = os.Getenv(prefix + "REPOSITORY")
-	if os.Getenv(prefix+"PAGE_SIZE") == "" {
-		j.PageSize = 500
-	} else {
-		pageSize, err := strconv.Atoi(os.Getenv(prefix + "PAGE_SIZE"))
-		FatalOnError(err)
-		if pageSize > 0 {
-			j.PageSize = pageSize
-		}
-	}
-	j.MultiOrigin = StringToBool(os.Getenv(prefix + "MULTI_ORIGIN"))
-	if j.NoSSLVerify {
-		NoSSLVerify()
-	}
-	return
+// DockerHubParams ...
+type DockerhubParams struct {
+	UserName string
+	Password string
 }
 
-// Validate - is current DS configuration OK?
-func (j *DSDockerhub) Validate() (err error) {
-	if j.Owner == "" {
-		err = fmt.Errorf("Owner name must be set")
-	}
-	return
+type HttpClientProvider interface {
+	Request(url string, method string, header map[string]string, body []byte) (statusCode int, resBody []byte, err error)
 }
 
+// NewFetcher initiates a new dockerhub fetcher
+func NewFetcher(params DockerhubParams, httpClientProvider HttpClientProvider) *Fetcher {
+	return &Fetcher{
+		DSName:             Dockerhub,
+		UserName:           params.UserName,
+		Password:           params.Password,
+		HttpClientProvider: httpClientProvider,
+	}
+}
+
+// Validate dockerhub datasource configuration
+func (f *Fetcher) Validate() error {
+	if f.UserName == "" {
+		return fmt.Errorf("owner must be set")
+	}
+
+	return nil
+}
+
+// todo: to be reviewed
 // Name - return data source name
-func (j *DSDockerhub) Name() string {
-	return j.DS
+func (f *Fetcher) Name() string {
+	return f.DSName
 }
 
 // Info - return DS configuration in a human readable form
-func (j DSDockerhub) Info() string {
-	return fmt.Sprintf("%+v", j)
+func (f *Fetcher) Info() string {
+	return Printf("%+v", f)
 }
 
 // CustomFetchRaw - is this datasource using custom fetch raw implementation?
-func (j *DSDockerhub) CustomFetchRaw() bool {
+func (f *Fetcher) CustomFetchRaw() bool {
 	return false
 }
 
 // FetchRaw - implement fetch raw data for stub datasource
-func (j *DSDockerhub) FetchRaw(ctx *Ctx) (err error) {
-	Printf("%s should use generic FetchRaw()\n", j.DS)
+func (f *Fetcher) FetchRaw() (err error) {
+	Printf("%s should use generic FetchRaw()\n", f.DSName)
 	return
 }
 
 // CustomEnrich - is this datasource using custom enrich implementation?
-func (j *DSDockerhub) CustomEnrich() bool {
+func (f *Fetcher) CustomEnrich() bool {
 	return false
 }
 
 // Enrich - implement enrich data for stub datasource
-func (j *DSDockerhub) Enrich(ctx *Ctx) (err error) {
-	Printf("%s should use generic Enrich()\n", j.DS)
+func (f *Fetcher) Enrich(ctx *Ctx) (err error) {
+	Printf("%s should use generic Enrich()\n", f.DSName)
 	return
+}
+
+func (f *Fetcher) login() (string, error) {
+	url := fmt.Sprintf("%s/%s", DockerhubAPIURL, DockerhubAPILogin)
+
+	payload := make(map[string]interface{})
+	payload["username"] = f.UserName
+	payload["password"] = f.Password
+
+	p, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+
+	Printf("dockerhub login via: %s\n", url)
+
+	statusCode, resBody, err := f.HttpClientProvider.Request(url, "Post", nil, p)
+
+	if statusCode == http.StatusOK {
+		res := LoginResponse{}
+		err = jsoniter.Unmarshal(resBody, &res)
+		if err != nil {
+			fmt.Printf("Cannot unmarshal result from %s\n", string(resBody))
+			return "", err
+		}
+	}
+
+	return "", errors.New("invalid login credentials")
+}
+
+// FetchItems ...
+func (f *Fetcher) FetchItems() error {
+	// login
+	token := ""
+	if f.Password != "" {
+		t, err := f.login()
+		if err != nil {
+			return err
+		}
+		token = t
+	}
+
+	return nil
 }
 
 // FetchItems - implement enrich data for stub datasource
@@ -115,21 +152,26 @@ func (j *DSDockerhub) FetchItems(ctx *Ctx) (err error) {
 	// Login to groups.io
 	method := Post
 	url := DockerhubAPIURL + DockerhubAPILogin
-	// headers := map[string]string{"Content-Type": "application/json"}
-	// By checking cookie expiration data I know that I can (probably) cache this even for 14 days
-	// In that case other dads groupsio instances will reuse login data from L2 cache :-D
-	// But we cache for 24:05 hours at most, because new subscriptions are added
+
 	cacheLoginDur := time.Duration(24)*time.Hour + time.Duration(5)*time.Minute
 	var res interface{}
-	var body string = "{username:` + neturl.QueryEscape(j.UserName) + `,password:` + neturl.QueryEscape(j.Password)}"
+	body := make(map[string]interface{})
+	body["username"] = j.UserName
+	body["password"] = j.Password
 
-	Printf("dockerhub login via: %s\n", url)
+	b, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("dockerhub login via: %s\n", url)
+
 	res, _, _, err = Request(
 		ctx,
 		url,
 		method,
 		map[string]string{"Content": "Content-Type: application/json"},
-		[]byte(body),
+		b,
 		[]string{},                          // cookies
 		nil,                                 // JSON statuses
 		nil,                                 // Error statuses
@@ -139,19 +181,14 @@ func (j *DSDockerhub) FetchItems(ctx *Ctx) (err error) {
 		false,                               // skip in dry-run mode
 	)
 	if err != nil {
-		return
+		return err
 	}
 
-	type Result struct {
-		User struct {
-			Token string `json:"token"`
-		} `json:"user"`
-	}
-	var result Result
+	result := make(map[string]interface{})
 	err = jsoniter.Unmarshal(res.([]byte), &result)
 	if err != nil {
-		Printf("Cannot unmarshal result from %s\n", string(res.([]byte)))
-		return
+		fmt.Printf("Cannot unmarshal result from %s\n", string(res.([]byte)))
+		return err
 	}
 
 	var messages [][]byte
