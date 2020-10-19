@@ -110,3 +110,6 @@ const Recipient string = "recipient"
 
 // From - common constant string
 const From = "from"
+
+// Commit - common constant string
+const Commit = "commit"

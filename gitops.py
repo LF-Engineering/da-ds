@@ -422,10 +422,10 @@ class GitOps:
         return self.errored
 
 logger = logging.getLogger(__name__)
-if argv[1] == 'i':
-    git_ops = GitOps(argv[2])
-    git_ops._load_cache()
-    git_ops.load()
-    git_ops.get_stats()
-    if git_ops.is_errored():
-        sys.exit(1)
+git_ops = GitOps(argv[1])
+git_ops._load_cache()
+git_ops.load()
+loc, pls = git_ops.get_stats()
+if git_ops.is_errored():
+    sys.exit(1)
+print (json.dumps({'loc':loc,'pls':pls}))

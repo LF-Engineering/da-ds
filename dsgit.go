@@ -3,9 +3,12 @@ package dads
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	jsoniter "github.com/json-iterator/go"
 )
 
 const (
@@ -26,6 +29,24 @@ var (
 	GitRichMapping = []byte(`{"properties":{"metadata__updated_on":{"type":"date"},"message_analyzed":{"type":"text","index":true}}}`)
 )
 
+// RawPLS - programming language summary (all fields as strings)
+type RawPLS struct {
+	Language string `json:"language"`
+	Files    string `json:"files"`
+	Blank    string `json:"blank"`
+	Comment  string `json:"comment"`
+	Code     string `json:"code"`
+}
+
+// PLS - programming language summary
+type PLS struct {
+	Language string `json:"language"`
+	Files    int    `json:"files"`
+	Blank    int    `json:"blank"`
+	Comment  int    `json:"comment"`
+	Code     int    `json:"code"`
+}
+
 // DSGit - DS implementation for git - does nothing at all, just presents a skeleton code
 type DSGit struct {
 	DS           string
@@ -34,7 +55,10 @@ type DSGit struct {
 	ReposPath    string // From DA_GIT_REPOS_PATH - default GitDefaultReposPath
 	CachePath    string // From DA_GIT_CACHE_PATH - default GitDefaultCachePath
 	NoSSLVerify  bool   // From DA_GIT_NO_SSL_VERIFY
-	RepoName     string
+	// Non-config variables
+	RepoName string // repo name
+	Loc      int    // lines of code as reported by GitOpsCommand
+	Pls      []PLS  // programming language suppary as reported by GitOpsCommand
 }
 
 // ParseArgs - parse git specific environment variables
@@ -126,10 +150,38 @@ func (j *DSGit) GetGitOps(ctx *Ctx, thrN int) (ch chan error, err error) {
 			sout string
 			serr string
 		)
-		cmdLine := []string{GitOpsCommand, "i", url}
+		cmdLine := []string{GitOpsCommand, url}
 		sout, serr, e = ExecCommand(ctx, cmdLine, nil)
 		if e != nil {
 			Printf("error executing %v: %v\n%s\n%s\n", cmdLine, e, sout, serr)
+			return
+		}
+		type resultType struct {
+			Loc int      `json:"loc"`
+			Pls []RawPLS `json:"pls"`
+		}
+		var data resultType
+		e = jsoniter.Unmarshal([]byte(sout), &data)
+		if e != nil {
+			Printf("error unmarshaling from %v\n", sout)
+			return
+		}
+		j.Loc = data.Loc
+		for _, f := range data.Pls {
+			files, _ := strconv.Atoi(f.Files)
+			blank, _ := strconv.Atoi(f.Blank)
+			comment, _ := strconv.Atoi(f.Comment)
+			code, _ := strconv.Atoi(f.Code)
+			j.Pls = append(
+				j.Pls,
+				PLS{
+					Language: f.Language,
+					Files:    files,
+					Blank:    blank,
+					Comment:  comment,
+					Code:     code,
+				},
+			)
 		}
 		return
 	}
@@ -167,13 +219,16 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 		}
 	}
 	// Do normal git processing, which don't needs gitops yet
+	Printf("processing data which doesn't need git ops result\n")
 	// If MT allowed, wait for GitOps
+	Printf("waiting for git ops result\n")
 	if thrN > 1 {
 		err = <-goch
 		if err != nil {
 			return
 		}
 	}
+	Printf("loc: %d, programming languages summary: %+v\n", j.Loc, j.Pls)
 	// Continue with operations that need git ops
 	nThreads := 0
 	processMsg := func(c chan error, msg []byte) (wch chan error, e error) {
@@ -351,8 +406,11 @@ func (j *DSGit) Origin(ctx *Ctx) string {
 
 // ItemID - return unique identifier for an item
 func (j *DSGit) ItemID(item interface{}) string {
-	// IMPL:
-	return fmt.Sprintf("%d", time.Now().UnixNano())
+	id, ok := item.(map[string]interface{})[Commit].(string)
+	if !ok {
+		Fatalf("%s: ItemID() - cannot extract %s from %+v", j.DS, Commit, DumpKeys(item))
+	}
+	return id
 }
 
 // AddMetadata - add metadata to the item
@@ -386,13 +444,13 @@ func (j *DSGit) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string]interf
 // ItemUpdatedOn - return updated on date for an item
 func (j *DSGit) ItemUpdatedOn(item interface{}) time.Time {
 	// IMPL:
+	// should be CommitDate
 	return time.Now()
 }
 
 // ItemCategory - return unique identifier for an item
 func (j *DSGit) ItemCategory(item interface{}) string {
-	// IMPL:
-	return fmt.Sprintf("%d", time.Now().UnixNano())
+	return Commit
 }
 
 // ElasticRawMapping - Raw index mapping definition
