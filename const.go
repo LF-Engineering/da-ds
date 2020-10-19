@@ -15,6 +15,9 @@ const Groupsio string = "groupsio"
 // Jira - common constant string
 const Jira string = "jira"
 
+// Git - common constant string
+const Git string = "git"
+
 // Stub - common constant string
 const Stub string = "stub"
 
