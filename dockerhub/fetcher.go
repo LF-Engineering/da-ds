@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	dads "github.com/LF-Engineering/da-ds"
 	jsoniter "github.com/json-iterator/go"
 	"net/http"
 	"sync"
@@ -35,38 +36,39 @@ var (
 // Fetcher contains dockerhub datasource fetch logic
 type Fetcher struct {
 	DSName             string // Datasource will be used as key for ES
-	UserName           string // UserName is repository owner name
-	Password           string
 	IncludeArchived    bool
 	MultiOrigin        bool // can we store multiple endpoints in a single index?
 	HttpClientProvider HttpClientProvider
+	ElasticSearchProvider ElasticSearchProvider
+	Username           string
+	Password           string
 }
 
 // DockerHubParams ...
 type DockerhubParams struct {
-	UserName string
-	Password string
+	Username           string
+	Password           string
 }
 
 type HttpClientProvider interface {
 	Request(url string, method string, header map[string]string, body []byte) (statusCode int, resBody []byte, err error)
 }
 
+type ElasticSearchProvider interface {
+}
+
 // NewFetcher initiates a new dockerhub fetcher
 func NewFetcher(params DockerhubParams, httpClientProvider HttpClientProvider) *Fetcher {
 	return &Fetcher{
 		DSName:             Dockerhub,
-		UserName:           params.UserName,
-		Password:           params.Password,
 		HttpClientProvider: httpClientProvider,
+		Username: params.Username,
+		Password: params.Password,
 	}
 }
 
 // Validate dockerhub datasource configuration
 func (f *Fetcher) Validate() error {
-	if f.UserName == "" {
-		return fmt.Errorf("owner must be set")
-	}
 
 	return nil
 }
@@ -79,7 +81,7 @@ func (f *Fetcher) Name() string {
 
 // Info - return DS configuration in a human readable form
 func (f *Fetcher) Info() string {
-	return Printf("%+v", f)
+	return fmt.Sprintf("%+v", f)
 }
 
 // CustomFetchRaw - is this datasource using custom fetch raw implementation?
@@ -89,7 +91,7 @@ func (f *Fetcher) CustomFetchRaw() bool {
 
 // FetchRaw - implement fetch raw data for stub datasource
 func (f *Fetcher) FetchRaw() (err error) {
-	Printf("%s should use generic FetchRaw()\n", f.DSName)
+	dads.Printf("%s should use generic FetchRaw()\n", f.DSName)
 	return
 }
 
@@ -99,24 +101,24 @@ func (f *Fetcher) CustomEnrich() bool {
 }
 
 // Enrich - implement enrich data for stub datasource
-func (f *Fetcher) Enrich(ctx *Ctx) (err error) {
-	Printf("%s should use generic Enrich()\n", f.DSName)
+func (f *Fetcher) Enrich() (err error) {
+	dads.Printf("%s should use generic Enrich()\n", f.DSName)
 	return
 }
 
-func (f *Fetcher) login() (string, error) {
+func (f *Fetcher) login(username string, password string) (string, error) {
 	url := fmt.Sprintf("%s/%s", DockerhubAPIURL, DockerhubAPILogin)
 
 	payload := make(map[string]interface{})
-	payload["username"] = f.UserName
-	payload["password"] = f.Password
+	payload["username"] = username
+	payload["password"] = password
 
 	p, err := json.Marshal(payload)
 	if err != nil {
 		return "", err
 	}
 
-	Printf("dockerhub login via: %s\n", url)
+	dads.Printf("dockerhub login via: %s\n", url)
 
 	statusCode, resBody, err := f.HttpClientProvider.Request(url, "Post", nil, p)
 
@@ -133,16 +135,36 @@ func (f *Fetcher) login() (string, error) {
 }
 
 // FetchItems ...
-func (f *Fetcher) FetchItems() error {
+func (f *Fetcher) FetchItems(owner string, repository string) error {
+	// todo: add owner, repository
+
 	// login
 	token := ""
+
+
 	if f.Password != "" {
-		t, err := f.login()
+		t, err := f.login(f.Username, f.Password)
 		if err != nil {
 			return err
 		}
 		token = t
 	}
+
+	// todo: call repository api
+	url := fmt.Sprintf("%s/%s/%s/%s", DockerhubAPIURL, DockerhubAPIRepositories, owner, repository)
+	headers := map[string]string{}
+	if token != "" {
+		headers["Authorization"] = fmt.Sprintf("JWT %s", token)
+	}
+
+	statusCode, resBody, err := f.HttpClientProvider.Request(url, "GET", headers, nil)
+	if err != nil {
+		return errors.New("invalid request")
+	}
+
+	// todo: is there any required process befor saving into ES?
+
+	// todo: save result to elastic search (raw document)
 
 	return nil
 }
