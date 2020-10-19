@@ -7,7 +7,6 @@ import (
 	dads "github.com/LF-Engineering/da-ds"
 	jsoniter "github.com/json-iterator/go"
 	"net/http"
-	"sync"
 	"time"
 )
 
@@ -35,35 +34,41 @@ var (
 
 // Fetcher contains dockerhub datasource fetch logic
 type Fetcher struct {
-	DSName             string // Datasource will be used as key for ES
-	IncludeArchived    bool
-	MultiOrigin        bool // can we store multiple endpoints in a single index?
-	HttpClientProvider HttpClientProvider
-	ElasticSearchProvider ElasticSearchProvider
-	Username           string
-	Password           string
+	DSName                string // Datasource will be used as key for ES
+	IncludeArchived       bool
+	MultiOrigin           bool // can we store multiple endpoints in a single index?
+	HttpClientProvider    HttpClientProvider
+	ElasticSearchProvider ESClientProvider
+	Username              string
+	Password              string
+	BackendVersion        string
 }
 
 // DockerHubParams ...
 type DockerhubParams struct {
-	Username           string
-	Password           string
+	Username       string
+	Password       string
+	BackendVersion string
 }
 
+// HttpClientProvider ...
 type HttpClientProvider interface {
 	Request(url string, method string, header map[string]string, body []byte) (statusCode int, resBody []byte, err error)
 }
 
-type ElasticSearchProvider interface {
+// ESClientProvider ...
+type ESClientProvider interface {
+	Add(index string, documentID string, body []byte) ([]byte, error)
 }
 
 // NewFetcher initiates a new dockerhub fetcher
-func NewFetcher(params DockerhubParams, httpClientProvider HttpClientProvider) *Fetcher {
+func NewFetcher(params *DockerhubParams, httpClientProvider HttpClientProvider, esClientProvider ESClientProvider) *Fetcher {
 	return &Fetcher{
-		DSName:             Dockerhub,
-		HttpClientProvider: httpClientProvider,
-		Username: params.Username,
-		Password: params.Password,
+		DSName:                Dockerhub,
+		HttpClientProvider:    httpClientProvider,
+		ElasticSearchProvider: esClientProvider,
+		Username:              params.Username,
+		Password:              params.Password,
 	}
 }
 
@@ -136,11 +141,8 @@ func (f *Fetcher) login(username string, password string) (string, error) {
 
 // FetchItems ...
 func (f *Fetcher) FetchItems(owner string, repository string) error {
-	// todo: add owner, repository
-
 	// login
 	token := ""
-
 
 	if f.Password != "" {
 		t, err := f.login(f.Username, f.Password)
@@ -158,18 +160,24 @@ func (f *Fetcher) FetchItems(owner string, repository string) error {
 	}
 
 	statusCode, resBody, err := f.HttpClientProvider.Request(url, "GET", headers, nil)
-	if err != nil {
+	if err != nil || statusCode != http.StatusOK {
 		return errors.New("invalid request")
 	}
 
 	// todo: is there any required process befor saving into ES?
 
 	// todo: save result to elastic search (raw document)
+	index := fmt.Sprintf("sds-%s-%s-dockerhub-raw", owner, repository)
+	esRes, err := f.ElasticSearchProvider.Add(index, fmt.Sprintf("test-id-%v", time.Now().Unix()), resBody)
+	if err != nil {
+		return err
+	}
 
+	fmt.Println(string(esRes))
 	return nil
 }
 
-// FetchItems - implement enrich data for stub datasource
+/*// FetchItems - implement enrich data for stub datasource
 func (j *DSDockerhub) FetchItems(ctx *Ctx) (err error) {
 	// Login to groups.io
 	method := Post
@@ -525,39 +533,39 @@ func DockerhubEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, do
 					if thrN > 1 {
 						mtx.Unlock()
 					}
-		*/
-		return
-	}
-	if thrN > 1 {
-		for i := range items {
-			go func(i int) {
-				_ = procItem(ch, i)
-			}(i)
-			nThreads++
-			if nThreads == thrN {
-				err = <-ch
-				if err != nil {
-					return
-				}
-				nThreads--
-			}
-		}
-		for nThreads > 0 {
-			err = <-ch
-			nThreads--
-			if err != nil {
-				return
-			}
-		}
-		return
-	}
-	for i := range items {
-		err = procItem(nil, i)
-		if err != nil {
-			return
-		}
-	}
-	return
+
+return
+}
+if thrN > 1 {
+for i := range items {
+go func (i int) {
+_ = procItem(ch, i)
+}(i)
+nThreads++
+if nThreads == thrN {
+err = <-ch
+if err != nil {
+return
+}
+nThreads--
+}
+}
+for nThreads > 0 {
+err = <-ch
+nThreads--
+if err != nil {
+return
+}
+}
+return
+}
+for i := range items {
+err = procItem(nil, i)
+if err != nil {
+return
+}
+}
+return
 }
 
 // EnrichItems - perform the enrichment
@@ -594,3 +602,4 @@ func (j *DSDockerhub) AllRoles(ctx *Ctx, item map[string]interface{}) ([]string,
 	// IMPL:
 	return []string{Author}, true
 }
+*/

@@ -1,34 +1,41 @@
-package elastic
+package utils
 
 import (
+	"bytes"
 	"context"
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/elastic/go-elasticsearch/v7/esapi"
-	"io"
-	"os"
+	"log"
 )
 
-// Provider ...
-type Provider struct {
+// ESClientProvider ...
+type ESClientProvider struct {
 	client *elasticsearch.Client
 }
 
-// NewProvider ...
-func NewProvider() (*Provider, error) {
+// ESParams ...
+type ESParams struct {
+	URL      string
+	Username string
+	Password string
+}
+
+// NewESClientProvider ...
+func NewESClientProvider(params *ESParams) (*ESClientProvider, error) {
 	config := elasticsearch.Config{
-		Addresses: []string{os.Getenv("ELASTIC_URL")},
-		Username:  os.Getenv("ELASTIC_USERNAME"),
-		Password:  os.Getenv("ELASTIC_PASSWORD"),
+		Addresses: []string{params.URL},
+		Username:  params.Username,
+		Password:  params.Password,
 	}
 
 	client, err := elasticsearch.NewClient(config)
 	if err != nil {
 		return nil, err
 	}
-	return &Provider{ client}, err
+	return &ESClientProvider{client}, err
 }
 
-func CreateIndex(index string) (res *esapi.Response, err error) {
+/*func CreateIndex(index string) (res *esapi.Response, err error) {
 	var client *elasticsearch.Client
 	client, err = GetClient()
 	if err != nil {
@@ -62,7 +69,7 @@ func CreateIndex(index string) (res *esapi.Response, err error) {
 						}
 					  }
 					],
-					"properties": { 
+					"properties": {
 					  "grimoire_creation_date": {
 						"type": "date"
 					  }
@@ -73,10 +80,27 @@ func CreateIndex(index string) (res *esapi.Response, err error) {
 
 	return res, err
 }
+*/
 
-func (e *Provider) Create(index string, document interface{}) (res *esapi.Response, err error) {
-	return e.client.Create(
-		query,
-		client.Bulk.WithIndex(index),
-	)
+func (p *ESClientProvider) Add(index string, documentID string, body []byte) ([]byte, error) {
+	buf := bytes.NewReader(body)
+
+	req := esapi.IndexRequest{
+		Index:      index,
+		DocumentID: documentID,
+		Body:       buf,
+	}
+
+	res, err := req.Do(context.Background(), p.client)
+	if err != nil {
+		log.Fatalf("Error getting response: %s", err)
+	}
+
+	var resBuf bytes.Buffer
+	if _, err := resBuf.ReadFrom(res.Body); err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	return resBuf.Bytes(), nil
 }
