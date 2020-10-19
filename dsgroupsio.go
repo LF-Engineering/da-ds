@@ -42,10 +42,12 @@ const (
 	GroupsioMessageReceivedField = "received"
 	// GroupsioDefaultSearchField - default search field
 	GroupsioDefaultSearchField = "item_id"
-	// MaxMessageBodyLength - trucacte message bodies longer than this (per each multi-body email part)
-	MaxMessageBodyLength = 1000
-	// MaxRichMessageLines - maximum numbe rof message text/plain lines copied to rich index
-	MaxRichMessageLines = 10
+	// GroupsioMaxMessageBodyLength - trucacte message bodies longer than this (per each multi-body email part)
+	GroupsioMaxMessageBodyLength = 1000
+	// GroupsioMaxRichMessageLines - maximum numbe rof message text/plain lines copied to rich index
+	GroupsioMaxRichMessageLines = 10
+	// GroupsioMaxRecipients - maximum number of emails parsed from To:
+	GroupsioMaxRecipients = 50
 )
 
 var (
@@ -631,7 +633,7 @@ func (j *DSGroupsio) ElasticRichMapping() []byte {
 // (name, username, email) tripples, special value Nil "<nil>" means null
 // we use string and not *string which allows nil to allow usage as a map key
 // This one (Ex) also returns information about identity's origins (from, to, or both)
-func (j *DSGroupsio) GetItemIdentitiesEx(ctx *Ctx, doc interface{}) (identities map[[3]string]map[string]struct{}) {
+func (j *DSGroupsio) GetItemIdentitiesEx(ctx *Ctx, doc interface{}) (identities map[[3]string]map[string]struct{}, nRecipients int) {
 	init := false
 	props := []string{"From", "To"}
 	for _, prop := range props {
@@ -663,7 +665,7 @@ func (j *DSGroupsio) GetItemIdentitiesEx(ctx *Ctx, doc interface{}) (identities 
 				Printf("cannot get identities: cannot read string from %v\n", ifrom)
 				continue
 			}
-			emails, ok := ParseAddresses(ctx, from)
+			emails, ok := ParseAddresses(ctx, from, GroupsioMaxRecipients)
 			if !ok {
 				if ctx.Debug > 1 {
 					Printf("cannot get identities: cannot read email address(es) from %s\n", from)
@@ -682,6 +684,9 @@ func (j *DSGroupsio) GetItemIdentitiesEx(ctx *Ctx, doc interface{}) (identities 
 				}
 				identities[identity][lProp] = struct{}{}
 			}
+			if lProp == "to" {
+				nRecipients = len(emails)
+			}
 		}
 	}
 	return
@@ -691,7 +696,7 @@ func (j *DSGroupsio) GetItemIdentitiesEx(ctx *Ctx, doc interface{}) (identities 
 // (name, username, email) tripples, special value Nil "<nil>" means null
 // we use string and not *string which allows nil to allow usage as a map key
 func (j *DSGroupsio) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3]string]struct{}, err error) {
-	sIdentities := j.GetItemIdentitiesEx(ctx, doc)
+	sIdentities, _ := j.GetItemIdentitiesEx(ctx, doc)
 	if sIdentities == nil || len(sIdentities) == 0 {
 		return
 	}
@@ -743,7 +748,7 @@ func GroupsioEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, doc
 			e = fmt.Errorf("Failed to parse document %+v\n", doc)
 			return
 		}
-		identities := groupsio.GetItemIdentitiesEx(ctx, doc)
+		identities, nRecipients := groupsio.GetItemIdentitiesEx(ctx, doc)
 		if identities == nil || len(identities) == 0 {
 			if ctx.Debug > 1 {
 				Printf("no identities to enrich in %v\n", doc)
@@ -800,6 +805,7 @@ func GroupsioEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, doc
 			}
 			return
 		}
+		rich["n_recipients"] = nRecipients
 		e = EnrichItem(ctx, ds, rich)
 		if e != nil {
 			return
@@ -968,8 +974,8 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 		rich["Date"] = msgDate
 		subj, _ := getStringValue(msg, "Subject")
 		rich["Subject_analyzed"] = subj
-		if len(subj) > MaxMessageBodyLength {
-			subj = subj[:MaxMessageBodyLength]
+		if len(subj) > GroupsioMaxMessageBodyLength {
+			subj = subj[:GroupsioMaxMessageBodyLength]
 		}
 		rich["Subject"] = subj
 		rich["email_date"], _ = getIValue(item, DefaultDateField)
@@ -1009,12 +1015,12 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 		if found {
 			rich["size"] = len(text)
 			ary := strings.Split(text, "\n")
-			if len(ary) > MaxRichMessageLines {
-				ary = ary[:MaxRichMessageLines]
+			if len(ary) > GroupsioMaxRichMessageLines {
+				ary = ary[:GroupsioMaxRichMessageLines]
 			}
 			text = strings.Join(ary, "\n")
-			if len(text) > MaxMessageBodyLength {
-				text = text[:MaxMessageBodyLength]
+			if len(text) > GroupsioMaxMessageBodyLength {
+				text = text[:GroupsioMaxMessageBodyLength]
 			}
 			rich["body_extract"] = text
 		} else {
@@ -1132,6 +1138,9 @@ func (j *DSGroupsio) AllRoles(ctx *Ctx, rich map[string]interface{}) (roles []st
 		}
 		roles = append(roles, role)
 		i++
+		if i >= GroupsioMaxRecipients {
+			break
+		}
 	}
 	return
 }
