@@ -11,8 +11,12 @@ import (
 const (
 	// GitBackendVersion - backend version
 	GitBackendVersion = "0.0.1"
-	// GitDefaultReposPath - default path where archives are stored
+	// GitDefaultReposPath - default path where git repository clones
 	GitDefaultReposPath = "$HOME/.perceval/repositories"
+	// GitDefaultCachePath - default path where gitops cache files are stored
+	GitDefaultCachePath = "$HOME/.perceval/cache"
+	// GitOpsCommand - command that maintains git stats cache
+	GitOpsCommand = "gitops.py"
 )
 
 var (
@@ -28,6 +32,7 @@ type DSGit struct {
 	URL          string // From DA_GIT_URL - git repo path
 	SingleOrigin bool   // From DA_GIT_SINGLE_ORIGIN - if you want to store only one git endpoint in the index
 	ReposPath    string // From DA_GIT_REPOS_PATH - default GitDefaultReposPath
+	CachePath    string // From DA_GIT_CACHE_PATH - default GitDefaultCachePath
 	NoSSLVerify  bool   // From DA_GIT_NO_SSL_VERIFY
 	RepoName     string
 }
@@ -42,6 +47,11 @@ func (j *DSGit) ParseArgs(ctx *Ctx) (err error) {
 		j.ReposPath = os.Getenv(prefix + "REPOS_PATH")
 	} else {
 		j.ReposPath = GitDefaultReposPath
+	}
+	if os.Getenv(prefix+"CACHE_PATH") != "" {
+		j.CachePath = os.Getenv(prefix + "REPOS_PATH")
+	} else {
+		j.CachePath = GitDefaultCachePath
 	}
 	j.NoSSLVerify = StringToBool(os.Getenv(prefix + "NO_SSL_VERIFY"))
 	if j.NoSSLVerify {
@@ -64,6 +74,10 @@ func (j *DSGit) Validate() (err error) {
 	j.ReposPath = os.ExpandEnv(j.ReposPath)
 	if strings.HasSuffix(j.ReposPath, "/") {
 		j.ReposPath = j.ReposPath[:len(j.ReposPath)-1]
+	}
+	j.CachePath = os.ExpandEnv(j.CachePath)
+	if strings.HasSuffix(j.CachePath, "/") {
+		j.CachePath = j.CachePath[:len(j.CachePath)-1]
 	}
 	return
 }
@@ -100,6 +114,33 @@ func (j *DSGit) Enrich(ctx *Ctx) (err error) {
 	return
 }
 
+// GetGitOps - LOC, lang summary stats
+func (j *DSGit) GetGitOps(ctx *Ctx, thrN int) (ch chan error, err error) {
+	worker := func(c chan error, url string) (e error) {
+		defer func() {
+			if c != nil {
+				c <- e
+			}
+		}()
+		var (
+			sout string
+			serr string
+		)
+		cmdLine := []string{GitOpsCommand, "i", url}
+		sout, serr, e = ExecCommand(ctx, cmdLine, nil)
+		if e != nil {
+			Printf("error executing %v: %v\n%s\n%s\n", cmdLine, e, sout, serr)
+		}
+		return
+	}
+	if thrN <= 1 {
+		return nil, worker(nil, j.URL)
+	}
+	ch = make(chan error)
+	go func() { _ = worker(ch, j.URL) }()
+	return ch, nil
+}
+
 // FetchItems - implement enrich data for git datasource
 func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 	// IMPL:
@@ -111,13 +152,29 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 		allMsgsMtx *sync.Mutex
 		escha      []chan error
 		eschaMtx   *sync.Mutex
+		goch       chan error
 	)
 	thrN := GetThreadsNum(ctx)
 	if thrN > 1 {
 		ch = make(chan error)
 		allMsgsMtx = &sync.Mutex{}
 		eschaMtx = &sync.Mutex{}
+		goch, _ = j.GetGitOps(ctx, thrN)
+	} else {
+		_, err = j.GetGitOps(ctx, thrN)
+		if err != nil {
+			return
+		}
 	}
+	// Do normal git processing, which don't needs gitops yet
+	// If MT allowed, wait for GitOps
+	if thrN > 1 {
+		err = <-goch
+		if err != nil {
+			return
+		}
+	}
+	// Continue with operations that need git ops
 	nThreads := 0
 	processMsg := func(c chan error, msg []byte) (wch chan error, e error) {
 		defer func() {
@@ -239,13 +296,11 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 
 // SupportDateFrom - does DS support resuming from date?
 func (j *DSGit) SupportDateFrom() bool {
-	// IMPL:
-	return false
+	return true
 }
 
 // SupportOffsetFrom - does DS support resuming from offset?
 func (j *DSGit) SupportOffsetFrom() bool {
-	// IMPL:
 	return false
 }
 
@@ -291,8 +346,7 @@ func (j *DSGit) ResumeNeedsOrigin(ctx *Ctx) bool {
 
 // Origin - return current origin
 func (j *DSGit) Origin(ctx *Ctx) string {
-	// IMPL: you must change this, for example to j.URL/j.GroupName or somethign like this
-	return ctx.Tag
+	return j.URL
 }
 
 // ItemID - return unique identifier for an item
@@ -305,7 +359,7 @@ func (j *DSGit) ItemID(item interface{}) string {
 func (j *DSGit) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string]interface{}) {
 	// IMPL:
 	mItem = make(map[string]interface{})
-	origin := "TODO"
+	origin := j.URL
 	tag := ctx.Tag
 	if tag == "" {
 		tag = origin

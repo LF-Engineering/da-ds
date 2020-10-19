@@ -213,8 +213,8 @@ func (ctx *Ctx) Init() {
 	ctx.Project = ctx.Env("PROJECT")
 	ctx.ProjectSlug = ctx.Env("PROJECT_SLUG")
 	if ctx.ProjectSlug == "" {
-    ctx.ProjectSlug = os.Getenv("PROJECT_SLUG")
-  }
+		ctx.ProjectSlug = os.Getenv("PROJECT_SLUG")
+	}
 	ctx.Category = ctx.Env("CATEGORY")
 
 	// Date from/to (optional)
