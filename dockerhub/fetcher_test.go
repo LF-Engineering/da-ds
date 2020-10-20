@@ -9,7 +9,7 @@ import (
 
 func TestFetchItems(t *testing.T) {
 	httpClientProvider := utils.NewHttpClientProvider(5 * time.Second)
-	params := &DockerhubParams{
+	params := &Params{
 		Username:       "",
 		Password:       "",
 		BackendVersion: "0.0.1",
@@ -26,7 +26,7 @@ func TestFetchItems(t *testing.T) {
 	repo := "caliper"
 	srv := NewFetcher(params, httpClientProvider, esClientProvider)
 
-	if err := srv.FetchItems(owner, repo); err != nil {
+	if err := srv.FetchItem(owner, repo); err != nil {
 		fmt.Println("err1111 ", err.Error())
 	}
 

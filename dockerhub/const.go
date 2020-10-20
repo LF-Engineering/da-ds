@@ -6,6 +6,7 @@ const (
 	APILogin        = "users/login"
 	APIRepositories = "repositories"
 	Category        = "dockerhub-data"
+	IndexPattern    = "sds-%s-%s-dockerhub-raw"
 
 	// Dockerhub - common constant string
 	Dockerhub string = "dockerhub"
