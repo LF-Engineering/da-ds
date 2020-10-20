@@ -59,7 +59,9 @@ func TestFetchItem(t *testing.T) {
 
 	srv := NewFetcher(params, httpClientProviderMock, esClientProviderMock)
 
+	// Act
 	err = srv.FetchItem(owner, repo)
 
+	// Assert
 	assert.NoError(t, err)
 }

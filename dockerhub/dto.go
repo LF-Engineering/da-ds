@@ -1,6 +1,6 @@
 package dockerhub
 
-// todo: add repository response
+// RepositoryResponse data model represents dockerhub get repository results
 type RepositoryResponse struct {
 	User            string `json:"user"`
 	Name            string `json:"name"`
@@ -26,12 +26,14 @@ type RepositoryResponse struct {
 	FetchedOn string `json:"fetched_on"`
 }
 
+// RepositorySearchFields ...
 type RepositorySearchFields struct {
 	Name      string `json:"name"`
 	ItemID    string `json:"item_id"`
 	Namespace string `json:"namespace"`
 }
 
+// RepositoryRaw data model represents es schema
 type RepositoryRaw struct {
 	BackendVersion           string                 `json:"backend_version"`
 	Data                     RepositoryResponse     `json:"data"`
@@ -48,6 +50,7 @@ type RepositoryRaw struct {
 	ClassifiedFieldsFiltered *string                 `json:"classified_fields_filtered"`
 }
 
+// LoginResponse from login dockerhub web API
 type LoginResponse struct {
 	Token string `json:"token"`
 }

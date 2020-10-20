@@ -138,7 +138,6 @@ func (f *Fetcher) FetchItem(owner string, repository string) error {
 	if err != nil {
 		return err
 	}
-
 	raw.UUID = uid
 
 	body, err := json.Marshal(raw)
