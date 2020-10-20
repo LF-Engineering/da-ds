@@ -23,26 +23,29 @@ type RepositoryResponse struct {
 		Write bool `json:"write"`
 		Admin bool `json:"admin"`
 	} `json:"permissions"`
+	FetchedOn string `json:"fetched_on"`
+}
+
+type RepositorySearchFields struct {
+	Name      string `json:"name"`
+	ItemID    string `json:"item_id"`
+	Namespace string `json:"namespace"`
 }
 
 type RepositoryRaw struct {
-	BackendVersion string             `json:"backend_version"`
-	Data           RepositoryResponse `json:"data"`
-	Tag            string             `json:"tag"`
-	UUID           string             `json:"uuid"`
-	SearchFields   struct {
-		Name      string `json:"name"`
-		ItemID    string `json:"item_id"`
-		Namespace string `json:"namespace"`
-	} `json:"search_fields"`
-	Origin                   string  `json:"origin"`
-	UpdatedOn                string  `json:"updated_on"`
-	MetadataUpdatedOn        string  `json:"metadata__updated_on"`
-	BackendName              string  `json:"backend_name"`
-	MetadataTimestamp        string  `json:"metadata__timestamp"`
-	Timestamp                float32 `json:"timestamp"`
-	Category                 string  `json:"category"`
-	ClassifiedFieldsFiltered string  `json:"classified_fields_filtered"`
+	BackendVersion           string                 `json:"backend_version"`
+	Data                     RepositoryResponse     `json:"data"`
+	Tag                      string                 `json:"tag"`
+	UUID                     string                 `json:"uuid"`
+	SearchFields             RepositorySearchFields `json:"search_fields"`
+	Origin                   string                 `json:"origin"`
+	UpdatedOn                string                 `json:"updated_on"`
+	MetadataUpdatedOn        string                 `json:"metadata__updated_on"`
+	BackendName              string                 `json:"backend_name"`
+	MetadataTimestamp        string                 `json:"metadata__timestamp"`
+	Timestamp                string              `json:"timestamp"`
+	Category                 string                 `json:"category"`
+	ClassifiedFieldsFiltered *string                 `json:"classified_fields_filtered"`
 }
 
 type LoginResponse struct {

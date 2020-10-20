@@ -5,8 +5,9 @@ import (
 	"errors"
 	"fmt"
 	dads "github.com/LF-Engineering/da-ds"
-	jsoniter "github.com/json-iterator/go"
+	"github.com/LF-Engineering/da-ds/utils/uuid"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -15,6 +16,7 @@ const (
 	DockerhubAPIURL          = "https://hub.docker.com/v2"
 	DockerhubAPILogin        = "users/login"
 	DockerhubAPIRepositories = "repositories"
+	DockerhubCategory        = "dockerhub-data"
 
 	// Dockerhub - common constant string
 	Dockerhub string = "dockerhub"
@@ -27,9 +29,9 @@ var (
 		"namespace": {"namespace"},
 	}
 	// DockerhubRawMapping - Jira raw index mapping
-	DockerhubRawMapping = []byte(`{"dynamic":true,"properties":{"metadata__updated_on":{"type":"date"},"data":{"properties":{"description":{"type":"text","index":true},"full_description":{"type":"text","index":true}}}}}`)
+	DockerhubRawMapping = []byte(`{"mappings": {"dynamic":true,"properties":{"metadata__updated_on":{"type":"date"},"data":{"properties":{"description":{"type":"text","index":true},"full_description":{"type":"text","index":true}}}}}}`)
 	// DockerhubRichMapping - Jira rich index mapping
-	DockerhubRichMapping = []byte(`{"properties":{"metadata__updated_on":{"type":"date"},"description":{"type":"text","index":true},"description_analyzed":{"type":"text","index":true},"full_description_analyzed":{"type":"text","index":true}}}`)
+	DockerhubRichMapping = []byte(`{"mappings": {"properties":{"metadata__updated_on":{"type":"date"},"description":{"type":"text","index":true},"description_analyzed":{"type":"text","index":true},"full_description_analyzed":{"type":"text","index":true}}}}`)
 )
 
 // Fetcher contains dockerhub datasource fetch logic
@@ -59,6 +61,7 @@ type HttpClientProvider interface {
 // ESClientProvider ...
 type ESClientProvider interface {
 	Add(index string, documentID string, body []byte) ([]byte, error)
+	CreateIndex(index string, body []byte) ([]byte, error)
 }
 
 // NewFetcher initiates a new dockerhub fetcher
@@ -69,6 +72,7 @@ func NewFetcher(params *DockerhubParams, httpClientProvider HttpClientProvider, 
 		ElasticSearchProvider: esClientProvider,
 		Username:              params.Username,
 		Password:              params.Password,
+		BackendVersion:        params.BackendVersion,
 	}
 }
 
@@ -129,7 +133,7 @@ func (f *Fetcher) login(username string, password string) (string, error) {
 
 	if statusCode == http.StatusOK {
 		res := LoginResponse{}
-		err = jsoniter.Unmarshal(resBody, &res)
+		err = json.Unmarshal(resBody, &res)
 		if err != nil {
 			fmt.Printf("Cannot unmarshal result from %s\n", string(resBody))
 			return "", err
@@ -152,7 +156,6 @@ func (f *Fetcher) FetchItems(owner string, repository string) error {
 		token = t
 	}
 
-	// todo: call repository api
 	url := fmt.Sprintf("%s/%s/%s/%s", DockerhubAPIURL, DockerhubAPIRepositories, owner, repository)
 	headers := map[string]string{}
 	if token != "" {
@@ -164,11 +167,49 @@ func (f *Fetcher) FetchItems(owner string, repository string) error {
 		return errors.New("invalid request")
 	}
 
-	// todo: is there any required process befor saving into ES?
+	// todo: is there any required process before saving into ES?
+	index := fmt.Sprintf("sds-%s-%s-dockerhub-raw", owner, repository)
+
+	_, err = f.ElasticSearchProvider.CreateIndex(index, DockerhubRawMapping)
+	if err != nil {
+		return err
+	}
+
+	repoRes := RepositoryResponse{}
+	if err := json.Unmarshal(resBody, &repoRes); err != nil {
+		return errors.New("unable to resolve json request")
+	}
+
+	b := RepositoryRaw{}
+	b.Data = repoRes
+	b.BackendName = strings.Title(Dockerhub)
+	b.BackendVersion = f.BackendVersion
+	b.Category = DockerhubCategory
+	b.ClassifiedFieldsFiltered = nil
+	timestamp := time.Now()
+	b.Timestamp = fmt.Sprintf("%.06f", float64(timestamp.UnixNano())/1.0e3)
+	b.Data.FetchedOn = b.Timestamp
+	b.MetadataTimestamp = dads.ToESDate(timestamp)
+	b.Origin = url
+	b.SearchFields = RepositorySearchFields{repository, fmt.Sprintf("%v", b.Timestamp), owner}
+	b.Tag = url
+	b.UpdatedOn = b.Data.LastUpdated
+
+	// generate UUID
+	generatedUUID, err := uuid.Generate(b.Data.FetchedOn)
+	if err != nil {
+		return err
+	}
+
+	b.UUID = generatedUUID
+
+	body, err := json.Marshal(b)
+	if err != nil || statusCode != http.StatusOK {
+		return errors.New("unable to convert body to json")
+	}
 
 	// todo: save result to elastic search (raw document)
-	index := fmt.Sprintf("sds-%s-%s-dockerhub-raw", owner, repository)
-	esRes, err := f.ElasticSearchProvider.Add(index, fmt.Sprintf("test-id-%v", time.Now().Unix()), resBody)
+	esRes, err := f.ElasticSearchProvider.Add(index, b.UUID, body)
 	if err != nil {
 		return err
 	}

@@ -5,7 +5,6 @@ import (
 	"context"
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/elastic/go-elasticsearch/v7/esapi"
-	"log"
 )
 
 // ESClientProvider ...
@@ -35,53 +34,62 @@ func NewESClientProvider(params *ESParams) (*ESClientProvider, error) {
 	return &ESClientProvider{client}, err
 }
 
-/*func CreateIndex(index string) (res *esapi.Response, err error) {
-	var client *elasticsearch.Client
-	client, err = GetClient()
-	if err != nil {
-		return
+// CreateIndex ...
+func (p *ESClientProvider) CreateIndex(index string, body []byte) ([]byte, error) {
+	buf := bytes.NewReader(body)
+
+	// Delete index if exists
+	resBytes, err := p.DeleteIndex(index, true)
+	if err!= nil {
+		return resBytes, err
 	}
 
 	// Create Index request
-	res, err = esapi.IndicesCreateRequest{
+	res, err := esapi.IndicesCreateRequest{
 		Index: index,
-		Body: strings.NewReader(
-			`{
-				"mappings": {
-					"dynamic_templates": [
-					  {
-						"notanalyzed": {
-						  "match": "*",
-						  "match_mapping_type": "string",
-						  "mapping": {
-							"type": "keyword"
-						  }
-						}
-					  },
-					  {
-						"formatdate": {
-						  "match": "*",
-						  "match_mapping_type": "date",
-						  "mapping": {
-							"format": "strict_date_optional_time||epoch_millis",
-							"type": "date"
-						  }
-						}
-					  }
-					],
-					"properties": {
-					  "grimoire_creation_date": {
-						"type": "date"
-					  }
-						  }
-				}
-			  }`),
-	}.Do(context.Background(), client)
+		Body:  buf,
+	}.Do(context.Background(), p.client)
+	if err != nil {
+		return nil, err
+	}
 
-	return res, err
+	resBytes, err = toBytes(res)
+	if err != nil {
+		return nil, err
+	}
+
+	defer res.Body.Close()
+
+	return resBytes, nil
 }
-*/
 
+func (p *ESClientProvider) DeleteIndex(index string, ignoreUnavailable bool) ([]byte, error) {
+	res, err := esapi.IndicesDeleteRequest{
+		Index:             []string{index},
+		IgnoreUnavailable: &ignoreUnavailable,
+	}.Do(context.Background(), p.client)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := toBytes(res)
+	if err != nil {
+		return nil, err
+	}
+	return body, err
+}
+
+// convert response to bytes
+func toBytes(res *esapi.Response) ([]byte, error) {
+	var resBuf bytes.Buffer
+	if _, err := resBuf.ReadFrom(res.Body); err != nil {
+		return nil, err
+	}
+	resBytes := resBuf.Bytes()
+	return resBytes, nil
+}
+
+// Add ...
 func (p *ESClientProvider) Add(index string, documentID string, body []byte) ([]byte, error) {
 	buf := bytes.NewReader(body)
 
@@ -93,14 +101,14 @@ func (p *ESClientProvider) Add(index string, documentID string, body []byte) ([]
 
 	res, err := req.Do(context.Background(), p.client)
 	if err != nil {
-		log.Fatalf("Error getting response: %s", err)
+		return nil, err
 	}
 
-	var resBuf bytes.Buffer
-	if _, err := resBuf.ReadFrom(res.Body); err != nil {
+	resBytes, err := toBytes(res)
+	if err != nil {
 		return nil, err
 	}
 	defer res.Body.Close()
 
-	return resBuf.Bytes(), nil
+	return resBytes, nil
 }
