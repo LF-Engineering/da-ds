@@ -23,19 +23,19 @@ type Fetcher struct {
 	BackendVersion        string
 }
 
-// Params ...
+// Params required parameters for dockerhub fetcher
 type Params struct {
 	Username       string
 	Password       string
 	BackendVersion string
 }
 
-// HttpClientProvider ...
+// HttpClientProvider used in connecting to remote http server
 type HttpClientProvider interface {
 	Request(url string, method string, header map[string]string, body []byte) (statusCode int, resBody []byte, err error)
 }
 
-// ESClientProvider ...
+// ESClientProvider used in connecting to ES Client server
 type ESClientProvider interface {
 	Add(index string, documentID string, body []byte) ([]byte, error)
 	CreateIndex(index string, body []byte) ([]byte, error)
@@ -51,18 +51,6 @@ func NewFetcher(params *Params, httpClientProvider HttpClientProvider, esClientP
 		Password:              params.Password,
 		BackendVersion:        params.BackendVersion,
 	}
-}
-
-// FetchRaw - implement fetch raw data for stub datasource
-func (f *Fetcher) FetchRaw() (err error) {
-	dads.Printf("%s should use generic FetchRaw()\n", f.DSName)
-	return
-}
-
-// Enrich - implement enrich data for stub datasource
-func (f *Fetcher) Enrich() (err error) {
-	dads.Printf("%s should use generic Enrich()\n", f.DSName)
-	return
 }
 
 func (f *Fetcher) login(username string, password string) (string, error) {
@@ -93,7 +81,7 @@ func (f *Fetcher) login(username string, password string) (string, error) {
 	return "", errors.New("invalid login credentials")
 }
 
-// FetchItems ...
+// FetchItem fetch dockerhub repository
 func (f *Fetcher) FetchItem(owner string, repository string) error {
 	// login
 	token := ""
@@ -119,6 +107,7 @@ func (f *Fetcher) FetchItem(owner string, repository string) error {
 
 	index := fmt.Sprintf("sds-%s-%s-dockerhub-raw", owner, repository)
 
+	// todo: should be moved to upstart
 	_, err = f.ElasticSearchProvider.CreateIndex(index, DockerhubRawMapping)
 	if err != nil {
 		return err
@@ -162,7 +151,7 @@ func (f *Fetcher) FetchItem(owner string, repository string) error {
 		return err
 	}
 
-	fmt.Println("Document created: %s", esRes)
+	fmt.Println("Index created: %S", string(esRes))
 
 	return nil
 }
