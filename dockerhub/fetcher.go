@@ -11,19 +11,6 @@ import (
 	"time"
 )
 
-const (
-	// DockerhubAPIURL - dockerhub API URL
-	DockerhubAPIURL          = "https://hub.docker.com/v2"
-	DockerhubAPILogin        = "users/login"
-	DockerhubAPIRepositories = "repositories"
-	DockerhubCategory        = "dockerhub-data"
-
-	// Dockerhub - common constant string
-	Dockerhub string = "dockerhub"
-)
-
-
-
 // Fetcher contains dockerhub datasource fetch logic
 type Fetcher struct {
 	DSName                string // Datasource will be used as key for ES
@@ -36,8 +23,8 @@ type Fetcher struct {
 	BackendVersion        string
 }
 
-// DockerHubParams ...
-type DockerhubParams struct {
+// Params ...
+type Params struct {
 	Username       string
 	Password       string
 	BackendVersion string
@@ -55,7 +42,7 @@ type ESClientProvider interface {
 }
 
 // NewFetcher initiates a new dockerhub fetcher
-func NewFetcher(params *DockerhubParams, httpClientProvider HttpClientProvider, esClientProvider ESClientProvider) *Fetcher {
+func NewFetcher(params *Params, httpClientProvider HttpClientProvider, esClientProvider ESClientProvider) *Fetcher {
 	return &Fetcher{
 		DSName:                Dockerhub,
 		HttpClientProvider:    httpClientProvider,
@@ -66,37 +53,10 @@ func NewFetcher(params *DockerhubParams, httpClientProvider HttpClientProvider, 
 	}
 }
 
-// Validate dockerhub datasource configuration
-func (f *Fetcher) Validate() error {
-
-	return nil
-}
-
-// todo: to be reviewed
-// Name - return data source name
-func (f *Fetcher) Name() string {
-	return f.DSName
-}
-
-// Info - return DS configuration in a human readable form
-func (f *Fetcher) Info() string {
-	return fmt.Sprintf("%+v", f)
-}
-
-// CustomFetchRaw - is this datasource using custom fetch raw implementation?
-func (f *Fetcher) CustomFetchRaw() bool {
-	return false
-}
-
 // FetchRaw - implement fetch raw data for stub datasource
 func (f *Fetcher) FetchRaw() (err error) {
 	dads.Printf("%s should use generic FetchRaw()\n", f.DSName)
 	return
-}
-
-// CustomEnrich - is this datasource using custom enrich implementation?
-func (f *Fetcher) CustomEnrich() bool {
-	return false
 }
 
 // Enrich - implement enrich data for stub datasource
@@ -106,7 +66,7 @@ func (f *Fetcher) Enrich() (err error) {
 }
 
 func (f *Fetcher) login(username string, password string) (string, error) {
-	url := fmt.Sprintf("%s/%s", DockerhubAPIURL, DockerhubAPILogin)
+	url := fmt.Sprintf("%s/%s", APIURL, APILogin)
 
 	payload := make(map[string]interface{})
 	payload["username"] = username
@@ -134,7 +94,7 @@ func (f *Fetcher) login(username string, password string) (string, error) {
 }
 
 // FetchItems ...
-func (f *Fetcher) FetchItems(owner string, repository string) error {
+func (f *Fetcher) FetchItem(owner string, repository string) error {
 	// login
 	token := ""
 
@@ -146,7 +106,7 @@ func (f *Fetcher) FetchItems(owner string, repository string) error {
 		token = t
 	}
 
-	url := fmt.Sprintf("%s/%s/%s/%s", DockerhubAPIURL, DockerhubAPIRepositories, owner, repository)
+	url := fmt.Sprintf("%s/%s/%s/%s", APIURL, APIRepositories, owner, repository)
 	headers := map[string]string{}
 	if token != "" {
 		headers["Authorization"] = fmt.Sprintf("JWT %s", token)
@@ -157,7 +117,6 @@ func (f *Fetcher) FetchItems(owner string, repository string) error {
 		return errors.New("invalid request")
 	}
 
-	// todo: is there any required process before saving into ES?
 	index := fmt.Sprintf("sds-%s-%s-dockerhub-raw", owner, repository)
 
 	_, err = f.ElasticSearchProvider.CreateIndex(index, DockerhubRawMapping)
@@ -170,40 +129,40 @@ func (f *Fetcher) FetchItems(owner string, repository string) error {
 		return errors.New("unable to resolve json request")
 	}
 
-	b := RepositoryRaw{}
-	b.Data = repoRes
-	b.BackendName = strings.Title(Dockerhub)
-	b.BackendVersion = f.BackendVersion
-	b.Category = DockerhubCategory
-	b.ClassifiedFieldsFiltered = nil
+	raw := RepositoryRaw{}
+	raw.Data = repoRes
+	raw.BackendName = strings.Title(f.DSName)
+	raw.BackendVersion = f.BackendVersion
+	raw.Category = Category
+	raw.ClassifiedFieldsFiltered = nil
 	timestamp := time.Now()
-	b.Timestamp = fmt.Sprintf("%.06f", float64(timestamp.UnixNano())/1.0e3)
-	b.Data.FetchedOn = b.Timestamp
-	b.MetadataTimestamp = dads.ToESDate(timestamp)
-	b.Origin = url
-	b.SearchFields = RepositorySearchFields{repository, fmt.Sprintf("%v", b.Timestamp), owner}
-	b.Tag = url
-	b.UpdatedOn = b.Data.LastUpdated
+	raw.Timestamp = fmt.Sprintf("%.06f", float64(timestamp.UnixNano())/1.0e3)
+	raw.Data.FetchedOn = raw.Timestamp
+	raw.MetadataTimestamp = dads.ToESDate(timestamp)
+	raw.Origin = url
+	raw.SearchFields = RepositorySearchFields{repository, fmt.Sprintf("%v", raw.Timestamp), owner}
+	raw.Tag = url
+	raw.UpdatedOn = raw.Data.LastUpdated
 
 	// generate UUID
-	generatedUUID, err := uuid.Generate(b.Data.FetchedOn)
+	uid, err := uuid.Generate(raw.Data.FetchedOn)
 	if err != nil {
 		return err
 	}
 
-	b.UUID = generatedUUID
+	raw.UUID = uid
 
-	body, err := json.Marshal(b)
+	body, err := json.Marshal(raw)
 	if err != nil || statusCode != http.StatusOK {
 		return errors.New("unable to convert body to json")
 	}
 
-	// todo: save result to elastic search (raw document)
-	esRes, err := f.ElasticSearchProvider.Add(index, b.UUID, body)
+	esRes, err := f.ElasticSearchProvider.Add(index, raw.UUID, body)
 	if err != nil {
 		return err
 	}
 
-	fmt.Println(string(esRes))
+	fmt.Println("Document created: %s", esRes)
+
 	return nil
 }
