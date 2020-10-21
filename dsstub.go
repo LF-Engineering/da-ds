@@ -97,7 +97,7 @@ func (j *DSStub) FetchItems(ctx *Ctx) (err error) {
 		if allMsgsMtx != nil {
 			allMsgsMtx.Lock()
 		}
-		allMsgs = append(allMsgs, item)
+		allMsgs = append(allMsgs, esItem)
 		nMsgs := len(allMsgs)
 		if nMsgs >= ctx.ESBulkSize {
 			sendToElastic := func(c chan error) (ee error) {

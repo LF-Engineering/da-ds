@@ -75,10 +75,12 @@ type DSGit struct {
 	CachePath    string // From DA_GIT_CACHE_PATH - default GitDefaultCachePath
 	NoSSLVerify  bool   // From DA_GIT_NO_SSL_VERIFY
 	// Non-config variables
-	RepoName string // repo name
-	Loc      int    // lines of code as reported by GitOpsCommand
-	Pls      []PLS  // programming language suppary as reported by GitOpsCommand
-	GitPath  string // path to git repo clone
+	RepoName    string         // repo name
+	Loc         int            // lines of code as reported by GitOpsCommand
+	Pls         []PLS          // programming language suppary as reported by GitOpsCommand
+	GitPath     string         // path to git repo clone
+	LineScanner *bufio.Scanner // line scanner for git log
+	CurrLine    int
 }
 
 // ParseArgs - parse git specific environment variables
@@ -276,7 +278,7 @@ func (j *DSGit) UpdateGitRepo(ctx *Ctx) (err error) {
 }
 
 // ParseGitLog - update git repo
-func (j *DSGit) ParseGitLog(ctx *Ctx) (err error) {
+func (j *DSGit) ParseGitLog(ctx *Ctx) (cmd *exec.Cmd, err error) {
 	if ctx.Debug > 0 {
 		Printf("parsing logs from %s\n", j.GitPath)
 	}
@@ -288,49 +290,46 @@ func (j *DSGit) ParseGitLog(ctx *Ctx) (err error) {
 	if ctx.DateTo != nil {
 		cmdLine = append(cmdLine, "--until="+ToYMDHMSDate(*ctx.DateTo))
 	}
-	var (
-		pipe io.ReadCloser
-		cmd  *exec.Cmd
-	)
+	var pipe io.ReadCloser
 	pipe, cmd, err = ExecCommandPipe(ctx, cmdLine, j.GitPath, GitDefaultEnv)
 	if err != nil {
 		Printf("error executing %v: %v\n", cmdLine, err)
 		return
 	}
-	scanner := bufio.NewScanner(pipe)
-	i := 0
-	for scanner.Scan() {
-		line := scanner.Text()
-		i++
-		Printf("line %d: '%s'\n", i, line)
-	}
-	err = cmd.Wait()
-	if err != nil {
-		return
-	}
+	j.LineScanner = bufio.NewScanner(pipe)
 	if ctx.Debug > 0 {
 		Printf("parsed logs from %s\n", j.GitPath)
 	}
 	return
 }
 
+// ParseNextCommit - parse next git log commit or report end
+func (j *DSGit) ParseNextCommit(ctx *Ctx) (commit map[string]interface{}, ok bool, err error) {
+	if j.LineScanner.Scan() {
+		j.CurrLine++
+		line := j.LineScanner.Text()
+		commit = make(map[string]interface{})
+		commit["line"] = line
+		commit["commit"] = fmt.Sprintf("%v", time.Now().UnixNano())
+		ok = true
+	}
+	return
+}
+
 // FetchItems - implement enrich data for git datasource
 func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
-	// IMPL:
-	var messages [][]byte
-	// Process messages (possibly in threads)
 	var (
-		ch         chan error
-		allMsgs    []interface{}
-		allMsgsMtx *sync.Mutex
-		escha      []chan error
-		eschaMtx   *sync.Mutex
-		goch       chan error
+		ch            chan error
+		allCommits    []interface{}
+		allCommitsMtx *sync.Mutex
+		escha         []chan error
+		eschaMtx      *sync.Mutex
+		goch          chan error
 	)
 	thrN := GetThreadsNum(ctx)
 	if thrN > 1 {
 		ch = make(chan error)
-		allMsgsMtx = &sync.Mutex{}
+		allCommitsMtx = &sync.Mutex{}
 		eschaMtx = &sync.Mutex{}
 		goch, _ = j.GetGitOps(ctx, thrN)
 	} else {
@@ -348,55 +347,44 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 	}
 	FatalOnError(j.CreateGitRepo(ctx))
 	FatalOnError(j.UpdateGitRepo(ctx))
-	FatalOnError(j.ParseGitLog(ctx))
-	// If MT allowed, wait for GitOps
-	// FIXME
-	Printf("waiting for git ops result\n")
-	if thrN > 1 {
-		err = <-goch
-		if err != nil {
-			return
-		}
-	}
-	if ctx.Debug > 1 {
-		Printf("loc: %d, programming languages summary: %+v\n", j.Loc, j.Pls)
-	}
-	// FIXME
-	os.Exit(1)
+	var cmd *exec.Cmd
+	cmd, err = j.ParseGitLog(ctx)
 	// Continue with operations that need git ops
 	nThreads := 0
-	processMsg := func(c chan error, msg []byte) (wch chan error, e error) {
+	processCommit := func(c chan error, commit map[string]interface{}) (wch chan error, e error) {
 		defer func() {
 			if c != nil {
 				c <- e
 			}
 		}()
-		// FIXME: Real data processing here
-		item := map[string]interface{}{"id": time.Now().UnixNano(), "name": "xyz"}
-		esItem := j.AddMetadata(ctx, item)
+		esItem := j.AddMetadata(ctx, commit)
 		if ctx.Project != "" {
-			item["project"] = ctx.Project
+			commit["project"] = ctx.Project
 		}
-		esItem["data"] = item
-		if allMsgsMtx != nil {
-			allMsgsMtx.Lock()
+		esItem["data"] = commit
+		// FIXME: Real data processing here
+		if 1 == 1 {
+			return
 		}
-		allMsgs = append(allMsgs, item)
-		nMsgs := len(allMsgs)
-		if nMsgs >= ctx.ESBulkSize {
+		if allCommitsMtx != nil {
+			allCommitsMtx.Lock()
+		}
+		allCommits = append(allCommits, esItem)
+		nCommits := len(allCommits)
+		if nCommits >= ctx.ESBulkSize {
 			sendToElastic := func(c chan error) (ee error) {
 				defer func() {
 					if c != nil {
 						c <- ee
 					}
 				}()
-				ee = SendToElastic(ctx, j, true, UUID, allMsgs)
+				ee = SendToElastic(ctx, j, true, UUID, allCommits)
 				if ee != nil {
-					Printf("error %v sending %d messages to ElasticSearch\n", ee, len(allMsgs))
+					Printf("error %v sending %d commits to ElasticSearch\n", ee, len(allCommits))
 				}
-				allMsgs = []interface{}{}
-				if allMsgsMtx != nil {
-					allMsgsMtx.Unlock()
+				allCommits = []interface{}{}
+				if allCommitsMtx != nil {
+					allCommitsMtx.Unlock()
 				}
 				return
 			}
@@ -412,20 +400,43 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 				}
 			}
 		} else {
-			if allMsgsMtx != nil {
-				allMsgsMtx.Unlock()
+			if allCommitsMtx != nil {
+				allCommitsMtx.Unlock()
 			}
 		}
 		return
 	}
+	// If MT allowed, wait for GitOps
+	// FIXME
+	Printf("waiting for git ops result\n")
 	if thrN > 1 {
-		for _, message := range messages {
-			go func(msg []byte) {
+		err = <-goch
+		if err != nil {
+			return
+		}
+	}
+	if ctx.Debug > 1 {
+		Printf("loc: %d, programming languages summary: %+v\n", j.Loc, j.Pls)
+	}
+	var (
+		commit map[string]interface{}
+		ok     bool
+	)
+	if thrN > 1 {
+		for {
+			commit, ok, err = j.ParseNextCommit(ctx)
+			if err != nil {
+				return
+			}
+			if !ok {
+				break
+			}
+			go func(com map[string]interface{}) {
 				var (
 					e    error
 					esch chan error
 				)
-				esch, e = processMsg(ch, msg)
+				esch, e = processCommit(ch, com)
 				if e != nil {
 					Printf("process error: %v\n", e)
 					return
@@ -439,7 +450,7 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 						eschaMtx.Unlock()
 					}
 				}
-			}(message)
+			}(commit)
 			nThreads++
 			if nThreads == thrN {
 				err = <-ch
@@ -457,8 +468,15 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 			}
 		}
 	} else {
-		for _, message := range messages {
-			_, err = processMsg(nil, message)
+		for {
+			commit, ok, err = j.ParseNextCommit(ctx)
+			if err != nil {
+				return
+			}
+			if !ok {
+				break
+			}
+			_, err = processCommit(nil, commit)
 			if err != nil {
 				return
 			}
@@ -470,16 +488,22 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 			return
 		}
 	}
-	nMsgs := len(allMsgs)
-	if ctx.Debug > 0 {
-		Printf("%d remaining messages to send to ES\n", nMsgs)
+	err = cmd.Wait()
+	if err != nil {
+		return
 	}
-	if nMsgs > 0 {
-		err = SendToElastic(ctx, j, true, UUID, allMsgs)
+	nCommits := len(allCommits)
+	if ctx.Debug > 0 {
+		Printf("%d remaining commits to send to ES\n", nCommits)
+	}
+	if nCommits > 0 {
+		err = SendToElastic(ctx, j, true, UUID, allCommits)
 		if err != nil {
-			Printf("Error %v sending %d messages to ES\n", err, len(allMsgs))
+			Printf("Error %v sending %d commits to ES\n", err, len(allCommits))
 		}
 	}
+	// FIXME
+	os.Exit(1)
 	return
 }
 
