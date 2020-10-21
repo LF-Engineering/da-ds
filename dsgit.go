@@ -20,6 +20,9 @@ const (
 	GitDefaultCachePath = "$HOME/.perceval/cache"
 	// GitOpsCommand - command that maintains git stats cache
 	GitOpsCommand = "gitops.py"
+	// GitOpsNoCleanup - if set, it will skip gitops.py repo cleanup
+	// FIXME: turn off when finshed
+	GitOpsNoCleanup = true
 )
 
 var (
@@ -59,6 +62,7 @@ type DSGit struct {
 	RepoName string // repo name
 	Loc      int    // lines of code as reported by GitOpsCommand
 	Pls      []PLS  // programming language suppary as reported by GitOpsCommand
+	GitPath  string // path to git repo clone
 }
 
 // ParseArgs - parse git specific environment variables
@@ -151,7 +155,11 @@ func (j *DSGit) GetGitOps(ctx *Ctx, thrN int) (ch chan error, err error) {
 			serr string
 		)
 		cmdLine := []string{GitOpsCommand, url}
-		sout, serr, e = ExecCommand(ctx, cmdLine, nil)
+		var env map[string]string
+		if GitOpsNoCleanup {
+			env = map[string]string{"SKIP_CLEANUP": "1"}
+		}
+		sout, serr, e = ExecCommand(ctx, cmdLine, env)
 		if e != nil {
 			Printf("error executing %v: %v\n%s\n%s\n", cmdLine, e, sout, serr)
 			return
@@ -219,7 +227,10 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 		}
 	}
 	// Do normal git processing, which don't needs gitops yet
-	Printf("processing data which doesn't need git ops result\n")
+	j.GitPath = j.ReposPath + "/" + j.URL + "-git"
+	j.GitPath, err = EnsurePath(j.GitPath, true)
+	FatalOnError(err)
+	Printf("path to store git repository: %s\n", j.GitPath)
 	// If MT allowed, wait for GitOps
 	Printf("waiting for git ops result\n")
 	if thrN > 1 {

@@ -83,6 +83,43 @@ class GitOps:
         return os.path.join(base_path, '{0}-{1}'.format(self.org_name, self.repo_name))
 
     @staticmethod
+    def _get_repo_size(start_path=None):
+        total_size = 0
+        if start_path:
+            for dirpath, dirnames, filenames in os.walk(start_path):
+                for f in filenames:
+                    fp = os.path.join(dirpath, f)
+                    # skip if it is symbolic link
+                    if not os.path.islink(fp):
+                        total_size += os.path.getsize(fp)
+
+        return total_size
+
+    @staticmethod
+    def _get_size_format(size_bytes, factor=1024, suffix="B"):
+        """
+        Scale bytes to its proper byte format
+        e.g:
+            1253656 => '1.20MB'
+            1253656678 => '1.17GB'
+        """
+        for unit in ["", "K", "M", "G", "T", "P", "E", "Z"]:
+            if size_bytes < factor:
+                return "{0:.2f} {1}{2}".format(size_bytes, unit, suffix)
+            size_bytes /= factor
+        return "{0:.2f} Y{1}".format(size_bytes, suffix)
+
+    @staticmethod
+    def _should_be_delete(size_unit=None):
+        if size_unit:
+            size, unit = size_unit.split(' ')
+            if unit in ['B', 'KB']:
+                return True
+            elif unit == 'MB' and float(size) <= 200:
+                return True
+        return False
+
+    @staticmethod
     def is_gitsource(host):
         if 'github.com' in host \
                 or 'gitlab.com' in host \
@@ -225,7 +262,7 @@ class GitOps:
             logger.error("Git clone error %s ", str(cloe))
             self.errored = True
 
-    def _clean(self):
+    def _clean(self, force=False):
         cmd = ['rm', '-rf', self.repo_path]
         env = {
             'LANG': 'C',
@@ -233,11 +270,15 @@ class GitOps:
         }
 
         try:
-            self._exec(cmd, env=env)
-            logger.debug("Git %s repository clean", self.repo_path)
+            size_bytes = self._get_repo_size(self.repo_path)
+            size = self._get_size_format(size_bytes)
+            if self._should_be_delete(size) or force:
+                self._exec(cmd, env=env)
+                logger.debug("Git %s repository clean", self.repo_path)
+            else:
+                logger.debug("Git %s repository clean skip", self.repo_path)
         except (RuntimeError, Exception) as cle:
-            logger.error("Git clone error %s", str(cle))
-            self.errored = True
+            logger.error("rm error %s", str(cle))
 
     def _pull(self):
         os.chdir(os.path.abspath(self.repo_path))
@@ -426,6 +467,8 @@ git_ops = GitOps(argv[1])
 git_ops._load_cache()
 git_ops.load()
 loc, pls = git_ops.get_stats()
+if os.getenv('SKIP_CLEANUP', '') == '':
+    git_ops._clean()
 if git_ops.is_errored():
     sys.exit(1)
 print (json.dumps({'loc':loc,'pls':pls}))

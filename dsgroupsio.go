@@ -183,7 +183,7 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 	var dirPath string
 	if j.SaveArchives {
 		dirPath = j.ArchPath + "/" + GroupsioURLRoot + j.GroupName
-		dirPath, err = EnsurePath(dirPath)
+		dirPath, err = EnsurePath(dirPath, false)
 		FatalOnError(err)
 		Printf("path to store mailing archives: %s\n", dirPath)
 	} else {

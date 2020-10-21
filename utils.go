@@ -285,7 +285,8 @@ func NoSSLVerify() {
 }
 
 // EnsurePath - craete archive directory (and all necessary parents as well)
-func EnsurePath(path string) (string, error) {
+// if noLastDir is set, then skip creating the last directory in the path
+func EnsurePath(path string, noLastDir bool) (string, error) {
 	ary := strings.Split(path, "/")
 	nonEmpty := []string{}
 	for i, dir := range ary {
@@ -295,7 +296,13 @@ func EnsurePath(path string) (string, error) {
 		nonEmpty = append(nonEmpty, dir)
 	}
 	path = strings.Join(nonEmpty, "/")
-	return path, os.MkdirAll(path, 0755)
+	var createPath string
+	if noLastDir {
+		createPath = strings.Join(nonEmpty[:len(nonEmpty)-1], "/")
+	} else {
+		createPath = path
+	}
+	return path, os.MkdirAll(createPath, 0755)
 }
 
 // Base64EncodeCookies - encode cookies array (strings) to base64 stream of bytes
