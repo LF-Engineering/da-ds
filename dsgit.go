@@ -6,6 +6,8 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -26,6 +28,16 @@ const (
 	// GitOpsNoCleanup - if set, it will skip gitops.py repo cleanup
 	// FIXME: turn off when finshed
 	GitOpsNoCleanup = true
+	// GitParseStateInit - init parser state
+	GitParseStateInit = 0
+	// GitParseStateCommit - commit parser state
+	GitParseStateCommit = 1
+	// GitParseStateHeader - header parser state
+	GitParseStateHeader = 2
+	// GitParseStateMessage - message parser state
+	GitParseStateMessage = 3
+	// GitParseStateFile - file parser state
+	GitParseStateFile = 4
 )
 
 var (
@@ -46,6 +58,14 @@ var (
 		"-C",              //detect and report copies
 		"-c",              //show merge info
 	}
+	// GitCommitPattern - pattern to match a commit
+	GitCommitPattern = regexp.MustCompile(`^commit[ \t](?P<commit>[a-f0-9]{40})(?:[ \t](?P<parents>[a-f0-9][a-f0-9 \t]+))?(?:[ \t]\((?P<refs>.+)\))?$`)
+	// GitHeaderPattern - pattern to match a commit
+	GitHeaderPattern = regexp.MustCompile(`^(?P<name>[a-zA-z0-9\-]+)\:[ \t]+(?P<value>.+)$`)
+	// GitMessagePattern - message patterns
+	GitMessagePattern = regexp.MustCompile(`^[\s]{4}(?P<msg>.*)$`)
+	// GitTrailerPattern - message trailer pattern
+	GitTrailerPattern = regexp.MustCompile(`^(?P<name>[a-zA-z0-9\-]+)\:[ \t]+(?P<value>.+)$`)
 )
 
 // RawPLS - programming language summary (all fields as strings)
@@ -75,12 +95,15 @@ type DSGit struct {
 	CachePath    string // From DA_GIT_CACHE_PATH - default GitDefaultCachePath
 	NoSSLVerify  bool   // From DA_GIT_NO_SSL_VERIFY
 	// Non-config variables
-	RepoName    string         // repo name
-	Loc         int            // lines of code as reported by GitOpsCommand
-	Pls         []PLS          // programming language suppary as reported by GitOpsCommand
-	GitPath     string         // path to git repo clone
-	LineScanner *bufio.Scanner // line scanner for git log
-	CurrLine    int
+	RepoName    string                            // repo name
+	Loc         int                               // lines of code as reported by GitOpsCommand
+	Pls         []PLS                             // programming language suppary as reported by GitOpsCommand
+	GitPath     string                            // path to git repo clone
+	LineScanner *bufio.Scanner                    // line scanner for git log
+	CurrLine    int                               // current line in git log
+	ParseState  int                               // 0-init, 1-commit, 2-header, 3-message, 4-file
+	Commit      map[string]interface{}            // current parsed commit
+	CommitFiles map[string]map[string]interface{} // current commit's files
 }
 
 // ParseArgs - parse git specific environment variables
@@ -303,14 +326,211 @@ func (j *DSGit) ParseGitLog(ctx *Ctx) (cmd *exec.Cmd, err error) {
 	return
 }
 
+// BuildCommit - return commit structure from the current parsed object
+func (j *DSGit) BuildCommit(ctx *Ctx) (commit map[string]interface{}) {
+	defer func() {
+		Printf("built commit %+v\n", commit)
+	}()
+	commit = j.Commit
+	ks := []string{}
+	for k, v := range commit {
+		if v == nil {
+			ks = append(ks, k)
+		}
+	}
+	for _, k := range ks {
+		delete(commit, k)
+	}
+	files := []map[string]interface{}{}
+	sf := []string{}
+	for f := range j.CommitFiles {
+		sf = append(sf, f)
+	}
+	sort.Strings(sf)
+	for _, f := range sf {
+		d := j.CommitFiles[f]
+		ks = []string{}
+		for k, v := range d {
+			if v == nil {
+				ks = append(ks, k)
+			}
+		}
+		for _, k := range ks {
+			delete(d, k)
+		}
+		files = append(files, d)
+	}
+	commit["files"] = files
+	j.Commit = nil
+	j.CommitFiles = nil
+	return
+}
+
+// ParseInit - parse initial state
+func (j *DSGit) ParseInit(ctx *Ctx, line string) (parsed bool, err error) {
+	j.ParseState = GitParseStateCommit
+	parsed = line == ""
+	return
+}
+
+// ParseCommit - parse commit
+func (j *DSGit) ParseCommit(ctx *Ctx, line string) (parsed bool, err error) {
+	m := MatchGrpups(GitCommitPattern, line)
+	if len(m) == 0 {
+		err = fmt.Errorf("expecting commit on line %d: '%s'", j.CurrLine, line)
+		return
+	}
+	var (
+		parentsAry []string
+		refsAry    []string
+	)
+	parents, parentsPresent := m["parents"]
+	if parentsPresent && parents != "" {
+		parentsAry = strings.Split(strings.TrimSpace(parents), " ")
+	}
+	refs, refsPresent := m["refs"]
+	if refsPresent && refs != "" {
+		ary := strings.Split(strings.TrimSpace(parents), ",")
+		for _, ref := range ary {
+			ref = strings.TrimSpace(ref)
+			if ref != "" {
+				refsAry = append(refsAry, ref)
+			}
+		}
+	}
+	// FIXME: debugging info
+	if len(refsAry) > 0 || len(parentsAry) > 0 {
+		Printf("ParseCommit: '%s' -> commit:'%s', parents:%v, refs:%v\n", line, m["commit"], parents, refs)
+	}
+	j.Commit = make(map[string]interface{})
+	j.Commit["commit"] = m["commit"]
+	j.Commit["parents"] = parentsAry
+	j.Commit["refs"] = refsAry
+	j.ParseState = GitParseStateHeader
+	parsed = true
+	return
+}
+
+// ParseHeader - parse header state
+func (j *DSGit) ParseHeader(ctx *Ctx, line string) (parsed bool, err error) {
+	// Printf("ParseHeader: '%s'\n", line)
+	if line == "" {
+		j.ParseState = GitParseStateMessage
+		parsed = true
+		return
+	}
+	m := MatchGrpups(GitHeaderPattern, line)
+	if len(m) == 0 {
+		err = fmt.Errorf("invalid header format, line %d: '%s'", j.CurrLine, line)
+		return
+	}
+	// FIXME: check value too?
+	if m["name"] != "" && m["value"] != "" {
+		j.Commit[m["name"]] = m["value"]
+	}
+	parsed = true
+	return
+}
+
+// ParseMessage - parse message state
+func (j *DSGit) ParseMessage(ctx *Ctx, line string) (parsed bool, err error) {
+	if line == "" {
+		j.ParseState = GitParseStateFile
+		parsed = true
+		return
+	}
+	m := MatchGrpups(GitMessagePattern, line)
+	// FIXME
+	Printf("MatchGroups message: %v -> %+v\n", j.Commit, m)
+	if len(m) == 0 {
+		if ctx.Debug > 1 {
+			Printf("invalid message format, line %d: '%s'", j.CurrLine, line)
+		}
+		j.ParseState = GitParseStateFile
+		return
+	}
+	msg := m["msg"]
+	currMsg, ok := j.Commit["message"]
+	if ok {
+		sMsg, _ := currMsg.(string)
+		j.Commit["message"] = sMsg + "\n" + msg
+	} else {
+		j.Commit["message"] = msg
+	}
+	j.ParseTrailer(ctx, msg)
+	parsed = true
+	return
+}
+
+// ParseFile - parse file state
+func (j *DSGit) ParseFile(ctx *Ctx, line string) (parsed bool, err error) {
+	// FIXME
+	os.Exit(1)
+	return
+}
+
+// ParseTrailer - parse possible trailer line
+func (j *DSGit) ParseTrailer(ctx *Ctx, line string) {
+	m := MatchGrpups(GitTrailerPattern, line)
+	// FIXME
+	Printf("MatchGroups trailer: %v -> %+v\n", j.Commit, m)
+	if len(m) == 0 {
+		return
+	}
+	trailer := m["name"]
+	_, ok := j.Commit[trailer]
+	if ok && ctx.Debug > 1 {
+		Printf("Trailer %s found in '%s', but it is already set, skiiping\n", trailer, line)
+		return
+	}
+	j.Commit[trailer] = []interface{}{m["value"]}
+}
+
 // ParseNextCommit - parse next git log commit or report end
 func (j *DSGit) ParseNextCommit(ctx *Ctx) (commit map[string]interface{}, ok bool, err error) {
-	if j.LineScanner.Scan() {
+	defer func() {
+		Printf("ParseNextCommit -> (%v,%v,%v)\n", commit, ok, err)
+	}()
+	for j.LineScanner.Scan() {
 		j.CurrLine++
-		line := j.LineScanner.Text()
-		commit = make(map[string]interface{})
-		commit["line"] = line
-		commit["commit"] = fmt.Sprintf("%v", time.Now().UnixNano())
+		line := strings.TrimRight(j.LineScanner.Text(), "\n")
+		parsed := false
+		Printf("Line %d: '%s'\n", j.CurrLine, line)
+		for {
+			s := fmt.Sprintf("(%d,%+v) -> ", j.ParseState, j.Commit)
+			switch j.ParseState {
+			case GitParseStateInit:
+				parsed, err = j.ParseInit(ctx, line)
+			case GitParseStateCommit:
+				parsed, err = j.ParseCommit(ctx, line)
+			case GitParseStateHeader:
+				parsed, err = j.ParseHeader(ctx, line)
+			case GitParseStateMessage:
+				parsed, err = j.ParseMessage(ctx, line)
+			case GitParseStateFile:
+				parsed, err = j.ParseFile(ctx, line)
+			default:
+				err = fmt.Errorf("unknown parse state:%d", j.ParseState)
+			}
+			s += fmt.Sprintf("(%d,%+v)\n", j.ParseState, j.Commit)
+			Printf("state change: " + s)
+			if err != nil {
+				Printf("Parse next line '%s' error: %v\n", line, err)
+				return
+			}
+			if j.ParseState == GitParseStateCommit && j.Commit != nil {
+				commit = j.BuildCommit(ctx)
+				ok = true
+				return
+			}
+			if parsed {
+				break
+			}
+		}
+	}
+	Printf("final flush\n")
+	if j.Commit != nil {
+		commit = j.BuildCommit(ctx)
 		ok = true
 	}
 	return
@@ -325,12 +545,14 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 		escha         []chan error
 		eschaMtx      *sync.Mutex
 		goch          chan error
+		waitLOCMtx    *sync.Mutex
 	)
 	thrN := GetThreadsNum(ctx)
 	if thrN > 1 {
 		ch = make(chan error)
 		allCommitsMtx = &sync.Mutex{}
 		eschaMtx = &sync.Mutex{}
+		waitLOCMtx = &sync.Mutex{}
 		goch, _ = j.GetGitOps(ctx, thrN)
 	} else {
 		_, err = j.GetGitOps(ctx, thrN)
@@ -351,6 +573,22 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 	cmd, err = j.ParseGitLog(ctx)
 	// Continue with operations that need git ops
 	nThreads := 0
+	locFinished := false
+	waitForLOC := func() {
+		if thrN == 1 {
+			return
+		}
+		waitLOCMtx.Lock()
+		if !locFinished {
+			Printf("waiting for git ops result\n")
+			err = <-goch
+			if err != nil {
+				return
+			}
+			locFinished = true
+		}
+		waitLOCMtx.Unlock()
+	}
 	processCommit := func(c chan error, commit map[string]interface{}) (wch chan error, e error) {
 		defer func() {
 			if c != nil {
@@ -361,6 +599,9 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 		if ctx.Project != "" {
 			commit["project"] = ctx.Project
 		}
+		waitForLOC()
+		commit["total_lines_of_code"] = j.Loc
+		commit["program_language_summary"] = j.Pls
 		esItem["data"] = commit
 		// FIXME: Real data processing here
 		if 1 == 1 {
@@ -407,14 +648,6 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 		return
 	}
 	// If MT allowed, wait for GitOps
-	// FIXME
-	Printf("waiting for git ops result\n")
-	if thrN > 1 {
-		err = <-goch
-		if err != nil {
-			return
-		}
-	}
 	if ctx.Debug > 1 {
 		Printf("loc: %d, programming languages summary: %+v\n", j.Loc, j.Pls)
 	}
@@ -503,6 +736,7 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 		}
 	}
 	// FIXME
+	Printf("exiting\n")
 	os.Exit(1)
 	return
 }

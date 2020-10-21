@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -118,6 +119,18 @@ func StringTrunc(data string, maxLen int, addLenInfo bool) (str string) {
 	}
 	half := maxLen >> 1
 	str = lenInfo + data[:half] + "(...)" + data[len(data)-half:]
+	return
+}
+
+// MatchGrpups - return regular expression matching groups as a map
+func MatchGrpups(re *regexp.Regexp, arg string) (result map[string]string) {
+	match := re.FindStringSubmatch(arg)
+	result = make(map[string]string)
+	for i, name := range re.SubexpNames() {
+		if i > 0 && i <= len(match) {
+			result[name] = match[i]
+		}
+	}
 	return
 }
 
