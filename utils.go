@@ -107,6 +107,20 @@ func CacheSummary(ctx *Ctx) {
 	}
 }
 
+// StringTrunc - truncate string to no more than maxLen
+func StringTrunc(data string, maxLen int, addLenInfo bool) (str string) {
+	lenInfo := ""
+	if addLenInfo {
+		lenInfo = "(" + strconv.Itoa(len(data)) + "): "
+	}
+	if len(data) <= maxLen {
+		return lenInfo + data
+	}
+	half := maxLen >> 1
+	str = lenInfo + data[:half] + "(...)" + data[len(data)-half:]
+	return
+}
+
 // BytesToStringTrunc - truncate bytes stream to no more than maxLen
 func BytesToStringTrunc(data []byte, maxLen int, addLenInfo bool) (str string) {
 	lenInfo := ""

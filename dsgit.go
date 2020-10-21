@@ -1,8 +1,11 @@
 package dads
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -32,6 +35,17 @@ var (
 	GitRichMapping = []byte(`{"properties":{"metadata__updated_on":{"type":"date"},"message_analyzed":{"type":"text","index":true}}}`)
 	// GitDefaultEnv - default git command environment
 	GitDefaultEnv = map[string]string{"LANG": "C", "PAGER": ""}
+	// GitLogOptions - default git log options
+	GitLogOptions = []string{
+		"--raw",           // show data in raw format
+		"--numstat",       // show added/deleted lines per file
+		"--pretty=fuller", // pretty output
+		"--decorate=full", // show full refs
+		"--parents",       //show parents information
+		"-M",              //detect and report renames
+		"-C",              //detect and report copies
+		"-c",              //show merge info
+	}
 )
 
 // RawPLS - programming language summary (all fields as strings)
@@ -261,6 +275,45 @@ func (j *DSGit) UpdateGitRepo(ctx *Ctx) (err error) {
 	return
 }
 
+// ParseGitLog - update git repo
+func (j *DSGit) ParseGitLog(ctx *Ctx) (err error) {
+	if ctx.Debug > 0 {
+		Printf("parsing logs from %s\n", j.GitPath)
+	}
+	cmdLine := []string{"git", "log", "--reverse", "--topo-order", "--branches", "--tags", "--remotes=origin"}
+	cmdLine = append(cmdLine, GitLogOptions...)
+	if ctx.DateFrom != nil {
+		cmdLine = append(cmdLine, "--since="+ToYMDHMSDate(*ctx.DateFrom))
+	}
+	if ctx.DateTo != nil {
+		cmdLine = append(cmdLine, "--until="+ToYMDHMSDate(*ctx.DateTo))
+	}
+	var (
+		pipe io.ReadCloser
+		cmd  *exec.Cmd
+	)
+	pipe, cmd, err = ExecCommandPipe(ctx, cmdLine, j.GitPath, GitDefaultEnv)
+	if err != nil {
+		Printf("error executing %v: %v\n", cmdLine, err)
+		return
+	}
+	scanner := bufio.NewScanner(pipe)
+	i := 0
+	for scanner.Scan() {
+		line := scanner.Text()
+		i++
+		Printf("line %d: '%s'\n", i, line)
+	}
+	err = cmd.Wait()
+	if err != nil {
+		return
+	}
+	if ctx.Debug > 0 {
+		Printf("parsed logs from %s\n", j.GitPath)
+	}
+	return
+}
+
 // FetchItems - implement enrich data for git datasource
 func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 	// IMPL:
@@ -295,6 +348,7 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 	}
 	FatalOnError(j.CreateGitRepo(ctx))
 	FatalOnError(j.UpdateGitRepo(ctx))
+	FatalOnError(j.ParseGitLog(ctx))
 	// If MT allowed, wait for GitOps
 	// FIXME
 	Printf("waiting for git ops result\n")
