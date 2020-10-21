@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	dads "github.com/LF-Engineering/da-ds"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -28,7 +29,7 @@ func NewEnricher(params EnricherParams, esClientProvider ESClientProvider) *Enri
 	}
 }
 
-func (e *Enricher) EnrichItem(rawItem RepositoryRaw) error {
+func (e *Enricher) EnrichItem(rawItem RepositoryRaw) (*RepositoryEnrich, error) {
 
 	enriched := RepositoryEnrich{}
 
@@ -65,29 +66,57 @@ func (e *Enricher) EnrichItem(rawItem RepositoryRaw) error {
 	enriched.MetadataFilterRaw = nil
 	enriched.Offset = nil
 
-
 	enriched.Origin = rawItem.Origin
 	enriched.Tag = rawItem.Origin
 	enriched.UUID = rawItem.UUID
 
-	body, err := json.Marshal(enriched)
-	if err != nil {
-		return errors.New("unable to convert body to json")
-	}
-
-	index := fmt.Sprintf("sds-%s-%s-dockerhub", rawItem.Data.Namespace, rawItem.Data.Name)
-
-	_, err = e.ElasticSearchProvider.Add(index, enriched.UUID, body)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return &enriched, nil
 }
 
-func (e *Enricher) HandleMapping(owner string, repository string) error {
-	index := fmt.Sprintf(IndexPattern, owner, repository)
+func (e *Enricher) Insert(data *RepositoryEnrich) ([]byte, error) {
+	body, err := json.Marshal(data)
+	if err != nil {
+		return nil, errors.New("unable to convert body to json")
+	}
 
+	resData, err := e.ElasticSearchProvider.Add(fmt.Sprintf("sds-%s-dockerhub-raw", data.ID), data.UUID, body)
+	if err != nil {
+		return nil, err
+	}
+
+	return resData, nil
+}
+
+func (e *Enricher) BulkInsert(data []*RepositoryEnrich) ([]byte, error) {
+	enriched := make([]interface{}, 0)
+
+	for _, item := range data {
+		enriched = append(enriched, map[string]interface{}{"index": map[string]string{"_index": fmt.Sprintf("sds-%s-dockerhub", item.ID), "_id": item.UUID}})
+		enriched = append(enriched, "\n")
+		enriched = append(enriched, item)
+		enriched = append(enriched, "\n")
+	}
+
+	body, err := json.Marshal(enriched)
+	if err != nil {
+		return nil, errors.New("unable to convert body to json")
+	}
+
+	var re = regexp.MustCompile(`(}),"\\n",?`)
+	body = []byte(re.ReplaceAllString(strings.TrimSuffix(strings.TrimPrefix(string(body), "["), "]"), "$1\n"))
+
+	// todo: remove this
+	fmt.Printf("enriched data: %s\n", body)
+
+	resData, err := e.ElasticSearchProvider.Bulk(body)
+	if err != nil {
+		return nil, err
+	}
+
+	return resData, nil
+}
+
+func (e *Enricher) HandleMapping(index string) error {
 	_, err := e.ElasticSearchProvider.CreateIndex(index, DockerhubRichMapping)
 	return err
 }

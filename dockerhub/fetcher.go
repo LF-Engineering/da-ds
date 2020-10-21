@@ -7,6 +7,7 @@ import (
 	dads "github.com/LF-Engineering/da-ds"
 	"github.com/LF-Engineering/da-ds/utils/uuid"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -39,6 +40,8 @@ type HttpClientProvider interface {
 type ESClientProvider interface {
 	Add(index string, documentID string, body []byte) ([]byte, error)
 	CreateIndex(index string, body []byte) ([]byte, error)
+	DeleteIndex(index string, ignoreUnavailable bool) ([]byte, error)
+	Bulk(body []byte) ([]byte, error)
 }
 
 // NewFetcher initiates a new dockerhub fetcher
@@ -82,7 +85,7 @@ func (f *Fetcher) login(username string, password string) (string, error) {
 }
 
 // FetchItems ...
-func (f *Fetcher) FetchItem(owner string, repository string) (*RepositoryRaw, error){
+func (f *Fetcher) FetchItem(owner string, repository string) (*RepositoryRaw, error) {
 	// login
 	token := ""
 
@@ -102,15 +105,8 @@ func (f *Fetcher) FetchItem(owner string, repository string) (*RepositoryRaw, er
 
 	statusCode, resBody, err := f.HttpClientProvider.Request(url, "GET", headers, nil)
 	if err != nil || statusCode != http.StatusOK {
-		return nil, errors.New("invalid request")
+		return nil, err
 	}
-
-	index := fmt.Sprintf(IndexPattern, owner, repository)
-
-	//index, err := f.HandleMapping(owner, repository)
-	//if err != nil {
-	//	return err
-	//}
 
 	repoRes := RepositoryResponse{}
 	if err := json.Unmarshal(resBody, &repoRes); err != nil {
@@ -124,7 +120,7 @@ func (f *Fetcher) FetchItem(owner string, repository string) (*RepositoryRaw, er
 	raw.Category = Category
 	raw.ClassifiedFieldsFiltered = nil
 	timestamp := time.Now()
-	raw.Timestamp = fmt.Sprintf("%.06f", float64(timestamp.UnixNano())/1.0e3)
+	raw.Timestamp = fmt.Sprintf("%v", timestamp.UnixNano()/1.0e3)
 	raw.Data.FetchedOn = raw.Timestamp
 	raw.MetadataTimestamp = dads.ToESDate(timestamp)
 	raw.Origin = url
@@ -140,24 +136,57 @@ func (f *Fetcher) FetchItem(owner string, repository string) (*RepositoryRaw, er
 
 	raw.UUID = uid
 
+	return &raw, nil
+}
+
+func (f *Fetcher) Insert(data *RepositoryRaw) ([]byte, error) {
+	body, err := json.Marshal(data)
+	if err != nil {
+		return nil, errors.New("unable to convert body to json")
+	}
+
+	resData, err := f.ElasticSearchProvider.Add(fmt.Sprintf("sds-%s-%s-dockerhub-raw", data.Data.Namespace, data.Data.Name), data.UUID, body)
+	if err != nil {
+		return nil, err
+	}
+
+	return resData, nil
+}
+
+func (f *Fetcher) BulkInsert(data []*RepositoryRaw) ([]byte, error) {
+	raw := make([]interface{}, 0)
+
+	for _, item := range data {
+
+		index := map[string]interface{}{
+			"index": map[string]string{
+				"_index": fmt.Sprintf("sds-%s-%s-dockerhub-raw", item.Data.Namespace, item.Data.Name),
+				"_id":    item.UUID,
+			},
+		}
+		raw = append(raw, index)
+		raw = append(raw, "\n")
+		raw = append(raw, item)
+		raw = append(raw, "\n")
+	}
+
 	body, err := json.Marshal(raw)
 	if err != nil {
 		return nil, errors.New("unable to convert body to json")
 	}
 
-	esRes, err := f.ElasticSearchProvider.Add(index, raw.UUID, body)
+	var re = regexp.MustCompile(`(}),"\\n",?`)
+	body = []byte(re.ReplaceAllString(strings.TrimSuffix(strings.TrimPrefix(string(body), "["), "]"), "$1\n"))
+
+	resData, err := f.ElasticSearchProvider.Bulk(body)
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Println("Document created: %s", esRes)
-
-	return &raw, nil
+	return resData, nil
 }
 
-func (f *Fetcher) HandleMapping(owner string, repository string) error {
-	index := fmt.Sprintf(IndexPattern, owner, repository)
-
+func (f *Fetcher) HandleMapping(index string) error {
 	_, err := f.ElasticSearchProvider.CreateIndex(index, DockerhubRawMapping)
 	return err
 }

@@ -8,6 +8,24 @@ import (
 )
 
 func TestFetchItems(t *testing.T) {
+	srv, err := prepareObject()
+	if err != nil {
+		t.Errorf("err: %v", err.Error())
+		return
+	}
+	owner := "hyperledger"
+	repo := "caliper"
+
+	raw, err := srv.FetchItem(owner, repo)
+	if err != nil {
+		t.Errorf("err: %v", err.Error())
+		return
+	}
+
+	t.Logf("%v", raw)
+}
+
+func prepareObject() (*Fetcher, error) {
 	httpClientProvider := utils.NewHttpClientProvider(5 * time.Second)
 	params := &Params{
 		Username:       "",
@@ -22,12 +40,48 @@ func TestFetchItems(t *testing.T) {
 	if err != nil {
 		fmt.Println("err22222 ", err.Error())
 	}
-	owner := "hyperledger"
-	repo := "caliper"
 	srv := NewFetcher(params, httpClientProvider, esClientProvider)
+	return srv, err
+}
 
-	if err := srv.FetchItem(owner, repo); err != nil {
-		fmt.Println("err1111 ", err.Error())
+func TestBulkInsert(t *testing.T) {
+	srv, err := prepareObject()
+	if err != nil {
+		t.Errorf("err: %v", err)
+		return
 	}
+
+	rawData := make([]*RepositoryRaw, 0)
+
+	raw, err := srv.FetchItem("hyperledger", "besu")
+	if err != nil {
+		t.Errorf("err: %v", err)
+		return
+	}
+	rawData = append(rawData, raw)
+
+	raw, err = srv.FetchItem("hyperledger", "explorer")
+	if err != nil {
+		t.Errorf("err: %v", err)
+		return
+	}
+	rawData = append(rawData, raw)
+
+	t.Logf("response: %v", rawData)
+
+	for _, item := range rawData {
+		err := srv.HandleMapping(fmt.Sprintf("sds-%s-%s-dockerhub-raw", item.Data.Namespace, item.Data.Name))
+		if err != nil {
+			t.Errorf("err: %v", err)
+		}
+	}
+
+	insert, err := srv.BulkInsert(rawData)
+	if err != nil {
+		t.Errorf("err: %v", err.Error())
+		return
+	}
+
+	t.Logf("response: %s", insert)
 
 }
