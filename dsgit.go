@@ -30,6 +30,8 @@ var (
 	GitRawMapping = []byte(`{"dynamic":true,"properties":{"metadata__updated_on":{"type":"date"},"data":{"properties":{"message":{"type":"text","index":true}}}}}`)
 	// GitRichMapping - Git rich index mapping
 	GitRichMapping = []byte(`{"properties":{"metadata__updated_on":{"type":"date"},"message_analyzed":{"type":"text","index":true}}}`)
+	// GitDefaultEnv - default git command environment
+	GitDefaultEnv = map[string]string{"LANG": "C", "PAGER": ""}
 )
 
 // RawPLS - programming language summary (all fields as strings)
@@ -159,7 +161,7 @@ func (j *DSGit) GetGitOps(ctx *Ctx, thrN int) (ch chan error, err error) {
 		if GitOpsNoCleanup {
 			env = map[string]string{"SKIP_CLEANUP": "1"}
 		}
-		sout, serr, e = ExecCommand(ctx, cmdLine, env)
+		sout, serr, e = ExecCommand(ctx, cmdLine, "", env)
 		if e != nil {
 			Printf("error executing %v: %v\n%s\n%s\n", cmdLine, e, sout, serr)
 			return
@@ -201,6 +203,64 @@ func (j *DSGit) GetGitOps(ctx *Ctx, thrN int) (ch chan error, err error) {
 	return ch, nil
 }
 
+// CreateGitRepo - clone git repo if needed
+func (j *DSGit) CreateGitRepo(ctx *Ctx) (err error) {
+	info, err := os.Stat(j.GitPath)
+	var exists bool
+	if !os.IsNotExist(err) {
+		if info.IsDir() {
+			exists = true
+		} else {
+			err = fmt.Errorf("%s exists and is a file, not a directory", j.GitPath)
+			return
+		}
+	}
+	if !exists {
+		if ctx.Debug > 0 {
+			Printf("cloning %s to %s\n", j.URL, j.GitPath)
+		}
+		cmdLine := []string{"git", "clone", "--bare", j.URL, j.GitPath}
+		env := map[string]string{"LANG": "C"}
+		var sout, serr string
+		sout, serr, err = ExecCommand(ctx, cmdLine, "", env)
+		if err != nil {
+			Printf("error executing %v: %v\n%s\n%s\n", cmdLine, err, sout, serr)
+			return
+		}
+		if ctx.Debug > 0 {
+			Printf("cloned %s to %s\n", j.URL, j.GitPath)
+		}
+	}
+	headPath := j.GitPath + "/HEAD"
+	info, err = os.Stat(headPath)
+	if os.IsNotExist(err) {
+		Printf("Missing %s file\n", headPath)
+		return
+	}
+	if info.IsDir() {
+		err = fmt.Errorf("%s is a directory, not file", headPath)
+	}
+	return
+}
+
+// UpdateGitRepo - update git repo
+func (j *DSGit) UpdateGitRepo(ctx *Ctx) (err error) {
+	if ctx.Debug > 0 {
+		Printf("updating repo %s\n", j.URL)
+	}
+	cmdLine := []string{"git", "fetch", "origin", "+refs/heads/*:refs/heads/*", "--prune"}
+	var sout, serr string
+	sout, serr, err = ExecCommand(ctx, cmdLine, j.GitPath, GitDefaultEnv)
+	if err != nil {
+		Printf("error executing %v: %v\n%s\n%s\n", cmdLine, err, sout, serr)
+		return
+	}
+	if ctx.Debug > 0 {
+		Printf("updated repo %s\n", j.URL)
+	}
+	return
+}
+
 // FetchItems - implement enrich data for git datasource
 func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 	// IMPL:
@@ -230,8 +290,13 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 	j.GitPath = j.ReposPath + "/" + j.URL + "-git"
 	j.GitPath, err = EnsurePath(j.GitPath, true)
 	FatalOnError(err)
-	Printf("path to store git repository: %s\n", j.GitPath)
+	if ctx.Debug > 0 {
+		Printf("path to store git repository: %s\n", j.GitPath)
+	}
+	FatalOnError(j.CreateGitRepo(ctx))
+	FatalOnError(j.UpdateGitRepo(ctx))
 	// If MT allowed, wait for GitOps
+	// FIXME
 	Printf("waiting for git ops result\n")
 	if thrN > 1 {
 		err = <-goch
@@ -239,7 +304,11 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 			return
 		}
 	}
-	Printf("loc: %d, programming languages summary: %+v\n", j.Loc, j.Pls)
+	if ctx.Debug > 1 {
+		Printf("loc: %d, programming languages summary: %+v\n", j.Loc, j.Pls)
+	}
+	// FIXME
+	os.Exit(1)
 	// Continue with operations that need git ops
 	nThreads := 0
 	processMsg := func(c chan error, msg []byte) (wch chan error, e error) {
