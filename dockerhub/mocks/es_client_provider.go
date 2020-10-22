@@ -9,6 +9,14 @@ type ESClientProvider struct {
 	mock.Mock
 }
 
+func (_m *ESClientProvider) DeleteIndex(index string, ignoreUnavailable bool) ([]byte, error) {
+	panic("implement me")
+}
+
+func (_m *ESClientProvider) Bulk(body []byte) ([]byte, error) {
+	panic("implement me")
+}
+
 // Add provides a mock function with given fields: index, documentID, body
 func (_m *ESClientProvider) Add(index string, documentID string, body []byte) ([]byte, error) {
 	ret := _m.Called(index, documentID, body)
