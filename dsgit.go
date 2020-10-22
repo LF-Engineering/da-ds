@@ -957,6 +957,27 @@ func (j *DSGit) GetAuthors(m map[string]string, n map[string][]string) (authors 
 	return
 }
 
+// IdentitiesFromGitAuthors - construct identities from git authors
+func (j *DSGit) IdentitiesFromGitAuthors(ctx *Ctx, authors map[string]struct{}) (identities map[[3]string]struct{}) {
+	init := false
+	for author := range authors {
+		fields := strings.Split(author, "<")
+		name := strings.TrimSpace(fields[0])
+		email := Nil
+		if len(fields) > 1 {
+			email = fields[1]
+			email = email[:len(email)-1]
+		}
+		identity := [3]string{name, Nil, email}
+		if !init {
+			identities = make(map[[3]string]struct{})
+			init = true
+		}
+		identities[identity] = struct{}{}
+	}
+	return
+}
+
 // GetItemIdentities return list of item's identities, each one is [3]string
 // (name, username, email) tripples, special value Nil "<nil>" means null
 // we use string and not *string which allows nil to allow usage as a map key
@@ -1007,7 +1028,9 @@ func (j *DSGit) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3]
 	for auth := range othersMap {
 		authorsMap[auth] = struct{}{}
 	}
-	Printf("identities: %+v\n", authorsMap)
+	if len(authorsMap) > 0 {
+		identities = j.IdentitiesFromGitAuthors(ctx, authorsMap)
+	}
 	return
 }
 
