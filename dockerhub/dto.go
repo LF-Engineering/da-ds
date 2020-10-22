@@ -2,28 +2,30 @@ package dockerhub
 
 // RepositoryResponse data model represents dockerhub get repository results
 type RepositoryResponse struct {
-	User            string `json:"user"`
-	Name            string `json:"name"`
-	Namespace       string `json:"namespace"`
-	RepositoryType  string `json:"repository_type"`
-	Status          int    `json:"status"`
-	Description     string `json:"description"`
-	IsPrivate       bool   `json:"is_private"`
-	IsAutomated     bool   `json:"is_automated"`
-	CanEdit         bool   `json:"can_edit"`
-	StarCount       int    `json:"star_count"`
-	PullCount       int    `json:"pull_count"`
-	LastUpdated     string `json:"last_updated"`
-	IsMigrated      bool   `json:"is_migrated"`
-	HasStarred      bool   `json:"has_starred"`
-	FullDescription string `json:"full_description"`
-	Affiliation     string `json:"affiliation"`
-	Permissions     struct {
-		Read  bool `json:"read"`
-		Write bool `json:"write"`
-		Admin bool `json:"admin"`
-	} `json:"permissions"`
-	FetchedOn string `json:"fetched_on"`
+	User            string      `json:"user"`
+	Name            string      `json:"name"`
+	Namespace       string      `json:"namespace"`
+	RepositoryType  string      `json:"repository_type"`
+	Status          int         `json:"status"`
+	Description     string      `json:"description"`
+	IsPrivate       bool        `json:"is_private"`
+	IsAutomated     bool        `json:"is_automated"`
+	CanEdit         bool        `json:"can_edit"`
+	StarCount       int         `json:"star_count"`
+	PullCount       int         `json:"pull_count"`
+	LastUpdated     string      `json:"last_updated"`
+	IsMigrated      bool        `json:"is_migrated"`
+	HasStarred      bool        `json:"has_starred"`
+	FullDescription string      `json:"full_description"`
+	Affiliation     string      `json:"affiliation"`
+	Permissions     Permissions `json:"permissions"`
+	FetchedOn       string      `json:"fetched_on"`
+}
+
+type Permissions struct {
+	Read  bool `json:"read"`
+	Write bool `json:"write"`
+	Admin bool `json:"admin"`
 }
 
 // RepositorySearchFields ...
@@ -36,18 +38,54 @@ type RepositorySearchFields struct {
 // RepositoryRaw data model represents es schema
 type RepositoryRaw struct {
 	BackendVersion           string                 `json:"backend_version"`
-	Data                     RepositoryResponse     `json:"data"`
+	Data                     *RepositoryResponse     `json:"data"`
 	Tag                      string                 `json:"tag"`
 	UUID                     string                 `json:"uuid"`
-	SearchFields             RepositorySearchFields `json:"search_fields"`
+	SearchFields             *RepositorySearchFields `json:"search_fields"`
 	Origin                   string                 `json:"origin"`
 	UpdatedOn                string                 `json:"updated_on"`
 	MetadataUpdatedOn        string                 `json:"metadata__updated_on"`
 	BackendName              string                 `json:"backend_name"`
 	MetadataTimestamp        string                 `json:"metadata__timestamp"`
-	Timestamp                string              `json:"timestamp"`
+	Timestamp                string                 `json:"timestamp"`
 	Category                 string                 `json:"category"`
-	ClassifiedFieldsFiltered *string                 `json:"classified_fields_filtered"`
+	ClassifiedFieldsFiltered *string                `json:"classified_fields_filtered"`
+}
+
+type RepositoryEnrich struct {
+	ID             string `json:"id"`
+	Project        string `json:"project"`
+	Affiliation    string `json:"affiliation"`
+	Description    string `json:"description"`
+	IsPrivate      bool   `json:"is_private"`
+	IsAutomated    bool   `json:"is_automated"`
+	PullCount      int    `json:"pull_count"`
+	RepositoryType string `json:"repository_type"`
+	User           string `json:"user"`
+	Status         int    `json:"status"`
+	StarCount      int    `json:"star_count"`
+
+	IsEvent                 int    `json:"is_event"`
+	IsDockerImage           int    `json:"is_docker_image"`
+	DescriptionAnalyzed     string `json:"description_analyzed"`
+	FullDescriptionAnalyzed string `json:"full_description_analyzed"`
+
+	CreationDate         string   `json:"creation_date"`
+	IsDockerhubDockerhub int      `json:"is_dockerhub_dockerhub"`
+	RepositoryLabels     *[]string `json:"repository_labels"`
+	MetadataFilterRaw    *string  `json:"metadata__filter_raw"`
+
+	LastUpdated        string `json:"last_updated"`
+	Offset             *string `json:"offset"`
+	MetadataEnrichedOn string `json:"metadata__enriched_on"`
+
+	BackendVersion    string `json:"backend_version"`
+	Tag               string `json:"tag"`
+	UUID              string `json:"uuid"`
+	Origin            string `json:"origin"`
+	MetadataUpdatedOn string `json:"metadata__updated_on"`
+	BackendName       string `json:"backend_name"`
+	MetadataTimestamp string `json:"metadata__timestamp"`
 }
 
 // LoginResponse from login dockerhub web API

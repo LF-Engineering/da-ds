@@ -38,12 +38,6 @@ func NewESClientProvider(params *ESParams) (*ESClientProvider, error) {
 func (p *ESClientProvider) CreateIndex(index string, body []byte) ([]byte, error) {
 	buf := bytes.NewReader(body)
 
-	// Delete index if exists
-	resBytes, err := p.DeleteIndex(index, true)
-	if err!= nil {
-		return resBytes, err
-	}
-
 	// Create Index request
 	res, err := esapi.IndicesCreateRequest{
 		Index: index,
@@ -53,7 +47,7 @@ func (p *ESClientProvider) CreateIndex(index string, body []byte) ([]byte, error
 		return nil, err
 	}
 
-	resBytes, err = toBytes(res)
+	resBytes, err := toBytes(res)
 	if err != nil {
 		return nil, err
 	}
@@ -97,6 +91,28 @@ func (p *ESClientProvider) Add(index string, documentID string, body []byte) ([]
 		Index:      index,
 		DocumentID: documentID,
 		Body:       buf,
+	}
+
+	res, err := req.Do(context.Background(), p.client)
+	if err != nil {
+		return nil, err
+	}
+
+	resBytes, err := toBytes(res)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	return resBytes, nil
+}
+
+// Bulk ...
+func (p *ESClientProvider) Bulk(body []byte) ([]byte, error) {
+	buf := bytes.NewReader(body)
+
+	req := esapi.BulkRequest{
+		Body: buf,
 	}
 
 	res, err := req.Do(context.Background(), p.client)

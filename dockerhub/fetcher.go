@@ -7,6 +7,7 @@ import (
 	dads "github.com/LF-Engineering/da-ds"
 	"github.com/LF-Engineering/da-ds/utils/uuid"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -20,6 +21,7 @@ type Fetcher struct {
 	ElasticSearchProvider ESClientProvider
 	Username              string
 	Password              string
+	Token                 string
 	BackendVersion        string
 }
 
@@ -39,6 +41,8 @@ type HttpClientProvider interface {
 type ESClientProvider interface {
 	Add(index string, documentID string, body []byte) ([]byte, error)
 	CreateIndex(index string, body []byte) ([]byte, error)
+	DeleteIndex(index string, ignoreUnavailable bool) ([]byte, error)
+	Bulk(body []byte) ([]byte, error)
 }
 
 // NewFetcher initiates a new dockerhub fetcher
@@ -53,7 +57,7 @@ func NewFetcher(params *Params, httpClientProvider HttpClientProvider, esClientP
 	}
 }
 
-func (f *Fetcher) login(username string, password string) (string, error) {
+func (f *Fetcher) Login(username string, password string) (string, error) {
 	url := fmt.Sprintf("%s/%s", APIURL, APILogin)
 
 	payload := make(map[string]interface{})
@@ -65,7 +69,7 @@ func (f *Fetcher) login(username string, password string) (string, error) {
 		return "", err
 	}
 
-	dads.Printf("dockerhub login via: %s\n", url)
+	_, err = dads.Printf("dockerhub login via: %s\n", url)
 
 	statusCode, resBody, err := f.HttpClientProvider.Request(url, "Post", nil, p)
 
@@ -73,84 +77,109 @@ func (f *Fetcher) login(username string, password string) (string, error) {
 		res := LoginResponse{}
 		err = json.Unmarshal(resBody, &res)
 		if err != nil {
-			fmt.Printf("Cannot unmarshal result from %s\n", string(resBody))
-			return "", err
+			return "", errors.New(fmt.Sprintf("Cannot unmarshal result from %s\n", string(resBody)))
 		}
+
+		// Set token into the object fetcher object
+		f.Token = res.Token
+
+		return res.Token, nil
 	}
 
 	return "", errors.New("invalid login credentials")
 }
 
-// FetchItem fetch dockerhub repository
-func (f *Fetcher) FetchItem(owner string, repository string) error {
-	// login
-	token := ""
-
-	if f.Password != "" {
-		t, err := f.login(f.Username, f.Password)
-		if err != nil {
-			return err
-		}
-		token = t
-	}
-
+// FetchItems ...
+func (f *Fetcher) FetchItem(owner string, repository string) (*RepositoryRaw, error) {
 	url := fmt.Sprintf("%s/%s/%s/%s", APIURL, APIRepositories, owner, repository)
 	headers := map[string]string{}
-	if token != "" {
-		headers["Authorization"] = fmt.Sprintf("JWT %s", token)
+	if f.Token != "" {
+		headers["Authorization"] = fmt.Sprintf("JWT %s", f.Token)
 	}
 
 	statusCode, resBody, err := f.HttpClientProvider.Request(url, "GET", headers, nil)
 	if err != nil || statusCode != http.StatusOK {
-		return errors.New("invalid request")
+		return nil, err
 	}
 
-	index := fmt.Sprintf("sds-%s-%s-dockerhub-raw", owner, repository)
-
-	// todo: should be moved to upstart
-	_, err = f.ElasticSearchProvider.CreateIndex(index, DockerhubRawMapping)
-	if err != nil {
-		return err
-	}
-
-	repoRes := RepositoryResponse{}
+	repoRes := &RepositoryResponse{}
 	if err := json.Unmarshal(resBody, &repoRes); err != nil {
-		return errors.New("unable to resolve json request")
+		return nil, errors.New("unable to resolve json request")
 	}
 
-	raw := RepositoryRaw{}
+	raw := &RepositoryRaw{}
 	raw.Data = repoRes
 	raw.BackendName = strings.Title(f.DSName)
 	raw.BackendVersion = f.BackendVersion
 	raw.Category = Category
 	raw.ClassifiedFieldsFiltered = nil
 	timestamp := time.Now()
-	raw.Timestamp = fmt.Sprintf("%.06f", float64(timestamp.UnixNano())/1.0e3)
+	raw.Timestamp = fmt.Sprintf("%v", timestamp.UnixNano()/1.0e3)
 	raw.Data.FetchedOn = raw.Timestamp
 	raw.MetadataTimestamp = dads.ToESDate(timestamp)
 	raw.Origin = url
-	raw.SearchFields = RepositorySearchFields{repository, fmt.Sprintf("%v", raw.Timestamp), owner}
+	raw.SearchFields = &RepositorySearchFields{repository, fmt.Sprintf("%v", raw.Timestamp), owner}
 	raw.Tag = url
 	raw.UpdatedOn = raw.Data.LastUpdated
 
 	// generate UUID
 	uid, err := uuid.Generate(raw.Data.FetchedOn)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	raw.UUID = uid
 
-	body, err := json.Marshal(raw)
-	if err != nil || statusCode != http.StatusOK {
-		return errors.New("unable to convert body to json")
-	}
+	return raw, nil
+}
 
-	esRes, err := f.ElasticSearchProvider.Add(index, raw.UUID, body)
+func (f *Fetcher) Insert(data *RepositoryRaw) ([]byte, error) {
+	body, err := json.Marshal(data)
 	if err != nil {
-		return err
+		return nil, errors.New("unable to convert body to json")
 	}
 
-	fmt.Println("Index created: %S", string(esRes))
+	resData, err := f.ElasticSearchProvider.Add(fmt.Sprintf("sds-%s-%s-dockerhub-raw", data.Data.Namespace, data.Data.Name), data.UUID, body)
+	if err != nil {
+		return nil, err
+	}
 
-	return nil
+	return resData, nil
+}
+
+func (f *Fetcher) BulkInsert(data []*RepositoryRaw) ([]byte, error) {
+	raw := make([]interface{}, 0)
+
+	for _, item := range data {
+
+		index := map[string]interface{}{
+			"index": map[string]string{
+				"_index": fmt.Sprintf("sds-%s-%s-dockerhub-raw", item.Data.Namespace, item.Data.Name),
+				"_id":    item.UUID,
+			},
+		}
+		raw = append(raw, index)
+		raw = append(raw, "\n")
+		raw = append(raw, item)
+		raw = append(raw, "\n")
+	}
+
+	body, err := json.Marshal(raw)
+	if err != nil {
+		return nil, errors.New("unable to convert body to json")
+	}
+
+	var re = regexp.MustCompile(`(}),"\\n",?`)
+	body = []byte(re.ReplaceAllString(strings.TrimSuffix(strings.TrimPrefix(string(body), "["), "]"), "$1\n"))
+
+	resData, err := f.ElasticSearchProvider.Bulk(body)
+	if err != nil {
+		return nil, err
+	}
+
+	return resData, nil
+}
+
+func (f *Fetcher) HandleMapping(index string) error {
+	_, err := f.ElasticSearchProvider.CreateIndex(index, DockerhubRawMapping)
+	return err
 }
