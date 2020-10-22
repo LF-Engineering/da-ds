@@ -66,6 +66,10 @@ var (
 	GitMessagePattern = regexp.MustCompile(`^[\s]{4}(?P<msg>.*)$`)
 	// GitTrailerPattern - message trailer pattern
 	GitTrailerPattern = regexp.MustCompile(`^(?P<name>[a-zA-z0-9\-]+)\:[ \t]+(?P<value>.+)$`)
+	// GitActionPattern - action pattern - note that original used `\.{,3}` which is not supported in go - you must specify from=0: `\.{0,3}`
+	GitActionPattern = regexp.MustCompile(`^(?P<sc>\:+)(?P<modes>(?:\d{6}[ \t])+)(?P<indexes>(?:[a-f0-9]+\.{0,3}[ \t])+)(?P<action>[^\t]+)\t+(?P<file>[^\t]+)(?:\t+(?P<newfile>.+))?$`)
+	// GitStatsPattern - stats pattern
+	GitStatsPattern = regexp.MustCompile(`^(?P<added>\d+|-)[ \t]+(?P<removed>\d+|-)[ \t]+(?P<file>.+)$`)
 )
 
 // RawPLS - programming language summary (all fields as strings)
@@ -375,7 +379,7 @@ func (j *DSGit) ParseInit(ctx *Ctx, line string) (parsed bool, err error) {
 
 // ParseCommit - parse commit
 func (j *DSGit) ParseCommit(ctx *Ctx, line string) (parsed bool, err error) {
-	m := MatchGrpups(GitCommitPattern, line)
+	m := MatchGroups(GitCommitPattern, line)
 	if len(m) == 0 {
 		err = fmt.Errorf("expecting commit on line %d: '%s'", j.CurrLine, line)
 		return
@@ -390,7 +394,7 @@ func (j *DSGit) ParseCommit(ctx *Ctx, line string) (parsed bool, err error) {
 	}
 	refs, refsPresent := m["refs"]
 	if refsPresent && refs != "" {
-		ary := strings.Split(strings.TrimSpace(parents), ",")
+		ary := strings.Split(strings.TrimSpace(refs), ",")
 		for _, ref := range ary {
 			ref = strings.TrimSpace(ref)
 			if ref != "" {
@@ -419,13 +423,14 @@ func (j *DSGit) ParseHeader(ctx *Ctx, line string) (parsed bool, err error) {
 		parsed = true
 		return
 	}
-	m := MatchGrpups(GitHeaderPattern, line)
+	m := MatchGroups(GitHeaderPattern, line)
 	if len(m) == 0 {
 		err = fmt.Errorf("invalid header format, line %d: '%s'", j.CurrLine, line)
 		return
 	}
 	// FIXME: check value too?
-	if m["name"] != "" && m["value"] != "" {
+	// if m["name"] != "" && m["value"] != "" {
+	if m["name"] != "" {
 		j.Commit[m["name"]] = m["value"]
 	}
 	parsed = true
@@ -439,7 +444,7 @@ func (j *DSGit) ParseMessage(ctx *Ctx, line string) (parsed bool, err error) {
 		parsed = true
 		return
 	}
-	m := MatchGrpups(GitMessagePattern, line)
+	m := MatchGroups(GitMessagePattern, line)
 	// FIXME
 	Printf("MatchGroups message: %v -> %+v\n", j.Commit, m)
 	if len(m) == 0 {
@@ -462,16 +467,101 @@ func (j *DSGit) ParseMessage(ctx *Ctx, line string) (parsed bool, err error) {
 	return
 }
 
+// ParseAction - parse action line
+func (j *DSGit) ParseAction(ctx *Ctx, data map[string]string) {
+	var (
+		modesAry   []string
+		indexesAry []string
+	)
+	modes, modesPresent := data["modes"]
+	if modesPresent && modes != "" {
+		modesAry = strings.Split(strings.TrimSpace(modes), " ")
+	}
+	indexes, indexesPresent := data["indexes"]
+	if indexesPresent && indexes != "" {
+		indexesAry = strings.Split(strings.TrimSpace(indexes), " ")
+	}
+	fileName := data["file"]
+	_, ok := j.CommitFiles[fileName]
+	if !ok {
+		j.CommitFiles[fileName] = make(map[string]interface{})
+	}
+	j.CommitFiles[fileName]["modes"] = modesAry
+	j.CommitFiles[fileName]["indexes"] = indexesAry
+	j.CommitFiles[fileName]["action"] = data["action"]
+	j.CommitFiles[fileName]["file"] = fileName
+	j.CommitFiles[fileName]["newfile"] = data["newfile"]
+	// FIXME
+	Printf("ParseAction: %+v\n", j.CommitFiles[fileName])
+}
+
+// ExtractPrevFileName - extracts previous file name (before rename/move etc.)
+func (*DSGit) ExtractPrevFileName(f string) (res string) {
+	i := strings.Index(f, "{")
+	j := strings.Index(f, "}")
+	if i > -1 && j > -1 {
+		k := IndexAt(f, " => ", i)
+		prefix := f[:i]
+		inner := f[i+1 : k]
+		suffix := f[j+1:]
+		res = prefix + inner + suffix
+	} else if strings.Index(f, " => ") > -1 {
+		res = strings.Split(f, " => ")[0]
+	} else {
+		res = f
+	}
+	// FIXME
+	Printf("ExtractPrevFileName: '%s' -> '%s'\n", f, res)
+	return
+}
+
+// ParseStats - parse stats line
+func (j *DSGit) ParseStats(ctx *Ctx, data map[string]string) {
+	fileName := j.ExtractPrevFileName(data["file"])
+	_, ok := j.CommitFiles[fileName]
+	if !ok {
+		j.CommitFiles[fileName] = make(map[string]interface{})
+		j.CommitFiles[fileName]["file"] = fileName
+	}
+	j.CommitFiles[fileName]["added"] = data["added"]
+	j.CommitFiles[fileName]["removed"] = data["removed"]
+	// FIXME
+	Printf("ParseStats: %+v\n", j.CommitFiles[fileName])
+}
+
 // ParseFile - parse file state
 func (j *DSGit) ParseFile(ctx *Ctx, line string) (parsed bool, err error) {
+	if line == "" {
+		j.ParseState = GitParseStateCommit
+		parsed = true
+		return
+	}
+	m := MatchGroups(GitActionPattern, line)
 	// FIXME
-	os.Exit(1)
+	Printf("MatchGroups action: %v -> %+v\n", j.Commit, m)
+	if len(m) > 0 {
+		j.ParseAction(ctx, m)
+		parsed = true
+		return
+	}
+	m = MatchGroups(GitStatsPattern, line)
+	// FIXME
+	Printf("MatchGroups stats: %v -> %+v\n", j.Commit, m)
+	if len(m) > 0 {
+		j.ParseStats(ctx, m)
+		parsed = true
+		return
+	}
+	if ctx.Debug > 1 {
+		Printf("invalid file section format, line %d: '%s'", j.CurrLine, line)
+	}
+	j.ParseState = GitParseStateCommit
 	return
 }
 
 // ParseTrailer - parse possible trailer line
 func (j *DSGit) ParseTrailer(ctx *Ctx, line string) {
-	m := MatchGrpups(GitTrailerPattern, line)
+	m := MatchGroups(GitTrailerPattern, line)
 	// FIXME
 	Printf("MatchGroups trailer: %v -> %+v\n", j.Commit, m)
 	if len(m) == 0 {
@@ -521,6 +611,9 @@ func (j *DSGit) ParseNextCommit(ctx *Ctx) (commit map[string]interface{}, ok boo
 			if j.ParseState == GitParseStateCommit && j.Commit != nil {
 				commit = j.BuildCommit(ctx)
 				ok = true
+				// FIXME
+				Printf("exit after parsed commit\n")
+				os.Exit(1)
 				return
 			}
 			if parsed {
@@ -533,6 +626,9 @@ func (j *DSGit) ParseNextCommit(ctx *Ctx) (commit map[string]interface{}, ok boo
 		commit = j.BuildCommit(ctx)
 		ok = true
 	}
+	// FIXME
+	Printf("exit after final\n")
+	os.Exit(1)
 	return
 }
 

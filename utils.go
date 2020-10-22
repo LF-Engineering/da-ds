@@ -122,8 +122,17 @@ func StringTrunc(data string, maxLen int, addLenInfo bool) (str string) {
 	return
 }
 
-// MatchGrpups - return regular expression matching groups as a map
-func MatchGrpups(re *regexp.Regexp, arg string) (result map[string]string) {
+// IndexAt - index of substring starting at a given position
+func IndexAt(s, sep string, n int) int {
+	idx := strings.Index(s[n:], sep)
+	if idx > -1 {
+		idx += n
+	}
+	return idx
+}
+
+// MatchGroups - return regular expression matching groups as a map
+func MatchGroups(re *regexp.Regexp, arg string) (result map[string]string) {
 	match := re.FindStringSubmatch(arg)
 	result = make(map[string]string)
 	for i, name := range re.SubexpNames() {
