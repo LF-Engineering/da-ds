@@ -19,6 +19,12 @@ var (
 	uuidsAffsCacheMtx *sync.RWMutex
 )
 
+// ResetUUIDCache - resets cache
+func ResetUUIDCache() {
+	uuidsNonEmptyCache = map[string]string{}
+	uuidsAffsCache = map[string]string{}
+}
+
 // UUIDNonEmpty - generate UUID of string args (all must be non-empty)
 // uses internal cache
 func UUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
@@ -119,8 +125,8 @@ func UUIDAffs(ctx *Ctx, args ...string) (h string) {
 		cmdLine := []string{"uuid.py", "u"}
 		cmdLine = append(cmdLine, args...)
 		h, _, err = ExecCommand(ctx, cmdLine, "", nil)
-		h = h[:len(h)-1]
 		FatalOnError(err)
+		h = h[:len(h)-1]
 		return
 	}
 	stripF := func(str string) string {

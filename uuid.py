@@ -26,6 +26,7 @@ def uuida(args):
         else:
             return v
     s = ':'.join(map(check_value, args))
+    # print(s.encode('utf-8', errors="surrogateescape"))
     sha = sha1(s.encode('utf-8', errors='surrogateescape'))
     uuid_sha = sha.hexdigest()
     return uuid_sha
@@ -41,6 +42,7 @@ def uuid(source, email=None, name=None, username=None):
                   to_unicode(email),
                   to_unicode(name, unaccent=True),
                   to_unicode(username))).lower()
+    # print(s.encode('UTF-8', errors="surrogateescape"))
     sha = sha1(s.encode('UTF-8', errors="surrogateescape"))
     uuid_ = sha.hexdigest()
     return uuid_
