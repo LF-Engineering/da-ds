@@ -830,6 +830,7 @@ func (j *DSGit) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string]interf
 	//mItem["search_fields"] = make(map[string]interface{})
 	mItem[DefaultDateField] = ToESDate(updatedOn)
 	mItem[DefaultTimestampField] = ToESDate(timestamp)
+	mItem[ProjectSlug] = ctx.ProjectSlug
 	return
 }
 

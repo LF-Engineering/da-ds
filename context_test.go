@@ -456,6 +456,19 @@ func TestInit(t *testing.T) {
 			),
 		},
 		{
+			"Setting legacy project slug",
+			map[string]string{
+				"PROJECT_SLUG": "lfn/onap",
+			},
+			dynamicSetFields(
+				t,
+				copyContext(&defaultContext),
+				map[string]interface{}{
+					"ProjectSlug": "lfn/onap",
+				},
+			),
+		},
+		{
 			"Setting date range",
 			map[string]string{
 				"DA_DS_DATE_FROM": "2020-09-28 09:12:17",

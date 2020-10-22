@@ -113,3 +113,6 @@ const From = "from"
 
 // Commit - common constant string
 const Commit = "commit"
+
+// ProjectSlug - common constant string
+const ProjectSlug = "project_slug"

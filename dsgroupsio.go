@@ -175,6 +175,7 @@ func (j *DSGroupsio) AddMetadata(ctx *Ctx, msg interface{}) (mItem map[string]in
 	FatalOnError(DeepSet(mItem, []string{"search_fields", "group_name"}, j.GroupName, false))
 	mItem[DefaultDateField] = ToESDate(updatedOn)
 	mItem[DefaultTimestampField] = ToESDate(timestamp)
+	mItem[ProjectSlug] = ctx.ProjectSlug
 	return
 }
 
