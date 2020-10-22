@@ -28,6 +28,7 @@ func TestParseMBoxDate(t *testing.T) {
 		{input: "2017-11-19T09:52:03Z", expectedStr: "2017-11-19T09:52:03Z", expectedValid: true},
 		{input: "2017-11-19\t09:52:03Z", expectedStr: "2017-11-19T09:52:03Z", expectedValid: true},
 		{input: "Fri, 12 February 2016 14:53:49 +0000", expectedStr: "2016-02-12T14:53:49Z", expectedValid: true},
+		{input: "Wed Dec 5 06:04:38 2018 -1000", expectedStr: "2018-12-05T06:04:38Z", expectedValid: true},
 	}
 	// Execute test cases
 	for index, test := range testCases {

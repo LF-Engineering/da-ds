@@ -38,6 +38,10 @@ const (
 	GitParseStateMessage = 3
 	// GitParseStateFile - file parser state
 	GitParseStateFile = 4
+	// GitCommitDateField - date field in the commit structure
+	GitCommitDateField = "CommitDate"
+	// GitDefaultSearchField - default search field
+	GitDefaultSearchField = "item_id"
 )
 
 var (
@@ -45,6 +49,8 @@ var (
 	GitRawMapping = []byte(`{"dynamic":true,"properties":{"metadata__updated_on":{"type":"date"},"data":{"properties":{"message":{"type":"text","index":true}}}}}`)
 	// GitRichMapping - Git rich index mapping
 	GitRichMapping = []byte(`{"properties":{"metadata__updated_on":{"type":"date"},"message_analyzed":{"type":"text","index":true}}}`)
+	// GitCategories - categories defined for Groupsio
+	GitCategories = map[string]struct{}{"commit": {}}
 	// GitDefaultEnv - default git command environment
 	GitDefaultEnv = map[string]string{"LANG": "C", "PAGER": ""}
 	// GitLogOptions - default git log options
@@ -90,7 +96,7 @@ type PLS struct {
 	Code     int    `json:"code"`
 }
 
-// DSGit - DS implementation for git - does nothing at all, just presents a skeleton code
+// DSGit - DS implementation for git
 type DSGit struct {
 	DS           string
 	URL          string // From DA_GIT_URL - git repo path
@@ -325,15 +331,14 @@ func (j *DSGit) ParseGitLog(ctx *Ctx) (cmd *exec.Cmd, err error) {
 	}
 	j.LineScanner = bufio.NewScanner(pipe)
 	if ctx.Debug > 0 {
-		Printf("parsed logs from %s\n", j.GitPath)
+		Printf("created logs scanner %s\n", j.GitPath)
 	}
 	return
 }
 
 // BuildCommit - return commit structure from the current parsed object
 func (j *DSGit) BuildCommit(ctx *Ctx) (commit map[string]interface{}) {
-	// FIXME
-	if ctx.Debug > 1 {
+	if ctx.Debug > 2 {
 		defer func() {
 			Printf("built commit %+v\n", commit)
 		}()
@@ -387,10 +392,8 @@ func (j *DSGit) ParseCommit(ctx *Ctx, line string) (parsed bool, err error) {
 		err = fmt.Errorf("expecting commit on line %d: '%s'", j.CurrLine, line)
 		return
 	}
-	var (
-		parentsAry []string
-		refsAry    []string
-	)
+	parentsAry := []string{}
+	refsAry := []string{}
 	parents, parentsPresent := m["parents"]
 	if parentsPresent && parents != "" {
 		parentsAry = strings.Split(strings.TrimSpace(parents), " ")
@@ -404,10 +407,6 @@ func (j *DSGit) ParseCommit(ctx *Ctx, line string) (parsed bool, err error) {
 				refsAry = append(refsAry, ref)
 			}
 		}
-	}
-	// FIXME: debugging info
-	if len(refsAry) > 0 {
-		Printf("ParseCommit: '%s' -> commit:'%s', parents:%v, refs:%v\n", line, m["commit"], parents, refs)
 	}
 	j.Commit = make(map[string]interface{})
 	j.Commit["commit"] = m["commit"]
@@ -502,12 +501,8 @@ func (*DSGit) ExtractPrevFileName(f string) (res string) {
 		inner := f[i+1 : k]
 		suffix := f[j+1:]
 		res = prefix + inner + suffix
-		// FIXME
-		Printf("ExtractPrevFileName: '%s' -> '%s'\n", f, res)
 	} else if strings.Index(f, " => ") > -1 {
 		res = strings.Split(f, " => ")[0]
-		// FIXME
-		Printf("ExtractPrevFileName: '%s' -> '%s'\n", f, res)
 	} else {
 		res = f
 	}
@@ -559,12 +554,15 @@ func (j *DSGit) ParseTrailer(ctx *Ctx, line string) {
 		return
 	}
 	trailer := m["name"]
-	_, ok := j.Commit[trailer]
-	if ok && ctx.Debug > 1 {
-		Printf("trailer %s found in '%s', but it is already set, skiiping\n", trailer, line)
-		return
+	ary, ok := j.Commit[trailer]
+	if ok {
+		if ctx.Debug > 1 {
+			Printf("trailer %s found in '%s'\n", trailer, line)
+		}
+		j.Commit[trailer] = append(ary.([]interface{}), m["value"])
+	} else {
+		j.Commit[trailer] = []interface{}{m["value"]}
 	}
-	j.Commit[trailer] = []interface{}{m["value"]}
 }
 
 // ParseNextCommit - parse next git log commit or report end
@@ -573,9 +571,7 @@ func (j *DSGit) ParseNextCommit(ctx *Ctx) (commit map[string]interface{}, ok boo
 		j.CurrLine++
 		line := strings.TrimRight(j.LineScanner.Text(), "\n")
 		parsed := false
-		//Printf("Line %d: '%s'\n", j.CurrLine, line)
 		for {
-			//s := fmt.Sprintf("(%d,%+v) -> ", j.ParseState, j.Commit)
 			switch j.ParseState {
 			case GitParseStateInit:
 				parsed, err = j.ParseInit(ctx, line)
@@ -590,10 +586,8 @@ func (j *DSGit) ParseNextCommit(ctx *Ctx) (commit map[string]interface{}, ok boo
 			default:
 				err = fmt.Errorf("unknown parse state:%d", j.ParseState)
 			}
-			//s += fmt.Sprintf("(%d,%+v)\n", j.ParseState, j.Commit)
-			//Printf("state change: " + s)
 			if err != nil {
-				Printf("Parse next line '%s' error: %v\n", line, err)
+				Printf("parse next line '%s' error: %v\n", line, err)
 				return
 			}
 			if j.ParseState == GitParseStateCommit && j.Commit != nil {
@@ -651,7 +645,7 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 	// Continue with operations that need git ops
 	nThreads := 0
 	locFinished := false
-	waitForLOC := func() {
+	waitForLOC := func() (e error) {
 		if thrN == 1 {
 			return
 		}
@@ -660,13 +654,18 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 			if ctx.Debug > 0 {
 				Printf("waiting for git ops result\n")
 			}
-			err = <-goch
-			if err != nil {
+			e = <-goch
+			if e != nil {
+				waitLOCMtx.Unlock()
 				return
 			}
 			locFinished = true
 		}
 		waitLOCMtx.Unlock()
+		if ctx.Debug > 1 {
+			Printf("loc: %d, programming languages summary: %+v\n", j.Loc, j.Pls)
+		}
+		return
 	}
 	processCommit := func(c chan error, commit map[string]interface{}) (wch chan error, e error) {
 		defer func() {
@@ -678,14 +677,13 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 		if ctx.Project != "" {
 			commit["project"] = ctx.Project
 		}
-		waitForLOC()
+		e = waitForLOC()
+		if e != nil {
+			return
+		}
 		commit["total_lines_of_code"] = j.Loc
 		commit["program_language_summary"] = j.Pls
 		esItem["data"] = commit
-		// FIXME: Real data processing here
-		if 1 == 1 {
-			return
-		}
 		if allCommitsMtx != nil {
 			allCommitsMtx.Lock()
 		}
@@ -725,10 +723,6 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 			}
 		}
 		return
-	}
-	// If MT allowed, wait for GitOps
-	if ctx.Debug > 1 {
-		Printf("loc: %d, programming languages summary: %+v\n", j.Loc, j.Pls)
 	}
 	var (
 		commit map[string]interface{}
@@ -814,9 +808,6 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 			Printf("Error %v sending %d commits to ES\n", err, len(allCommits))
 		}
 	}
-	// FIXME
-	Printf("exiting\n")
-	os.Exit(1)
 	return
 }
 
@@ -860,8 +851,7 @@ func (j *DSGit) OriginField(ctx *Ctx) string {
 
 // Categories - return a set of configured categories
 func (j *DSGit) Categories() map[string]struct{} {
-	// IMPL:
-	return map[string]struct{}{}
+	return GitCategories
 }
 
 // ResumeNeedsOrigin - is origin field needed when resuming
@@ -886,7 +876,6 @@ func (j *DSGit) ItemID(item interface{}) string {
 
 // AddMetadata - add metadata to the item
 func (j *DSGit) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string]interface{}) {
-	// IMPL:
 	mItem = make(map[string]interface{})
 	origin := j.URL
 	tag := ctx.Tag
@@ -905,8 +894,8 @@ func (j *DSGit) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string]interf
 	mItem[DefaultTagField] = tag
 	mItem["updated_on"] = updatedOn
 	mItem["category"] = j.ItemCategory(item)
-	//mItem["search_fields"] = j.GenSearchFields(ctx, issue, uuid)
-	//mItem["search_fields"] = make(map[string]interface{})
+	mItem["search_fields"] = make(map[string]interface{})
+	FatalOnError(DeepSet(mItem, []string{"search_fields", GitDefaultSearchField}, itemID, false))
 	mItem[DefaultDateField] = ToESDate(updatedOn)
 	mItem[DefaultTimestampField] = ToESDate(timestamp)
 	mItem[ProjectSlug] = ctx.ProjectSlug
@@ -915,9 +904,16 @@ func (j *DSGit) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string]interf
 
 // ItemUpdatedOn - return updated on date for an item
 func (j *DSGit) ItemUpdatedOn(item interface{}) time.Time {
-	// IMPL:
-	// should be CommitDate
-	return time.Now()
+	iUpdated, _ := Dig(item, []string{GitCommitDateField}, true, false)
+	sUpdated, ok := iUpdated.(string)
+	if !ok {
+		Fatalf("%s: ItemUpdatedOn() - cannot extract %s from %+v", j.DS, GitCommitDateField, DumpKeys(item))
+	}
+	updated, ok := ParseMBoxDate(sUpdated)
+	if !ok {
+		Fatalf("%s: ItemUpdatedOn() - cannot extract %s from %s", j.DS, GitCommitDateField, sUpdated)
+	}
+	return updated
 }
 
 // ItemCategory - return unique identifier for an item
