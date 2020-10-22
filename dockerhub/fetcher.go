@@ -25,19 +25,19 @@ type Fetcher struct {
 	BackendVersion        string
 }
 
-// Params ...
+// Params required parameters for dockerhub fetcher
 type Params struct {
 	Username       string
 	Password       string
 	BackendVersion string
 }
 
-// HttpClientProvider ...
+// HttpClientProvider used in connecting to remote http server
 type HttpClientProvider interface {
 	Request(url string, method string, header map[string]string, body []byte) (statusCode int, resBody []byte, err error)
 }
 
-// ESClientProvider ...
+// ESClientProvider used in connecting to ES Client server
 type ESClientProvider interface {
 	Add(index string, documentID string, body []byte) ([]byte, error)
 	CreateIndex(index string, body []byte) ([]byte, error)
@@ -127,7 +127,6 @@ func (f *Fetcher) FetchItem(owner string, repository string) (*RepositoryRaw, er
 	if err != nil {
 		return nil, err
 	}
-
 	raw.UUID = uid
 
 	return raw, nil

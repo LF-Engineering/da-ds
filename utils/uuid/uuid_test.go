@@ -1,16 +1,18 @@
 package uuid
 
-import "testing"
+import (
+	"github.com/stretchr/testify/assert"
+	"testing"
+)
 
 func TestGenerate(t *testing.T) {
+	// Arrange
 	args := []string{" abc ", "123"}
 
-
+	// Act
 	id, err := Generate(args...)
-	if err != nil {
-		t.Errorf("could not generate %v, error: %v", args, err)
-		return
-	}
 
-	t.Logf("uuid: %s\nargs: %v", id, args)
+	// Assert
+	assert.Equal(t, "18ecd81c8bb792b5c23142c89aa60d0fb2442863", id)
+	assert.NoError(t, err)
 }
