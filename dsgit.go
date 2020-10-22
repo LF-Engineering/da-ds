@@ -332,9 +332,12 @@ func (j *DSGit) ParseGitLog(ctx *Ctx) (cmd *exec.Cmd, err error) {
 
 // BuildCommit - return commit structure from the current parsed object
 func (j *DSGit) BuildCommit(ctx *Ctx) (commit map[string]interface{}) {
-	defer func() {
-		Printf("built commit %+v\n", commit)
-	}()
+	// FIXME
+	if ctx.Debug > 1 {
+		defer func() {
+			Printf("built commit %+v\n", commit)
+		}()
+	}
 	commit = j.Commit
 	ks := []string{}
 	for k, v := range commit {
@@ -403,13 +406,14 @@ func (j *DSGit) ParseCommit(ctx *Ctx, line string) (parsed bool, err error) {
 		}
 	}
 	// FIXME: debugging info
-	if len(refsAry) > 0 || len(parentsAry) > 0 {
+	if len(refsAry) > 0 {
 		Printf("ParseCommit: '%s' -> commit:'%s', parents:%v, refs:%v\n", line, m["commit"], parents, refs)
 	}
 	j.Commit = make(map[string]interface{})
 	j.Commit["commit"] = m["commit"]
 	j.Commit["parents"] = parentsAry
 	j.Commit["refs"] = refsAry
+	j.CommitFiles = make(map[string]map[string]interface{})
 	j.ParseState = GitParseStateHeader
 	parsed = true
 	return
@@ -417,7 +421,6 @@ func (j *DSGit) ParseCommit(ctx *Ctx, line string) (parsed bool, err error) {
 
 // ParseHeader - parse header state
 func (j *DSGit) ParseHeader(ctx *Ctx, line string) (parsed bool, err error) {
-	// Printf("ParseHeader: '%s'\n", line)
 	if line == "" {
 		j.ParseState = GitParseStateMessage
 		parsed = true
@@ -428,8 +431,6 @@ func (j *DSGit) ParseHeader(ctx *Ctx, line string) (parsed bool, err error) {
 		err = fmt.Errorf("invalid header format, line %d: '%s'", j.CurrLine, line)
 		return
 	}
-	// FIXME: check value too?
-	// if m["name"] != "" && m["value"] != "" {
 	if m["name"] != "" {
 		j.Commit[m["name"]] = m["value"]
 	}
@@ -445,8 +446,6 @@ func (j *DSGit) ParseMessage(ctx *Ctx, line string) (parsed bool, err error) {
 		return
 	}
 	m := MatchGroups(GitMessagePattern, line)
-	// FIXME
-	Printf("MatchGroups message: %v -> %+v\n", j.Commit, m)
 	if len(m) == 0 {
 		if ctx.Debug > 1 {
 			Printf("invalid message format, line %d: '%s'", j.CurrLine, line)
@@ -491,8 +490,6 @@ func (j *DSGit) ParseAction(ctx *Ctx, data map[string]string) {
 	j.CommitFiles[fileName]["action"] = data["action"]
 	j.CommitFiles[fileName]["file"] = fileName
 	j.CommitFiles[fileName]["newfile"] = data["newfile"]
-	// FIXME
-	Printf("ParseAction: %+v\n", j.CommitFiles[fileName])
 }
 
 // ExtractPrevFileName - extracts previous file name (before rename/move etc.)
@@ -505,13 +502,15 @@ func (*DSGit) ExtractPrevFileName(f string) (res string) {
 		inner := f[i+1 : k]
 		suffix := f[j+1:]
 		res = prefix + inner + suffix
+		// FIXME
+		Printf("ExtractPrevFileName: '%s' -> '%s'\n", f, res)
 	} else if strings.Index(f, " => ") > -1 {
 		res = strings.Split(f, " => ")[0]
+		// FIXME
+		Printf("ExtractPrevFileName: '%s' -> '%s'\n", f, res)
 	} else {
 		res = f
 	}
-	// FIXME
-	Printf("ExtractPrevFileName: '%s' -> '%s'\n", f, res)
 	return
 }
 
@@ -525,8 +524,6 @@ func (j *DSGit) ParseStats(ctx *Ctx, data map[string]string) {
 	}
 	j.CommitFiles[fileName]["added"] = data["added"]
 	j.CommitFiles[fileName]["removed"] = data["removed"]
-	// FIXME
-	Printf("ParseStats: %+v\n", j.CommitFiles[fileName])
 }
 
 // ParseFile - parse file state
@@ -537,16 +534,12 @@ func (j *DSGit) ParseFile(ctx *Ctx, line string) (parsed bool, err error) {
 		return
 	}
 	m := MatchGroups(GitActionPattern, line)
-	// FIXME
-	Printf("MatchGroups action: %v -> %+v\n", j.Commit, m)
 	if len(m) > 0 {
 		j.ParseAction(ctx, m)
 		parsed = true
 		return
 	}
 	m = MatchGroups(GitStatsPattern, line)
-	// FIXME
-	Printf("MatchGroups stats: %v -> %+v\n", j.Commit, m)
 	if len(m) > 0 {
 		j.ParseStats(ctx, m)
 		parsed = true
@@ -562,15 +555,13 @@ func (j *DSGit) ParseFile(ctx *Ctx, line string) (parsed bool, err error) {
 // ParseTrailer - parse possible trailer line
 func (j *DSGit) ParseTrailer(ctx *Ctx, line string) {
 	m := MatchGroups(GitTrailerPattern, line)
-	// FIXME
-	Printf("MatchGroups trailer: %v -> %+v\n", j.Commit, m)
 	if len(m) == 0 {
 		return
 	}
 	trailer := m["name"]
 	_, ok := j.Commit[trailer]
 	if ok && ctx.Debug > 1 {
-		Printf("Trailer %s found in '%s', but it is already set, skiiping\n", trailer, line)
+		Printf("trailer %s found in '%s', but it is already set, skiiping\n", trailer, line)
 		return
 	}
 	j.Commit[trailer] = []interface{}{m["value"]}
@@ -578,16 +569,13 @@ func (j *DSGit) ParseTrailer(ctx *Ctx, line string) {
 
 // ParseNextCommit - parse next git log commit or report end
 func (j *DSGit) ParseNextCommit(ctx *Ctx) (commit map[string]interface{}, ok bool, err error) {
-	defer func() {
-		Printf("ParseNextCommit -> (%v,%v,%v)\n", commit, ok, err)
-	}()
 	for j.LineScanner.Scan() {
 		j.CurrLine++
 		line := strings.TrimRight(j.LineScanner.Text(), "\n")
 		parsed := false
-		Printf("Line %d: '%s'\n", j.CurrLine, line)
+		//Printf("Line %d: '%s'\n", j.CurrLine, line)
 		for {
-			s := fmt.Sprintf("(%d,%+v) -> ", j.ParseState, j.Commit)
+			//s := fmt.Sprintf("(%d,%+v) -> ", j.ParseState, j.Commit)
 			switch j.ParseState {
 			case GitParseStateInit:
 				parsed, err = j.ParseInit(ctx, line)
@@ -602,8 +590,8 @@ func (j *DSGit) ParseNextCommit(ctx *Ctx) (commit map[string]interface{}, ok boo
 			default:
 				err = fmt.Errorf("unknown parse state:%d", j.ParseState)
 			}
-			s += fmt.Sprintf("(%d,%+v)\n", j.ParseState, j.Commit)
-			Printf("state change: " + s)
+			//s += fmt.Sprintf("(%d,%+v)\n", j.ParseState, j.Commit)
+			//Printf("state change: " + s)
 			if err != nil {
 				Printf("Parse next line '%s' error: %v\n", line, err)
 				return
@@ -611,9 +599,6 @@ func (j *DSGit) ParseNextCommit(ctx *Ctx) (commit map[string]interface{}, ok boo
 			if j.ParseState == GitParseStateCommit && j.Commit != nil {
 				commit = j.BuildCommit(ctx)
 				ok = true
-				// FIXME
-				Printf("exit after parsed commit\n")
-				os.Exit(1)
 				return
 			}
 			if parsed {
@@ -621,14 +606,10 @@ func (j *DSGit) ParseNextCommit(ctx *Ctx) (commit map[string]interface{}, ok boo
 			}
 		}
 	}
-	Printf("final flush\n")
 	if j.Commit != nil {
 		commit = j.BuildCommit(ctx)
 		ok = true
 	}
-	// FIXME
-	Printf("exit after final\n")
-	os.Exit(1)
 	return
 }
 
@@ -676,7 +657,9 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 		}
 		waitLOCMtx.Lock()
 		if !locFinished {
-			Printf("waiting for git ops result\n")
+			if ctx.Debug > 0 {
+				Printf("waiting for git ops result\n")
+			}
 			err = <-goch
 			if err != nil {
 				return
