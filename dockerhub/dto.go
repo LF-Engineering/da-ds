@@ -36,10 +36,10 @@ type RepositorySearchFields struct {
 
 type RepositoryRaw struct {
 	BackendVersion           string                 `json:"backend_version"`
-	Data                     RepositoryResponse     `json:"data"`
+	Data                     *RepositoryResponse     `json:"data"`
 	Tag                      string                 `json:"tag"`
 	UUID                     string                 `json:"uuid"`
-	SearchFields             RepositorySearchFields `json:"search_fields"`
+	SearchFields             *RepositorySearchFields `json:"search_fields"`
 	Origin                   string                 `json:"origin"`
 	UpdatedOn                string                 `json:"updated_on"`
 	MetadataUpdatedOn        string                 `json:"metadata__updated_on"`

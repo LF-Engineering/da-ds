@@ -102,12 +102,12 @@ func (f *Fetcher) FetchItem(owner string, repository string) (*RepositoryRaw, er
 		return nil, err
 	}
 
-	repoRes := RepositoryResponse{}
+	repoRes := &RepositoryResponse{}
 	if err := json.Unmarshal(resBody, &repoRes); err != nil {
 		return nil, errors.New("unable to resolve json request")
 	}
 
-	raw := RepositoryRaw{}
+	raw := &RepositoryRaw{}
 	raw.Data = repoRes
 	raw.BackendName = strings.Title(f.DSName)
 	raw.BackendVersion = f.BackendVersion
@@ -118,7 +118,7 @@ func (f *Fetcher) FetchItem(owner string, repository string) (*RepositoryRaw, er
 	raw.Data.FetchedOn = raw.Timestamp
 	raw.MetadataTimestamp = dads.ToESDate(timestamp)
 	raw.Origin = url
-	raw.SearchFields = RepositorySearchFields{repository, fmt.Sprintf("%v", raw.Timestamp), owner}
+	raw.SearchFields = &RepositorySearchFields{repository, fmt.Sprintf("%v", raw.Timestamp), owner}
 	raw.Tag = url
 	raw.UpdatedOn = raw.Data.LastUpdated
 
@@ -130,7 +130,7 @@ func (f *Fetcher) FetchItem(owner string, repository string) (*RepositoryRaw, er
 
 	raw.UUID = uid
 
-	return &raw, nil
+	return raw, nil
 }
 
 func (f *Fetcher) Insert(data *RepositoryRaw) ([]byte, error) {

@@ -57,7 +57,7 @@ func (e *Enricher) EnrichItem(rawItem RepositoryRaw) (*RepositoryEnrich, error) 
 	enriched.MetadataUpdatedOn = rawItem.MetadataUpdatedOn
 	enriched.CreationDate = rawItem.MetadataUpdatedOn
 
-	// todo:
+	// todo: the 3 following fields filling is vague
 	enriched.RepositoryLabels = nil
 	enriched.MetadataFilterRaw = nil
 	enriched.Offset = nil
@@ -100,9 +100,6 @@ func (e *Enricher) BulkInsert(data []*RepositoryEnrich) ([]byte, error) {
 
 	var re = regexp.MustCompile(`(}),"\\n",?`)
 	body = []byte(re.ReplaceAllString(strings.TrimSuffix(strings.TrimPrefix(string(body), "["), "]"), "$1\n"))
-
-	// todo: remove this
-	fmt.Printf("enriched data: %s\n", body)
 
 	resData, err := e.ElasticSearchProvider.Bulk(body)
 	if err != nil {

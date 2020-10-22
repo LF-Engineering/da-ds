@@ -16,10 +16,10 @@ type Manager struct {
 	ESUsername     string
 	ESPassword     string
 	HttpTimeout    time.Duration
-	Repositories   Repositories
+	Repositories   []*Repository
 }
 
-type Repositories []*struct {
+type Repository struct {
 	Owner      string
 	Repository string
 }
@@ -39,8 +39,8 @@ func NewManager(Username string,
 	return mng
 }
 
-func (m *Manager) Do() error {
-	fetcher, enricher, err := prepare(m)
+func (m *Manager) Sync() error {
+	fetcher, enricher, err := buildServices(m)
 	if err != nil {
 		return err
 	}
@@ -88,7 +88,7 @@ func (m *Manager) Do() error {
 	return nil
 }
 
-func prepare(m *Manager) (*Fetcher, *Enricher, error) {
+func buildServices(m *Manager) (*Fetcher, *Enricher, error) {
 	httpClientProvider := utils.NewHttpClientProvider(m.HttpTimeout)
 	params := &Params{
 		Username:       m.Username,
