@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/LF-Engineering/da-ds/dockerhub/mocks"
+	"github.com/LF-Engineering/da-ds/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"testing"
+	"time"
 )
 
 func TestFetchItem(t *testing.T) {
@@ -60,7 +62,7 @@ func TestFetchItem(t *testing.T) {
 	srv := NewFetcher(params, httpClientProviderMock, esClientProviderMock)
 
 	// Act
-	err = srv.FetchItem(owner, repo)
+	_, err = srv.FetchItem(owner, repo)
 
 	// Assert
 	assert.NoError(t, err)
