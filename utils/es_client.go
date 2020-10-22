@@ -112,7 +112,7 @@ func (p *ESClientProvider) Bulk(body []byte) ([]byte, error) {
 	buf := bytes.NewReader(body)
 
 	req := esapi.BulkRequest{
-		Body:       buf,
+		Body: buf,
 	}
 
 	res, err := req.Do(context.Background(), p.client)

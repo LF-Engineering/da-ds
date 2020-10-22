@@ -21,6 +21,7 @@ type Fetcher struct {
 	ElasticSearchProvider ESClientProvider
 	Username              string
 	Password              string
+	Token                 string
 	BackendVersion        string
 }
 
@@ -56,7 +57,7 @@ func NewFetcher(params *Params, httpClientProvider HttpClientProvider, esClientP
 	}
 }
 
-func (f *Fetcher) login(username string, password string) (string, error) {
+func (f *Fetcher) Login(username string, password string) (string, error) {
 	url := fmt.Sprintf("%s/%s", APIURL, APILogin)
 
 	payload := make(map[string]interface{})
@@ -76,9 +77,13 @@ func (f *Fetcher) login(username string, password string) (string, error) {
 		res := LoginResponse{}
 		err = json.Unmarshal(resBody, &res)
 		if err != nil {
-			fmt.Printf("Cannot unmarshal result from %s\n", string(resBody))
-			return "", err
+			return "", errors.New(fmt.Sprintf("Cannot unmarshal result from %s\n", string(resBody)))
 		}
+
+		// Set token into the object fetcher object
+		f.Token = res.Token
+
+		return res.Token, nil
 	}
 
 	return "", errors.New("invalid login credentials")
@@ -86,21 +91,10 @@ func (f *Fetcher) login(username string, password string) (string, error) {
 
 // FetchItems ...
 func (f *Fetcher) FetchItem(owner string, repository string) (*RepositoryRaw, error) {
-	// login
-	token := ""
-
-	if f.Password != "" {
-		t, err := f.login(f.Username, f.Password)
-		if err != nil {
-			return nil, err
-		}
-		token = t
-	}
-
 	url := fmt.Sprintf("%s/%s/%s/%s", APIURL, APIRepositories, owner, repository)
 	headers := map[string]string{}
-	if token != "" {
-		headers["Authorization"] = fmt.Sprintf("JWT %s", token)
+	if f.Token != "" {
+		headers["Authorization"] = fmt.Sprintf("JWT %s", f.Token)
 	}
 
 	statusCode, resBody, err := f.HttpClientProvider.Request(url, "GET", headers, nil)

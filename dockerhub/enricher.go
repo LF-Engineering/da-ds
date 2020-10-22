@@ -17,15 +17,11 @@ type Enricher struct {
 	BackendVersion        string
 }
 
-type EnricherParams struct {
-	BackendVersion string
-}
-
-func NewEnricher(params EnricherParams, esClientProvider ESClientProvider) *Enricher {
+func NewEnricher(BackendVersion string, esClientProvider ESClientProvider) *Enricher {
 	return &Enricher{
 		DSName:                Dockerhub,
 		ElasticSearchProvider: esClientProvider,
-		BackendVersion:        params.BackendVersion,
+		BackendVersion:        BackendVersion,
 	}
 }
 
