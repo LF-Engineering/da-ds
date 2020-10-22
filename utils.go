@@ -143,6 +143,28 @@ func MatchGroups(re *regexp.Regexp, arg string) (result map[string]string) {
 	return
 }
 
+// MatchGroupsArray - return regular expression matching groups as a map
+func MatchGroupsArray(re *regexp.Regexp, arg string) (result map[string][]string) {
+	match := re.FindAllStringSubmatch(arg, -1)
+	//Printf("match(%d,%d): %+v\n", len(match), len(re.SubexpNames()), match)
+	result = make(map[string][]string)
+	names := re.SubexpNames()
+	names = names[1:]
+	for idx, m := range match {
+		if idx == 0 {
+			for i, name := range names {
+				result[name] = []string{m[i+1]}
+			}
+			continue
+		}
+		for i, name := range names {
+			ary, _ := result[name]
+			result[name] = append(ary, m[i+1])
+		}
+	}
+	return
+}
+
 // BytesToStringTrunc - truncate bytes stream to no more than maxLen
 func BytesToStringTrunc(data []byte, maxLen int, addLenInfo bool) (str string) {
 	lenInfo := ""

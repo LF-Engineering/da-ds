@@ -76,6 +76,10 @@ var (
 	GitActionPattern = regexp.MustCompile(`^(?P<sc>\:+)(?P<modes>(?:\d{6}[ \t])+)(?P<indexes>(?:[a-f0-9]+\.{0,3}[ \t])+)(?P<action>[^\t]+)\t+(?P<file>[^\t]+)(?:\t+(?P<newfile>.+))?$`)
 	// GitStatsPattern - stats pattern
 	GitStatsPattern = regexp.MustCompile(`^(?P<added>\d+|-)[ \t]+(?P<removed>\d+|-)[ \t]+(?P<file>.+)$`)
+	// GitAuthorsPattern - author pattern
+	GitAuthorsPattern = regexp.MustCompile(`(?P<first_authors>.* .*) and (?P<last_author>.* .*) (?P<email>.*)`)
+	// GitCoAuthorsPattern - author pattern
+	GitCoAuthorsPattern = regexp.MustCompile(`Co-authored-by:(?P<first_authors>.* .*)<(?P<email>.*)>\n?`)
 )
 
 // RawPLS - programming language summary (all fields as strings)
@@ -98,12 +102,13 @@ type PLS struct {
 
 // DSGit - DS implementation for git
 type DSGit struct {
-	DS           string
-	URL          string // From DA_GIT_URL - git repo path
-	SingleOrigin bool   // From DA_GIT_SINGLE_ORIGIN - if you want to store only one git endpoint in the index
-	ReposPath    string // From DA_GIT_REPOS_PATH - default GitDefaultReposPath
-	CachePath    string // From DA_GIT_CACHE_PATH - default GitDefaultCachePath
-	NoSSLVerify  bool   // From DA_GIT_NO_SSL_VERIFY
+	DS              string
+	URL             string // From DA_GIT_URL - git repo path
+	SingleOrigin    bool   // From DA_GIT_SINGLE_ORIGIN - if you want to store only one git endpoint in the index
+	ReposPath       string // From DA_GIT_REPOS_PATH - default GitDefaultReposPath
+	CachePath       string // From DA_GIT_CACHE_PATH - default GitDefaultCachePath
+	NoSSLVerify     bool   // From DA_GIT_NO_SSL_VERIFY
+	PairProgramming bool   // From DA_GIT_PAIR_PROGRAMMING
 	// Non-config variables
 	RepoName    string                            // repo name
 	Loc         int                               // lines of code as reported by GitOpsCommand
@@ -122,6 +127,7 @@ func (j *DSGit) ParseArgs(ctx *Ctx) (err error) {
 	prefix := "DA_GIT_"
 	j.URL = os.Getenv(prefix + "URL")
 	j.SingleOrigin = StringToBool(os.Getenv(prefix + "SINGLE_ORIGIN"))
+	j.PairProgramming = StringToBool(os.Getenv(prefix + "PAIR_PROGRAMMING"))
 	if os.Getenv(prefix+"REPOS_PATH") != "" {
 		j.ReposPath = os.Getenv(prefix + "REPOS_PATH")
 	} else {
@@ -931,12 +937,78 @@ func (j *DSGit) ElasticRichMapping() []byte {
 	return GitRichMapping
 }
 
+// GetAuthors - parse multiple authors used in pair programming mode
+func (j *DSGit) GetAuthors(m map[string]string, n map[string][]string) (authors map[string]struct{}) {
+	// FIXME:
+	defer func() {
+		Printf("GetAuthors(%+v,%+v) -> %+v\n", m, n, authors)
+	}()
+	if len(m) > 0 {
+		for _, auth := range strings.Split(m["first_authors"], ",") {
+			authors[strings.TrimSpace(auth)] = struct{}{}
+		}
+		authors[strings.TrimSpace(m["last_author"])] = struct{}{}
+	}
+	if len(n) > 0 {
+		for _, auth := range n["first_authors"] {
+			authors[strings.TrimSpace(auth)] = struct{}{}
+		}
+	}
+	return
+}
+
 // GetItemIdentities return list of item's identities, each one is [3]string
 // (name, username, email) tripples, special value Nil "<nil>" means null
 // we use string and not *string which allows nil to allow usage as a map key
-func (j *DSGit) GetItemIdentities(ctx *Ctx, doc interface{}) (map[[3]string]struct{}, error) {
-	// IMPL:
-	return map[[3]string]struct{}{}, nil
+func (j *DSGit) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3]string]struct{}, err error) {
+	var authorsMap map[string]struct{}
+	iauthors, ok := Dig(doc, []string{"data", "Author"}, false, true)
+	if ok {
+		authors, _ := iauthors.(string)
+		if j.PairProgramming {
+			m1 := MatchGroups(GitAuthorsPattern, authors)
+			m2 := MatchGroupsArray(GitCoAuthorsPattern, authors)
+			if len(m1) > 0 || len(m2) > 0 {
+				authorsMap = j.GetAuthors(m1, m2)
+			}
+		}
+		if len(authorsMap) == 0 {
+			authorsMap = map[string]struct{}{authors: {}}
+		}
+	}
+	var committersMap map[string]struct{}
+	icommitters, ok := Dig(doc, []string{"data", "Commit"}, false, true)
+	if ok {
+		committers, _ := icommitters.(string)
+		if j.PairProgramming {
+			m1 := MatchGroups(GitAuthorsPattern, committers)
+			m2 := MatchGroupsArray(GitCoAuthorsPattern, committers)
+			if len(m1) > 0 || len(m2) > 0 {
+				committersMap = j.GetAuthors(m1, m2)
+			}
+		}
+		if len(committersMap) == 0 {
+			committersMap = map[string]struct{}{committers: {}}
+		}
+	}
+	othersMap := map[string]struct{}{}
+	for _, otherKey := range []string{"Signed-off-by", "Co-authored-by"} {
+		iothers, ok := Dig(doc, []string{"data", otherKey}, false, true)
+		if ok {
+			others, _ := iothers.([]interface{})
+			for _, other := range others {
+				othersMap[strings.TrimSpace(other.(string))] = struct{}{}
+			}
+		}
+	}
+	for auth := range committersMap {
+		authorsMap[auth] = struct{}{}
+	}
+	for auth := range othersMap {
+		authorsMap[auth] = struct{}{}
+	}
+	Printf("identities: %+v\n", authorsMap)
+	return
 }
 
 // GitEnrichItemsFunc - iterate items and enrich them

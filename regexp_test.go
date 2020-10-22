@@ -2,6 +2,7 @@ package dads
 
 import (
 	"regexp"
+	"strings"
 	"testing"
 
 	lib "github.com/LF-Engineering/da-ds"
@@ -96,6 +97,49 @@ func TestREs(t *testing.T) {
 				"file":    ".circleci/deployments/{production => prod}/api.deployment.yml.erb",
 			},
 		},
+		{
+			res: lib.GitAuthorsPattern.String(),
+			str: "Lukasz Gryglicki and Justyna Gryglicka <us@cncf.io>",
+			expected: map[string]string{
+				"first_authors": "Lukasz Gryglicki",
+				"last_author":   "Justyna Gryglicka",
+				"email":         "<us@cncf.io>",
+			},
+		},
+		{
+			res: lib.GitAuthorsPattern.String(),
+			str: "Lukasz Gryglicki, Alicja Gryglicka, Krzysztof Gryglicki and Justyna Gryglicka <family@cncf.io>",
+			expected: map[string]string{
+				"first_authors": "Lukasz Gryglicki, Alicja Gryglicka, Krzysztof Gryglicki",
+				"last_author":   "Justyna Gryglicka",
+				"email":         "<family@cncf.io>",
+			},
+		},
+		{
+			res: lib.GitAuthorsPattern.String(),
+			str: "Lukasz Gryglicki <lgryglicki@cncf.io> and Justyna Gryglicka <jgryglicka@cncf.io> <us@cncf.io>",
+			expected: map[string]string{
+				"first_authors": "Lukasz Gryglicki <lgryglicki@cncf.io>",
+				"last_author":   "Justyna Gryglicka <jgryglicka@cncf.io>",
+				"email":         "<us@cncf.io>",
+			},
+		},
+		{
+			res: lib.GitCoAuthorsPattern.String(),
+			str: "Co-authored-by:Lukasz Gryglicki<lgryglicki@cncf.io>",
+			expected: map[string]string{
+				"first_authors": "Lukasz Gryglicki",
+				"email":         "lgryglicki@cncf.io",
+			},
+		},
+		{
+			res: lib.GitCoAuthorsPattern.String(),
+			str: "Co-authored-by:Lukasz Gryglicki<lgryglicki@cncf.io>\nCo-authored-by:Justyna Gryglicka<jgryglicka@cncf.io>",
+			expected: map[string]string{
+				"first_authors": "Lukasz Gryglicki",
+				"email":         "lgryglicki@cncf.io",
+			},
+		},
 	}
 	sameResult := func(a1, a2 map[string]string) bool {
 		m1 := make(map[[2]string]struct{})
@@ -123,6 +167,55 @@ func TestREs(t *testing.T) {
 	for index, test := range testCases {
 		re := regexp.MustCompile(test.res)
 		got := lib.MatchGroups(re, test.str)
+		if !sameResult(got, test.expected) {
+			t.Errorf("test number %d, expected '%s' matching '%s' result %v, got %v", index+1, test.str, test.res, test.expected, got)
+		}
+	}
+}
+
+func TestArrayREs(t *testing.T) {
+	var testCases = []struct {
+		res      string
+		str      string
+		expected map[string][]string
+	}{
+		{
+			res: lib.GitCoAuthorsPattern.String(),
+			str: "Co-authored-by:Lukasz Gryglicki<lgryglicki@cncf.io>\nCo-authored-by:Justyna Gryglicka<jgryglicka@cncf.io>\n",
+			expected: map[string][]string{
+				"first_authors": {"Lukasz Gryglicki", "Justyna Gryglicka"},
+				"email":         {"lgryglicki@cncf.io", "jgryglicka@cncf.io"},
+			},
+		},
+	}
+	sameResult := func(a1, a2 map[string][]string) bool {
+		m1 := make(map[[2]string]struct{})
+		m2 := make(map[[2]string]struct{})
+		for k, va := range a1 {
+			v := strings.Join(va, ",")
+			m1[[2]string{k, v}] = struct{}{}
+		}
+		for k, va := range a2 {
+			v := strings.Join(va, ",")
+			m2[[2]string{k, v}] = struct{}{}
+		}
+		for k := range m1 {
+			_, ok := m2[k]
+			if !ok {
+				return false
+			}
+		}
+		for k := range m2 {
+			_, ok := m1[k]
+			if !ok {
+				return false
+			}
+		}
+		return true
+	}
+	for index, test := range testCases {
+		re := regexp.MustCompile(test.res)
+		got := lib.MatchGroupsArray(re, test.str)
 		if !sameResult(got, test.expected) {
 			t.Errorf("test number %d, expected '%s' matching '%s' result %v, got %v", index+1, test.str, test.res, test.expected, got)
 		}
