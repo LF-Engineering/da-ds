@@ -869,6 +869,16 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 			Printf("Error %v sending %d commits to ES\n", err, len(allCommits))
 		}
 	}
+	if !locFinished {
+		if ctx.Debug > 0 {
+			Printf("gitops result not needed, but waiting for orphan process\n")
+		}
+		<-goch
+		locFinished = true
+		if ctx.Debug > 0 {
+			Printf("loc: %d, programming languages: %d\n", j.Loc, len(j.Pls))
+		}
+	}
 	return
 }
 
@@ -996,10 +1006,10 @@ func (j *DSGit) ElasticRichMapping() []byte {
 }
 
 // GetAuthors - parse multiple authors used in pair programming mode
-func (j *DSGit) GetAuthors(ctx *Ctx, m map[string]string, n map[string][]string) (authors map[string]struct{}) {
-	if ctx.Debug > 0 {
+func (j *DSGit) GetAuthors(ctx *Ctx, m map[string]string, n map[string][]string) (authors map[string]struct{}, author string) {
+	if ctx.Debug > 1 {
 		defer func() {
-			Printf("GetAuthors(%+v,%+v) -> %+v\n", m, n, authors)
+			Printf("GetAuthors(%+v,%+v) -> %+v,%s\n", m, n, authors, author)
 		}()
 	}
 	if len(m) > 0 {
@@ -1014,12 +1024,18 @@ func (j *DSGit) GetAuthors(ctx *Ctx, m map[string]string, n map[string][]string)
 				auth += " " + email
 			}
 			authors[auth] = struct{}{}
+			if author == "" {
+				author = auth
+			}
 		}
 		auth := strings.TrimSpace(m["last_author"])
 		if email != "" && (!strings.Contains(auth, "<") || !strings.Contains(auth, "@") || !strings.Contains(auth, ">")) {
 			auth += " " + email
 		}
 		authors[auth] = struct{}{}
+		if author == "" {
+			author = auth
+		}
 	}
 	if len(n) > 0 {
 		if authors == nil {
@@ -1039,6 +1055,9 @@ func (j *DSGit) GetAuthors(ctx *Ctx, m map[string]string, n map[string][]string)
 				auth += " <" + email + ">"
 			}
 			authors[auth] = struct{}{}
+			if author == "" {
+				author = auth
+			}
 		}
 	}
 	return
@@ -1065,6 +1084,47 @@ func (j *DSGit) IdentitiesFromGitAuthors(ctx *Ctx, authors map[string]struct{}) 
 	return
 }
 
+// GetAuthorsData - extract authors data from a given field (this supports pair programming)
+func (j *DSGit) GetAuthorsData(ctx *Ctx, doc interface{}, auth string) (authorsMap map[string]struct{}, firstAuthor string) {
+	iauthors, ok := Dig(doc, []string{"data", auth}, false, true)
+	if ok {
+		authors, _ := iauthors.(string)
+		if j.PairProgramming {
+			if ctx.Debug > 1 {
+				Printf("pp %s: %s\n", auth, authors)
+			}
+			m1 := MatchGroups(GitAuthorsPattern, authors)
+			m2 := MatchGroupsArray(GitCoAuthorsPattern, authors)
+			if len(m1) > 0 || len(m2) > 0 {
+				authorsMap, firstAuthor = j.GetAuthors(ctx, m1, m2)
+			}
+		}
+		if len(authorsMap) == 0 {
+			authorsMap = map[string]struct{}{authors: {}}
+			firstAuthor = authors
+		}
+	}
+	return
+}
+
+// GetOtherAuthors - get others authors - possible from fields: Signed-off-by and/or Co-authored-by
+func (j *DSGit) GetOtherAuthors(ctx *Ctx, doc interface{}) (othersMap map[string]string) {
+	for _, otherKey := range []string{"Signed-off-by", "Co-authored-by"} {
+		iothers, ok := Dig(doc, []string{"data", otherKey}, false, true)
+		if ok {
+			others, _ := iothers.([]interface{})
+			if ctx.Debug > 1 {
+				Printf("pp %s: %s\n", otherKey, others)
+			}
+			othersMap = make(map[string]string)
+			for _, other := range others {
+				othersMap[strings.TrimSpace(other.(string))] = otherKey
+			}
+		}
+	}
+	return
+}
+
 // GetItemIdentities return list of item's identities, each one is [3]string
 // (name, username, email) tripples, special value Nil "<nil>" means null
 // we use string and not *string which allows nil to allow usage as a map key
@@ -1074,55 +1134,9 @@ func (j *DSGit) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3]
 			Printf("%+v\n", identities)
 		}()
 	}
-	var authorsMap map[string]struct{}
-	iauthors, ok := Dig(doc, []string{"data", "Author"}, false, true)
-	if ok {
-		authors, _ := iauthors.(string)
-		if j.PairProgramming {
-			if ctx.Debug > 1 {
-				Printf("pp authors: %s\n", authors)
-			}
-			m1 := MatchGroups(GitAuthorsPattern, authors)
-			m2 := MatchGroupsArray(GitCoAuthorsPattern, authors)
-			if len(m1) > 0 || len(m2) > 0 {
-				authorsMap = j.GetAuthors(ctx, m1, m2)
-			}
-		}
-		if len(authorsMap) == 0 {
-			authorsMap = map[string]struct{}{authors: {}}
-		}
-	}
-	var committersMap map[string]struct{}
-	icommitters, ok := Dig(doc, []string{"data", "Commit"}, false, true)
-	if ok {
-		committers, _ := icommitters.(string)
-		if j.PairProgramming {
-			if ctx.Debug > 1 {
-				Printf("pp committers: %s\n", committers)
-			}
-			m1 := MatchGroups(GitAuthorsPattern, committers)
-			m2 := MatchGroupsArray(GitCoAuthorsPattern, committers)
-			if len(m1) > 0 || len(m2) > 0 {
-				committersMap = j.GetAuthors(ctx, m1, m2)
-			}
-		}
-		if len(committersMap) == 0 {
-			committersMap = map[string]struct{}{committers: {}}
-		}
-	}
-	othersMap := map[string]struct{}{}
-	for _, otherKey := range []string{"Signed-off-by", "Co-authored-by"} {
-		iothers, ok := Dig(doc, []string{"data", otherKey}, false, true)
-		if ok {
-			others, _ := iothers.([]interface{})
-			if ctx.Debug > 1 {
-				Printf("pp %s: %s\n", otherKey, others)
-			}
-			for _, other := range others {
-				othersMap[strings.TrimSpace(other.(string))] = struct{}{}
-			}
-		}
-	}
+	authorsMap, _ := j.GetAuthorsData(ctx, doc, "Author")
+	committersMap, _ := j.GetAuthorsData(ctx, doc, "Commit")
+	othersMap := j.GetOtherAuthors(ctx, doc)
 	for auth := range committersMap {
 		authorsMap[auth] = struct{}{}
 	}
@@ -1139,10 +1153,6 @@ func (j *DSGit) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3]
 // items is a current pack of input items
 // docs is a pointer to where extracted identities will be stored
 func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]interface{}) (err error) {
-	// IMPL:
-	if ctx.Debug > 0 {
-		Printf("stub enrich items %d/%d func\n", len(items), len(*docs))
-	}
 	var (
 		mtx *sync.RWMutex
 		ch  chan error
@@ -1152,6 +1162,72 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 		ch = make(chan error)
 	}
 	dbConfigured := ctx.AffsDBConfigured()
+	git, _ := ds.(*DSGit)
+	var getRichItems func(map[string]interface{}) ([]interface{}, error)
+	if git.PairProgramming {
+		getRichItems = func(doc map[string]interface{}) (richItems []interface{}, e error) {
+			authorsMap, firstAuthor := git.GetAuthorsData(ctx, doc, "Author")
+			if len(authorsMap) > 1 {
+				authors := []string{}
+				for auth := range authorsMap {
+					authors = append(authors, auth)
+				}
+				FatalOnError(DeepSet(doc, []string{"data", "authors"}, authors, false))
+				FatalOnError(DeepSet(doc, []string{"data", "Author"}, firstAuthor, false))
+			}
+			committersMap, firstCommitter := git.GetAuthorsData(ctx, doc, "Commit")
+			if len(committersMap) > 1 {
+				committers := []string{}
+				for committer := range committersMap {
+					committers = append(committers, committer)
+				}
+				FatalOnError(DeepSet(doc, []string{"data", "committers"}, committers, false))
+				FatalOnError(DeepSet(doc, []string{"data", "Commit"}, firstCommitter, false))
+			}
+			othersMap := git.GetOtherAuthors(ctx, doc)
+			if len(othersMap) > 0 {
+				signers := []string{firstAuthor}
+				coAuthors := []string{firstAuthor}
+				hasSigners := false
+				hasCoAuthors := false
+				for auth, authType := range othersMap {
+					if auth == firstAuthor {
+						continue
+					}
+					if authType == "Signed-off-by" {
+						hasSigners = true
+						signers = append(signers, auth)
+					} else {
+						hasCoAuthors = true
+						coAuthors = append(coAuthors, auth)
+					}
+				}
+				if hasSigners {
+					FatalOnError(DeepSet(doc, []string{"data", "authors_signed_off"}, signers, false))
+				}
+				if hasCoAuthors {
+					FatalOnError(DeepSet(doc, []string{"data", "co_authors"}, coAuthors, false))
+				}
+			}
+			if len(authorsMap) > 1 && len(committersMap) > 0 && len(othersMap) > 0 {
+				Printf("got: %v, authors=%v,%s, committers=%v,%s, others=%v\n", dbConfigured, authorsMap, firstAuthor, committersMap, firstCommitter, othersMap)
+				Printf("%+v\n", doc)
+				// FIXME
+				os.Exit(1)
+			}
+			return
+		}
+	} else {
+		getRichItems = func(doc map[string]interface{}) (richItems []interface{}, e error) {
+			var rich map[string]interface{}
+			rich, e = ds.EnrichItem(ctx, doc, "", dbConfigured, nil)
+			if e != nil {
+				return
+			}
+			richItems = append(richItems, rich)
+			return
+		}
+	}
 	nThreads := 0
 	procItem := func(c chan error, idx int) (e error) {
 		if thrN > 1 {
@@ -1176,20 +1252,17 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 			e = fmt.Errorf("Failed to parse document %+v\n", doc)
 			return
 		}
-		if 1 == 0 {
-			Printf("%v\n", dbConfigured)
+		richItems, e := getRichItems(doc)
+		if e != nil {
+			return
 		}
-		// Actual item enrichment
-		/*
-			    var rich map[string]interface{}
-					if thrN > 1 {
-						mtx.Lock()
-					}
-					*docs = append(*docs, rich)
-					if thrN > 1 {
-						mtx.Unlock()
-					}
-		*/
+		if thrN > 1 {
+			mtx.Lock()
+		}
+		*docs = append(*docs, richItems...)
+		if thrN > 1 {
+			mtx.Unlock()
+		}
 		return
 	}
 	if thrN > 1 {
