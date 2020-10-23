@@ -632,6 +632,9 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 // ParseMBoxDate - try to parse mbox date
 func ParseMBoxDate(indt string) (dt time.Time, off float64, valid bool) {
 	defer func() {
+		if !valid {
+			return
+		}
 		ary := strings.Split(indt, "+0")
 		if len(ary) > 1 {
 			last := ary[len(ary)-1]
