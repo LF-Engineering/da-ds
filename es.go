@@ -421,20 +421,30 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 		payloads = append(payloads, doc...)
 		payloads = append(payloads, newLine...)
 	}
-	_, _, _, err = Request(
+	var result interface{}
+	result, _, _, err = Request(
 		ctx,
 		url,
 		Post,
 		map[string]string{"Content-Type": "application/x-ndjson"},
 		payloads,
 		[]string{},
-		nil,                                 // JSON statuses
+		map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses
 		map[[2]int]struct{}{{400, 599}: {}}, // error statuses: 400-599
 		nil,                                 // OK statuses
 		true,                                // retry
 		nil,                                 // cache duration
 		true,                                // skip in dry-run mode
 	)
+	resp, ok := result.(map[string]interface{})
+	if ok {
+		ers, ok := resp["errors"].(bool)
+		if ok && ers {
+			msg := InterfaceToStringTrunc(result, 1000, true)
+			Printf("bulk upload failed: %s\n", msg)
+			err = fmt.Errorf("%s", msg)
+		}
+	}
 	if err == nil {
 		if ctx.Debug > 0 {
 			Printf("%s(raw=%v,key=%s) ES bulk upload saved %d items\n", ds.Name(), raw, key, len(items))
@@ -470,6 +480,10 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 			nil,                                 // cache duration
 			true,                                // skip in dry-run mode
 		)
+		if err != nil {
+			Printf("SendToElastic: error: %+v for %+v\n", err, item)
+			return
+		}
 	}
 	if ctx.Debug > 0 {
 		Printf("%s(raw=%v,key=%s) ES bulk upload saved %d items (in non-bulk mode)\n", ds.Name(), raw, key, len(items))

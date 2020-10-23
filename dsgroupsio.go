@@ -168,7 +168,7 @@ func (j *DSGroupsio) AddMetadata(ctx *Ctx, msg interface{}) (mItem map[string]in
 	mItem[UUID] = uuid
 	mItem[DefaultOriginField] = origin
 	mItem[DefaultTagField] = tag
-	mItem["updated_on"] = updatedOn
+	mItem[DefaultOffsetField] = float64(updatedOn.Unix())
 	mItem["category"] = j.ItemCategory(msg)
 	mItem["search_fields"] = make(map[string]interface{})
 	FatalOnError(DeepSet(mItem, []string{"search_fields", GroupsioDefaultSearchField}, msgID, false))
@@ -176,6 +176,9 @@ func (j *DSGroupsio) AddMetadata(ctx *Ctx, msg interface{}) (mItem map[string]in
 	mItem[DefaultDateField] = ToESDate(updatedOn)
 	mItem[DefaultTimestampField] = ToESDate(timestamp)
 	mItem[ProjectSlug] = ctx.ProjectSlug
+	if ctx.Debug > 1 {
+		Printf("%s: %s: %v %v\n", origin, uuid, msgID, updatedOn)
+	}
 	return
 }
 

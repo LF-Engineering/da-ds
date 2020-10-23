@@ -184,7 +184,7 @@ func (j *DSJira) GenSearchFields(ctx *Ctx, issue interface{}, uuid string) (fiel
 		}
 	}
 	if ctx.Debug > 1 {
-		Printf("returing search fields %+v\n", fields)
+		Printf("returning search fields %+v\n", fields)
 	}
 	return
 }
@@ -207,12 +207,15 @@ func (j *DSJira) AddMetadata(ctx *Ctx, issue interface{}) (mItem map[string]inte
 	mItem[UUID] = uuid
 	mItem[DefaultOriginField] = origin
 	mItem[DefaultTagField] = tag
-	mItem["updated_on"] = updatedOn
+	mItem[DefaultOffsetField] = float64(updatedOn.Unix())
 	mItem["category"] = j.ItemCategory(issue)
 	mItem["search_fields"] = j.GenSearchFields(ctx, issue, uuid)
 	mItem[DefaultDateField] = ToESDate(updatedOn)
 	mItem[DefaultTimestampField] = ToESDate(timestamp)
 	mItem[ProjectSlug] = ctx.ProjectSlug
+	if ctx.Debug > 1 {
+		Printf("%s: %s: %v %v\n", origin, uuid, issueID, updatedOn)
+	}
 	return
 }
 

@@ -888,9 +888,9 @@ func (j *DSGit) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string]interf
 	if tag == "" {
 		tag = origin
 	}
-	itemID := j.ItemID(item)
+	commitSHA := j.ItemID(item)
 	updatedOn := j.ItemUpdatedOn(item)
-	uuid := UUIDNonEmpty(ctx, origin, itemID)
+	uuid := UUIDNonEmpty(ctx, origin, commitSHA)
 	timestamp := time.Now()
 	mItem["backend_name"] = j.DS
 	mItem["backend_version"] = GitBackendVersion
@@ -898,13 +898,16 @@ func (j *DSGit) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string]interf
 	mItem[UUID] = uuid
 	mItem[DefaultOriginField] = origin
 	mItem[DefaultTagField] = tag
-	mItem["updated_on"] = updatedOn
+	mItem[DefaultOffsetField] = float64(updatedOn.Unix())
 	mItem["category"] = j.ItemCategory(item)
 	mItem["search_fields"] = make(map[string]interface{})
-	FatalOnError(DeepSet(mItem, []string{"search_fields", GitDefaultSearchField}, itemID, false))
+	FatalOnError(DeepSet(mItem, []string{"search_fields", GitDefaultSearchField}, commitSHA, false))
 	mItem[DefaultDateField] = ToESDate(updatedOn)
 	mItem[DefaultTimestampField] = ToESDate(timestamp)
 	mItem[ProjectSlug] = ctx.ProjectSlug
+	if ctx.Debug > 1 {
+		Printf("%s: %s: %v %v\n", origin, uuid, commitSHA, updatedOn)
+	}
 	return
 }
 
