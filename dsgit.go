@@ -42,6 +42,8 @@ const (
 	GitCommitDateField = "CommitDate"
 	// GitDefaultSearchField - default search field
 	GitDefaultSearchField = "item_id"
+	// GitUUID - field used as a rich item ID when pair progrmamming is enabled
+	GitUUID = "git_uuid"
 )
 
 var (
@@ -870,14 +872,16 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 		}
 	}
 	if !locFinished {
-		if ctx.Debug > 0 {
-			Printf("gitops result not needed, but waiting for orphan process\n")
-		}
-		<-goch
-		locFinished = true
-		if ctx.Debug > 0 {
-			Printf("loc: %d, programming languages: %d\n", j.Loc, len(j.Pls))
-		}
+		go func() {
+			if ctx.Debug > 0 {
+				Printf("gitops result not needed, but waiting for orphan process\n")
+			}
+			<-goch
+			locFinished = true
+			if ctx.Debug > 0 {
+				Printf("loc: %d, programming languages: %d\n", j.Loc, len(j.Pls))
+			}
+		}()
 	}
 	return
 }
@@ -899,7 +903,10 @@ func (j *DSGit) DateField(*Ctx) string {
 
 // RichIDField - return rich ID field name
 func (j *DSGit) RichIDField(*Ctx) string {
-	return DefaultIDField
+	if j.PairProgramming {
+		return GitUUID
+	}
+	return UUID
 }
 
 // RichAuthorField - return rich ID field name
@@ -1166,14 +1173,24 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 	var getRichItems func(map[string]interface{}) ([]interface{}, error)
 	if git.PairProgramming {
 		getRichItems = func(doc map[string]interface{}) (richItems []interface{}, e error) {
+			// FIXME
+			defer func() {
+				if len(richItems) > 6 {
+					Printf("%+v --> %+v\n", doc, richItems)
+					os.Exit(1)
+				}
+			}()
+			idata, _ := Dig(doc, []string{"data"}, true, false)
+			data, _ := idata.(map[string]interface{})
+			data["Author-Original"] = data["Author"]
 			authorsMap, firstAuthor := git.GetAuthorsData(ctx, doc, "Author")
 			if len(authorsMap) > 1 {
 				authors := []string{}
 				for auth := range authorsMap {
 					authors = append(authors, auth)
 				}
-				FatalOnError(DeepSet(doc, []string{"data", "authors"}, authors, false))
-				FatalOnError(DeepSet(doc, []string{"data", "Author"}, firstAuthor, false))
+				data["authors"] = authors
+				data["Author"] = firstAuthor
 			}
 			committersMap, firstCommitter := git.GetAuthorsData(ctx, doc, "Commit")
 			if len(committersMap) > 1 {
@@ -1181,15 +1198,20 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 				for committer := range committersMap {
 					committers = append(committers, committer)
 				}
-				FatalOnError(DeepSet(doc, []string{"data", "committers"}, committers, false))
-				FatalOnError(DeepSet(doc, []string{"data", "Commit"}, firstCommitter, false))
+				data["committers"] = committers
+				data["Commit-Original"] = data["Commit"]
+				data["Commit"] = firstCommitter
 			}
+			hasSigners := false
+			hasCoAuthors := false
+			var (
+				signers   []string
+				coAuthors []string
+			)
 			othersMap := git.GetOtherAuthors(ctx, doc)
 			if len(othersMap) > 0 {
-				signers := []string{firstAuthor}
-				coAuthors := []string{firstAuthor}
-				hasSigners := false
-				hasCoAuthors := false
+				signers = []string{firstAuthor}
+				coAuthors = []string{firstAuthor}
 				for auth, authType := range othersMap {
 					if auth == firstAuthor {
 						continue
@@ -1203,17 +1225,89 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 					}
 				}
 				if hasSigners {
-					FatalOnError(DeepSet(doc, []string{"data", "authors_signed_off"}, signers, false))
+					data["authors_signed_off"] = signers
 				}
 				if hasCoAuthors {
-					FatalOnError(DeepSet(doc, []string{"data", "co_authors"}, coAuthors, false))
+					data["co_authors"] = coAuthors
 				}
 			}
-			if len(authorsMap) > 1 && len(committersMap) > 0 && len(othersMap) > 0 {
-				Printf("got: %v, authors=%v,%s, committers=%v,%s, others=%v\n", dbConfigured, authorsMap, firstAuthor, committersMap, firstCommitter, othersMap)
-				Printf("%+v\n", doc)
-				// FIXME
-				os.Exit(1)
+			uuid, _ := doc[UUID].(string)
+			added := make(map[string]struct{})
+			added[firstAuthor] = struct{}{}
+			aIdx := 0
+			flags := make(map[string]struct{})
+			auth2UUID := make(map[string]string)
+			if len(authorsMap) > 1 {
+				for auth := range authorsMap {
+					_, alreadyAdded := added[auth]
+					if alreadyAdded {
+						continue
+					}
+					added[auth] = struct{}{}
+					flags["is_git_commit_multi_author"] = struct{}{}
+					commitID := uuid + "_" + strconv.Itoa(aIdx)
+					aIdx++
+					auth2UUID[auth] = commitID
+				}
+			}
+			if len(committersMap) > 1 {
+				for auth := range committersMap {
+					_, alreadyAdded := added[auth]
+					if alreadyAdded {
+						continue
+					}
+					added[auth] = struct{}{}
+					flags["is_git_commit_multi_committer"] = struct{}{}
+					commitID := uuid + "_" + strconv.Itoa(aIdx)
+					aIdx++
+					auth2UUID[auth] = commitID
+				}
+			}
+			if hasSigners {
+				for _, auth := range signers {
+					_, alreadyAdded := added[auth]
+					if alreadyAdded {
+						continue
+					}
+					added[auth] = struct{}{}
+					flags["is_git_commit_signed_off"] = struct{}{}
+					commitID := uuid + "_" + strconv.Itoa(aIdx)
+					aIdx++
+					auth2UUID[auth] = commitID
+				}
+			}
+			if hasCoAuthors {
+				for _, auth := range coAuthors {
+					_, alreadyAdded := added[auth]
+					if alreadyAdded {
+						continue
+					}
+					added[auth] = struct{}{}
+					flags["is_git_commit_co_author"] = struct{}{}
+					commitID := uuid + "_" + strconv.Itoa(aIdx)
+					aIdx++
+					auth2UUID[auth] = commitID
+				}
+			}
+			for flag := range flags {
+				data[flag] = 1
+			}
+			// Normal enrichment
+			var rich map[string]interface{}
+			rich, e = ds.EnrichItem(ctx, doc, "", dbConfigured, nil)
+			if e != nil {
+				return
+			}
+			// additional authors, committers, signers and co-authors
+			richItems = append(richItems, rich)
+			for auth, gitUUID := range auth2UUID {
+				data["Author"] = auth
+				rich, e = ds.EnrichItem(ctx, doc, "", dbConfigured, nil)
+				if e != nil {
+					return
+				}
+				rich[GitUUID] = gitUUID
+				richItems = append(richItems, rich)
 			}
 			return
 		}
@@ -1306,8 +1400,17 @@ func (j *DSGit) EnrichItems(ctx *Ctx) (err error) {
 
 // EnrichItem - return rich item from raw item for a given author type
 func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, author string, affs bool, extra interface{}) (rich map[string]interface{}, err error) {
-	// IMPL:
-	rich = item
+	rich = make(map[string]interface{})
+	auth, _ := Dig(item, []string{"data", "Author"}, true, false)
+	f1, _ := Dig(item, []string{"data", "is_git_commit_multi_author"}, false, true)
+	f2, _ := Dig(item, []string{"data", "is_git_commit_multi_committer"}, false, true)
+	f3, _ := Dig(item, []string{"data", "is_git_commit_signed_off"}, false, true)
+	f4, _ := Dig(item, []string{"data", "is_git_commit_co_author"}, false, true)
+	rich["author"] = auth
+	rich["is_git_commit_multi_author"] = f1
+	rich["is_git_commit_multi_committer"] = f2
+	rich["is_git_commit_signed_off"] = f3
+	rich["is_git_commit_co_author"] = f4
 	return
 }
 

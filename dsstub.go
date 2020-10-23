@@ -218,6 +218,7 @@ func (j *DSStub) DateField(*Ctx) string {
 
 // RichIDField - return rich ID field name
 func (j *DSStub) RichIDField(*Ctx) string {
+	// IMPL:
 	return DefaultIDField
 }
 
