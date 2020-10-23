@@ -864,7 +864,6 @@ func (j *DSGroupsio) EnrichItems(ctx *Ctx) (err error) {
 
 // EnrichItem - return rich item from raw item for a given author type/role
 func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role string, affs bool, extra interface{}) (rich map[string]interface{}, err error) {
-	// copy RawFields
 	rich = make(map[string]interface{})
 	msg, ok := item["data"].(map[string]interface{})
 	if !ok {
@@ -880,6 +879,7 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 			return
 		}
 	}
+	// copy RawFields
 	if role == Author {
 		for _, field := range RawFields {
 			v, _ := item[field]

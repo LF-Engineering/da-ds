@@ -1173,13 +1173,6 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 	var getRichItems func(map[string]interface{}) ([]interface{}, error)
 	if git.PairProgramming {
 		getRichItems = func(doc map[string]interface{}) (richItems []interface{}, e error) {
-			// FIXME
-			defer func() {
-				if len(richItems) > 6 {
-					Printf("%+v --> %+v\n", doc, richItems)
-					os.Exit(1)
-				}
-			}()
 			idata, _ := Dig(doc, []string{"data"}, true, false)
 			data, _ := idata.(map[string]interface{})
 			data["Author-Original"] = data["Author"]
@@ -1298,8 +1291,8 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 			if e != nil {
 				return
 			}
-			// additional authors, committers, signers and co-authors
 			richItems = append(richItems, rich)
+			// additional authors, committers, signers and co-authors
 			for auth, gitUUID := range auth2UUID {
 				data["Author"] = auth
 				rich, e = ds.EnrichItem(ctx, doc, "", dbConfigured, nil)
@@ -1399,18 +1392,57 @@ func (j *DSGit) EnrichItems(ctx *Ctx) (err error) {
 }
 
 // EnrichItem - return rich item from raw item for a given author type
-func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, author string, affs bool, extra interface{}) (rich map[string]interface{}, err error) {
+func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, affs bool, extra interface{}) (rich map[string]interface{}, err error) {
+	/*
+		f1, _ := Dig(item, []string{"data", "is_git_commit_multi_author"}, false, true)
+		f2, _ := Dig(item, []string{"data", "is_git_commit_multi_committer"}, false, true)
+		f3, _ := Dig(item, []string{"data", "is_git_commit_signed_off"}, false, true)
+		f4, _ := Dig(item, []string{"data", "is_git_commit_co_author"}, false, true)
+		rich["author"] = auth
+		rich["is_git_commit_multi_author"] = f1
+		rich["is_git_commit_multi_committer"] = f2
+		rich["is_git_commit_signed_off"] = f3
+		rich["is_git_commit_co_author"] = f4
+	*/
 	rich = make(map[string]interface{})
-	auth, _ := Dig(item, []string{"data", "Author"}, true, false)
-	f1, _ := Dig(item, []string{"data", "is_git_commit_multi_author"}, false, true)
-	f2, _ := Dig(item, []string{"data", "is_git_commit_multi_committer"}, false, true)
-	f3, _ := Dig(item, []string{"data", "is_git_commit_signed_off"}, false, true)
-	f4, _ := Dig(item, []string{"data", "is_git_commit_co_author"}, false, true)
-	rich["author"] = auth
-	rich["is_git_commit_multi_author"] = f1
-	rich["is_git_commit_multi_committer"] = f2
-	rich["is_git_commit_signed_off"] = f3
-	rich["is_git_commit_co_author"] = f4
+	for _, field := range RawFields {
+		v, _ := item[field]
+		rich[field] = v
+	}
+	commit, ok := item["data"].(map[string]interface{})
+	if !ok {
+		err = fmt.Errorf("missing data field in item %+v", DumpKeys(item))
+		return
+	}
+	rich[GitUUID] = rich[UUID]
+	iAuthorDate, _ := Dig(commit, []string{"AuthorDate"}, true, false)
+	sAuthorDate, _ := iAuthorDate.(string)
+	authorDate, ok := ParseMBoxDate(sAuthorDate)
+	if !ok {
+		err = fmt.Errorf("cannot parse author date from %v", iAuthorDate)
+		return
+	}
+	rich["author_date"] = authorDate
+	iCommitDate, _ := Dig(commit, []string{"CommitDate"}, true, false)
+	sCommitDate, _ := iCommitDate.(string)
+	commitDate, ok := ParseMBoxDate(sCommitDate)
+	if !ok {
+		err = fmt.Errorf("cannot parse commit date from %v", iAuthorDate)
+		return
+	}
+	rich["commit_date"] = commitDate
+	message, ok := Dig(commit, []string{"message"}, false, true)
+	if ok {
+		msg, _ := message.(string)
+		if len(msg) > KeywordMaxlength {
+			msg = msg[:KeywordMaxlength]
+		}
+		rich["message"] = msg
+	}
+	// author, _ := Dig(commit, []string{"Author"}, true, false)
+	// FIXME
+	Printf("%+v\n", rich)
+	os.Exit(1)
 	return
 }
 
