@@ -1,6 +1,7 @@
 package dads
 
 import (
+	"regexp"
 	"strings"
 	"sync"
 )
@@ -11,6 +12,8 @@ var (
 	// GRedactedMtx - guard access to this map while in MT
 	GRedactedMtx *sync.RWMutex
 	redactedOnce sync.Once
+	// AnonymizeURLPattern - used to remove sensitive data from the url - 3rd can be a GitHub password
+	AnonymizeURLPattern = regexp.MustCompile(`(^.*)(://)(.*@)(.*$)`)
 )
 
 // AddRedacted - adds redacted string
@@ -61,4 +64,9 @@ func GetRedacted() (str string) {
 	}
 	str += "]"
 	return
+}
+
+// AnonymizeURL - remove sensitive data from the URL
+func AnonymizeURL(url string) string {
+	return AnonymizeURLPattern.ReplaceAllString(url, `$1$2$4`)
 }

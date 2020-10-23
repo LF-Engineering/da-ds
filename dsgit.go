@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"regexp"
@@ -1477,6 +1478,15 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 	}
 	rich["tz"] = 0
 	rich["branches"] = []interface{}{}
+	dtDiff := float64(commitDate.Sub(authorDate).Seconds()) / 3600.0
+	dtDiff = math.Round(dtDiff*100.0) / 100.0
+	rich["time_to_commit_hours"] = dtDiff
+	iRepoName, _ := Dig(item, []string{"origin"}, true, false)
+	repoName, ok := iRepoName.(string)
+	if strings.HasPrefix(repoName, "http") {
+		repoName = AnonymizeURL(repoName)
+	}
+	rich["repo_name"] = repoName
 	// author, _ := Dig(commit, []string{"Author"}, true, false)
 	// FIXME
 	Printf("%+v\n", rich)
