@@ -640,7 +640,7 @@ func ParseMBoxDate(indt string) (dt time.Time, off float64, valid bool) {
 				offH, _ := strconv.Atoi(digs[:1])
 				offM, _ := strconv.Atoi(digs[1:])
 				off = float64(offH) + float64(offM)/60.0
-        dt = dt.Add(time.Minute * time.Duration(off*-60))
+				dt = dt.Add(time.Minute * time.Duration(off*-60))
 				return
 			}
 		}
@@ -652,7 +652,7 @@ func ParseMBoxDate(indt string) (dt time.Time, off float64, valid bool) {
 				offH, _ := strconv.Atoi(digs[:1])
 				offM, _ := strconv.Atoi(digs[1:])
 				off = float64(10+offH) + float64(offM)/60.0
-        dt = dt.Add(time.Minute * time.Duration(off*-60))
+				dt = dt.Add(time.Minute * time.Duration(off*-60))
 				return
 			}
 		}
@@ -664,7 +664,7 @@ func ParseMBoxDate(indt string) (dt time.Time, off float64, valid bool) {
 				offH, _ := strconv.Atoi(digs[:1])
 				offM, _ := strconv.Atoi(digs[1:])
 				off = -(float64(offH) + float64(offM)/60.0)
-        dt = dt.Add(time.Minute * time.Duration(off*-60))
+				dt = dt.Add(time.Minute * time.Duration(off*-60))
 				return
 			}
 		}
@@ -676,7 +676,7 @@ func ParseMBoxDate(indt string) (dt time.Time, off float64, valid bool) {
 				offH, _ := strconv.Atoi(digs[:1])
 				offM, _ := strconv.Atoi(digs[1:])
 				off = -(float64(10+offH) + float64(offM)/60.0)
-        dt = dt.Add(time.Minute * time.Duration(off*-60))
+				dt = dt.Add(time.Minute * time.Duration(off*-60))
 				return
 			}
 		}
