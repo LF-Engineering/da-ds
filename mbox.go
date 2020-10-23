@@ -53,6 +53,9 @@ var (
 	}
 	// SpacesRE - match 1 or more space characters
 	SpacesRE = regexp.MustCompile(`\s+`)
+	// TZOffsetRE - time zone offset that comes after +0... +1... -0... -1...
+	// Can be 3 disgits or 3 digits then whitespace and then anything
+	TZOffsetRE = regexp.MustCompile(`^(\d{3})(\s+.*$|$)`)
 )
 
 // ParseMBoxMsg - parse a raw MBox message into object to be inserte dinto raw ES
@@ -527,7 +530,10 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		dumpMBox()
 		return
 	}
-	var dt time.Time
+	var (
+		dt time.Time
+		tz float64
+	)
 	found := false
 	mdt, ok := item[GroupsioMessageDateField]
 	if !ok {
@@ -535,13 +541,17 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		if !ok {
 			Printf("%s(%d): missing Date & Received fields\n", groupName, len(msg))
 		}
-		var dts []time.Time
+		type DtTz struct {
+			Dt time.Time
+			Tz float64
+		}
+		var dts []DtTz
 		for _, rcv := range rcvs {
 			ary := strings.Split(string(rcv), ";")
 			sdt := ary[len(ary)-1]
-			dt, ok := ParseMBoxDate(sdt)
+			dt, tz, ok := ParseMBoxDate(sdt)
 			if ok {
-				dts = append(dts, dt)
+				dts = append(dts, DtTz{Dt: dt, Tz: tz})
 			}
 		}
 		nDts := len(dts)
@@ -551,9 +561,10 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 			return
 		}
 		if nDts > 1 {
-			sort.Slice(dts, func(i, j int) bool { return dts[i].After(dts[j]) })
+			sort.Slice(dts, func(i, j int) bool { return dts[i].Dt.After(dts[j].Dt) })
 		}
-		dt = dts[0]
+		dt = dts[0].Dt
+		tz = dts[0].Tz
 		found = true
 	}
 	if !found {
@@ -561,7 +572,7 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		if !ok {
 			Printf("%s(%d): non-string date field %v\n", groupName, len(msg), mdt)
 		}
-		dt, ok = ParseMBoxDate(sdt)
+		dt, tz, ok = ParseMBoxDate(sdt)
 		if !ok {
 			Printf("%s(%d): unable to parse date from '%s'\n", groupName, len(msg), sdt)
 			dumpMBox()
@@ -570,6 +581,7 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 	}
 	// item["Date"] = dt
 	item[GroupsioMessageDateField] = dt
+	item["date_tz"] = tz
 	item["MBox-N-Bodies"] = len(bodies)
 	bodyKeys := make(map[string]struct{})
 	item["data"] = make(map[string]interface{})
@@ -618,7 +630,57 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 }
 
 // ParseMBoxDate - try to parse mbox date
-func ParseMBoxDate(indt string) (dt time.Time, valid bool) {
+func ParseMBoxDate(indt string) (dt time.Time, off float64, valid bool) {
+	defer func() {
+		ary := strings.Split(indt, "+0")
+		if len(ary) > 1 {
+			last := ary[len(ary)-1]
+			if TZOffsetRE.MatchString(last) {
+				digs := TZOffsetRE.ReplaceAllString(last, `$1`)
+				offH, _ := strconv.Atoi(digs[:1])
+				offM, _ := strconv.Atoi(digs[1:])
+				off = float64(offH) + float64(offM)/60.0
+        dt = dt.Add(time.Minute * time.Duration(off*-60))
+				return
+			}
+		}
+		ary = strings.Split(indt, "+1")
+		if len(ary) > 1 {
+			last := ary[len(ary)-1]
+			if TZOffsetRE.MatchString(last) {
+				digs := TZOffsetRE.ReplaceAllString(last, `$1`)
+				offH, _ := strconv.Atoi(digs[:1])
+				offM, _ := strconv.Atoi(digs[1:])
+				off = float64(10+offH) + float64(offM)/60.0
+        dt = dt.Add(time.Minute * time.Duration(off*-60))
+				return
+			}
+		}
+		ary = strings.Split(indt, "-0")
+		if len(ary) > 1 {
+			last := ary[len(ary)-1]
+			if TZOffsetRE.MatchString(last) {
+				digs := TZOffsetRE.ReplaceAllString(last, `$1`)
+				offH, _ := strconv.Atoi(digs[:1])
+				offM, _ := strconv.Atoi(digs[1:])
+				off = -(float64(offH) + float64(offM)/60.0)
+        dt = dt.Add(time.Minute * time.Duration(off*-60))
+				return
+			}
+		}
+		ary = strings.Split(indt, "-1")
+		if len(ary) > 1 {
+			last := ary[len(ary)-1]
+			if TZOffsetRE.MatchString(last) {
+				digs := TZOffsetRE.ReplaceAllString(last, `$1`)
+				offH, _ := strconv.Atoi(digs[:1])
+				offM, _ := strconv.Atoi(digs[1:])
+				off = -(float64(10+offH) + float64(offM)/60.0)
+        dt = dt.Add(time.Minute * time.Duration(off*-60))
+				return
+			}
+		}
+	}()
 	sdt := indt
 	// https://www.broobles.com/eml2mbox/mbox.html
 	// but the real world is not that simple

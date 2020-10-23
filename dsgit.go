@@ -991,7 +991,7 @@ func (j *DSGit) ItemUpdatedOn(item interface{}) time.Time {
 	if !ok {
 		Fatalf("%s: ItemUpdatedOn() - cannot extract %s from %+v", j.DS, GitCommitDateField, DumpKeys(item))
 	}
-	updated, ok := ParseMBoxDate(sUpdated)
+	updated, _, ok := ParseMBoxDate(sUpdated)
 	if !ok {
 		Fatalf("%s: ItemUpdatedOn() - cannot extract %s from %s", j.DS, GitCommitDateField, sUpdated)
 	}
@@ -1418,11 +1418,14 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 	rich[GitUUID] = rich[UUID]
 	iAuthorDate, _ := Dig(commit, []string{"AuthorDate"}, true, false)
 	sAuthorDate, _ := iAuthorDate.(string)
-	authorDate, ok := ParseMBoxDate(sAuthorDate)
+	// FIXME: author tz, utc converted values
+	authorDate, authorTz, ok := ParseMBoxDate(sAuthorDate)
 	if !ok {
 		err = fmt.Errorf("cannot parse author date from %v", iAuthorDate)
 		return
 	}
+	// tz from author
+	rich["tz"] = 0
 	rich["author_date"] = authorDate
 	rich["author_date_weekday"] = int(authorDate.Weekday())
 	rich["author_date_hour"] = authorDate.Hour()
@@ -1431,7 +1434,8 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 	rich["utc_author_date_hour"] = rich["author_date_hour"]
 	iCommitDate, _ := Dig(commit, []string{"CommitDate"}, true, false)
 	sCommitDate, _ := iCommitDate.(string)
-	commitDate, ok := ParseMBoxDate(sCommitDate)
+	// FIXME: commit tz, utc converted values
+	commitDate, commitTz, ok := ParseMBoxDate(sCommitDate)
 	if !ok {
 		err = fmt.Errorf("cannot parse commit date from %v", iAuthorDate)
 		return
@@ -1476,7 +1480,7 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 			rich["commit_tags"] = tags
 		}
 	}
-	rich["tz"] = 0
+
 	rich["branches"] = []interface{}{}
 	dtDiff := float64(commitDate.Sub(authorDate).Seconds()) / 3600.0
 	dtDiff = math.Round(dtDiff*100.0) / 100.0
@@ -1489,7 +1493,7 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 	rich["repo_name"] = repoName
 	// author, _ := Dig(commit, []string{"Author"}, true, false)
 	// FIXME
-	Printf("%+v\n", rich)
+	Printf("%f,%f,%+v\n", authorTz, commitTz, rich)
 	os.Exit(1)
 	return
 }
