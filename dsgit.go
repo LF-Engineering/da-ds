@@ -119,6 +119,7 @@ type DSGit struct {
 	ParseState  int                               // 0-init, 1-commit, 2-header, 3-message, 4-file
 	Commit      map[string]interface{}            // current parsed commit
 	CommitFiles map[string]map[string]interface{} // current commit's files
+	RecentLines []string                          // recent commit lines
 }
 
 // ParseArgs - parse git specific environment variables
@@ -568,9 +569,36 @@ func (j *DSGit) ParseTrailer(ctx *Ctx, line string) {
 		if ctx.Debug > 1 {
 			Printf("trailer %s found in '%s'\n", trailer, line)
 		}
-		j.Commit[trailer] = append(ary.([]interface{}), m["value"])
+		// Trailer can be the same as header value, we still want to have it - with "-Trailer" prefix added
+		_, ok = ary.(string)
+		if ok {
+			trailer += "-Trailer"
+			ary2, ok2 := j.Commit[trailer]
+			if ok2 {
+				if ctx.Debug > 1 {
+					Printf("renamed trailer %s found in '%s'\n", trailer, line)
+				}
+				j.Commit[trailer] = append(ary2.([]interface{}), m["value"])
+			} else {
+				if ctx.Debug > 1 {
+					Printf("added renamed trailer %s\n", trailer)
+				}
+				j.Commit[trailer] = []interface{}{m["value"]}
+			}
+		} else {
+			j.Commit[trailer] = append(ary.([]interface{}), m["value"])
+		}
 	} else {
 		j.Commit[trailer] = []interface{}{m["value"]}
+	}
+}
+
+// HandleRecentLines - keep last 30 lines, so we can show them on parser error
+func (j *DSGit) HandleRecentLines(line string) {
+	j.RecentLines = append(j.RecentLines, line)
+	l := len(j.RecentLines)
+	if l > 30 {
+		j.RecentLines = j.RecentLines[1:]
 	}
 }
 
@@ -579,6 +607,9 @@ func (j *DSGit) ParseNextCommit(ctx *Ctx) (commit map[string]interface{}, ok boo
 	for j.LineScanner.Scan() {
 		j.CurrLine++
 		line := strings.TrimRight(j.LineScanner.Text(), "\n")
+		if ctx.Debug > 2 {
+			j.HandleRecentLines(line)
+		}
 		if ctx.Debug > 2 {
 			Printf("line %d: '%s'\n", j.CurrLine, line)
 		}
@@ -965,11 +996,12 @@ func (j *DSGit) ElasticRichMapping() []byte {
 }
 
 // GetAuthors - parse multiple authors used in pair programming mode
-func (j *DSGit) GetAuthors(m map[string]string, n map[string][]string) (authors map[string]struct{}) {
-	// FIXME:
-	defer func() {
-		Printf("GetAuthors(%+v,%+v) -> %+v\n", m, n, authors)
-	}()
+func (j *DSGit) GetAuthors(ctx *Ctx, m map[string]string, n map[string][]string) (authors map[string]struct{}) {
+	if ctx.Debug > 0 {
+		defer func() {
+			Printf("GetAuthors(%+v,%+v) -> %+v\n", m, n, authors)
+		}()
+	}
 	if len(m) > 0 {
 		authors = make(map[string]struct{})
 		email := strings.TrimSpace(m["email"])
@@ -1037,6 +1069,11 @@ func (j *DSGit) IdentitiesFromGitAuthors(ctx *Ctx, authors map[string]struct{}) 
 // (name, username, email) tripples, special value Nil "<nil>" means null
 // we use string and not *string which allows nil to allow usage as a map key
 func (j *DSGit) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3]string]struct{}, err error) {
+	if ctx.Debug > 2 {
+		defer func() {
+			Printf("%+v\n", identities)
+		}()
+	}
 	var authorsMap map[string]struct{}
 	iauthors, ok := Dig(doc, []string{"data", "Author"}, false, true)
 	if ok {
@@ -1048,7 +1085,7 @@ func (j *DSGit) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3]
 			m1 := MatchGroups(GitAuthorsPattern, authors)
 			m2 := MatchGroupsArray(GitCoAuthorsPattern, authors)
 			if len(m1) > 0 || len(m2) > 0 {
-				authorsMap = j.GetAuthors(m1, m2)
+				authorsMap = j.GetAuthors(ctx, m1, m2)
 			}
 		}
 		if len(authorsMap) == 0 {
@@ -1066,7 +1103,7 @@ func (j *DSGit) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3]
 			m1 := MatchGroups(GitAuthorsPattern, committers)
 			m2 := MatchGroupsArray(GitCoAuthorsPattern, committers)
 			if len(m1) > 0 || len(m2) > 0 {
-				committersMap = j.GetAuthors(m1, m2)
+				committersMap = j.GetAuthors(ctx, m1, m2)
 			}
 		}
 		if len(committersMap) == 0 {
@@ -1080,10 +1117,6 @@ func (j *DSGit) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3]
 			others, _ := iothers.([]interface{})
 			if ctx.Debug > 1 {
 				Printf("pp %s: %s\n", otherKey, others)
-			}
-			// FIXME
-			if len(others) > 1 {
-				Printf("pp: multiple: %+v\n", others)
 			}
 			for _, other := range others {
 				othersMap[strings.TrimSpace(other.(string))] = struct{}{}
