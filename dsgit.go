@@ -528,7 +528,7 @@ func (j *DSGit) ParseStats(ctx *Ctx, data map[string]string) {
 }
 
 // ParseFile - parse file state
-func (j *DSGit) ParseFile(ctx *Ctx, line string) (parsed bool, err error) {
+func (j *DSGit) ParseFile(ctx *Ctx, line string) (parsed, empty bool, err error) {
 	if line == "" {
 		j.ParseState = GitParseStateCommit
 		parsed = true
@@ -546,8 +546,11 @@ func (j *DSGit) ParseFile(ctx *Ctx, line string) (parsed bool, err error) {
 		parsed = true
 		return
 	}
-	if ctx.Debug > 1 {
-		Printf("invalid file section format, line %d: '%s'", j.CurrLine, line)
+	m = MatchGroups(GitCommitPattern, line)
+	if len(m) > 0 {
+		empty = true
+	} else if ctx.Debug > 1 {
+		Printf("invalid file section format, line %d: '%s'\n", j.CurrLine, line)
 	}
 	j.ParseState = GitParseStateCommit
 	return
@@ -576,8 +579,18 @@ func (j *DSGit) ParseNextCommit(ctx *Ctx) (commit map[string]interface{}, ok boo
 	for j.LineScanner.Scan() {
 		j.CurrLine++
 		line := strings.TrimRight(j.LineScanner.Text(), "\n")
-		parsed := false
+		if ctx.Debug > 2 {
+			Printf("line %d: '%s'\n", j.CurrLine, line)
+		}
+		var (
+			parsed bool
+			empty  bool
+			state  string
+		)
 		for {
+			if ctx.Debug > 2 {
+				state = fmt.Sprintf("%v", j.ParseState)
+			}
 			switch j.ParseState {
 			case GitParseStateInit:
 				parsed, err = j.ParseInit(ctx, line)
@@ -588,9 +601,13 @@ func (j *DSGit) ParseNextCommit(ctx *Ctx) (commit map[string]interface{}, ok boo
 			case GitParseStateMessage:
 				parsed, err = j.ParseMessage(ctx, line)
 			case GitParseStateFile:
-				parsed, err = j.ParseFile(ctx, line)
+				parsed, empty, err = j.ParseFile(ctx, line)
 			default:
 				err = fmt.Errorf("unknown parse state:%d", j.ParseState)
+			}
+			if ctx.Debug > 2 {
+				state += fmt.Sprintf(" -> (%v,%v,%v)", j.ParseState, parsed, err)
+				Printf("%s\n", state)
 			}
 			if err != nil {
 				Printf("parse next line '%s' error: %v\n", line, err)
@@ -598,6 +615,13 @@ func (j *DSGit) ParseNextCommit(ctx *Ctx) (commit map[string]interface{}, ok boo
 			}
 			if j.ParseState == GitParseStateCommit && j.Commit != nil {
 				commit = j.BuildCommit(ctx)
+				if empty {
+					parsed, err = j.ParseCommit(ctx, line)
+					if !parsed || err != nil {
+						Printf("failed to parse commit after empty file section\n")
+						return
+					}
+				}
 				ok = true
 				return
 			}
@@ -666,11 +690,11 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 				return
 			}
 			locFinished = true
+			if ctx.Debug > 0 {
+				Printf("loc: %d, programming languages: %d\n", j.Loc, len(j.Pls))
+			}
 		}
 		waitLOCMtx.Unlock()
-		if ctx.Debug > 1 {
-			Printf("loc: %d, programming languages summary: %+v\n", j.Loc, j.Pls)
-		}
 		return
 	}
 	processCommit := func(c chan error, commit map[string]interface{}) (wch chan error, e error) {
@@ -947,14 +971,42 @@ func (j *DSGit) GetAuthors(m map[string]string, n map[string][]string) (authors 
 		Printf("GetAuthors(%+v,%+v) -> %+v\n", m, n, authors)
 	}()
 	if len(m) > 0 {
-		for _, auth := range strings.Split(m["first_authors"], ",") {
-			authors[strings.TrimSpace(auth)] = struct{}{}
+		authors = make(map[string]struct{})
+		email := strings.TrimSpace(m["email"])
+		if !strings.Contains(email, "<") || !strings.Contains(email, "@") || !strings.Contains(email, ">") {
+			email = ""
 		}
-		authors[strings.TrimSpace(m["last_author"])] = struct{}{}
+		for _, auth := range strings.Split(m["first_authors"], ",") {
+			auth = strings.TrimSpace(auth)
+			if email != "" && (!strings.Contains(auth, "<") || !strings.Contains(auth, "@") || !strings.Contains(auth, ">")) {
+				auth += " " + email
+			}
+			authors[auth] = struct{}{}
+		}
+		auth := strings.TrimSpace(m["last_author"])
+		if email != "" && (!strings.Contains(auth, "<") || !strings.Contains(auth, "@") || !strings.Contains(auth, ">")) {
+			auth += " " + email
+		}
+		authors[auth] = struct{}{}
 	}
 	if len(n) > 0 {
-		for _, auth := range n["first_authors"] {
-			authors[strings.TrimSpace(auth)] = struct{}{}
+		if authors == nil {
+			authors = make(map[string]struct{})
+		}
+		nEmails := len(n["email"])
+		for i, auth := range n["first_authors"] {
+			email := ""
+			if i < nEmails {
+				email = strings.TrimSpace(n["email"][i])
+				if !strings.Contains(email, "@") {
+					email = ""
+				}
+			}
+			auth = strings.TrimSpace(auth)
+			if email != "" && !strings.Contains(auth, "@") {
+				auth += " <" + email + ">"
+			}
+			authors[auth] = struct{}{}
 		}
 	}
 	return
@@ -990,6 +1042,9 @@ func (j *DSGit) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3]
 	if ok {
 		authors, _ := iauthors.(string)
 		if j.PairProgramming {
+			if ctx.Debug > 1 {
+				Printf("pp authors: %s\n", authors)
+			}
 			m1 := MatchGroups(GitAuthorsPattern, authors)
 			m2 := MatchGroupsArray(GitCoAuthorsPattern, authors)
 			if len(m1) > 0 || len(m2) > 0 {
@@ -1005,6 +1060,9 @@ func (j *DSGit) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3]
 	if ok {
 		committers, _ := icommitters.(string)
 		if j.PairProgramming {
+			if ctx.Debug > 1 {
+				Printf("pp committers: %s\n", committers)
+			}
 			m1 := MatchGroups(GitAuthorsPattern, committers)
 			m2 := MatchGroupsArray(GitCoAuthorsPattern, committers)
 			if len(m1) > 0 || len(m2) > 0 {
@@ -1020,6 +1078,13 @@ func (j *DSGit) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3]
 		iothers, ok := Dig(doc, []string{"data", otherKey}, false, true)
 		if ok {
 			others, _ := iothers.([]interface{})
+			if ctx.Debug > 1 {
+				Printf("pp %s: %s\n", otherKey, others)
+			}
+			// FIXME
+			if len(others) > 1 {
+				Printf("pp: multiple: %+v\n", others)
+			}
 			for _, other := range others {
 				othersMap[strings.TrimSpace(other.(string))] = struct{}{}
 			}
