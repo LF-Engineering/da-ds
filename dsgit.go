@@ -1423,6 +1423,11 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 		return
 	}
 	rich["author_date"] = authorDate
+	rich["author_date_weekday"] = int(authorDate.Weekday())
+	rich["author_date_hour"] = authorDate.Hour()
+	rich["utc_author"] = authorDate
+	rich["utc_author_date_weekday"] = rich["author_date_weekday"]
+	rich["utc_author_date_hour"] = rich["author_date_hour"]
 	iCommitDate, _ := Dig(commit, []string{"CommitDate"}, true, false)
 	sCommitDate, _ := iCommitDate.(string)
 	commitDate, ok := ParseMBoxDate(sCommitDate)
@@ -1431,14 +1436,47 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 		return
 	}
 	rich["commit_date"] = commitDate
+	rich["commit_date_weekday"] = int(commitDate.Weekday())
+	rich["commit_date_hour"] = commitDate.Hour()
+	rich["utc_commit"] = commitDate
+	rich["utc_commit_date_weekday"] = rich["commit_date_weekday"]
+	rich["utc_commit_date_hour"] = rich["commit_date_hour"]
 	message, ok := Dig(commit, []string{"message"}, false, true)
 	if ok {
 		msg, _ := message.(string)
+		rich["message_analyzed"] = msg
 		if len(msg) > KeywordMaxlength {
 			msg = msg[:KeywordMaxlength]
 		}
 		rich["message"] = msg
+	} else {
+		rich["message_analyzed"] = nil
+		rich["message"] = nil
 	}
+	comm, ok := Dig(commit, []string{"commit"}, false, true)
+	if ok {
+		hsh, _ := comm.(string)
+		rich["hash"] = hsh
+		rich["hash_short"] = hsh[:6]
+	} else {
+		rich["hash"] = nil
+	}
+	iRefs, ok := Dig(commit, []string{"refs"}, false, true)
+	if ok {
+		refsAry, ok := iRefs.([]interface{})
+		if ok {
+			tags := []string{}
+			for _, iRef := range refsAry {
+				ref, _ := iRef.(string)
+				if strings.Contains(ref, "tag: ") {
+					tags = append(tags, ref)
+				}
+			}
+			rich["commit_tags"] = tags
+		}
+	}
+	rich["tz"] = 0
+	rich["branches"] = []interface{}{}
 	// author, _ := Dig(commit, []string{"Author"}, true, false)
 	// FIXME
 	Printf("%+v\n", rich)
