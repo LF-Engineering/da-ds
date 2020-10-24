@@ -144,16 +144,16 @@ func ParseDateWithTz(indt string) (dt, dtInTz time.Time, off float64, valid bool
 		return
 	}
 	defer func() {
-    defer func() {
-      entry := DateCacheEntry{Dt: dt, DtInTz: dtInTz, TzOff: off, Valid: valid}
-		  if MT {
-			  parseDateCacheMtx.Lock()
-		  }
-		  parseDateCache[k] = entry
-		  if MT {
-			  parseDateCacheMtx.Unlock()
-		  }
-    }()
+		defer func() {
+			entry := DateCacheEntry{Dt: dt, DtInTz: dtInTz, TzOff: off, Valid: valid}
+			if MT {
+				parseDateCacheMtx.Lock()
+			}
+			parseDateCache[k] = entry
+			if MT {
+				parseDateCacheMtx.Unlock()
+			}
+		}()
 		if !valid {
 			return
 		}

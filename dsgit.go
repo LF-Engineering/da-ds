@@ -28,8 +28,7 @@ const (
 	// GitOpsCommand - command that maintains git stats cache
 	GitOpsCommand = "gitops.py"
 	// GitOpsNoCleanup - if set, it will skip gitops.py repo cleanup
-	// FIXME: turn off when finshed
-	GitOpsNoCleanup = true
+	GitOpsNoCleanup = false
 	// GitParseStateInit - init parser state
 	GitParseStateInit = 0
 	// GitParseStateCommit - commit parser state
@@ -48,6 +47,8 @@ const (
 	GitUUID = "git_uuid"
 	// GitHubURL - GitHub URL
 	GitHubURL = "https://github.com/"
+	// GitMaxCommitProperties - maximum properties that can be set on the commit object
+	GitMaxCommitProperties = 300
 )
 
 var (
@@ -97,6 +98,8 @@ var (
 	}
 	// GitTrailerAuthors - trailer name to authors map
 	GitTrailerAuthors = map[string]string{"Signed-off-by": "authors_signed_off", "Co-authored-by": "co_authors"}
+	// GitAllowedTrailers - allowed commit trailer flags
+	GitAllowedTrailers = map[string]struct{}{"Signed-off-by": {}, "Co-authored-by": {}}
 )
 
 // RawPLS - programming language summary (all fields as strings)
@@ -454,8 +457,12 @@ func (j *DSGit) ParseHeader(ctx *Ctx, line string) (parsed bool, err error) {
 		err = fmt.Errorf("invalid header format, line %d: '%s'", j.CurrLine, line)
 		return
 	}
-	if m["name"] != "" {
-		j.Commit[m["name"]] = m["value"]
+	// Not too many properties, ES has 1000 fields limit, and each commit can have
+	// different properties, so value around 300 should(?) be safe
+	if len(j.Commit) < GitMaxCommitProperties {
+		if m["name"] != "" {
+			j.Commit[m["name"]] = m["value"]
+		}
 	}
 	parsed = true
 	return
@@ -583,6 +590,13 @@ func (j *DSGit) ParseTrailer(ctx *Ctx, line string) {
 		return
 	}
 	trailer := m["name"]
+	_, ok := GitAllowedTrailers[trailer]
+	if !ok {
+		if ctx.Debug > 1 {
+			Printf("Trailer %s not in the allowed list %v, skipping\n", trailer, GitAllowedTrailers)
+		}
+		return
+	}
 	ary, ok := j.Commit[trailer]
 	if ok {
 		if ctx.Debug > 1 {
