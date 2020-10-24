@@ -991,7 +991,7 @@ func (j *DSGit) ItemUpdatedOn(item interface{}) time.Time {
 	if !ok {
 		Fatalf("%s: ItemUpdatedOn() - cannot extract %s from %+v", j.DS, GitCommitDateField, DumpKeys(item))
 	}
-	updated, _, ok := ParseMBoxDate(sUpdated)
+	updated, _, _, ok := ParseMBoxDate(sUpdated)
 	if !ok {
 		Fatalf("%s: ItemUpdatedOn() - cannot extract %s from %s", j.DS, GitCommitDateField, sUpdated)
 	}
@@ -1418,34 +1418,31 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 	rich[GitUUID] = rich[UUID]
 	iAuthorDate, _ := Dig(commit, []string{"AuthorDate"}, true, false)
 	sAuthorDate, _ := iAuthorDate.(string)
-	// FIXME: author tz, utc converted values
-	authorDate, authorTz, ok := ParseMBoxDate(sAuthorDate)
+	authorDate, authorDateTz, authorTz, ok := ParseMBoxDate(sAuthorDate)
 	if !ok {
 		err = fmt.Errorf("cannot parse author date from %v", iAuthorDate)
 		return
 	}
-	// tz from author
-	rich["tz"] = 0
-	rich["author_date"] = authorDate
-	rich["author_date_weekday"] = int(authorDate.Weekday())
-	rich["author_date_hour"] = authorDate.Hour()
+	rich["tz"] = authorTz
+	rich["author_date"] = authorDateTz
+	rich["author_date_weekday"] = int(authorDateTz.Weekday())
+	rich["author_date_hour"] = authorDateTz.Hour()
 	rich["utc_author"] = authorDate
-	rich["utc_author_date_weekday"] = rich["author_date_weekday"]
-	rich["utc_author_date_hour"] = rich["author_date_hour"]
+	rich["utc_author_date_weekday"] = int(authorDate.Weekday())
+	rich["utc_author_date_hour"] = authorDate.Hour()
 	iCommitDate, _ := Dig(commit, []string{"CommitDate"}, true, false)
 	sCommitDate, _ := iCommitDate.(string)
-	// FIXME: commit tz, utc converted values
-	commitDate, commitTz, ok := ParseMBoxDate(sCommitDate)
+	commitDate, commitDateTz, commitTz, ok := ParseMBoxDate(sCommitDate)
 	if !ok {
 		err = fmt.Errorf("cannot parse commit date from %v", iAuthorDate)
 		return
 	}
-	rich["commit_date"] = commitDate
-	rich["commit_date_weekday"] = int(commitDate.Weekday())
-	rich["commit_date_hour"] = commitDate.Hour()
+	rich["commit_date"] = commitDateTz
+	rich["commit_date_weekday"] = int(commitDateTz.Weekday())
+	rich["commit_date_hour"] = commitDateTz.Hour()
 	rich["utc_commit"] = commitDate
-	rich["utc_commit_date_weekday"] = rich["commit_date_weekday"]
-	rich["utc_commit_date_hour"] = rich["commit_date_hour"]
+	rich["utc_commit_date_weekday"] = int(commitDate.Weekday())
+	rich["utc_commit_date_hour"] = commitDate.Hour()
 	message, ok := Dig(commit, []string{"message"}, false, true)
 	if ok {
 		msg, _ := message.(string)

@@ -879,16 +879,31 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 			return
 		}
 	}
-	var msgTz float64
-	iMsgTz, ok := Dig(msg, []string{"date_tz"}, false, true)
-	if ok {
-		msgTz, ok = iMsgTz.(float64)
+	var (
+		msgTz       float64
+		msgDateInTz time.Time
+	)
+	iMsgDateInTz, ok1 := Dig(msg, []string{"date_in_tz"}, false, true)
+	if ok1 {
+		msgDateInTz, ok1 = iMsgDateInTz.(time.Time)
 	}
-	if !ok {
+	iMsgTz, ok2 := Dig(msg, []string{"date_tz"}, false, true)
+	if ok2 {
+		msgTz, ok2 = iMsgTz.(float64)
+	}
+	if !ok1 || !ok2 {
 		sdt := fmt.Sprintf("%v", msgDate)
-		_, msgTz, ok = ParseMBoxDate(sdt)
+		_, msgDateInTzN, msgTzN, ok := ParseMBoxDate(sdt)
+		if ok {
+			if !ok1 {
+				msgDateInTz = msgDateInTzN
+			}
+			if !ok2 {
+				msgTz = msgTzN
+			}
+		}
 		if !ok && ctx.Debug > 0 {
-			Printf("unable to determine tz for %v/%v\n", msgDate, iMsgTz)
+			Printf("unable to determine tz for %v/%v/%v\n", msgDate, iMsgDateInTz, iMsgTz)
 		}
 	}
 	// copy RawFields
@@ -988,6 +1003,7 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 			}
 		}
 		rich["Date"] = msgDate
+		rich["Date_in_tz"] = msgDateInTz
 		rich["tz"] = msgTz
 		subj, _ := getStringValue(msg, "Subject")
 		rich["Subject_analyzed"] = subj
@@ -1056,10 +1072,11 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 			sdt, ok := dtStr.(string)
 			if ok {
 				rich["mbox_date_str"] = sdt
-				dt, tz, valid := ParseMBoxDate(sdt)
+				dt, dttz, tz, valid := ParseMBoxDate(sdt)
 				if valid {
 					rich["mbox_date"] = dt
 					rich["mbox_date_tz"] = tz
+					rich["mbox_date_in_tz"] = dttz
 				}
 			}
 		}
@@ -1074,7 +1091,7 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 		if err != nil {
 			switch vdt := msgDate.(type) {
 			case string:
-				dt, _, ok = ParseMBoxDate(vdt)
+				dt, _, _, ok = ParseMBoxDate(vdt)
 				if !ok {
 					err = fmt.Errorf("cannot parse date %s\n", vdt)
 					return

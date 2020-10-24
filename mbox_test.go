@@ -41,7 +41,7 @@ func TestParseMBoxDate(t *testing.T) {
 	}
 	// Execute test cases
 	for index, test := range testCases {
-		gotDt, gotTz, gotValid := lib.ParseMBoxDate(test.input)
+		gotDt, _, gotTz, gotValid := lib.ParseMBoxDate(test.input)
 		if gotValid != test.expectedValid {
 			t.Errorf("test number %d, expected '%s' validation result %v, got %v", index+1, test.input, test.expectedValid, gotValid)
 		} else {

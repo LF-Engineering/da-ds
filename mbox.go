@@ -536,8 +536,9 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		return
 	}
 	var (
-		dt time.Time
-		tz float64
+		dt   time.Time
+		dttz time.Time
+		tz   float64
 	)
 	found := false
 	mdt, ok := item[GroupsioMessageDateField]
@@ -547,16 +548,17 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 			Printf("%s(%d): missing Date & Received fields\n", groupName, len(msg))
 		}
 		type DtTz struct {
-			Dt time.Time
-			Tz float64
+			Dt   time.Time
+			DtTz time.Time
+			Tz   float64
 		}
 		var dts []DtTz
 		for _, rcv := range rcvs {
 			ary := strings.Split(string(rcv), ";")
 			sdt := ary[len(ary)-1]
-			dt, tz, ok := ParseMBoxDate(sdt)
+			dt, dttz, tz, ok := ParseMBoxDate(sdt)
 			if ok {
-				dts = append(dts, DtTz{Dt: dt, Tz: tz})
+				dts = append(dts, DtTz{Dt: dt, DtTz: dttz, Tz: tz})
 			}
 		}
 		nDts := len(dts)
@@ -569,6 +571,7 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 			sort.Slice(dts, func(i, j int) bool { return dts[i].Dt.After(dts[j].Dt) })
 		}
 		dt = dts[0].Dt
+		dttz = dts[0].DtTz
 		tz = dts[0].Tz
 		found = true
 	}
@@ -577,7 +580,7 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		if !ok {
 			Printf("%s(%d): non-string date field %v\n", groupName, len(msg), mdt)
 		}
-		dt, tz, ok = ParseMBoxDate(sdt)
+		dt, dttz, tz, ok = ParseMBoxDate(sdt)
 		if !ok {
 			Printf("%s(%d): unable to parse date from '%s'\n", groupName, len(msg), sdt)
 			dumpMBox()
@@ -587,6 +590,7 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 	// item["Date"] = dt
 	item[GroupsioMessageDateField] = dt
 	item["date_tz"] = tz
+	item["date_in_tz"] = dttz
 	item["MBox-N-Bodies"] = len(bodies)
 	bodyKeys := make(map[string]struct{})
 	item["data"] = make(map[string]interface{})
@@ -647,11 +651,12 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 }
 
 // ParseMBoxDate - try to parse mbox date
-func ParseMBoxDate(indt string) (dt time.Time, off float64, valid bool) {
+func ParseMBoxDate(indt string) (dt, dtInTz time.Time, off float64, valid bool) {
 	defer func() {
 		if !valid {
 			return
 		}
+		dtInTz = dt
 		ary := strings.Split(indt, "+0")
 		if len(ary) > 1 {
 			last := ary[len(ary)-1]
