@@ -95,6 +95,8 @@ var (
 		"is_git_commit_signed_off":      "authors_signed_off",
 		"is_git_commit_co_author":       "co_authors",
 	}
+	// GitTrailerAuthors - trailer name to authors map
+	GitTrailerAuthors = map[string]string{"Signed-off-by": "authors_signed_off", "Co-authored-by": "co_authors"}
 )
 
 // RawPLS - programming language summary (all fields as strings)
@@ -1617,24 +1619,21 @@ func (j *DSGit) PairProgrammingMetrics(ctx *Ctx, rich, commit map[string]interfa
 			continue
 		}
 		rich[flag] = flag
-		Printf("flag %s/%s is set\n", flag, authorsKey)
 		iAuthors, _ := Dig(commit, []string{authorsKey}, true, false)
 		rich[authorsKey] = iAuthors
 		authors, _ := iAuthors.([]string)
 		rich[authorsKey+"_number"] = len(authors)
-		Printf("flag %s %s: %d %+v\n", flag, authorsKey, len(authors), authors)
 		for _, author := range authors {
 			allAuthors[author] = struct{}{}
 		}
 	}
-	for k, v := range map[string]string{"Signed-off-by": "signers", "Co-authored-by": "co_authors"} {
+	for k, v := range GitTrailerAuthors {
 		_, ok := Dig(commit, []string{k}, false, true)
 		if !ok {
 			continue
 		}
 		rich[k] = commit[k]
 		rich[k+"_number"] = rich[v+"_number"]
-		Printf("(%v,%v)\n", rich[k], rich[k+"_number"])
 	}
 	nAuthors := len(allAuthors)
 	files, _ := rich["files"].(int)
@@ -1729,5 +1728,5 @@ func (j *DSGit) GetRoleIdentity(ctx *Ctx, commit map[string]interface{}, role st
 // second return parameter is static mode (true/false)
 // dynamic roles will use item to get its roles
 func (j *DSGit) AllRoles(ctx *Ctx, item map[string]interface{}) ([]string, bool) {
-	return GitCommitRoles, true
+	return append(GitCommitRoles, Author), true
 }

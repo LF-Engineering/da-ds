@@ -406,7 +406,7 @@ func CopyAffsRoleData(item map[string]interface{}, fromRole, toRole string) {
 
 // IdenityAffsData - add affiliations related data
 // identity - full identity
-// aid identity ID value (which is uuis), for example from "author_id", "creator_id" etc.
+// aid identity ID value (which is uuid), for example from "author_id", "creator_id" etc.
 // either identity or aid must be specified
 func IdenityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, aid interface{}, dt time.Time, role string) (outItem map[string]interface{}) {
 	outItem = EmptyAffsItem(role, false)
