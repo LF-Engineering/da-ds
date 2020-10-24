@@ -893,7 +893,7 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 	}
 	if !ok1 || !ok2 {
 		sdt := fmt.Sprintf("%v", msgDate)
-		_, msgDateInTzN, msgTzN, ok := ParseMBoxDate(sdt)
+		_, msgDateInTzN, msgTzN, ok := ParseDateWithTz(sdt)
 		if ok {
 			if !ok1 {
 				msgDateInTz = msgDateInTzN
@@ -1072,7 +1072,7 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 			sdt, ok := dtStr.(string)
 			if ok {
 				rich["mbox_date_str"] = sdt
-				dt, dttz, tz, valid := ParseMBoxDate(sdt)
+				dt, dttz, tz, valid := ParseDateWithTz(sdt)
 				if valid {
 					rich["mbox_date"] = dt
 					rich["mbox_date_tz"] = tz
@@ -1091,7 +1091,7 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 		if err != nil {
 			switch vdt := msgDate.(type) {
 			case string:
-				dt, _, _, ok = ParseMBoxDate(vdt)
+				dt, _, _, ok = ParseDateWithTz(vdt)
 				if !ok {
 					err = fmt.Errorf("cannot parse date %s\n", vdt)
 					return

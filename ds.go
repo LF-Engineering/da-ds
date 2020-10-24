@@ -70,7 +70,7 @@ func CommonFields(ds DS, date interface{}, category string) (fields map[string]i
 		case string:
 			// 1st date is in UTC, 2nd is in TZ, 3rd is TZ offset innhours
 			var ok bool
-			dt, _, _, ok = ParseMBoxDate(vdt)
+			dt, _, _, ok = ParseDateWithTz(vdt)
 			if !ok {
 				Fatalf("CommonFields: cannot parse date %s\n", vdt)
 				return

@@ -1007,7 +1007,7 @@ func (j *DSGit) ItemUpdatedOn(item interface{}) time.Time {
 	if !ok {
 		Fatalf("%s: ItemUpdatedOn() - cannot extract %s from %+v", j.DS, GitCommitDateField, DumpKeys(item))
 	}
-	updated, _, _, ok := ParseMBoxDate(sUpdated)
+	updated, _, _, ok := ParseDateWithTz(sUpdated)
 	if !ok {
 		Fatalf("%s: ItemUpdatedOn() - cannot extract %s from %s", j.DS, GitCommitDateField, sUpdated)
 	}
@@ -1436,7 +1436,7 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 	rich[GitUUID] = rich[UUID]
 	iAuthorDate, _ := Dig(commit, []string{"AuthorDate"}, true, false)
 	sAuthorDate, _ := iAuthorDate.(string)
-	authorDate, authorDateTz, authorTz, ok := ParseMBoxDate(sAuthorDate)
+	authorDate, authorDateTz, authorTz, ok := ParseDateWithTz(sAuthorDate)
 	if !ok {
 		err = fmt.Errorf("cannot parse author date from %v", iAuthorDate)
 		return
@@ -1450,7 +1450,7 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 	rich["utc_author_date_hour"] = authorDate.Hour()
 	iCommitDate, _ := Dig(commit, []string{"CommitDate"}, true, false)
 	sCommitDate, _ := iCommitDate.(string)
-	commitDate, commitDateTz, commitTz, ok := ParseMBoxDate(sCommitDate)
+	commitDate, commitDateTz, commitTz, ok := ParseDateWithTz(sCommitDate)
 	if !ok {
 		err = fmt.Errorf("cannot parse commit date from %v", iAuthorDate)
 		return
