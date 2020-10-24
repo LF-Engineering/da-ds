@@ -879,20 +879,17 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 			return
 		}
 	}
-	// FIXME
 	var msgTz float64
 	iMsgTz, ok := Dig(msg, []string{"date_tz"}, false, true)
 	if ok {
 		msgTz, ok = iMsgTz.(float64)
-		Printf("msgTz got from raw: %f\n", msgTz)
 	}
 	if !ok {
 		sdt := fmt.Sprintf("%v", msgDate)
 		_, msgTz, ok = ParseMBoxDate(sdt)
-		if !ok {
+		if !ok && ctx.Debug > 0 {
 			Printf("unable to determine tz for %v/%v\n", msgDate, iMsgTz)
 		}
-		Printf("msgTz got from msgDate: %s -> %f\n", msgDate, msgTz)
 	}
 	// copy RawFields
 	if role == Author {

@@ -10,6 +10,11 @@ import (
 	"time"
 )
 
+const (
+	// MBoxDropXFields - drop fields starting with X- - to avoid ES 1000 fields limit
+	MBoxDropXFields = true
+)
+
 var (
 	// LowerDayNames - downcased 3 letter US day names
 	LowerDayNames = map[string]struct{}{
@@ -624,6 +629,18 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 			FatalOnError(DeepSet(item, path, ifary, true))
 		}
 		//Printf("#%d: %s %s %d\n", i, string(body.ContentType), propertiesString(body.Properties), len(body.Data))
+	}
+	if MBoxDropXFields {
+		ks := []string{}
+		for k := range item {
+			lk := strings.ToLower(k)
+			if strings.HasPrefix(lk, "x-") {
+				ks = append(ks, k)
+			}
+		}
+		for _, k := range ks {
+			delete(item, k)
+		}
 	}
 	valid = true
 	return
