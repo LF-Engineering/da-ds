@@ -88,6 +88,13 @@ var (
 	GitCoAuthorsPattern = regexp.MustCompile(`Co-authored-by:(?P<first_authors>.* .*)<(?P<email>.*)>\n?`)
 	// GitCommitRoles - roles to fetch affiliation data
 	GitCommitRoles = []string{"Author", "Commit"}
+	// GitPairProgrammingAuthors - flag to authors mapping used in pair programming mode
+	GitPairProgrammingAuthors = map[string]string{
+		"is_git_commit_multi_author":    "authors",
+		"is_git_commit_multi_committer": "committers",
+		"is_git_commit_signed_off":      "authors_signed_off",
+		"is_git_commit_co_author":       "co_authors",
+	}
 )
 
 // RawPLS - programming language summary (all fields as strings)
@@ -1584,16 +1591,75 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 	for prop, value := range CommonFields(j, authorDate, Commit) {
 		rich[prop] = value
 		// FIXME: why we need this on the original item?
-		item[prop] = value
+		// item[prop] = value
+	}
+	if j.PairProgramming {
+		err = j.PairProgrammingMetrics(rich, commit)
+		if err != nil {
+			Printf("error calculating pair programming metrics: %+v\n", err)
+			return
+		}
 	}
 	rich["origin"] = AnonymizeURL(rich["origin"].(string))
 	rich["tag"] = AnonymizeURL(rich["tag"].(string))
 	rich["commit_url"] = AnonymizeURL(rich["tag"].(string))
 	rich["git_author_domain"] = rich["author_domain"]
 	rich["type"] = Commit
-	// FIXME
 	Printf("%+v\n", DumpPreview(rich, 100))
-	os.Exit(1)
+	return
+}
+
+// PairProgrammingMetrics - calculate pair programming metrics data
+func (j *DSGit) PairProgrammingMetrics(rich, commit map[string]interface{}) (err error) {
+	iMainAuthor, _ := Dig(commit, []string{"Author"}, true, false)
+	mainAuthor, _ := iMainAuthor.(string)
+	allAuthors := map[string]struct{}{mainAuthor: {}}
+	for flag, authorsKey := range GitPairProgrammingAuthors {
+		_, ok := Dig(commit, []string{flag}, false, true)
+		if !ok {
+			continue
+		}
+		rich[flag] = flag
+		Printf("flag %s is set\n", flag)
+		iAuthors, _ := Dig(commit, []string{authorsKey}, true, false)
+		rich[authorsKey] = iAuthors
+		authors, _ := iAuthors.([]interface{})
+		rich[authorsKey+"_number"] = len(authors)
+		Printf("flag %s authors: %d %+v\n", flag, len(authors), authors)
+		for _, iAuthor := range authors {
+			author, _ := iAuthor.(string)
+			allAuthors[author] = struct{}{}
+		}
+	}
+	for k, v := range map[string]string{"Signed-off-by": "signers", "Co-authored-by": "co_authors"} {
+		_, ok := Dig(commit, []string{k}, false, true)
+		if !ok {
+			continue
+		}
+		rich[k] = commit[k]
+		rich[k+"_number"] = rich[v+"_number"]
+		Printf("(%v,%v)\n", rich[k], rich[k+"_number"])
+	}
+	nAuthors := len(allAuthors)
+	files, _ := rich["files"].(int)
+	linesAdded, _ := rich["lines_added"].(int)
+	linesRemoved, _ := rich["lines_removed"].(int)
+	linesChanged, _ := rich["lines_changed"].(int)
+	dec := 100.0
+	ppCount := math.Round((1.0/float64(nAuthors))*dec) / dec
+	ppFiles := math.Round((float64(files)/float64(nAuthors))*dec) / dec
+	ppLinesAdded := math.Round((float64(linesAdded)/float64(nAuthors))*dec) / dec
+	ppLinesRemoved := math.Round((float64(linesRemoved)/float64(nAuthors))*dec) / dec
+	ppLinesChanged := math.Round((float64(linesChanged)/float64(nAuthors))*dec) / dec
+	rich["pair_programming_commit"] = ppCount
+	rich["pair_programming_files"] = ppFiles
+	rich["pair_programming_lines_added"] = ppLinesAdded
+	rich["pair_programming_lines_removed"] = ppLinesRemoved
+	rich["pair_programming_lines_changed"] = ppLinesChanged
+	Printf("(%d,%d,%d,%d,%f,%f,%f,%f,%f)\n", files, linesAdded, linesRemoved, linesChanged, ppCount, ppFiles, ppLinesAdded, ppLinesRemoved, ppLinesChanged)
+	if nAuthors > 0 {
+		os.Exit(1)
+	}
 	return
 }
 
