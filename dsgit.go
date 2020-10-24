@@ -1590,11 +1590,9 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 	// If needed replace authorDate with authorDateTz
 	for prop, value := range CommonFields(j, authorDate, Commit) {
 		rich[prop] = value
-		// FIXME: why we need this on the original item?
-		// item[prop] = value
 	}
 	if j.PairProgramming {
-		err = j.PairProgrammingMetrics(rich, commit)
+		err = j.PairProgrammingMetrics(ctx, rich, commit)
 		if err != nil {
 			Printf("error calculating pair programming metrics: %+v\n", err)
 			return
@@ -1605,12 +1603,11 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 	rich["commit_url"] = AnonymizeURL(rich["tag"].(string))
 	rich["git_author_domain"] = rich["author_domain"]
 	rich["type"] = Commit
-	Printf("%+v\n", DumpPreview(rich, 100))
 	return
 }
 
 // PairProgrammingMetrics - calculate pair programming metrics data
-func (j *DSGit) PairProgrammingMetrics(rich, commit map[string]interface{}) (err error) {
+func (j *DSGit) PairProgrammingMetrics(ctx *Ctx, rich, commit map[string]interface{}) (err error) {
 	iMainAuthor, _ := Dig(commit, []string{"Author"}, true, false)
 	mainAuthor, _ := iMainAuthor.(string)
 	allAuthors := map[string]struct{}{mainAuthor: {}}
@@ -1620,14 +1617,13 @@ func (j *DSGit) PairProgrammingMetrics(rich, commit map[string]interface{}) (err
 			continue
 		}
 		rich[flag] = flag
-		Printf("flag %s is set\n", flag)
+		Printf("flag %s/%s is set\n", flag, authorsKey)
 		iAuthors, _ := Dig(commit, []string{authorsKey}, true, false)
 		rich[authorsKey] = iAuthors
-		authors, _ := iAuthors.([]interface{})
+		authors, _ := iAuthors.([]string)
 		rich[authorsKey+"_number"] = len(authors)
-		Printf("flag %s authors: %d %+v\n", flag, len(authors), authors)
-		for _, iAuthor := range authors {
-			author, _ := iAuthor.(string)
+		Printf("flag %s %s: %d %+v\n", flag, authorsKey, len(authors), authors)
+		for _, author := range authors {
 			allAuthors[author] = struct{}{}
 		}
 	}
@@ -1656,9 +1652,8 @@ func (j *DSGit) PairProgrammingMetrics(rich, commit map[string]interface{}) (err
 	rich["pair_programming_lines_added"] = ppLinesAdded
 	rich["pair_programming_lines_removed"] = ppLinesRemoved
 	rich["pair_programming_lines_changed"] = ppLinesChanged
-	Printf("(%d,%d,%d,%d,%f,%f,%f,%f,%f)\n", files, linesAdded, linesRemoved, linesChanged, ppCount, ppFiles, ppLinesAdded, ppLinesRemoved, ppLinesChanged)
-	if nAuthors > 0 {
-		os.Exit(1)
+	if ctx.Debug > 2 {
+		Printf("(%d,%d,%d,%d,%f,%f,%f,%f,%f)\n", files, linesAdded, linesRemoved, linesChanged, ppCount, ppFiles, ppLinesAdded, ppLinesRemoved, ppLinesChanged)
 	}
 	return
 }

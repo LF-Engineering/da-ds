@@ -64,12 +64,22 @@ type DS interface {
 // CommonFields - common rich item fields
 // { "is_dsname_category": 1, "grimoire_creation_date": dt}
 func CommonFields(ds DS, date interface{}, category string) (fields map[string]interface{}) {
-	var dt *time.Time
-	sDate, ok := date.(string)
-	if ok {
-		d, err := TimeParseES(sDate)
-		if err == nil {
-			dt = &d
+	dt, err := TimeParseInterfaceString(date)
+	if err != nil {
+		switch vdt := date.(type) {
+		case string:
+			// 1st date is in UTC, 2nd is in TZ, 3rd is TZ offset innhours
+			var ok bool
+			dt, _, _, ok = ParseMBoxDate(vdt)
+			if !ok {
+				Fatalf("CommonFields: cannot parse date %s\n", vdt)
+				return
+			}
+		case time.Time:
+			dt = vdt
+		default:
+			Fatalf("cannot parse date %T %v\n", vdt, vdt)
+			return
 		}
 	}
 	name := "is_" + ds.Name() + "_" + category
