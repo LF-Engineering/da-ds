@@ -884,6 +884,7 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 	iMsgTz, ok := Dig(msg, []string{"date_tz"}, false, true)
 	if ok {
 		msgTz, ok = iMsgTz.(float64)
+		Printf("msgTz got from raw: %f\n", msgTz)
 	}
 	if !ok {
 		sdt := fmt.Sprintf("%v", msgDate)
@@ -891,6 +892,7 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 		if !ok {
 			Printf("unable to determine tz for %v/%v\n", msgDate, iMsgTz)
 		}
+		Printf("msgTz got from msgDate: %s -> %f\n", msgDate, msgTz)
 	}
 	// copy RawFields
 	if role == Author {

@@ -27,10 +27,10 @@ const (
 	JiraBackendVersion = "0.1.0"
 	// JiraDefaultSearchField - default search field
 	JiraDefaultSearchField = "item_id"
-	// JiraDropCustomFields - drop custom fields from raw index
-	JiraDropCustomFields = false
 	// JiraFilterByProjectInComments - filter by project when searching for comments
 	JiraFilterByProjectInComments = false
+	// JiraDropCustomFields - drop custom fields from raw index
+	JiraDropCustomFields = true
 	// JiraMapCustomFields - run custom fields mapping
 	JiraMapCustomFields = true
 	// ClosedStatusCategoryKey - issue closed status key
@@ -55,6 +55,8 @@ var (
 	JiraRoles = []string{"assignee", "reporter", "creator", Author, "updateAuthor"}
 	// JiraCategories - categories defined for Jira
 	JiraCategories = map[string]struct{}{"issue": {}}
+	// JiraKeepCustomFiled - we're dropping all but those custom fields
+	JiraKeepCustomFiled = map[string]struct{}{"Story Points": {}, "Sprint": {}}
 )
 
 // DSJira - DS implementation for Jira
@@ -379,12 +381,15 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 		err = fmt.Errorf("unable to unmarshal fields from issue %+v", DumpKeys(issue))
 		return
 	}
+	if ctx.Debug > 1 {
+		Printf("before map custom: %+v\n", DumpPreview(issueFields, 100))
+	}
+	type mapping struct {
+		ID    string
+		Name  string
+		Value interface{}
+	}
 	if JiraMapCustomFields {
-		type mapping struct {
-			ID    string
-			Name  string
-			Value interface{}
-		}
 		m := make(map[string]mapping)
 		for k, v := range issueFields {
 			customField, ok := customFields[k]
@@ -401,6 +406,9 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 			issueFields[k] = v
 		}
 	}
+	if ctx.Debug > 1 {
+		Printf("after map custom: %+v\n", DumpPreview(issueFields, 100))
+	}
 	// Extra fields
 	if thrN > 1 {
 		mtx.Lock()
@@ -408,11 +416,18 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 	esItem := j.AddMetadata(ctx, issue)
 	// Seems like it doesn't make sense, because we just added those custom fields
 	if JiraDropCustomFields {
-		for k := range issueFields {
+		for k, v := range issueFields {
 			if strings.HasPrefix(strings.ToLower(k), "customfield_") {
-				delete(issueFields, k)
+				mp, _ := v.(mapping)
+				_, keep := JiraKeepCustomFiled[mp.Name]
+				if !keep {
+					delete(issueFields, k)
+				}
 			}
 		}
+	}
+	if ctx.Debug > 1 {
+		Printf("after drop: %+v\n", DumpPreview(issueFields, 100))
 	}
 	if ctx.Project != "" {
 		issue.(map[string]interface{})["project"] = ctx.Project
