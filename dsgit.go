@@ -1437,6 +1437,7 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 		err = fmt.Errorf("cannot parse commit date from %v", iAuthorDate)
 		return
 	}
+	rich["commit_tz"] = commitTz
 	rich["commit_date"] = commitDateTz
 	rich["commit_date_weekday"] = int(commitDateTz.Weekday())
 	rich["commit_date_hour"] = commitDateTz.Hour()
@@ -1488,9 +1489,12 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 		repoName = AnonymizeURL(repoName)
 	}
 	rich["repo_name"] = repoName
+	rich["origin"] = AnonymizeURL(rich["origin"].(string))
+	rich["tag"] = AnonymizeURL(rich["tag"].(string))
+	rich["files"] = 0
 	// author, _ := Dig(commit, []string{"Author"}, true, false)
 	// FIXME
-	Printf("%f,%f,%+v\n", authorTz, commitTz, rich)
+	Printf("%+v\n", DumpPreview(rich, 100))
 	os.Exit(1)
 	return
 }
