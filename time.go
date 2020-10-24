@@ -4,7 +4,21 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+)
+
+// DateCacheEntry - parse date cache entry
+type DateCacheEntry struct {
+	Dt     time.Time
+	DtInTz time.Time
+	TzOff  float64
+	Valid  bool
+}
+
+var (
+	parseDateCache    = map[string]DateCacheEntry{}
+	parseDateCacheMtx *sync.RWMutex
 )
 
 // ProgressInfo display info about progress: i/n if current time >= last + period
@@ -114,7 +128,32 @@ func TimeParseInterfaceString(date interface{}) (dt time.Time, err error) {
 
 // ParseDateWithTz - try to parse mbox date
 func ParseDateWithTz(indt string) (dt, dtInTz time.Time, off float64, valid bool) {
+	k := strings.TrimSpace(indt)
+	if MT {
+		parseDateCacheMtx.RLock()
+	}
+	entry, ok := parseDateCache[k]
+	if MT {
+		parseDateCacheMtx.RUnlock()
+	}
+	if ok {
+		dt = entry.Dt
+		dtInTz = entry.DtInTz
+		off = entry.TzOff
+		valid = entry.Valid
+		return
+	}
 	defer func() {
+    defer func() {
+      entry := DateCacheEntry{Dt: dt, DtInTz: dtInTz, TzOff: off, Valid: valid}
+		  if MT {
+			  parseDateCacheMtx.Lock()
+		  }
+		  parseDateCache[k] = entry
+		  if MT {
+			  parseDateCacheMtx.Unlock()
+		  }
+    }()
 		if !valid {
 			return
 		}
@@ -195,7 +234,7 @@ func ParseDateWithTz(indt string) (dt, dtInTz time.Time, off float64, valid bool
 	if len(day) > 3 {
 		day = day[:3]
 	}
-	_, ok := LowerDayNames[day]
+	_, ok = LowerDayNames[day]
 	if ok {
 		sdt = strings.Join(ary[1:], " ")
 	}

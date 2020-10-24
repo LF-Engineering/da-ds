@@ -84,6 +84,7 @@ func CacheSummary(ctx *Ctx) {
 		Printf("emails cache: %d entries\n", len(emailsCache))
 		Printf("uuids type 1 cache: %d entries\n", len(uuidsNonEmptyCache))
 		Printf("uuids type 2 cache: %d entries\n", len(uuidsAffsCache))
+		Printf("parse date cache: %d entries\n", len(parseDateCache))
 	}
 	if ctx.Debug >= 2 {
 		if len(identityCache) > 0 {
@@ -103,6 +104,9 @@ func CacheSummary(ctx *Ctx) {
 		}
 		if len(uuidsAffsCache) > 0 {
 			Printf("uuids type 2 cache:\n%s\n", PrintCache(uuidsAffsCache))
+		}
+		if len(parseDateCache) > 0 {
+			Printf("parse date cache:\n%s\n", PrintCache(parseDateCache))
 		}
 		PrintfNoRedacted("Redacted data: %s\n", GetRedacted())
 	}
