@@ -527,8 +527,10 @@ func (j *DSGit) ParseStats(ctx *Ctx, data map[string]string) {
 		j.CommitFiles[fileName] = make(map[string]interface{})
 		j.CommitFiles[fileName]["file"] = fileName
 	}
-	j.CommitFiles[fileName]["added"] = data["added"]
-	j.CommitFiles[fileName]["removed"] = data["removed"]
+	added, _ := strconv.Atoi(data["added"])
+	removed, _ := strconv.Atoi(data["removed"])
+	j.CommitFiles[fileName]["added"] = added
+	j.CommitFiles[fileName]["removed"] = removed
 }
 
 // ParseFile - parse file state
@@ -1491,7 +1493,49 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 	rich["repo_name"] = repoName
 	rich["origin"] = AnonymizeURL(rich["origin"].(string))
 	rich["tag"] = AnonymizeURL(rich["tag"].(string))
-	rich["files"] = 0
+	nFiles := 0
+	linesAdded := 0
+	linesRemoved := 0
+	iFiles, ok := Dig(commit, []string{"files"}, false, true)
+	if ok {
+		files, ok := iFiles.([]interface{})
+		if ok {
+			for _, file := range files {
+				_, action := Dig(file, []string{"action"}, false, true)
+				if !action {
+					continue
+				}
+				nFiles++
+				iAdded, ok := Dig(file, []string{"added"}, false, true)
+				if ok {
+					added, _ := strconv.Atoi(fmt.Sprintf("%v", iAdded))
+					linesAdded += added
+				}
+				iRemoved, ok := Dig(file, []string{"removed"}, false, true)
+				if ok {
+					//removed, _ := iRemoved.(float64)
+					removed, _ := strconv.Atoi(fmt.Sprintf("%v", iRemoved))
+					linesRemoved += int(removed)
+				}
+			}
+		}
+	}
+	rich["files"] = nFiles
+	rich["lines_added"] = linesAdded
+	rich["lines_removed"] = linesRemoved
+	rich["lines_changed"] = linesAdded + linesRemoved
+	loc, ok := Dig(commit, []string{"total_lines_of_code"}, false, true)
+	if ok {
+		rich["total_lines_of_code"] = loc
+	} else {
+		rich["total_lines_of_code"] = 0
+	}
+	pls, ok := Dig(commit, []string{"program_language_summary"}, false, true)
+	if ok {
+		rich["program_language_summary"] = pls
+	} else {
+		rich["program_language_summary"] = []interface{}{}
+	}
 	// author, _ := Dig(commit, []string{"Author"}, true, false)
 	// FIXME
 	Printf("%+v\n", DumpPreview(rich, 100))
