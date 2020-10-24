@@ -1363,8 +1363,7 @@ func (j *DSJira) AffsItems(ctx *Ctx, item map[string]interface{}, roles []string
 		for prop, value := range affsIdentity {
 			affsItems[prop] = value
 		}
-		suffs := []string{"_org_name", "_name", "_user_name"}
-		for _, suff := range suffs {
+		for _, suff := range RequiredAffsFields {
 			k := role + suff
 			_, ok := affsIdentity[k]
 			if !ok {

@@ -15,13 +15,15 @@ const (
 
 var (
 	// AffsFields - all properties added by affiliations (excluding multi org name)
-	AffsFields       = []string{"_id", "_uuid", "_name", "_user_name", "_domain", "_gender", "_gender_acc", "_org_name", "_bot"}
-	identityCache    = map[string][2]interface{}{}
-	identityCacheMtx *sync.RWMutex
-	rollsCache       = map[string][]string{}
-	rollsCacheMtx    *sync.RWMutex
-	i2uCache         = map[string]interface{}{}
-	i2uCacheMtx      *sync.RWMutex
+	AffsFields = []string{"_id", "_uuid", "_name", "_user_name", "_domain", "_gender", "_gender_acc", "_org_name", "_bot"}
+	// RequiredAffsFields - required affs fields
+	RequiredAffsFields = []string{"_org_name", "_name", "_user_name"}
+	identityCache      = map[string][2]interface{}{}
+	identityCacheMtx   *sync.RWMutex
+	rollsCache         = map[string][]string{}
+	rollsCacheMtx      *sync.RWMutex
+	i2uCache           = map[string]interface{}{}
+	i2uCacheMtx        *sync.RWMutex
 )
 
 // EmptyAffsItem - return empty affiliation sitem for a given role

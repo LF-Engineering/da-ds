@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net/url"
 	"os"
 	"os/exec"
 	"regexp"
@@ -45,6 +46,8 @@ const (
 	GitDefaultSearchField = "item_id"
 	// GitUUID - field used as a rich item ID when pair progrmamming is enabled
 	GitUUID = "git_uuid"
+	// GitHubURL - GitHub URL
+	GitHubURL = "https://github.com/"
 )
 
 var (
@@ -83,6 +86,8 @@ var (
 	GitAuthorsPattern = regexp.MustCompile(`(?P<first_authors>.* .*) and (?P<last_author>.* .*) (?P<email>.*)`)
 	// GitCoAuthorsPattern - author pattern
 	GitCoAuthorsPattern = regexp.MustCompile(`Co-authored-by:(?P<first_authors>.* .*)<(?P<email>.*)>\n?`)
+	// GitCommitRoles - roles to fetch affiliation data
+	GitCommitRoles = []string{"Author", "Commit"}
 )
 
 // RawPLS - programming language summary (all fields as strings)
@@ -1073,6 +1078,19 @@ func (j *DSGit) GetAuthors(ctx *Ctx, m map[string]string, n map[string][]string)
 	return
 }
 
+// IdentityFromGitAuthor - construct identity from git author
+func (j *DSGit) IdentityFromGitAuthor(ctx *Ctx, author string) (identity [3]string) {
+	fields := strings.Split(author, "<")
+	name := strings.TrimSpace(fields[0])
+	email := Nil
+	if len(fields) > 1 {
+		email = fields[1]
+		email = email[:len(email)-1]
+	}
+	identity = [3]string{name, Nil, email}
+	return
+}
+
 // IdentitiesFromGitAuthors - construct identities from git authors
 func (j *DSGit) IdentitiesFromGitAuthors(ctx *Ctx, authors map[string]struct{}) (identities map[[3]string]struct{}) {
 	init := false
@@ -1396,17 +1414,6 @@ func (j *DSGit) EnrichItems(ctx *Ctx) (err error) {
 
 // EnrichItem - return rich item from raw item for a given author type
 func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, affs bool, extra interface{}) (rich map[string]interface{}, err error) {
-	/*
-		f1, _ := Dig(item, []string{"data", "is_git_commit_multi_author"}, false, true)
-		f2, _ := Dig(item, []string{"data", "is_git_commit_multi_committer"}, false, true)
-		f3, _ := Dig(item, []string{"data", "is_git_commit_signed_off"}, false, true)
-		f4, _ := Dig(item, []string{"data", "is_git_commit_co_author"}, false, true)
-		rich["author"] = auth
-		rich["is_git_commit_multi_author"] = f1
-		rich["is_git_commit_multi_committer"] = f2
-		rich["is_git_commit_signed_off"] = f3
-		rich["is_git_commit_co_author"] = f4
-	*/
 	rich = make(map[string]interface{})
 	for _, field := range RawFields {
 		v, _ := item[field]
@@ -1449,6 +1456,8 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 	message, ok := Dig(commit, []string{"message"}, false, true)
 	if ok {
 		msg, _ := message.(string)
+		ary := strings.Split(msg, "\n")
+		rich["title"] = ary[0]
 		rich["message_analyzed"] = msg
 		if len(msg) > KeywordMaxlength {
 			msg = msg[:KeywordMaxlength]
@@ -1459,8 +1468,9 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 		rich["message"] = nil
 	}
 	comm, ok := Dig(commit, []string{"commit"}, false, true)
+	var hsh string
 	if ok {
-		hsh, _ := comm.(string)
+		hsh, _ = comm.(string)
 		rich["hash"] = hsh
 		rich["hash_short"] = hsh[:6]
 	} else {
@@ -1486,13 +1496,12 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 	dtDiff = math.Round(dtDiff*100.0) / 100.0
 	rich["time_to_commit_hours"] = dtDiff
 	iRepoName, _ := Dig(item, []string{"origin"}, true, false)
-	repoName, ok := iRepoName.(string)
+	repoName, _ := iRepoName.(string)
+	origin := repoName
 	if strings.HasPrefix(repoName, "http") {
 		repoName = AnonymizeURL(repoName)
 	}
 	rich["repo_name"] = repoName
-	rich["origin"] = AnonymizeURL(rich["origin"].(string))
-	rich["tag"] = AnonymizeURL(rich["tag"].(string))
 	nFiles := 0
 	linesAdded := 0
 	linesRemoved := 0
@@ -1536,23 +1545,122 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 	} else {
 		rich["program_language_summary"] = []interface{}{}
 	}
-	// author, _ := Dig(commit, []string{"Author"}, true, false)
+	rich["commit_url"] = j.GetCommitURL(origin, hsh)
+	project, ok := Dig(commit, []string{"project"}, false, true)
+	if ok {
+		rich["project"] = project
+	}
+	if strings.Contains(origin, GitHubURL) {
+		githubRepo := strings.Replace(origin, GitHubURL, "", -1)
+		githubRepo = strings.TrimSuffix(githubRepo, ".git")
+		rich["github_repo"] = githubRepo
+		rich["url_id"] = githubRepo + "/commit/" + hsh
+	}
+	if affs {
+		authorKey := "Author"
+		var affsItems map[string]interface{}
+		// Note that this uses author date in UTC - I think UTC will be a better option
+		// Original design used TZ date here
+		// If needed replace authorDate with authorDateTz
+		affsItems, err = j.AffsItems(ctx, commit, GitCommitRoles, authorDate)
+		if err != nil {
+			return
+		}
+		for prop, value := range affsItems {
+			rich[prop] = value
+		}
+		for _, suff := range AffsFields {
+			rich[Author+suff] = rich[authorKey+suff]
+		}
+		orgsKey := authorKey + MultiOrgNames
+		_, ok := Dig(rich, []string{orgsKey}, false, true)
+		if !ok {
+			rich[orgsKey] = []interface{}{}
+		}
+	}
+	// Note that this uses author date in UTC - I think UTC will be a better option
+	// Original design used TZ date here
+	// If needed replace authorDate with authorDateTz
+	for prop, value := range CommonFields(j, authorDate, Commit) {
+		rich[prop] = value
+		// FIXME: why we need this on the original item?
+		item[prop] = value
+	}
+	rich["origin"] = AnonymizeURL(rich["origin"].(string))
+	rich["tag"] = AnonymizeURL(rich["tag"].(string))
+	rich["commit_url"] = AnonymizeURL(rich["tag"].(string))
+	rich["git_author_domain"] = rich["author_domain"]
+	rich["type"] = Commit
 	// FIXME
 	Printf("%+v\n", DumpPreview(rich, 100))
 	os.Exit(1)
 	return
 }
 
+// GetCommitURL - return git commit URL for a given path and SHA
+func (j *DSGit) GetCommitURL(origin, hash string) string {
+	if strings.Contains(origin, "github.com") {
+		return origin + "/commit/" + hash
+	} else if strings.Contains(origin, "gitlab.com") {
+		return origin + "/-/commit/" + hash
+	} else if strings.Contains(origin, "bitbucket.org") {
+		return origin + "/commits/" + hash
+	} else if strings.Contains(origin, "gerrit") || strings.Contains(origin, "review") {
+		u, err := url.Parse(origin)
+		if err != nil {
+			Printf("cannot parse git commit origin: '%s'\n", origin)
+			return origin + "/" + hash
+		}
+		baseURL := u.Scheme + "://" + u.Host
+		vURL := "gitweb"
+		if strings.Contains(u.Path, "/gerrit/") {
+			vURL = "gerrit/gitweb"
+		} else if strings.Contains(u.Path, "/r/") {
+			vURL = "r/gitweb"
+		}
+		project := strings.Replace(u.Path, "/gerrit/", "", -1)
+		project = strings.Replace(project, "/r/", "", -1)
+		project = strings.TrimLeft(project, "/")
+		projectURL := "p=" + project + ".git"
+		typeURL := "a=commit"
+		hashURL := "h=" + hash
+		return baseURL + "/" + vURL + "?" + projectURL + ";" + typeURL + ";" + hashURL
+	} else if strings.Contains(origin, "git.") && (!strings.Contains(origin, "gerrit") || !strings.Contains(origin, "review")) {
+		return origin + "/commit/?id=" + hash
+	}
+	return origin + "/" + hash
+}
+
 // AffsItems - return affiliations data items for given roles and date
-func (j *DSGit) AffsItems(ctx *Ctx, rawItem map[string]interface{}, roles []string, date interface{}) (affsItems map[string]interface{}, err error) {
-	// IMPL:
+func (j *DSGit) AffsItems(ctx *Ctx, commit map[string]interface{}, roles []string, date interface{}) (affsItems map[string]interface{}, err error) {
+	affsItems = make(map[string]interface{})
+	dt, _ := date.(time.Time)
+	for _, role := range roles {
+		identity := j.GetRoleIdentity(ctx, commit, role)
+		if len(identity) == 0 {
+			continue
+		}
+		affsIdentity := IdenityAffsData(ctx, j, identity, nil, dt, role)
+		for prop, value := range affsIdentity {
+			affsItems[prop] = value
+		}
+		for _, suff := range RequiredAffsFields {
+			k := role + suff
+			_, ok := affsIdentity[k]
+			if !ok {
+				affsIdentity[k] = Unknown
+			}
+		}
+	}
 	return
 }
 
 // GetRoleIdentity - return identity data for a given role
-func (j *DSGit) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role string) map[string]interface{} {
-	// IMPL:
-	return map[string]interface{}{"name": nil, "username": nil, "email": nil}
+func (j *DSGit) GetRoleIdentity(ctx *Ctx, commit map[string]interface{}, role string) map[string]interface{} {
+	iAuthor, _ := Dig(commit, []string{role}, true, false)
+	author, _ := iAuthor.(string)
+	identity := j.IdentityFromGitAuthor(ctx, author)
+	return map[string]interface{}{"name": identity[0], "username": identity[1], "email": identity[2]}
 }
 
 // AllRoles - return all roles defined for the backend
@@ -1560,6 +1668,5 @@ func (j *DSGit) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role stri
 // second return parameter is static mode (true/false)
 // dynamic roles will use item to get its roles
 func (j *DSGit) AllRoles(ctx *Ctx, item map[string]interface{}) ([]string, bool) {
-	// IMPL:
-	return []string{Author}, true
+	return GitCommitRoles, true
 }
