@@ -51,6 +51,7 @@ type Ctx struct {
 	OffsetFrom         float64    // From DA_DS_OFFSET_FROM
 	OffsetTo           float64    // From DA_DS_OFFSET_TO
 	LegacyUUID         bool       // From DA_DS_LEGACY_UUID - use python code for generating uuids
+	AllowFail          bool       // From DA_DS_ALLOW_FAIL - allow fail uploading single documents to elastic
 	DateFromDetected   bool
 	OffsetFromDetected bool
 	DB                 *sqlx.DB
@@ -208,6 +209,9 @@ func (ctx *Ctx) Init() {
 
 	// Legacy UUID
 	ctx.LegacyUUID = ctx.BoolEnv("LEGACY_UUID")
+
+	// Allow fail
+	ctx.AllowFail = ctx.BoolEnv("ALLOW_FAIL")
 
 	// Project, Project slug, Category
 	ctx.Project = ctx.Env("PROJECT")

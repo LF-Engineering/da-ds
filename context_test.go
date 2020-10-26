@@ -47,6 +47,7 @@ func copyContext(in *lib.Ctx) *lib.Ctx {
 		OnlyIdentities:   in.OnlyIdentities,
 		ForceFull:        in.ForceFull,
 		LegacyUUID:       in.LegacyUUID,
+		AllowFail:        in.AllowFail,
 		Project:          in.Project,
 		ProjectSlug:      in.ProjectSlug,
 		Category:         in.Category,
@@ -228,6 +229,7 @@ func TestInit(t *testing.T) {
 		OnlyIdentities:   false,
 		ForceFull:        false,
 		LegacyUUID:       false,
+		AllowFail:        false,
 		Project:          "",
 		ProjectSlug:      "",
 		Category:         "",
@@ -424,6 +426,19 @@ func TestInit(t *testing.T) {
 			),
 		},
 		{
+			"Setting allow fail mode",
+			map[string]string{
+				"DA_DS_ALLOW_FAIL": "1",
+			},
+			dynamicSetFields(
+				t,
+				copyContext(&defaultContext),
+				map[string]interface{}{
+					"AllowFail": true,
+				},
+			),
+		},
+		{
 			"Setting no-cache/dry-run params",
 			map[string]string{
 				"DA_DS_NO_CACHE": "1",
@@ -516,6 +531,7 @@ func TestInit(t *testing.T) {
 				"DA_DS_ONLY_IDENTITIES": " .0",
 				"DA_DS_FORCE_FULL":      "",
 				"DA_DS_LEGACY_UUID":     "  ",
+				"DA_DS_AllowFail":       "t",
 			},
 			dynamicSetFields(
 				t,
@@ -536,6 +552,7 @@ func TestInit(t *testing.T) {
 					"OnlyIdentities": false,
 					"ForceFull":      false,
 					"LegacyUUID":     false,
+					"AllowFail":      false,
 				},
 			),
 		},

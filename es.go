@@ -482,7 +482,11 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 		)
 		if err != nil {
 			Printf("SendToElastic: error: %+v for %+v\n", err, item)
-			return
+			if ctx.AllowFail {
+				err = nil
+			} else {
+				return
+			}
 		}
 	}
 	if ctx.Debug > 0 {
