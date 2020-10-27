@@ -31,14 +31,16 @@ var (
 
 // DSGerrit - DS implementation for stub - does nothing at all, just presents a skeleton code
 type DSGerrit struct {
-	DS           string
-	URL          string // From DA_GERRIT_URL - gerrit repo path
-	SingleOrigin bool   // From DA_GERRIT_SINGLE_ORIGIN - if you want to store only one gerrit endpoint in the index
-	SSHKey       string // From DA_GERRIT_SSH_KEY - must contain full SSH private key - has higher priority than key path
-	SSHKeyPath   string // From DA_GERRIT_SSH_KEY_PATH - path to SSH private key, default GerritDefaultSSHKeyPath '~/.ssh/id_rsa'
-	SSHPort      int    // From DA_GERRIT_SSH_PORT, defaults to GerritDefaultSSHPort (29418)
-	MaxReviews   int    // From DA_GERRIT_MAX_REVIEWS, defaults to GerritDefaultMaxReviews (500)
-	NoSSLVerify  bool   // From DA_GERRIT_NO_SSL_VERIFY
+	DS                  string
+	URL                 string // From DA_GERRIT_URL - gerrit repo path
+	SingleOrigin        bool   // From DA_GERRIT_SINGLE_ORIGIN - if you want to store only one gerrit endpoint in the index
+	User                string // From DA_GERRIT_USER - gerrit user name
+	SSHKey              string // From DA_GERRIT_SSH_KEY - must contain full SSH private key - has higher priority than key path
+	SSHKeyPath          string // From DA_GERRIT_SSH_KEY_PATH - path to SSH private key, default GerritDefaultSSHKeyPath '~/.ssh/id_rsa'
+	SSHPort             int    // From DA_GERRIT_SSH_PORT, defaults to GerritDefaultSSHPort (29418)
+	MaxReviews          int    // From DA_GERRIT_MAX_REVIEWS, defaults to GerritDefaultMaxReviews (500)
+	NoSSLVerify         bool   // From DA_GERRIT_NO_SSL_VERIFY
+	DisableHostKeyCheck bool   // From DA_GERRIT_DISABLE_HOST_KEY_CHECK
 	// Non-config variables
 	RepoName string // repo name
 }
@@ -48,6 +50,7 @@ func (j *DSGerrit) ParseArgs(ctx *Ctx) (err error) {
 	j.DS = Gerrit
 	prefix := "DA_GERRIT_"
 	j.URL = os.Getenv(prefix + "URL")
+	j.User = os.Getenv(prefix + "USER")
 	j.SingleOrigin = StringToBool(os.Getenv(prefix + "SINGLE_ORIGIN"))
 	if os.Getenv(prefix+"SSH_KEY_PATH") != "" {
 		j.SSHKeyPath = os.Getenv(prefix + "SSH_KEY_PATH")
@@ -59,6 +62,7 @@ func (j *DSGerrit) ParseArgs(ctx *Ctx) (err error) {
 	if j.NoSSLVerify {
 		NoSSLVerify()
 	}
+	j.DisableHostKeyCheck = StringToBool(os.Getenv(prefix + "DISABLE_HOST_KEY_CHECK"))
 	if ctx.Env("SSH_PORT") != "" {
 		sshPort, err := strconv.Atoi(ctx.Env("SSH_PORT"))
 		FatalOnError(err)
@@ -95,6 +99,10 @@ func (j *DSGerrit) Validate() (err error) {
 	j.SSHKeyPath = os.ExpandEnv(j.SSHKeyPath)
 	if j.SSHKeyPath == "" && j.SSHKey == "" {
 		err = fmt.Errorf("Either SSH key or SSH key path must be set")
+		return
+	}
+	if j.User == "" {
+		err = fmt.Errorf("User must be set")
 	}
 	return
 }
@@ -305,6 +313,7 @@ func (j *DSGerrit) OriginField(ctx *Ctx) string {
 	if ctx.Tag != "" {
 		return DefaultTagField
 	}
+	// FIXME: number?
 	return DefaultOriginField
 }
 
@@ -349,6 +358,7 @@ func (j *DSGerrit) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string]int
 	mItem["backend_version"] = GerritBackendVersion
 	mItem["timestamp"] = fmt.Sprintf("%.06f", float64(timestamp.UnixNano())/1.0e3)
 	mItem[UUID] = uuid
+	// FIXME: number?
 	mItem[DefaultOriginField] = origin
 	mItem[DefaultTagField] = tag
 	mItem["updated_on"] = updatedOn
