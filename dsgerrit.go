@@ -3,6 +3,7 @@ package dads
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -13,6 +14,10 @@ const (
 	GerritBackendVersion = "0.0.0"
 	// GerritDefaultSSHKeyPath - default path to look for gerrit ssh private key
 	GerritDefaultSSHKeyPath = "$HOME/.ssh/id_rsa"
+	// GerritDefaultSSHPort - default gerrit ssh port
+	GerritDefaultSSHPort = 29418
+	// GerritDefaultMaxReviews = default max reviews when processing gerrit
+	GerritDefaultMaxReviews = 500
 )
 
 var (
@@ -31,6 +36,8 @@ type DSGerrit struct {
 	SingleOrigin bool   // From DA_GERRIT_SINGLE_ORIGIN - if you want to store only one gerrit endpoint in the index
 	SSHKey       string // From DA_GERRIT_SSH_KEY - must contain full SSH private key - has higher priority than key path
 	SSHKeyPath   string // From DA_GERRIT_SSH_KEY_PATH - path to SSH private key, default GerritDefaultSSHKeyPath '~/.ssh/id_rsa'
+	SSHPort      int    // From DA_GERRIT_SSH_PORT, defaults to GerritDefaultSSHPort (29418)
+	MaxReviews   int    // From DA_GERRIT_MAX_REVIEWS, defaults to GerritDefaultMaxReviews (500)
 	NoSSLVerify  bool   // From DA_GERRIT_NO_SSL_VERIFY
 	// Non-config variables
 	RepoName string // repo name
@@ -51,6 +58,24 @@ func (j *DSGerrit) ParseArgs(ctx *Ctx) (err error) {
 	j.NoSSLVerify = StringToBool(os.Getenv(prefix + "NO_SSL_VERIFY"))
 	if j.NoSSLVerify {
 		NoSSLVerify()
+	}
+	if ctx.Env("SSH_PORT") != "" {
+		sshPort, err := strconv.Atoi(ctx.Env("SSH_PORT"))
+		FatalOnError(err)
+		if sshPort > 0 {
+			j.SSHPort = sshPort
+		}
+	} else {
+		j.SSHPort = GerritDefaultSSHPort
+	}
+	if ctx.Env("MAX_REVIEWS") != "" {
+		maxReviews, err := strconv.Atoi(ctx.Env("MAX_REVIEWS"))
+		FatalOnError(err)
+		if maxReviews > 0 {
+			j.MaxReviews = maxReviews
+		}
+	} else {
+		j.MaxReviews = GerritDefaultMaxReviews
 	}
 	return
 }
