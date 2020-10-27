@@ -1,4 +1,4 @@
-GO_LIB_FILES=affs.go context.go const.go ds.go dsgit.go dsgroupsio.go dsjira.go dsstub.go email.go es.go error.go exec.go json.go log.go mbox.go redacted.go sql.go threads.go time.go utils.go uuid.go
+GO_LIB_FILES=affs.go context.go const.go ds.go dsgerrit.go dsgit.go dsgroupsio.go dsjira.go dsstub.go email.go es.go error.go exec.go json.go log.go mbox.go redacted.go sql.go threads.go time.go utils.go uuid.go
 GO_BIN_FILES=cmd/dads/dads.go
 GO_TEST_FILES=context_test.go email_test.go regexp_test.go time_test.go threads_test.go uuid_test.go
 GO_LIBTEST_FILES=test/time.go

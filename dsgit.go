@@ -20,7 +20,7 @@ import (
 
 const (
 	// GitBackendVersion - backend version
-	GitBackendVersion = "0.0.1"
+	GitBackendVersion = "0.1.0"
 	// GitDefaultReposPath - default path where git repository clones
 	GitDefaultReposPath = "$HOME/.perceval/repositories"
 	// GitDefaultCachePath - default path where gitops cache files are stored
@@ -176,6 +176,7 @@ func (j *DSGit) Validate() (err error) {
 	j.RepoName = ary[len(ary)-1]
 	if j.RepoName == "" {
 		err = fmt.Errorf("Repo name must be set")
+		return
 	}
 	j.ReposPath = os.ExpandEnv(j.ReposPath)
 	if strings.HasSuffix(j.ReposPath, "/") {

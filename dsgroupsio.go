@@ -19,7 +19,7 @@ import (
 
 const (
 	// GroupsioBackendVersion - backend version
-	GroupsioBackendVersion = "0.1.0"
+	GroupsioBackendVersion = "0.1.1"
 	// GroupsioURLRoot - root url for group name origin
 	GroupsioURLRoot = "https://groups.io/g/"
 	// GroupsioAPIURL - Groups.io API URL
@@ -110,6 +110,7 @@ func (j *DSGroupsio) Validate() (err error) {
 	j.GroupName = ary[len(ary)-1]
 	if j.GroupName == "" {
 		err = fmt.Errorf("Group name must be set: [https://groups.io/g/]GROUP+channel")
+		return
 	}
 	j.ArchPath = os.ExpandEnv(j.ArchPath)
 	if strings.HasSuffix(j.ArchPath, "/") {

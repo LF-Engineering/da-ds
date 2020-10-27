@@ -24,7 +24,7 @@ const (
 	// JiraAPIComment - comments API subpath
 	JiraAPIComment = "/comment"
 	// JiraBackendVersion - backend version
-	JiraBackendVersion = "0.1.0"
+	JiraBackendVersion = "0.1.1"
 	// JiraDefaultSearchField - default search field
 	JiraDefaultSearchField = "item_id"
 	// JiraFilterByProjectInComments - filter by project when searching for comments
