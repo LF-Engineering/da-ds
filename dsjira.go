@@ -48,7 +48,7 @@ var (
 		"issue_key":    {"key"},
 	}
 	// JiraRawMapping - Jira raw index mapping
-	JiraRawMapping = []byte(`{"dynamic":true,"properties":{"metadata__updated_on":{"type":"date"},"data":{"properties":{"renderedFields":{"dynamic":false,"properties":{}},"operations":{"dynamic":false,"properties":{}},"fields":{"dynamic":true,"properties":{"description":{"type":"text","index":true},"environment":{"type":"text","index":true}}},"changelog":{"properties":{"histories":{"dynamic":false,"properties":{}}}},"comments_data":{"properties":{"body":{"type":"text","index":true}}}}}}}`)
+	JiraRawMapping = []byte(`{"dynamic":true,"properties":{"metadata__updated_on":{"type":"date"},"data":{"properties":{"renderedFields":{"dynamic":false,"properties":{}},"operations":{"dynamic":false,"properties":{}},"fields":{"dynamic":true,"properties":{"description":{"type":"text","index":true},"workratio":{"type":"double"},"environment":{"type":"text","index":true}}},"changelog":{"properties":{"histories":{"dynamic":false,"properties":{}}}},"comments_data":{"properties":{"body":{"type":"text","index":true}}}}}}}`)
 	// JiraRichMapping - Jira rich index mapping
 	JiraRichMapping = []byte(`{"properties":{"metadata__updated_on":{"type":"date"},"main_description_analyzed":{"type":"text","index":true},"releases":{"type":"keyword"},"body":{"type":"text","index":true}}}`)
 	// JiraRoles - roles defined for Jira backend
