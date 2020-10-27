@@ -2,6 +2,7 @@ package dads
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -42,7 +43,10 @@ type DSGerrit struct {
 	NoSSLVerify         bool   // From DA_GERRIT_NO_SSL_VERIFY
 	DisableHostKeyCheck bool   // From DA_GERRIT_DISABLE_HOST_KEY_CHECK
 	// Non-config variables
-	RepoName string // repo name
+	RepoName       string // repo name
+	SSHOpts        string // SSH Options
+	SSHKeyTempPath string // if used SSHKey - temp file with this name was used to store key contents
+	GerritCmd      string // gerrit remote command used to fetch data
 }
 
 // ParseArgs - parse stub specific environment variables
@@ -139,9 +143,56 @@ func (j *DSGerrit) Enrich(ctx *Ctx) (err error) {
 	return
 }
 
+// InitGerrit - initializes gerrit client
+func (j *DSGerrit) InitGerrit(ctx *Ctx) (err error) {
+	if j.DisableHostKeyCheck {
+		j.SSHOpts += "-o StrictHostKeyChecking=no "
+	}
+	if j.SSHKey != "" {
+		var f *os.File
+		f, err = ioutil.TempFile("", "id_rsa")
+		if err != nil {
+			return
+		}
+		j.SSHKeyTempPath = f.Name()
+		_, err = f.Write([]byte(j.SSHKey))
+		if err != nil {
+			return
+		}
+		err = f.Close()
+		if err != nil {
+			return
+		}
+		err = os.Chmod(j.SSHKeyTempPath, 0600)
+		if err != nil {
+			return
+		}
+		j.SSHOpts += "-i " + j.SSHKeyTempPath + " "
+	} else {
+		if j.SSHKeyPath != "" {
+			j.SSHOpts += "-i " + j.SSHKeyPath + " "
+		}
+	}
+	if strings.HasSuffix(j.SSHOpts, " ") {
+		j.SSHOpts = j.SSHOpts[:len(j.SSHOpts)-1]
+	}
+	j.GerritCmd = fmt.Sprintf("ssh %s -p %d %s@%s gerrit", j.SSHOpts, j.SSHPort, j.User, j.URL)
+	Printf("%s\n", j.GerritCmd)
+	return
+}
+
 // FetchItems - implement enrich data for stub datasource
 func (j *DSGerrit) FetchItems(ctx *Ctx) (err error) {
-	// IMPL:
+	err = j.InitGerrit(ctx)
+	if err != nil {
+		return
+	}
+	if j.SSHKeyTempPath != "" {
+		defer func() {
+			Printf("removing temporary SSH key %s\n", j.SSHKeyTempPath)
+			_ = os.Remove(j.SSHKeyTempPath)
+		}()
+	}
 	var messages [][]byte
 	// Process messages (possibly in threads)
 	var (
