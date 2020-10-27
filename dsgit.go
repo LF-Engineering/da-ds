@@ -56,7 +56,7 @@ var (
 	GitRawMapping = []byte(`{"dynamic":true,"properties":{"metadata__updated_on":{"type":"date"},"data":{"properties":{"message":{"type":"text","index":true}}}}}`)
 	// GitRichMapping - Git rich index mapping
 	GitRichMapping = []byte(`{"properties":{"metadata__updated_on":{"type":"date"},"message_analyzed":{"type":"text","index":true}}}`)
-	// GitCategories - categories defined for Groupsio
+	// GitCategories - categories defined for git
 	GitCategories = map[string]struct{}{"commit": {}}
 	// GitDefaultEnv - default git command environment
 	GitDefaultEnv = map[string]string{"LANG": "C", "PAGER": ""}

@@ -117,5 +117,8 @@ const From = "from"
 // Commit - common constant string
 const Commit = "commit"
 
+// Review - common constant string
+const Review = "review"
+
 // ProjectSlug - common constant string
 const ProjectSlug = "project_slug"

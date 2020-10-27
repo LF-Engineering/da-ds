@@ -20,6 +20,8 @@ var (
 	GerritRawMapping = []byte(`{"dynamic":true,"properties":{"metadata__updated_on":{"type":"date"},"data":{"properties":{"commitMessage":{"type":"text","index":true},"comments":{"properties":{"message":{"type":"text","index":true}}},"subject":{"type":"text","index":true},"patchSets":{"properties":{"approvals":{"properties":{"description":{"type":"text","index":true}}},"comments":{"properties":{"message":{"type":"text","index":true}}}}}}}}}`)
 	// GerritRichMapping - Gerrit rich index mapping
 	GerritRichMapping = []byte(`{"properties":{"metadata__updated_on":{"type":"date"},"approval_description_analyzed":{"type":"text","index":true},"comment_message_analyzed":{"type":"text","index":true},"status":{"type":"keyword"},"summary_analyzed":{"type":"text","index":true},"timeopen":{"type":"double"}}}`)
+	// GerritCategories - categories defined for gerrit
+	GerritCategories = map[string]struct{}{Review: {}}
 )
 
 // DSGerrit - DS implementation for stub - does nothing at all, just presents a skeleton code
@@ -243,13 +245,12 @@ func (j *DSGerrit) FetchItems(ctx *Ctx) (err error) {
 
 // SupportDateFrom - does DS support resuming from date?
 func (j *DSGerrit) SupportDateFrom() bool {
-	// IMPL:
-	return false
+	// FIXME: is it really supported?
+	return true
 }
 
 // SupportOffsetFrom - does DS support resuming from offset?
 func (j *DSGerrit) SupportOffsetFrom() bool {
-	// IMPL:
 	return false
 }
 
@@ -284,8 +285,7 @@ func (j *DSGerrit) OriginField(ctx *Ctx) string {
 
 // Categories - return a set of configured categories
 func (j *DSGerrit) Categories() map[string]struct{} {
-	// IMPL:
-	return map[string]struct{}{}
+	return GerritCategories
 }
 
 // ResumeNeedsOrigin - is origin field needed when resuming
@@ -303,6 +303,7 @@ func (j *DSGerrit) Origin(ctx *Ctx) string {
 // ItemID - return unique identifier for an item
 func (j *DSGerrit) ItemID(item interface{}) string {
 	// IMPL:
+	// "number" ?
 	return fmt.Sprintf("%d", time.Now().UnixNano())
 }
 
@@ -338,25 +339,23 @@ func (j *DSGerrit) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string]int
 // ItemUpdatedOn - return updated on date for an item
 func (j *DSGerrit) ItemUpdatedOn(item interface{}) time.Time {
 	// IMPL:
+	// "lastUpdated" ?
 	return time.Now()
 }
 
 // ItemCategory - return unique identifier for an item
 func (j *DSGerrit) ItemCategory(item interface{}) string {
-	// IMPL:
-	return fmt.Sprintf("%d", time.Now().UnixNano())
+	return Review
 }
 
 // ElasticRawMapping - Raw index mapping definition
 func (j *DSGerrit) ElasticRawMapping() []byte {
-	// IMPL:
-	return []byte{}
+	return GerritRawMapping
 }
 
 // ElasticRichMapping - Rich index mapping definition
 func (j *DSGerrit) ElasticRichMapping() []byte {
-	// IMPL:
-	return []byte{}
+	return GerritRichMapping
 }
 
 // GetItemIdentities return list of item's identities, each one is [3]string
