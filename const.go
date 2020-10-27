@@ -19,7 +19,7 @@ const Jira string = "jira"
 const Git string = "git"
 
 // Gerrit - common constant string
-const Gerrit string = "git"
+const Gerrit string = "gerrit"
 
 // Stub - common constant string
 const Stub string = "stub"

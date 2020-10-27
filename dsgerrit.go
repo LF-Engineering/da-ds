@@ -15,6 +15,13 @@ const (
 	GerritDefaultSSHKeyPath = "$HOME/.ssh/id_rsa"
 )
 
+var (
+	// GerritRawMapping - Gerrit raw index mapping
+	GerritRawMapping = []byte(`{"dynamic":true,"properties":{"metadata__updated_on":{"type":"date"},"data":{"properties":{"commitMessage":{"type":"text","index":true},"comments":{"properties":{"message":{"type":"text","index":true}}},"subject":{"type":"text","index":true},"patchSets":{"properties":{"approvals":{"properties":{"description":{"type":"text","index":true}}},"comments":{"properties":{"message":{"type":"text","index":true}}}}}}}}}`)
+	// GerritRichMapping - Gerrit rich index mapping
+	GerritRichMapping = []byte(`{"properties":{"metadata__updated_on":{"type":"date"},"approval_description_analyzed":{"type":"text","index":true},"comment_message_analyzed":{"type":"text","index":true},"status":{"type":"keyword"},"summary_analyzed":{"type":"text","index":true},"timeopen":{"type":"double"}}}`)
+)
+
 // DSGerrit - DS implementation for stub - does nothing at all, just presents a skeleton code
 type DSGerrit struct {
 	DS           string
