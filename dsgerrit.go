@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -28,6 +29,8 @@ var (
 	GerritRichMapping = []byte(`{"properties":{"metadata__updated_on":{"type":"date"},"approval_description_analyzed":{"type":"text","index":true},"comment_message_analyzed":{"type":"text","index":true},"status":{"type":"keyword"},"summary_analyzed":{"type":"text","index":true},"timeopen":{"type":"double"}}}`)
 	// GerritCategories - categories defined for gerrit
 	GerritCategories = map[string]struct{}{Review: {}}
+	// GerritVersionRegexp - gerrit verion pattern
+	GerritVersionRegexp = regexp.MustCompile(`gerrit version (\d+)\.(\d+).*`)
 )
 
 // DSGerrit - DS implementation for stub - does nothing at all, just presents a skeleton code
@@ -43,10 +46,12 @@ type DSGerrit struct {
 	NoSSLVerify         bool   // From DA_GERRIT_NO_SSL_VERIFY
 	DisableHostKeyCheck bool   // From DA_GERRIT_DISABLE_HOST_KEY_CHECK
 	// Non-config variables
-	RepoName       string // repo name
-	SSHOpts        string // SSH Options
-	SSHKeyTempPath string // if used SSHKey - temp file with this name was used to store key contents
-	GerritCmd      string // gerrit remote command used to fetch data
+	RepoName       string   // repo name
+	SSHOpts        string   // SSH Options
+	SSHKeyTempPath string   // if used SSHKey - temp file with this name was used to store key contents
+	GerritCmd      []string // gerrit remote command used to fetch data
+	VersionMajor   int      // gerrit major version
+	VersionMinor   int      // gerrit minor version
 }
 
 // ParseArgs - parse stub specific environment variables
@@ -146,7 +151,7 @@ func (j *DSGerrit) Enrich(ctx *Ctx) (err error) {
 // InitGerrit - initializes gerrit client
 func (j *DSGerrit) InitGerrit(ctx *Ctx) (err error) {
 	if j.DisableHostKeyCheck {
-		j.SSHOpts += "-o StrictHostKeyChecking=no "
+    j.SSHOpts += "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
 	}
 	if j.SSHKey != "" {
 		var f *os.File
@@ -176,8 +181,43 @@ func (j *DSGerrit) InitGerrit(ctx *Ctx) (err error) {
 	if strings.HasSuffix(j.SSHOpts, " ") {
 		j.SSHOpts = j.SSHOpts[:len(j.SSHOpts)-1]
 	}
-	j.GerritCmd = fmt.Sprintf("ssh %s -p %d %s@%s gerrit", j.SSHOpts, j.SSHPort, j.User, j.URL)
-	Printf("%s\n", j.GerritCmd)
+	url := j.URL
+	ary := strings.Split(url, "://")
+	if len(ary) > 1 {
+		url = ary[1]
+	}
+	gerritCmd := fmt.Sprintf("ssh %s -p %d %s@%s gerrit", j.SSHOpts, j.SSHPort, j.User, url)
+	ary = strings.Split(gerritCmd, " ")
+	for _, item := range ary {
+		if item == "" {
+			continue
+		}
+		j.GerritCmd = append(j.GerritCmd, item)
+	}
+	return
+}
+
+// GetGerritVersion - get gerrit version
+func (j *DSGerrit) GetGerritVersion(ctx *Ctx) (err error) {
+	cmdLine := j.GerritCmd
+	cmdLine = append(cmdLine, "version")
+	var (
+		sout string
+		serr string
+	)
+	sout, serr, err = ExecCommand(ctx, cmdLine, "", nil)
+	if err != nil {
+		Printf("error executing %v: %v\n%s\n%s\n", cmdLine, err, sout, serr)
+		return
+	}
+	match := GerritVersionRegexp.FindAllStringSubmatch(sout, -1)
+	if len(match) < 1 {
+		err = fmt.Errorf("cannot parse gerrit version '%s'", sout)
+		return
+	}
+	j.VersionMajor, _ = strconv.Atoi(match[0][1])
+	j.VersionMinor, _ = strconv.Atoi(match[0][2])
+	Printf("%d.%d\n", j.VersionMajor, j.VersionMinor)
 	return
 }
 
@@ -190,9 +230,15 @@ func (j *DSGerrit) FetchItems(ctx *Ctx) (err error) {
 	if j.SSHKeyTempPath != "" {
 		defer func() {
 			Printf("removing temporary SSH key %s\n", j.SSHKeyTempPath)
-			_ = os.Remove(j.SSHKeyTempPath)
+			//_ = os.Remove(j.SSHKeyTempPath)
 		}()
 	}
+	err = j.GetGerritVersion(ctx)
+	if err != nil {
+		return
+	}
+	// FIXME
+	os.Exit(1)
 	var messages [][]byte
 	// Process messages (possibly in threads)
 	var (
