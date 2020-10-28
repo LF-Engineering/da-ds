@@ -327,7 +327,7 @@ func (j *DSGerrit) FetchItems(ctx *Ctx) (err error) {
 		after = ToYMDHMSDate(*ctx.DateFrom)
 		afterEpoch = float64(ctx.DateFrom.Unix())
 	} else {
-		after = "1970-01-01"
+		after = "1970-01-01 00:00:00"
 		afterEpoch = 0.0
 	}
 	var (
