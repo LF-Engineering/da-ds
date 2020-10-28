@@ -223,12 +223,14 @@ func (j *DSGerrit) GetGerritVersion(ctx *Ctx) (err error) {
 func (j *DSGerrit) GetGerritReviews(ctx *Ctx, after string, afterEpoch float64, startFrom int) (reviews []map[string]interface{}, newStartFrom int, err error) {
 	cmdLine := j.GerritCmd
 	// https://gerrit-review.googlesource.com/Documentation/user-search.html:
-	// ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ./ssh-key.secret -p XYZ usr@gerrit-url gerrit query after:1970-01-01 limit: 2 (status:open OR status:closed) --all-approvals --all-reviewers --comments --format=JSON
+	// ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ./ssh-key.secret -p XYZ usr@gerrit-url gerrit query after:'1970-01-01 00:00:00' limit: 2 (status:open OR status:closed) --all-approvals --all-reviewers --comments --format=JSON
+	// For unknown reasons , gerrit is not returning data if number of seconds is not equal to 00 - so I'm updating query string to set seconds to ":00"
+	after = after[:len(after)-3] + ":00"
 	cmdLine = append(cmdLine, "query")
 	if ctx.Project != "" {
 		cmdLine = append(cmdLine, "project:", ctx.Project)
 	}
-	cmdLine = append(cmdLine, "after:"+after, "limit:", strconv.Itoa(j.MaxReviews), "(status:open OR status:closed)", "--all-approvals", "--all-reviewers", "--comments", "--format=JSON")
+	cmdLine = append(cmdLine, `after:"`+after+`"`, "limit:", strconv.Itoa(j.MaxReviews), "(status:open OR status:closed)", "--all-approvals", "--all-reviewers", "--comments", "--format=JSON")
 	// 2006-01-02[ 15:04:05[.890][ -0700]]
 	if startFrom > 0 {
 		cmdLine = append(cmdLine, "--start="+strconv.Itoa(startFrom))
@@ -257,10 +259,12 @@ func (j *DSGerrit) GetGerritReviews(ctx *Ctx, after string, afterEpoch float64, 
 		iMoreChanges, ok := item["moreChanges"]
 		if ok {
 			moreChanges, ok := iMoreChanges.(bool)
-			if ok && moreChanges {
-				newStartFrom = startFrom + i
-				if ctx.Debug > 0 {
-					Printf("#%d) moreChanges: %v, newStartFrom: %d\n", i, moreChanges, newStartFrom)
+			if ok {
+				if moreChanges {
+					newStartFrom = startFrom + i
+					if ctx.Debug > 0 {
+						Printf("#%d) moreChanges: %v, newStartFrom: %d\n", i, moreChanges, newStartFrom)
+					}
 				}
 			} else {
 				Printf("cannot read boolean value from %v\n", iMoreChanges)
@@ -279,7 +283,7 @@ func (j *DSGerrit) GetGerritReviews(ctx *Ctx, after string, afterEpoch float64, 
 			lastUpdated, ok := iLastUpdated.(float64)
 			if ok {
 				if lastUpdated < afterEpoch {
-					if ctx.Debug > 0 {
+					if ctx.Debug > 1 {
 						Printf("#%d) lastUpdated: %v < afterEpoch: %v, skipping\n", i, lastUpdated, afterEpoch)
 					}
 					continue
