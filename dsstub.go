@@ -268,6 +268,7 @@ func (j *DSStub) ItemID(item interface{}) string {
 func (j *DSStub) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string]interface{}) {
 	// IMPL:
 	mItem = make(map[string]interface{})
+	// Change to unique datasource origin
 	origin := "stub"
 	tag := ctx.Tag
 	if tag == "" {

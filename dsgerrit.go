@@ -33,6 +33,8 @@ var (
 	GerritCategories = map[string]struct{}{Review: {}}
 	// GerritVersionRegexp - gerrit verion pattern
 	GerritVersionRegexp = regexp.MustCompile(`gerrit version (\d+)\.(\d+).*`)
+	// GerritDefaultSearchField - default search field
+	GerritDefaultSearchField = "item_id"
 )
 
 // DSGerrit - DS implementation for stub - does nothing at all, just presents a skeleton code
@@ -255,9 +257,11 @@ func (j *DSGerrit) GetGerritReviews(ctx *Ctx, after string, afterEpoch float64, 
 		iMoreChanges, ok := item["moreChanges"]
 		if ok {
 			moreChanges, ok := iMoreChanges.(bool)
-			if ok {
+			if ok && moreChanges {
 				newStartFrom = startFrom + i
-				Printf("#%d) moreChanges: %v, newStartFrom: %d\n", i, moreChanges, newStartFrom)
+				if ctx.Debug > 0 {
+					Printf("#%d) moreChanges: %v, newStartFrom: %d\n", i, moreChanges, newStartFrom)
+				}
 			} else {
 				Printf("cannot read boolean value from %v\n", iMoreChanges)
 			}
@@ -342,12 +346,11 @@ func (j *DSGerrit) FetchItems(ctx *Ctx) (err error) {
 				c <- e
 			}
 		}()
-		item := map[string]interface{}{"id": time.Now().UnixNano(), "name": "xyz"}
-		esItem := j.AddMetadata(ctx, item)
+		esItem := j.AddMetadata(ctx, review)
 		if ctx.Project != "" {
-			item["project"] = ctx.Project
+			review["project"] = ctx.Project
 		}
-		esItem["data"] = item
+		esItem["data"] = review
 		if allReviewsMtx != nil {
 			allReviewsMtx.Lock()
 		}
@@ -475,6 +478,8 @@ func (j *DSGerrit) FetchItems(ctx *Ctx) (err error) {
 
 // SupportDateFrom - does DS support resuming from date?
 func (j *DSGerrit) SupportDateFrom() bool {
+	// A bit dangerous, because if any run failed then one review can set max update to some recent date
+	// while other reviews can be left at a lower date
 	return true
 }
 
@@ -530,16 +535,17 @@ func (j *DSGerrit) Origin(ctx *Ctx) string {
 
 // ItemID - return unique identifier for an item
 func (j *DSGerrit) ItemID(item interface{}) string {
-	// IMPL:
-	// "number" ?
-	return fmt.Sprintf("%d", time.Now().UnixNano())
+	id, ok := item.(map[string]interface{})["number"].(float64)
+	if !ok {
+		Fatalf("%s: ItemID() - cannot extract number from %+v", j.DS, DumpKeys(item))
+	}
+	return fmt.Sprintf("%.0f", id)
 }
 
 // AddMetadata - add metadata to the item
 func (j *DSGerrit) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string]interface{}) {
-	// IMPL:
 	mItem = make(map[string]interface{})
-	origin := "gerrit"
+	origin := j.URL
 	tag := ctx.Tag
 	if tag == "" {
 		tag = origin
@@ -552,13 +558,16 @@ func (j *DSGerrit) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string]int
 	mItem["backend_version"] = GerritBackendVersion
 	mItem["timestamp"] = fmt.Sprintf("%.06f", float64(timestamp.UnixNano())/1.0e3)
 	mItem[UUID] = uuid
-	// FIXME: number?
 	mItem[DefaultOriginField] = origin
 	mItem[DefaultTagField] = tag
 	mItem["updated_on"] = updatedOn
 	mItem["category"] = j.ItemCategory(item)
-	//mItem["search_fields"] = j.GenSearchFields(ctx, issue, uuid)
-	//mItem["search_fields"] = make(map[string]interface{})
+	mItem["search_fields"] = make(map[string]interface{})
+	project, _ := Dig(item, []string{"project"}, true, false)
+	hash, _ := Dig(item, []string{"id"}, true, false)
+	FatalOnError(DeepSet(mItem, []string{"search_fields", GerritDefaultSearchField}, itemID, false))
+	FatalOnError(DeepSet(mItem, []string{"search_fields", "project_name"}, project, false))
+	FatalOnError(DeepSet(mItem, []string{"search_fields", "review_hash"}, hash, false))
 	mItem[DefaultDateField] = ToESDate(updatedOn)
 	mItem[DefaultTimestampField] = ToESDate(timestamp)
 	mItem[ProjectSlug] = ctx.ProjectSlug
@@ -567,9 +576,11 @@ func (j *DSGerrit) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string]int
 
 // ItemUpdatedOn - return updated on date for an item
 func (j *DSGerrit) ItemUpdatedOn(item interface{}) time.Time {
-	// IMPL:
-	// "lastUpdated" ?
-	return time.Now()
+	epoch, ok := item.(map[string]interface{})["lastUpdated"].(float64)
+	if !ok {
+		Fatalf("%s: ItemUpdatedOn() - cannot extract lastUpdated from %+v", j.DS, DumpKeys(item))
+	}
+	return time.Unix(int64(epoch), 0)
 }
 
 // ItemCategory - return unique identifier for an item
