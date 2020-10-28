@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	jsoniter "github.com/json-iterator/go"
 )
 
 const (
@@ -46,7 +48,6 @@ type DSGerrit struct {
 	NoSSLVerify         bool   // From DA_GERRIT_NO_SSL_VERIFY
 	DisableHostKeyCheck bool   // From DA_GERRIT_DISABLE_HOST_KEY_CHECK
 	// Non-config variables
-	RepoName       string   // repo name
 	SSHOpts        string   // SSH Options
 	SSHKeyTempPath string   // if used SSHKey - temp file with this name was used to store key contents
 	GerritCmd      []string // gerrit remote command used to fetch data
@@ -95,15 +96,13 @@ func (j *DSGerrit) ParseArgs(ctx *Ctx) (err error) {
 
 // Validate - is current DS configuration OK?
 func (j *DSGerrit) Validate() (err error) {
-	url := strings.TrimSpace(j.URL)
-	if strings.HasSuffix(url, "/") {
-		url = url[:len(url)-1]
+	j.URL = strings.TrimSpace(j.URL)
+	if strings.HasSuffix(j.URL, "/") {
+		j.URL = j.URL[:len(j.URL)-1]
 	}
-	ary := strings.Split(url, "/")
-	j.RepoName = ary[len(ary)-1]
-	if j.RepoName == "" {
-		err = fmt.Errorf("Repo name must be set")
-		return
+	ary := strings.Split(j.URL, "://")
+	if len(ary) > 1 {
+		j.URL = ary[1]
 	}
 	j.SSHKeyPath = os.ExpandEnv(j.SSHKeyPath)
 	if j.SSHKeyPath == "" && j.SSHKey == "" {
@@ -181,13 +180,8 @@ func (j *DSGerrit) InitGerrit(ctx *Ctx) (err error) {
 	if strings.HasSuffix(j.SSHOpts, " ") {
 		j.SSHOpts = j.SSHOpts[:len(j.SSHOpts)-1]
 	}
-	url := j.URL
-	ary := strings.Split(url, "://")
-	if len(ary) > 1 {
-		url = ary[1]
-	}
-	gerritCmd := fmt.Sprintf("ssh %s -p %d %s@%s gerrit", j.SSHOpts, j.SSHPort, j.User, url)
-	ary = strings.Split(gerritCmd, " ")
+	gerritCmd := fmt.Sprintf("ssh %s -p %d %s@%s gerrit", j.SSHOpts, j.SSHPort, j.User, j.URL)
+	ary := strings.Split(gerritCmd, " ")
 	for _, item := range ary {
 		if item == "" {
 			continue
@@ -224,7 +218,7 @@ func (j *DSGerrit) GetGerritVersion(ctx *Ctx) (err error) {
 }
 
 // GetGerritReviews - get gerrit reviews
-func (j *DSGerrit) GetGerritReviews(ctx *Ctx, after string, startFrom int) (err error) {
+func (j *DSGerrit) GetGerritReviews(ctx *Ctx, after string, afterEpoch float64, startFrom int) (reviews []map[string]interface{}, newStartFrom int, err error) {
 	cmdLine := j.GerritCmd
 	// https://gerrit-review.googlesource.com/Documentation/user-search.html:
 	// ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ./ssh-key.secret -p XYZ usr@gerrit-url gerrit query after:1970-01-01 limit: 2 (status:open OR status:closed) --all-approvals --all-reviewers --comments --format=JSON
@@ -249,7 +243,51 @@ func (j *DSGerrit) GetGerritReviews(ctx *Ctx, after string, startFrom int) (err 
 		Printf("error executing %v: %v\n%s\n%s\n", cmdLine, err, sout, serr)
 		return
 	}
-	Printf("%s\n", sout)
+	data := strings.Replace("["+strings.Replace(sout, "\n", ",", -1)+"]", ",]", "]", -1)
+	var items []interface{}
+	err = jsoniter.Unmarshal([]byte(data), &items)
+	if err != nil {
+		return
+	}
+	for i, iItem := range items {
+		item, _ := iItem.(map[string]interface{})
+		//Printf("#%d) %v\n", i, DumpKeys(item))
+		iMoreChanges, ok := item["moreChanges"]
+		if ok {
+			moreChanges, ok := iMoreChanges.(bool)
+			if ok {
+				newStartFrom = startFrom + i
+				Printf("#%d) moreChanges: %v, newStartFrom: %d\n", i, moreChanges, newStartFrom)
+			} else {
+				Printf("cannot read boolean value from %v\n", iMoreChanges)
+			}
+			return
+		}
+		_, ok = item["project"]
+		if !ok {
+			if ctx.Debug > 0 {
+				Printf("#%d) project not found: %+v", i, item)
+			}
+			continue
+		}
+		iLastUpdated, ok := item["lastUpdated"]
+		if ok {
+			lastUpdated, ok := iLastUpdated.(float64)
+			if ok {
+				if lastUpdated < afterEpoch {
+					if ctx.Debug > 0 {
+						Printf("#%d) lastUpdated: %v < afterEpoch: %v, skipping\n", i, lastUpdated, afterEpoch)
+					}
+					continue
+				}
+			} else {
+				Printf("cannot read float value from %v\n", iLastUpdated)
+			}
+		} else {
+			Printf("cannot read lastUpdated from %v\n", item)
+		}
+		reviews = append(reviews, item)
+	}
 	return
 }
 
@@ -262,74 +300,73 @@ func (j *DSGerrit) FetchItems(ctx *Ctx) (err error) {
 	if j.SSHKeyTempPath != "" {
 		defer func() {
 			Printf("removing temporary SSH key %s\n", j.SSHKeyTempPath)
-			//_ = os.Remove(j.SSHKeyTempPath)
+			_ = os.Remove(j.SSHKeyTempPath)
 		}()
 	}
-	err = j.GetGerritVersion(ctx)
-	if err != nil {
-		return
+	// We don't have ancient gerrit versions like < 2.9 - this check is only for debugging
+	if ctx.Debug > 1 {
+		err = j.GetGerritVersion(ctx)
+		if err != nil {
+			return
+		}
 	}
-	var after string
+	var (
+		startFrom  int
+		after      string
+		afterEpoch float64
+	)
 	if ctx.DateFrom != nil {
 		after = ToYMDHMSDate(*ctx.DateFrom)
+		afterEpoch = float64(ctx.DateFrom.Unix())
 	} else {
 		after = "1970-01-01"
+		afterEpoch = 0.0
 	}
-	startFrom := 0
-	err = j.GetGerritReviews(ctx, after, startFrom)
-	if err != nil {
-		return
-	}
-	// FIXME
-	os.Exit(1)
-	var messages [][]byte
-	// Process messages (possibly in threads)
 	var (
-		ch         chan error
-		allMsgs    []interface{}
-		allMsgsMtx *sync.Mutex
-		escha      []chan error
-		eschaMtx   *sync.Mutex
+		ch            chan error
+		allReviews    []interface{}
+		allReviewsMtx *sync.Mutex
+		escha         []chan error
+		eschaMtx      *sync.Mutex
 	)
 	thrN := GetThreadsNum(ctx)
 	if thrN > 1 {
 		ch = make(chan error)
-		allMsgsMtx = &sync.Mutex{}
+		allReviewsMtx = &sync.Mutex{}
 		eschaMtx = &sync.Mutex{}
 	}
 	nThreads := 0
-	processMsg := func(c chan error, msg []byte) (wch chan error, e error) {
+	processReview := func(c chan error, review map[string]interface{}) (wch chan error, e error) {
 		defer func() {
 			if c != nil {
 				c <- e
 			}
 		}()
-		// FIXME: Real data processing here
 		item := map[string]interface{}{"id": time.Now().UnixNano(), "name": "xyz"}
 		esItem := j.AddMetadata(ctx, item)
 		if ctx.Project != "" {
 			item["project"] = ctx.Project
 		}
 		esItem["data"] = item
-		if allMsgsMtx != nil {
-			allMsgsMtx.Lock()
+		if allReviewsMtx != nil {
+			allReviewsMtx.Lock()
 		}
-		allMsgs = append(allMsgs, esItem)
-		nMsgs := len(allMsgs)
-		if nMsgs >= ctx.ESBulkSize {
+		allReviews = append(allReviews, esItem)
+		nReviews := len(allReviews)
+		if nReviews >= ctx.ESBulkSize {
 			sendToElastic := func(c chan error) (ee error) {
 				defer func() {
 					if c != nil {
 						c <- ee
 					}
 				}()
-				ee = SendToElastic(ctx, j, true, UUID, allMsgs)
+				ee = SendToElastic(ctx, j, true, UUID, allReviews)
 				if ee != nil {
-					Printf("error %v sending %d messages to ElasticSearch\n", ee, len(allMsgs))
+					Printf("error %v sending %d reviews to ElasticSearch\n", ee, len(allReviews))
 				}
-				allMsgs = []interface{}{}
-				if allMsgsMtx != nil {
-					allMsgsMtx.Unlock()
+				allReviews = []interface{}{}
+				if allReviewsMtx != nil {
+					allReviewsMtx.Unlock()
 				}
 				return
 			}
@@ -345,41 +382,51 @@ func (j *DSGerrit) FetchItems(ctx *Ctx) (err error) {
 				}
 			}
 		} else {
-			if allMsgsMtx != nil {
-				allMsgsMtx.Unlock()
+			if allReviewsMtx != nil {
+				allReviewsMtx.Unlock()
 			}
 		}
 		return
 	}
 	if thrN > 1 {
-		for _, message := range messages {
-			go func(msg []byte) {
-				var (
-					e    error
-					esch chan error
-				)
-				esch, e = processMsg(ch, msg)
-				if e != nil {
-					Printf("process error: %v\n", e)
-					return
-				}
-				if esch != nil {
-					if eschaMtx != nil {
-						eschaMtx.Lock()
+		for {
+			var reviews []map[string]interface{}
+			reviews, startFrom, err = j.GetGerritReviews(ctx, after, afterEpoch, startFrom)
+			if err != nil {
+				return
+			}
+			for _, review := range reviews {
+				go func(review map[string]interface{}) {
+					var (
+						e    error
+						esch chan error
+					)
+					esch, e = processReview(ch, review)
+					if e != nil {
+						Printf("process error: %v\n", e)
+						return
 					}
-					escha = append(escha, esch)
-					if eschaMtx != nil {
-						eschaMtx.Unlock()
+					if esch != nil {
+						if eschaMtx != nil {
+							eschaMtx.Lock()
+						}
+						escha = append(escha, esch)
+						if eschaMtx != nil {
+							eschaMtx.Unlock()
+						}
 					}
+				}(review)
+				nThreads++
+				if nThreads == thrN {
+					err = <-ch
+					if err != nil {
+						return
+					}
+					nThreads--
 				}
-			}(message)
-			nThreads++
-			if nThreads == thrN {
-				err = <-ch
-				if err != nil {
-					return
-				}
-				nThreads--
+			}
+			if startFrom == 0 {
+				break
 			}
 		}
 		for nThreads > 0 {
@@ -390,10 +437,20 @@ func (j *DSGerrit) FetchItems(ctx *Ctx) (err error) {
 			}
 		}
 	} else {
-		for _, message := range messages {
-			_, err = processMsg(nil, message)
+		for {
+			var reviews []map[string]interface{}
+			reviews, startFrom, err = j.GetGerritReviews(ctx, after, afterEpoch, startFrom)
 			if err != nil {
 				return
+			}
+			for _, review := range reviews {
+				_, err = processReview(nil, review)
+				if err != nil {
+					return
+				}
+			}
+			if startFrom == 0 {
+				break
 			}
 		}
 	}
@@ -403,14 +460,14 @@ func (j *DSGerrit) FetchItems(ctx *Ctx) (err error) {
 			return
 		}
 	}
-	nMsgs := len(allMsgs)
+	nReviews := len(allReviews)
 	if ctx.Debug > 0 {
-		Printf("%d remaining messages to send to ES\n", nMsgs)
+		Printf("%d remaining reviews to send to ES\n", nReviews)
 	}
-	if nMsgs > 0 {
-		err = SendToElastic(ctx, j, true, UUID, allMsgs)
+	if nReviews > 0 {
+		err = SendToElastic(ctx, j, true, UUID, allReviews)
 		if err != nil {
-			Printf("Error %v sending %d messages to ES\n", err, len(allMsgs))
+			Printf("Error %v sending %d reviews to ES\n", err, len(allReviews))
 		}
 	}
 	return
@@ -452,7 +509,6 @@ func (j *DSGerrit) OriginField(ctx *Ctx) string {
 	if ctx.Tag != "" {
 		return DefaultTagField
 	}
-	// FIXME: number?
 	return DefaultOriginField
 }
 
@@ -469,8 +525,7 @@ func (j *DSGerrit) ResumeNeedsOrigin(ctx *Ctx) bool {
 
 // Origin - return current origin
 func (j *DSGerrit) Origin(ctx *Ctx) string {
-	// IMPL: you must change this, for example to j.URL/j.GroupName or somethign like this
-	return ctx.Tag
+	return j.URL
 }
 
 // ItemID - return unique identifier for an item
