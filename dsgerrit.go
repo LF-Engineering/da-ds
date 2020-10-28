@@ -151,7 +151,7 @@ func (j *DSGerrit) Enrich(ctx *Ctx) (err error) {
 // InitGerrit - initializes gerrit client
 func (j *DSGerrit) InitGerrit(ctx *Ctx) (err error) {
 	if j.DisableHostKeyCheck {
-    j.SSHOpts += "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
+		j.SSHOpts += "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
 	}
 	if j.SSHKey != "" {
 		var f *os.File
@@ -217,7 +217,39 @@ func (j *DSGerrit) GetGerritVersion(ctx *Ctx) (err error) {
 	}
 	j.VersionMajor, _ = strconv.Atoi(match[0][1])
 	j.VersionMinor, _ = strconv.Atoi(match[0][2])
-	Printf("%d.%d\n", j.VersionMajor, j.VersionMinor)
+	if ctx.Debug > 0 {
+		Printf("Detected gerrit %d.%d\n", j.VersionMajor, j.VersionMinor)
+	}
+	return
+}
+
+// GetGerritReviews - get gerrit reviews
+func (j *DSGerrit) GetGerritReviews(ctx *Ctx, after string, startFrom int) (err error) {
+	cmdLine := j.GerritCmd
+	// https://gerrit-review.googlesource.com/Documentation/user-search.html:
+	// ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ./ssh-key.secret -p XYZ usr@gerrit-url gerrit query after:1970-01-01 limit: 2 (status:open OR status:closed) --all-approvals --all-reviewers --comments --format=JSON
+	cmdLine = append(cmdLine, "query")
+	if ctx.Project != "" {
+		cmdLine = append(cmdLine, "project:", ctx.Project)
+	}
+	cmdLine = append(cmdLine, "after:"+after, "limit:", strconv.Itoa(j.MaxReviews), "(status:open OR status:closed)", "--all-approvals", "--all-reviewers", "--comments", "--format=JSON")
+	// 2006-01-02[ 15:04:05[.890][ -0700]]
+	if startFrom > 0 {
+		cmdLine = append(cmdLine, "--start="+strconv.Itoa(startFrom))
+	}
+	var (
+		sout string
+		serr string
+	)
+	if ctx.Debug > 0 {
+		Printf("getting reviews via: %v\n", cmdLine)
+	}
+	sout, serr, err = ExecCommand(ctx, cmdLine, "", nil)
+	if err != nil {
+		Printf("error executing %v: %v\n%s\n%s\n", cmdLine, err, sout, serr)
+		return
+	}
+	Printf("%s\n", sout)
 	return
 }
 
@@ -234,6 +266,17 @@ func (j *DSGerrit) FetchItems(ctx *Ctx) (err error) {
 		}()
 	}
 	err = j.GetGerritVersion(ctx)
+	if err != nil {
+		return
+	}
+	var after string
+	if ctx.DateFrom != nil {
+		after = ToYMDHMSDate(*ctx.DateFrom)
+	} else {
+		after = "1970-01-01"
+	}
+	startFrom := 0
+	err = j.GetGerritReviews(ctx, after, startFrom)
 	if err != nil {
 		return
 	}
@@ -375,7 +418,6 @@ func (j *DSGerrit) FetchItems(ctx *Ctx) (err error) {
 
 // SupportDateFrom - does DS support resuming from date?
 func (j *DSGerrit) SupportDateFrom() bool {
-	// FIXME: is it really supported?
 	return true
 }
 
