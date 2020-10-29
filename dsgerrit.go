@@ -37,8 +37,10 @@ var (
 	GerritVersionRegexp = regexp.MustCompile(`gerrit version (\d+)\.(\d+).*`)
 	// GerritDefaultSearchField - default search field
 	GerritDefaultSearchField = "item_id"
-	// GerritReviewRoles - roles to fetch affiliation data
+	// GerritReviewRoles - roles to fetch affiliation data for review
 	GerritReviewRoles = []string{"owner"}
+	// GerritCommentRoles - roles to fetch affiliation data for comment
+	GerritCommentRoles = []string{"reviewer"}
 )
 
 // DSGerrit - DS implementation for stub - does nothing at all, just presents a skeleton code
@@ -1363,9 +1365,7 @@ func (j *DSGerrit) EnrichComments(ctx *Ctx, review map[string]interface{}, comme
 			err = fmt.Errorf("cannot read timestamp property from comment: %+v", comment)
 			return
 		}
-		Printf("created: %+v\n", created)
 		rich["comment_created_on"] = created
-		richItems = append(richItems, rich)
 		message := ""
 		iMessage, ok := comment["message"]
 		if ok {
@@ -1377,8 +1377,37 @@ func (j *DSGerrit) EnrichComments(ctx *Ctx, review map[string]interface{}, comme
 		}
 		rich["comment_message"] = message
 		rich["type"] = "comment"
-		rich["id"] = reviewID + "_comment_" + fmt.Sprintf("%d", created.Unix())
-		Printf("id: %s\n", rich["id"])
+		rich["id"] = reviewID + "_comment_" + fmt.Sprintf("%d.0", created.Unix())
+		if affs {
+			_, okReviewer := comment["reviewer"]
+			if okReviewer {
+				authorKey := "reviewer"
+				var affsItems map[string]interface{}
+				affsItems, err = j.AffsItems(ctx, comment, GerritCommentRoles, iCreated)
+				if err != nil {
+					return
+				}
+				for prop, value := range affsItems {
+					rich[prop] = value
+				}
+				for _, suff := range AffsFields {
+					rich[Author+suff] = rich[authorKey+suff]
+				}
+				orgsKey := authorKey + MultiOrgNames
+				_, ok := Dig(rich, []string{orgsKey}, false, true)
+				if !ok {
+					rich[orgsKey] = []interface{}{}
+				}
+			}
+			CopyAffsRoleData(rich, review, "changeset", "changeset")
+		}
+		for prop, value := range CommonFields(j, iCreated, Review) {
+			rich[prop] = value
+		}
+		for prop, value := range CommonFields(j, iCreated, "comment") {
+			rich[prop] = value
+		}
+		richItems = append(richItems, rich)
 	}
 	return
 }

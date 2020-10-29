@@ -397,11 +397,11 @@ func GetEnrollmentsMulti(ctx *Ctx, ds DS, uuid string, dt time.Time) (orgs []str
 }
 
 // CopyAffsRoleData - copy affiliations fields from source role to dest role
-func CopyAffsRoleData(item map[string]interface{}, fromRole, toRole string) {
+func CopyAffsRoleData(dst, src map[string]interface{}, fromRole, toRole string) {
 	for _, suff := range AffsFields {
-		item[toRole+suff], _ = Dig(item, []string{fromRole + suff}, false, true)
+		dst[toRole+suff], _ = Dig(src, []string{fromRole + suff}, false, true)
 	}
-	item[toRole+MultiOrgNames], _ = Dig(item, []string{fromRole + MultiOrgNames}, false, true)
+	dst[toRole+MultiOrgNames], _ = Dig(src, []string{fromRole + MultiOrgNames}, false, true)
 }
 
 // IdenityAffsData - add affiliations related data
