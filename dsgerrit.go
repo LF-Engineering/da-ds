@@ -973,6 +973,105 @@ func (j *DSGerrit) ConvertDates(ctx *Ctx, review map[string]interface{}) {
 	}
 }
 
+// FirstReviewDatetime - return first review date/time
+func (j *DSGerrit) FirstReviewDatetime(ctx *Ctx, review map[string]interface{}, patchSets []interface{}) (reviewDatetime interface{}) {
+	if ctx.Debug > 2 {
+		defer func() {
+			Printf("FirstReviewDatetime: %+v -> %+v\n", patchSets, reviewDatetime)
+		}()
+	}
+	nPatchSets := len(patchSets)
+	if ctx.Debug > 2 {
+		Printf("FirstReviewDatetime: %d patch sets\n", nPatchSets)
+	}
+	ownerUsername, okOwnerUsername := Dig(review, []string{"owner", "username"}, false, true)
+	ownerEmail, okOwnerEmail := Dig(review, []string{"owner", "email"}, false, true)
+	var createdOn time.Time
+	iCreatedOn, okCreatedOn := review["createdOn"]
+	if okCreatedOn {
+		createdOn, okCreatedOn = iCreatedOn.(time.Time)
+	}
+	for _, iPatchSet := range patchSets {
+		patchSet, ok := iPatchSet.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		iApprovals, ok := patchSet["approvals"]
+		if !ok {
+			if ctx.Debug > 2 {
+				Printf("FirstReviewDatetime: no approvals\n")
+			}
+			continue
+		}
+		approvals, ok := iApprovals.([]interface{})
+		if !ok {
+			continue
+		}
+		nApprovals := len(approvals)
+		if ctx.Debug > 2 {
+			Printf("FirstReviewDatetime: %d approvals\n", nApprovals)
+		}
+		for _, iApproval := range approvals {
+			approval, ok := iApproval.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			iApprovalType, ok := approval["type"]
+			if !ok {
+				continue
+			}
+			approvalType, ok := iApprovalType.(string)
+			if !ok || approvalType != GerritCodeReviewApprovalType {
+				if ctx.Debug > 2 {
+					Printf("FirstReviewDatetime: incorrect type %+v\n", iApprovalType)
+				}
+				continue
+			}
+			iGrantedOn, okGrantedOn := approval["grantedOn"]
+			var grantedOn time.Time
+			if okCreatedOn && okGrantedOn {
+				grantedOn, okGrantedOn = iGrantedOn.(time.Time)
+				if okGrantedOn {
+					if grantedOn.Before(createdOn) {
+						Printf("approval granted before patchset was created %+v < %+v, skipping\n", grantedOn, createdOn)
+						continue
+					}
+				}
+			}
+			// Printf("FirstReviewDatetime: (%+v,%T,%v) <=> (%+v,%T,%+v)\n", createdOn, createdOn, okCreatedOn, grantedOn, grantedOn, okGrantedOn)
+			byUsername, okByUsername := Dig(approval, []string{"by", "username"}, false, true)
+			byEmail, okByEmail := Dig(approval, []string{"by", "email"}, false, true)
+			// Printf("FirstReviewDatetime: (%s,%s,%s,%s) (%v,%v,%v,%v)\n", ownerUsername, ownerEmail, byUsername, byEmail, okOwnerUsername, okOwnerEmail, okByUsername, okByEmail)
+			var okReviewDatetime bool
+			if okByUsername && okOwnerUsername {
+				// Printf("FirstReviewDatetime: usernames set\n")
+				byUName, _ := byUsername.(string)
+				ownerUName, _ := ownerUsername.(string)
+				if byUName != ownerUName {
+					reviewDatetime, okReviewDatetime = grantedOn, okGrantedOn
+				}
+			} else if okByEmail && okOwnerEmail {
+				// Printf("FirstReviewDatetime: emails set\n")
+				byMail, _ := byEmail.(string)
+				ownerMail, _ := ownerEmail.(string)
+				if byMail != ownerMail {
+					reviewDatetime, okReviewDatetime = grantedOn, okGrantedOn
+				}
+			} else {
+				// Printf("FirstReviewDatetime: else case\n")
+				reviewDatetime, okReviewDatetime = grantedOn, okGrantedOn
+			}
+			if ctx.Debug > 2 {
+				Printf("FirstReviewDatetime: final (%+v,%+v)\n", reviewDatetime, okReviewDatetime)
+			}
+			if okReviewDatetime && reviewDatetime != nil {
+				return
+			}
+		}
+	}
+	return
+}
+
 // LastChangesetApprovalValue - return last approval status
 func (j *DSGerrit) LastChangesetApprovalValue(ctx *Ctx, patchSets []interface{}) (status interface{}) {
 	if ctx.Debug > 2 {
@@ -993,7 +1092,7 @@ func (j *DSGerrit) LastChangesetApprovalValue(ctx *Ctx, patchSets []interface{})
 		iApprovals, ok := patchSet["approvals"]
 		if !ok {
 			if ctx.Debug > 2 {
-				Printf("LastChangesetApprovalValue: no approvals 1\n")
+				Printf("LastChangesetApprovalValue: no approvals\n")
 			}
 			continue
 		}
@@ -1132,9 +1231,13 @@ func (j *DSGerrit) EnrichItem(ctx *Ctx, item map[string]interface{}, author stri
 	rich["status_value"] = status
 	rich["changeset_status_value"] = status
 	rich["changeset_status"] = status
+	firstReviewDt := j.FirstReviewDatetime(ctx, review, patchSets)
+	rich["first_review_date"] = firstReviewDt
 	// FIXME
 	Printf("%+v\n", rich)
-	os.Exit(1)
+	if firstReviewDt != nil && status != nil {
+		os.Exit(1)
+	}
 	return
 }
 
