@@ -602,12 +602,140 @@ func (j *DSGerrit) ElasticRichMapping() []byte {
 	return GerritRichMapping
 }
 
+// IdentityForObject - construct identity from a given object
+func (j *DSGerrit) IdentityForObject(ctx *Ctx, obj map[string]interface{}) (identity [3]string) {
+	if ctx.Debug > 2 {
+		defer func() {
+			Printf("%+v -> %+v\n", obj, identity)
+		}()
+	}
+	item := obj
+	data, ok := Dig(item, []string{"data"}, false, true)
+	if ok {
+		mp, ok := data.(map[string]interface{})
+		if ok {
+			// FIXME
+			Printf("digged in data: %+v\n", obj)
+			item = mp
+		}
+	}
+	for i, prop := range []string{"name", "username", "email"} {
+		iVal, ok := Dig(item, []string{prop}, false, true)
+		if ok {
+			val, ok := iVal.(string)
+			if ok {
+				identity[i] = val
+			}
+		} else {
+			identity[i] = Nil
+		}
+	}
+	return
+}
+
 // GetItemIdentities return list of item's identities, each one is [3]string
 // (name, username, email) tripples, special value Nil "<nil>" means null
 // we use string and not *string which allows nil to allow usage as a map key
-func (j *DSGerrit) GetItemIdentities(ctx *Ctx, doc interface{}) (map[[3]string]struct{}, error) {
-	// IMPL:
-	return map[[3]string]struct{}{}, nil
+func (j *DSGerrit) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3]string]struct{}, err error) {
+	if ctx.Debug > 2 {
+		defer func() {
+			Printf("%+v -> %+v\n", DumpPreview(doc, 100), identities)
+		}()
+	}
+	init := false
+	item, _ := Dig(doc, []string{"data"}, true, false)
+	iUser, ok := Dig(item, []string{"owner"}, false, true)
+	if ok {
+		user, ok := iUser.(map[string]interface{})
+		if ok {
+			if !init {
+				identities = make(map[[3]string]struct{})
+				init = true
+			}
+			identities[j.IdentityForObject(ctx, user)] = struct{}{}
+		}
+	}
+	iPatchSets, ok := Dig(item, []string{"patchSets"}, false, true)
+	if ok {
+		patchSets, ok := iPatchSets.([]interface{})
+		if ok {
+			for _, iPatch := range patchSets {
+				patch, ok := iPatch.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				iUploader, ok := Dig(patch, []string{"uploader"}, false, true)
+				if ok {
+					uploader, ok := iUploader.(map[string]interface{})
+					if ok {
+						if !init {
+							identities = make(map[[3]string]struct{})
+							init = true
+						}
+						identities[j.IdentityForObject(ctx, uploader)] = struct{}{}
+					}
+				}
+				iAuthor, ok := Dig(patch, []string{"author"}, false, true)
+				if ok {
+					author, ok := iAuthor.(map[string]interface{})
+					if ok {
+						if !init {
+							identities = make(map[[3]string]struct{})
+							init = true
+						}
+						identities[j.IdentityForObject(ctx, author)] = struct{}{}
+					}
+				}
+				iApprovals, ok := Dig(patch, []string{"approvals"}, false, true)
+				if ok {
+					approvals, ok := iApprovals.([]interface{})
+					if ok {
+						for _, iApproval := range approvals {
+							approval, ok := iApproval.(map[string]interface{})
+							if !ok {
+								continue
+							}
+							iBy, ok := Dig(approval, []string{"by"}, false, true)
+							if ok {
+								by, ok := iBy.(map[string]interface{})
+								if ok {
+									if !init {
+										identities = make(map[[3]string]struct{})
+										init = true
+									}
+									identities[j.IdentityForObject(ctx, by)] = struct{}{}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	iComments, ok := Dig(item, []string{"comments"}, false, true)
+	if ok {
+		comments, ok := iComments.([]interface{})
+		if ok {
+			for _, iComment := range comments {
+				comment, ok := iComment.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				iReviewer, ok := Dig(comment, []string{"reviewer"}, false, true)
+				if ok {
+					reviewer, ok := iReviewer.(map[string]interface{})
+					if ok {
+						if !init {
+							identities = make(map[[3]string]struct{})
+							init = true
+						}
+						identities[j.IdentityForObject(ctx, reviewer)] = struct{}{}
+					}
+				}
+			}
+		}
+	}
+	return
 }
 
 // GerritEnrichItemsFunc - iterate items and enrich them
