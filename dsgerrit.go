@@ -1315,11 +1315,6 @@ func (j *DSGerrit) EnrichPatchsets(ctx *Ctx, review map[string]interface{}, patc
 
 // EnrichComments - return rich items from raw patch sets
 func (j *DSGerrit) EnrichComments(ctx *Ctx, review map[string]interface{}, comments []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
-	// FIXME
-	defer func() {
-		Printf("%+v --> %+v\n", comments, richItems)
-		os.Exit(1)
-	}()
 	copyFields := []string{"wip", "open", "url", "summary", "repository", "branch", "changeset_number"}
 	iReviewID, ok := review["id"]
 	if !ok {
@@ -1379,11 +1374,12 @@ func (j *DSGerrit) EnrichComments(ctx *Ctx, review map[string]interface{}, comme
 		rich["type"] = "comment"
 		rich["id"] = reviewID + "_comment_" + fmt.Sprintf("%d.0", created.Unix())
 		if affs {
+			sCreated := ToYMDTHMSZDate(created)
 			_, okReviewer := comment["reviewer"]
 			if okReviewer {
 				authorKey := "reviewer"
 				var affsItems map[string]interface{}
-				affsItems, err = j.AffsItems(ctx, comment, GerritCommentRoles, iCreated)
+				affsItems, err = j.AffsItems(ctx, comment, GerritCommentRoles, sCreated)
 				if err != nil {
 					return
 				}
