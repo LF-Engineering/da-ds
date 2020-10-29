@@ -22,6 +22,8 @@ const (
 	GerritDefaultSSHPort = 29418
 	// GerritDefaultMaxReviews = default max reviews when processing gerrit
 	GerritDefaultMaxReviews = 500
+	// GerritCodeReviewApprovalType - code review approval type
+	GerritCodeReviewApprovalType = "Code-Review"
 )
 
 var (
@@ -971,6 +973,90 @@ func (j *DSGerrit) ConvertDates(ctx *Ctx, review map[string]interface{}) {
 	}
 }
 
+// LastChangesetApprovalValue - return last approval status
+func (j *DSGerrit) LastChangesetApprovalValue(ctx *Ctx, patchSets []interface{}) (status interface{}) {
+	if ctx.Debug > 2 {
+		defer func() {
+			Printf("LastChangesetApprovalValue: %+v -> %+v\n", patchSets, status)
+		}()
+	}
+	nPatchSets := len(patchSets)
+	if ctx.Debug > 2 {
+		Printf("LastChangesetApprovalValue: %d patch sets\n", nPatchSets)
+	}
+	for i := nPatchSets - 1; i >= 0; i-- {
+		iPatchSet := patchSets[i]
+		patchSet, ok := iPatchSet.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		iApprovals, ok := patchSet["approvals"]
+		if !ok {
+			if ctx.Debug > 2 {
+				Printf("LastChangesetApprovalValue: no approvals 1\n")
+			}
+			continue
+		}
+		approvals, ok := iApprovals.([]interface{})
+		if !ok {
+			continue
+		}
+		authorUsername, okAuthorUsername := Dig(patchSet, []string{"author", "username"}, false, true)
+		authorEmail, okAuthorEmail := Dig(patchSet, []string{"author", "email"}, false, true)
+		nApprovals := len(approvals)
+		if ctx.Debug > 2 {
+			Printf("LastChangesetApprovalValue: %d approvals\n", nApprovals)
+		}
+		for j := nApprovals - 1; j >= 0; j-- {
+			iApproval := approvals[j]
+			approval, ok := iApproval.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			iApprovalType, ok := approval["type"]
+			if !ok {
+				continue
+			}
+			approvalType, ok := iApprovalType.(string)
+			if !ok || approvalType != GerritCodeReviewApprovalType {
+				if ctx.Debug > 2 {
+					Printf("LastChangesetApprovalValue: incorrect type %+v\n", iApprovalType)
+				}
+				continue
+			}
+			byUsername, okByUsername := Dig(approval, []string{"by", "username"}, false, true)
+			byEmail, okByEmail := Dig(approval, []string{"by", "email"}, false, true)
+			// Printf("LastChangesetApprovalValue: (%s,%s,%s,%s) (%v,%v,%v,%v)\n", authorUsername, authorEmail, byUsername, byEmail, okAuthorUsername, okAuthorEmail, okByUsername, okByEmail)
+			var okStatus bool
+			if okByUsername && okAuthorUsername {
+				// Printf("LastChangesetApprovalValue: usernames set\n")
+				byUName, _ := byUsername.(string)
+				authorUName, _ := authorUsername.(string)
+				if byUName != authorUName {
+					status, okStatus = approval["value"]
+				}
+			} else if okByEmail && okAuthorEmail {
+				// Printf("LastChangesetApprovalValue: emails set\n")
+				byMail, _ := byEmail.(string)
+				authorMail, _ := authorEmail.(string)
+				if byMail != authorMail {
+					status, okStatus = approval["value"]
+				}
+			} else {
+				// Printf("LastChangesetApprovalValue: else case\n")
+				status, okStatus = approval["value"]
+			}
+			if ctx.Debug > 2 {
+				Printf("LastChangesetApprovalValue: final (%+v,%+v)\n", status, okStatus)
+			}
+			if okStatus && status != nil {
+				return
+			}
+		}
+	}
+	return
+}
+
 // EnrichItem - return rich item from raw item
 func (j *DSGerrit) EnrichItem(ctx *Ctx, item map[string]interface{}, author string, affs bool, extra interface{}) (rich map[string]interface{}, err error) {
 	rich = make(map[string]interface{})
@@ -989,11 +1075,63 @@ func (j *DSGerrit) EnrichItem(ctx *Ctx, item map[string]interface{}, author stri
 	rich["status"], _ = review["status"]
 	rich["branch"], _ = review["branch"]
 	rich["url"], _ = review["url"]
-	rich["summary"], _ = review["subject"]
 	rich["githash"], _ = review["id"]
 	rich["opened"], _ = review["createdOn"]
 	rich["repository"], _ = review["project"]
 	rich["changeset_number"], _ = review["number"]
+	uuid, ok := rich[UUID].(string)
+	if !ok {
+		err = fmt.Errorf("cannot read string uuid from %+v", DumpPreview(rich, 100))
+		return
+	}
+	changesetNumber := j.ItemID(review)
+	rich["id"] = uuid + "_changeset_" + changesetNumber
+	summary := ""
+	iSummary, ok := review["subject"]
+	if ok {
+		summary, _ = iSummary.(string)
+	}
+	rich["summary_analyzed"] = summary
+	if len(summary) > KeywordMaxlength {
+		summary = summary[:KeywordMaxlength]
+	}
+	rich["summary"] = summary
+	rich["name"] = nil
+	rich["domain"] = nil
+	ownerName, ok := Dig(review, []string{"owner", "name"}, false, true)
+	if ok {
+		rich["name"] = ownerName
+		iOwnerEmail, ok := Dig(review, []string{"owner", "email"}, false, true)
+		if ok {
+			ownerEmail, ok := iOwnerEmail.(string)
+			if ok {
+				ary := strings.Split(ownerEmail, "@")
+				if len(ary) > 1 {
+					rich["domain"] = strings.TrimSpace(ary[1])
+				}
+			}
+		}
+	}
+	iPatchSets, ok := Dig(review, []string{"patchSets"}, false, true)
+	nPatchSets := 0
+	createdOn, _ := review["createdOn"]
+	var patchSets []interface{}
+	if ok {
+		patchSets, ok = iPatchSets.([]interface{})
+		if ok {
+			nPatchSets = len(patchSets)
+			firstPatch, ok := patchSets[0].(map[string]interface{})
+			if ok {
+				createdOn, _ = firstPatch["createdOn"]
+			}
+		}
+	}
+	rich["created_on"] = createdOn
+	rich["patchsets"] = nPatchSets
+	status := j.LastChangesetApprovalValue(ctx, patchSets)
+	rich["status_value"] = status
+	rich["changeset_status_value"] = status
+	rich["changeset_status"] = status
 	// FIXME
 	Printf("%+v\n", rich)
 	os.Exit(1)
