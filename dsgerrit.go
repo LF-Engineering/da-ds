@@ -37,6 +37,8 @@ var (
 	GerritVersionRegexp = regexp.MustCompile(`gerrit version (\d+)\.(\d+).*`)
 	// GerritDefaultSearchField - default search field
 	GerritDefaultSearchField = "item_id"
+	// GerritReviewRoles - roles to fetch affiliation data
+	GerritReviewRoles = []string{"owner"}
 )
 
 // DSGerrit - DS implementation for stub - does nothing at all, just presents a skeleton code
@@ -1171,11 +1173,21 @@ func (j *DSGerrit) EnrichItem(ctx *Ctx, item map[string]interface{}, author stri
 		return
 	}
 	j.ConvertDates(ctx, review)
-	rich["status"], _ = review["status"]
+	iReviewStatus, ok := review["status"]
+	var reviewStatus string
+	if ok {
+		reviewStatus, _ = iReviewStatus.(string)
+	}
+	rich["status"] = reviewStatus
 	rich["branch"], _ = review["branch"]
 	rich["url"], _ = review["url"]
 	rich["githash"], _ = review["id"]
-	rich["opened"], _ = review["createdOn"]
+	var createdOn time.Time
+	iCreatedOn, ok := review["createdOn"]
+	if ok {
+		createdOn, _ = iCreatedOn.(time.Time)
+	}
+	rich["opened"] = createdOn
 	rich["repository"], _ = review["project"]
 	rich["changeset_number"], _ = review["number"]
 	uuid, ok := rich[UUID].(string)
@@ -1213,7 +1225,6 @@ func (j *DSGerrit) EnrichItem(ctx *Ctx, item map[string]interface{}, author stri
 	}
 	iPatchSets, ok := Dig(review, []string{"patchSets"}, false, true)
 	nPatchSets := 0
-	createdOn, _ := review["createdOn"]
 	var patchSets []interface{}
 	if ok {
 		patchSets, ok = iPatchSets.([]interface{})
@@ -1221,7 +1232,10 @@ func (j *DSGerrit) EnrichItem(ctx *Ctx, item map[string]interface{}, author stri
 			nPatchSets = len(patchSets)
 			firstPatch, ok := patchSets[0].(map[string]interface{})
 			if ok {
-				createdOn, _ = firstPatch["createdOn"]
+				iCreatedOn, ok = firstPatch["createdOn"]
+				if ok {
+					createdOn, _ = iCreatedOn.(time.Time)
+				}
 			}
 		}
 	}
@@ -1231,11 +1245,65 @@ func (j *DSGerrit) EnrichItem(ctx *Ctx, item map[string]interface{}, author stri
 	rich["status_value"] = status
 	rich["changeset_status_value"] = status
 	rich["changeset_status"] = status
-	firstReviewDt := j.FirstReviewDatetime(ctx, review, patchSets)
-	rich["first_review_date"] = firstReviewDt
+	iFirstReviewDt := j.FirstReviewDatetime(ctx, review, patchSets)
+	rich["first_review_date"] = iFirstReviewDt
+	if iFirstReviewDt != nil {
+		firstReviewDt, ok := iFirstReviewDt.(time.Time)
+		if ok {
+			rich["time_to_first_review"] = float64(firstReviewDt.Sub(createdOn).Seconds()) / 86400.0
+		}
+	}
+	var lastUpdatedOn time.Time
+	iLastUpdatedOn, ok := review["lastUpdated"]
+	if ok {
+		lastUpdatedOn, _ = iLastUpdatedOn.(time.Time)
+	}
+	rich["last_updated"] = lastUpdatedOn
+	if reviewStatus == "MERGED" || reviewStatus == "ABANDONED" {
+		rich["timeopen"] = float64(lastUpdatedOn.Sub(createdOn).Seconds()) / 86400.0
+	} else {
+		rich["timeopen"] = float64(time.Now().Sub(createdOn).Seconds()) / 86400.0
+	}
+	wip, ok := Dig(review, []string{"wip"}, false, true)
+	if ok {
+		rich["wip"] = wip
+	} else {
+		rich["wip"] = false
+	}
+	rich["open"], _ = Dig(review, []string{"open"}, false, true)
+	rich["type"] = "changeset"
+	if affs {
+		authorKey := "owner"
+		var affsItems map[string]interface{}
+		affsItems, err = j.AffsItems(ctx, review, GerritReviewRoles, updatedOn)
+		if err != nil {
+			return
+		}
+		for prop, value := range affsItems {
+			rich[prop] = value
+		}
+		for _, suff := range AffsFields {
+			rich[Author+suff] = rich[authorKey+suff]
+			// Copy to changeset object
+			rich["changeset"+suff] = rich[authorKey+suff]
+		}
+		orgsKey := authorKey + MultiOrgNames
+		_, ok := Dig(rich, []string{orgsKey}, false, true)
+		if !ok {
+			rich[orgsKey] = []interface{}{}
+		}
+		// Copy to changeset object
+		rich["changeset"+MultiOrgNames] = rich[orgsKey]
+	}
+	for prop, value := range CommonFields(j, createdOn, Review) {
+		rich[prop] = value
+	}
+	for prop, value := range CommonFields(j, createdOn, "changeset") {
+		rich[prop] = value
+	}
 	// FIXME
 	Printf("%+v\n", rich)
-	if firstReviewDt != nil && status != nil {
+	if iFirstReviewDt != nil && status != nil {
 		os.Exit(1)
 	}
 	return
