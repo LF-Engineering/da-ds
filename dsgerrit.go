@@ -892,9 +892,111 @@ func (j *DSGerrit) EnrichItems(ctx *Ctx) (err error) {
 	return
 }
 
+// ConvertDates - convert floating point dates to datetimes
+func (j *DSGerrit) ConvertDates(ctx *Ctx, review map[string]interface{}) {
+	for _, field := range []string{"timestamp", "createdOn", "lastUpdated"} {
+		idt, ok := Dig(review, []string{field}, false, true)
+		if !ok {
+			continue
+		}
+		fdt, ok := idt.(float64)
+		if !ok {
+			continue
+		}
+		review[field] = time.Unix(int64(fdt), 0)
+		// Printf("converted %s: %v -> %v\n", field, idt, review[field])
+	}
+	iPatchSets, ok := Dig(review, []string{"patchSets"}, false, true)
+	if ok {
+		patchSets, ok := iPatchSets.([]interface{})
+		if ok {
+			for _, iPatch := range patchSets {
+				patch, ok := iPatch.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				field := "createdOn"
+				idt, ok := Dig(patch, []string{field}, false, true)
+				if ok {
+					fdt, ok := idt.(float64)
+					if ok {
+						patch[field] = time.Unix(int64(fdt), 0)
+						// Printf("converted patch %s: %v -> %v\n", field, idt, patch[field])
+					}
+				}
+				iApprovals, ok := Dig(patch, []string{"approvals"}, false, true)
+				if ok {
+					approvals, ok := iApprovals.([]interface{})
+					if ok {
+						for _, iApproval := range approvals {
+							approval, ok := iApproval.(map[string]interface{})
+							if !ok {
+								continue
+							}
+							field := "grantedOn"
+							idt, ok := Dig(approval, []string{field}, false, true)
+							if ok {
+								fdt, ok := idt.(float64)
+								if ok {
+									approval[field] = time.Unix(int64(fdt), 0)
+									// Printf("converted patch approval %s: %v -> %v\n", field, idt, approval[field])
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	iComments, ok := Dig(review, []string{"comments"}, false, true)
+	if ok {
+		comments, ok := iComments.([]interface{})
+		if ok {
+			for _, iComment := range comments {
+				comment, ok := iComment.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				field := "timestamp"
+				idt, ok := Dig(comment, []string{field}, false, true)
+				if ok {
+					fdt, ok := idt.(float64)
+					if ok {
+						comment[field] = time.Unix(int64(fdt), 0)
+						// Printf("converted comment %s: %v -> %v\n", field, idt, comment[field])
+					}
+				}
+			}
+		}
+	}
+}
+
 // EnrichItem - return rich item from raw item
 func (j *DSGerrit) EnrichItem(ctx *Ctx, item map[string]interface{}, author string, affs bool, extra interface{}) (rich map[string]interface{}, err error) {
+	rich = make(map[string]interface{})
+	for _, field := range RawFields {
+		v, _ := item[field]
+		rich[field] = v
+	}
+	updatedOn, _ := Dig(item, []string{DefaultDateField}, true, false)
+	rich["closed"] = updatedOn
+	review, ok := item["data"].(map[string]interface{})
+	if !ok {
+		err = fmt.Errorf("missing data field in item %+v", DumpPreview(item, 100))
+		return
+	}
+	j.ConvertDates(ctx, review)
+	rich["status"], _ = review["status"]
+	rich["branch"], _ = review["branch"]
+	rich["url"], _ = review["url"]
+	rich["summary"], _ = review["subject"]
+	rich["githash"], _ = review["id"]
+	rich["opened"], _ = review["createdOn"]
+	rich["repository"], _ = review["project"]
+	rich["changeset_number"], _ = review["number"]
 	// FIXME
+	Printf("%+v\n", rich)
+	os.Exit(1)
 	return
 }
 
