@@ -614,8 +614,9 @@ func (j *DSGerrit) IdentityForObject(ctx *Ctx, obj map[string]interface{}) (iden
 	if ok {
 		mp, ok := data.(map[string]interface{})
 		if ok {
-			// FIXME
-			Printf("digged in data: %+v\n", obj)
+			if ctx.Debug > 2 {
+				Printf("digged in data: %+v\n", obj)
+			}
 			item = mp
 		}
 	}
@@ -742,7 +743,6 @@ func (j *DSGerrit) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[
 // items is a current pack of input items
 // docs is a pointer to where extracted identities will be stored
 func GerritEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]interface{}) (err error) {
-	// IMPL:
 	if ctx.Debug > 0 {
 		Printf("gerrit enrich items %d/%d func\n", len(items), len(*docs))
 	}
@@ -755,6 +755,61 @@ func GerritEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs 
 		ch = make(chan error)
 	}
 	dbConfigured := ctx.AffsDBConfigured()
+	gerrit, _ := ds.(*DSGerrit)
+	getRichItems := func(doc map[string]interface{}) (richItems []interface{}, e error) {
+		var rich map[string]interface{}
+		rich, e = ds.EnrichItem(ctx, doc, "", dbConfigured, nil)
+		if e != nil {
+			return
+		}
+		richItems = append(richItems, rich)
+		data, _ := Dig(doc, []string{"data"}, true, false)
+		iPatchSets, ok := Dig(data, []string{"patchSets"}, false, true)
+		if ok {
+			patchSets, ok := iPatchSets.([]interface{})
+			if ok {
+				var patches []map[string]interface{}
+				for _, iPatch := range patchSets {
+					patch, ok := iPatch.(map[string]interface{})
+					if !ok {
+						continue
+					}
+					patches = append(patches, patch)
+				}
+				if len(patches) > 0 {
+					var riches []interface{}
+					riches, e = gerrit.EnrichPatchsets(ctx, patches, dbConfigured)
+					if e != nil {
+						return
+					}
+					richItems = append(richItems, riches...)
+				}
+			}
+		}
+		iComments, ok := Dig(data, []string{"comments"}, false, true)
+		if ok {
+			comments, ok := iComments.([]interface{})
+			if ok {
+				var comms []map[string]interface{}
+				for _, iComment := range comments {
+					comment, ok := iComment.(map[string]interface{})
+					if !ok {
+						continue
+					}
+					comms = append(comms, comment)
+				}
+				if len(comms) > 0 {
+					var riches []interface{}
+					riches, e = gerrit.EnrichComments(ctx, comms, dbConfigured)
+					if e != nil {
+						return
+					}
+					richItems = append(richItems, riches...)
+				}
+			}
+		}
+		return
+	}
 	nThreads := 0
 	procItem := func(c chan error, idx int) (e error) {
 		if thrN > 1 {
@@ -779,20 +834,23 @@ func GerritEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs 
 			e = fmt.Errorf("Failed to parse document %+v\n", doc)
 			return
 		}
-		if 1 == 0 {
-			Printf("%v\n", dbConfigured)
+		richItems, e := getRichItems(doc)
+		if e != nil {
+			return
 		}
-		// Actual item enrichment
-		/*
-			    var rich map[string]interface{}
-					if thrN > 1 {
-						mtx.Lock()
-					}
-					*docs = append(*docs, rich)
-					if thrN > 1 {
-						mtx.Unlock()
-					}
-		*/
+		for _, rich := range richItems {
+			e = EnrichItem(ctx, ds, rich.(map[string]interface{}))
+			if e != nil {
+				return
+			}
+		}
+		if thrN > 1 {
+			mtx.Lock()
+		}
+		*docs = append(*docs, richItems...)
+		if thrN > 1 {
+			mtx.Unlock()
+		}
 		return
 	}
 	if thrN > 1 {
@@ -834,10 +892,21 @@ func (j *DSGerrit) EnrichItems(ctx *Ctx) (err error) {
 	return
 }
 
-// EnrichItem - return rich item from raw item for a given author type
+// EnrichItem - return rich item from raw item
 func (j *DSGerrit) EnrichItem(ctx *Ctx, item map[string]interface{}, author string, affs bool, extra interface{}) (rich map[string]interface{}, err error) {
-	// IMPL:
-	rich = item
+	// FIXME
+	return
+}
+
+// EnrichPatchsets - return rich items from raw patch sets
+func (j *DSGerrit) EnrichPatchsets(ctx *Ctx, patches []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
+	// FIXME
+	return
+}
+
+// EnrichComments - return rich items from raw patch sets
+func (j *DSGerrit) EnrichComments(ctx *Ctx, comments []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
+	// FIXME
 	return
 }
 

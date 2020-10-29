@@ -1388,6 +1388,12 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 		if e != nil {
 			return
 		}
+		for _, rich := range richItems {
+			e = EnrichItem(ctx, ds, rich.(map[string]interface{}))
+			if e != nil {
+				return
+			}
+		}
 		if thrN > 1 {
 			mtx.Lock()
 		}
