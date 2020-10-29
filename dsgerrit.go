@@ -783,7 +783,7 @@ func GerritEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs 
 				}
 				if len(patches) > 0 {
 					var riches []interface{}
-					riches, e = gerrit.EnrichPatchsets(ctx, patches, dbConfigured)
+					riches, e = gerrit.EnrichPatchsets(ctx, rich, patches, dbConfigured)
 					if e != nil {
 						return
 					}
@@ -805,7 +805,7 @@ func GerritEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs 
 				}
 				if len(comms) > 0 {
 					var riches []interface{}
-					riches, e = gerrit.EnrichComments(ctx, comms, dbConfigured)
+					riches, e = gerrit.EnrichComments(ctx, rich, comms, dbConfigured)
 					if e != nil {
 						return
 					}
@@ -1306,14 +1306,80 @@ func (j *DSGerrit) EnrichItem(ctx *Ctx, item map[string]interface{}, author stri
 }
 
 // EnrichPatchsets - return rich items from raw patch sets
-func (j *DSGerrit) EnrichPatchsets(ctx *Ctx, patches []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
+func (j *DSGerrit) EnrichPatchsets(ctx *Ctx, review map[string]interface{}, patcheSets []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
 	// FIXME
 	return
 }
 
 // EnrichComments - return rich items from raw patch sets
-func (j *DSGerrit) EnrichComments(ctx *Ctx, comments []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
+func (j *DSGerrit) EnrichComments(ctx *Ctx, review map[string]interface{}, comments []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
 	// FIXME
+	defer func() {
+		Printf("%+v --> %+v\n", comments, richItems)
+		os.Exit(1)
+	}()
+	copyFields := []string{"wip", "open", "url", "summary", "repository", "branch", "changeset_number"}
+	iReviewID, ok := review["id"]
+	if !ok {
+		err = fmt.Errorf("cannot get id property of review: %+v", review)
+		return
+	}
+	reviewID, ok := iReviewID.(string)
+	if !ok {
+		err = fmt.Errorf("cannot get string id property of review: %+v", iReviewID)
+		return
+	}
+	for _, comment := range comments {
+		rich := make(map[string]interface{})
+		for _, field := range RawFields {
+			v, _ := review[field]
+			rich[field] = v
+		}
+		for _, field := range copyFields {
+			rich[field] = review[field]
+		}
+		rich["reviewer_name"] = nil
+		rich["reviewer_domain"] = nil
+		reviewerName, ok := Dig(comment, []string{"reviewer", "name"}, false, true)
+		if ok {
+			rich["reviewer_name"] = reviewerName
+			iReviewerEmail, ok := Dig(comment, []string{"reviewer", "email"}, false, true)
+			if ok {
+				reviewerEmail, ok := iReviewerEmail.(string)
+				if ok {
+					ary := strings.Split(reviewerEmail, "@")
+					if len(ary) > 1 {
+						rich["reviewer_domain"] = strings.TrimSpace(ary[1])
+					}
+				}
+			}
+		}
+		var created time.Time
+		iCreated, ok := comment["timestamp"]
+		if ok {
+			created, ok = iCreated.(time.Time)
+		}
+		if !ok {
+			err = fmt.Errorf("cannot read timestamp property from comment: %+v", comment)
+			return
+		}
+		Printf("created: %+v\n", created)
+		rich["comment_created_on"] = created
+		richItems = append(richItems, rich)
+		message := ""
+		iMessage, ok := comment["message"]
+		if ok {
+			message, _ = iMessage.(string)
+		}
+		rich["comment_message_analyzed"] = message
+		if len(message) > KeywordMaxlength {
+			message = message[:KeywordMaxlength]
+		}
+		rich["comment_message"] = message
+		rich["type"] = "comment"
+		rich["id"] = reviewID + "_comment_" + fmt.Sprintf("%d", created.Unix())
+		Printf("id: %s\n", rich["id"])
+	}
 	return
 }
 
