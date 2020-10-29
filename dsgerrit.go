@@ -504,6 +504,7 @@ func (j *DSGerrit) DateField(*Ctx) string {
 // RichIDField - return rich ID field name
 func (j *DSGerrit) RichIDField(*Ctx) string {
 	// IMPL:
+	// _source.review_id  || id ?
 	return DefaultIDField
 }
 
@@ -1301,11 +1302,6 @@ func (j *DSGerrit) EnrichItem(ctx *Ctx, item map[string]interface{}, author stri
 	for prop, value := range CommonFields(j, createdOn, "changeset") {
 		rich[prop] = value
 	}
-	// FIXME
-	Printf("%+v\n", rich)
-	if iFirstReviewDt != nil && status != nil {
-		os.Exit(1)
-	}
 	return
 }
 
@@ -1322,15 +1318,44 @@ func (j *DSGerrit) EnrichComments(ctx *Ctx, comments []map[string]interface{}, a
 }
 
 // AffsItems - return affiliations data items for given roles and date
-func (j *DSGerrit) AffsItems(ctx *Ctx, rawItem map[string]interface{}, roles []string, date interface{}) (affsItems map[string]interface{}, err error) {
-	// IMPL:
+func (j *DSGerrit) AffsItems(ctx *Ctx, review map[string]interface{}, roles []string, date interface{}) (affsItems map[string]interface{}, err error) {
+	affsItems = make(map[string]interface{})
+	var dt time.Time
+	dt, err = TimeParseInterfaceString(date)
+	if err != nil {
+		return
+	}
+	for _, role := range roles {
+		identity := j.GetRoleIdentity(ctx, review, role)
+		if len(identity) == 0 {
+			continue
+		}
+		affsIdentity := IdenityAffsData(ctx, j, identity, nil, dt, role)
+		for prop, value := range affsIdentity {
+			affsItems[prop] = value
+		}
+		for _, suff := range RequiredAffsFields {
+			k := role + suff
+			_, ok := affsIdentity[k]
+			if !ok {
+				affsIdentity[k] = Unknown
+			}
+		}
+	}
 	return
 }
 
 // GetRoleIdentity - return identity data for a given role
-func (j *DSGerrit) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role string) map[string]interface{} {
-	// IMPL:
-	return map[string]interface{}{"name": nil, "username": nil, "email": nil}
+func (j *DSGerrit) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role string) (identity map[string]interface{}) {
+	iRole, ok := Dig(item, []string{role}, false, true)
+	if ok {
+		roleObj, ok := iRole.(map[string]interface{})
+		if ok {
+			ident := j.IdentityForObject(ctx, roleObj)
+			identity = map[string]interface{}{"name": ident[0], "username": ident[1], "email": ident[2]}
+		}
+	}
+	return
 }
 
 // AllRoles - return all roles defined for the backend

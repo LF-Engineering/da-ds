@@ -1141,6 +1141,7 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 
 // AffsItems - return affiliations data items for given roles and date
 func (j *DSGroupsio) AffsItems(ctx *Ctx, rawItem map[string]interface{}, roles []string, date interface{}) (affsItems map[string]interface{}, err error) {
+	// Groups.io is not using this
 	return
 }
 
