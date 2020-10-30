@@ -573,7 +573,7 @@ func (j *DSGerrit) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string]int
 	mItem[UUID] = uuid
 	mItem[DefaultOriginField] = origin
 	mItem[DefaultTagField] = tag
-	mItem["updated_on"] = updatedOn
+	mItem[DefaultOffsetField] = float64(updatedOn.Unix())
 	mItem["category"] = j.ItemCategory(item)
 	mItem["search_fields"] = make(map[string]interface{})
 	project, _ := Dig(item, []string{"project"}, true, false)
@@ -1427,7 +1427,7 @@ func (j *DSGerrit) EnrichItem(ctx *Ctx, item map[string]interface{}, author stri
 		rich["wip"] = false
 	}
 	rich["open"], _ = Dig(review, []string{"open"}, false, true)
-	rich["type"] = "changeset"
+	rich["type"] = Changeset
 	if affs {
 		authorKey := "owner"
 		var affsItems map[string]interface{}
@@ -1441,7 +1441,7 @@ func (j *DSGerrit) EnrichItem(ctx *Ctx, item map[string]interface{}, author stri
 		for _, suff := range AffsFields {
 			rich[Author+suff] = rich[authorKey+suff]
 			// Copy to changeset object
-			rich["changeset"+suff] = rich[authorKey+suff]
+			rich[Changeset+suff] = rich[authorKey+suff]
 		}
 		orgsKey := authorKey + MultiOrgNames
 		_, ok := Dig(rich, []string{orgsKey}, false, true)
@@ -1449,12 +1449,12 @@ func (j *DSGerrit) EnrichItem(ctx *Ctx, item map[string]interface{}, author stri
 			rich[orgsKey] = []interface{}{}
 		}
 		// Copy to changeset object
-		rich["changeset"+MultiOrgNames] = rich[orgsKey]
+		rich[Changeset+MultiOrgNames] = rich[orgsKey]
 	}
 	for prop, value := range CommonFields(j, createdOn, Review) {
 		rich[prop] = value
 	}
-	for prop, value := range CommonFields(j, createdOn, "changeset") {
+	for prop, value := range CommonFields(j, createdOn, Changeset) {
 		rich[prop] = value
 	}
 	return
@@ -1541,7 +1541,7 @@ func (j *DSGerrit) EnrichPatchsets(ctx *Ctx, review map[string]interface{}, patc
 				rich["patchset_time_to_first_review"] = float64(firstReviewDt.Sub(created).Seconds()) / 86400.0
 			}
 		}
-		rich["type"] = "patchset"
+		rich["type"] = Patchset
 		rich["id"] = reviewID + "_patchset_" + fmt.Sprintf("%v", number)
 		if affs {
 			sCreated := ToYMDTHMSZDate(created)
@@ -1553,12 +1553,12 @@ func (j *DSGerrit) EnrichPatchsets(ctx *Ctx, review map[string]interface{}, patc
 			for prop, value := range affsItems {
 				rich[prop] = value
 			}
-			CopyAffsRoleData(rich, review, "changeset", "changeset")
+			CopyAffsRoleData(rich, review, Changeset, Changeset)
 		}
 		for prop, value := range CommonFields(j, iCreated, Review) {
 			rich[prop] = value
 		}
-		for prop, value := range CommonFields(j, iCreated, "patchset") {
+		for prop, value := range CommonFields(j, iCreated, Patchset) {
 			rich[prop] = value
 		}
 		richItems = append(richItems, rich)
@@ -1649,7 +1649,7 @@ func (j *DSGerrit) EnrichApprovals(ctx *Ctx, patchSet map[string]interface{}, ap
 			desc = desc[:KeywordMaxlength]
 		}
 		rich["approval_description"] = desc
-		rich["type"] = "approval"
+		rich["type"] = Approval
 		rich["id"] = patchSetID + "_approval_" + fmt.Sprintf("%d.0", created.Unix())
 		if affs {
 			sCreated := ToYMDTHMSZDate(created)
@@ -1670,12 +1670,12 @@ func (j *DSGerrit) EnrichApprovals(ctx *Ctx, patchSet map[string]interface{}, ap
 			if !ok {
 				rich[orgsKey] = []interface{}{}
 			}
-			CopyAffsRoleData(rich, patchSet, "changeset", "changeset")
+			CopyAffsRoleData(rich, patchSet, Changeset, Changeset)
 		}
 		for prop, value := range CommonFields(j, iCreated, Review) {
 			rich[prop] = value
 		}
-		for prop, value := range CommonFields(j, iCreated, "approval") {
+		for prop, value := range CommonFields(j, iCreated, Approval) {
 			rich[prop] = value
 		}
 		richItems = append(richItems, rich)
@@ -1741,7 +1741,7 @@ func (j *DSGerrit) EnrichComments(ctx *Ctx, review map[string]interface{}, comme
 			message = message[:KeywordMaxlength]
 		}
 		rich["comment_message"] = message
-		rich["type"] = "comment"
+		rich["type"] = Comment
 		rich["id"] = reviewID + "_comment_" + fmt.Sprintf("%d.0", created.Unix())
 		if affs {
 			sCreated := ToYMDTHMSZDate(created)
@@ -1765,12 +1765,12 @@ func (j *DSGerrit) EnrichComments(ctx *Ctx, review map[string]interface{}, comme
 					rich[orgsKey] = []interface{}{}
 				}
 			}
-			CopyAffsRoleData(rich, review, "changeset", "changeset")
+			CopyAffsRoleData(rich, review, Changeset, Changeset)
 		}
 		for prop, value := range CommonFields(j, iCreated, Review) {
 			rich[prop] = value
 		}
-		for prop, value := range CommonFields(j, iCreated, "comment") {
+		for prop, value := range CommonFields(j, iCreated, Comment) {
 			rich[prop] = value
 		}
 		richItems = append(richItems, rich)
@@ -1838,13 +1838,13 @@ func (j *DSGerrit) AllRoles(ctx *Ctx, rich map[string]interface{}) (roles []stri
 	}
 	var possibleRoles []string
 	switch tp {
-	case "changeset":
+	case Changeset:
 		possibleRoles = GerritReviewRoles
-	case "comment":
+	case Comment:
 		possibleRoles = GerritCommentRoles
-	case "patchset":
+	case Patchset:
 		possibleRoles = []string{"uploader"}
-	case "approval":
+	case Approval:
 		possibleRoles = GerritApprovalRoles
 	}
 	for _, possibleRole := range possibleRoles {

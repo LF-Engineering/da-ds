@@ -284,7 +284,7 @@ func (j *DSStub) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string]inter
 	mItem[UUID] = uuid
 	mItem[DefaultOriginField] = origin
 	mItem[DefaultTagField] = tag
-	mItem["updated_on"] = updatedOn
+	mItem[DefaultOffsetField] = float64(updatedOn.Unix())
 	mItem["category"] = j.ItemCategory(item)
 	//mItem["search_fields"] = j.GenSearchFields(ctx, issue, uuid)
 	//mItem["search_fields"] = make(map[string]interface{})

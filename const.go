@@ -120,5 +120,14 @@ const Commit = "commit"
 // Review - common constant string
 const Review = "review"
 
+// Patchset - common constant string
+const Patchset = "patchset"
+
+// Changeset - common constant string
+const Changeset = "changeset"
+
+// Approval - common constant string
+const Approval = "approval"
+
 // ProjectSlug - common constant string
 const ProjectSlug = "project_slug"
