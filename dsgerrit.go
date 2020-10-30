@@ -43,6 +43,8 @@ var (
 	GerritCommentRoles = []string{"reviewer"}
 	// GerritPatchsetRoles - roles to fetch affiliation data for patchset
 	GerritPatchsetRoles = []string{"author", "uploader"}
+	// GerritApprovalRoles - roles to fetch affiliation data for approval
+	GerritApprovalRoles = []string{"by"}
 )
 
 // DSGerrit - DS implementation for stub - does nothing at all, just presents a skeleton code
@@ -766,6 +768,37 @@ func GerritEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs 
 	dbConfigured := ctx.AffsDBConfigured()
 	gerrit, _ := ds.(*DSGerrit)
 	getRichItems := func(doc map[string]interface{}) (richItems []interface{}, e error) {
+		/*
+			defer func() {
+				m := make(map[string]struct{})
+				if len(richItems) < 10 {
+					return
+				}
+				for _, iRich := range richItems {
+					rich, ok := iRich.(map[string]interface{})
+					if !ok {
+						continue
+					}
+					it, ok := rich["type"]
+					if !ok {
+						continue
+					}
+					t, ok := it.(string)
+					if !ok {
+						continue
+					}
+					m[t] = struct{}{}
+				}
+				if len(m) < 4 {
+					return
+				}
+				s := "\n"
+				for i, rich := range richItems {
+					s += fmt.Sprintf("%d) %+v\n", i+1, PreviewOnly(rich, 128))
+				}
+				Printf("%s\n", s)
+			}()
+		*/
 		var rich map[string]interface{}
 		rich, e = ds.EnrichItem(ctx, doc, "", dbConfigured, nil)
 		if e != nil {
@@ -1371,6 +1404,7 @@ func (j *DSGerrit) EnrichItem(ctx *Ctx, item map[string]interface{}, author stri
 	rich["changeset_status"] = status
 	iFirstReviewDt := j.FirstReviewDatetime(ctx, review, patchSets)
 	rich["first_review_date"] = iFirstReviewDt
+	rich["time_to_first_review"] = nil
 	if iFirstReviewDt != nil {
 		firstReviewDt, ok := iFirstReviewDt.(time.Time)
 		if ok {
@@ -1450,9 +1484,6 @@ func (j *DSGerrit) EnrichPatchsets(ctx *Ctx, review map[string]interface{}, patc
 		for _, field := range copyFields {
 			rich[field] = review[field]
 		}
-		for _, field := range copyFields {
-			rich[field] = review[field]
-		}
 		rich["patchset_author_name"] = nil
 		rich["patchset_author_domain"] = nil
 		authorName, ok := Dig(patchSet, []string{"author", "name"}, false, true)
@@ -1505,6 +1536,7 @@ func (j *DSGerrit) EnrichPatchsets(ctx *Ctx, review map[string]interface{}, patc
 		rich["patchset_sizeInsertions"], _ = patchSet["sizeInsertions"]
 		iFirstReviewDt := j.FirstPatchsetReviewDatetime(ctx, patchSet)
 		rich["patchset_first_review_date"] = iFirstReviewDt
+		rich["patchset_time_to_first_review"] = nil
 		if iFirstReviewDt != nil {
 			firstReviewDt, ok := iFirstReviewDt.(time.Time)
 			if ok {
@@ -1559,7 +1591,97 @@ func (j *DSGerrit) EnrichPatchsets(ctx *Ctx, review map[string]interface{}, patc
 }
 
 // EnrichApprovals - return rich items from raw approvals
-func (j *DSGerrit) EnrichApprovals(ctx *Ctx, patchset map[string]interface{}, approvals []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
+func (j *DSGerrit) EnrichApprovals(ctx *Ctx, patchSet map[string]interface{}, approvals []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
+	iPatchSetID, ok := patchSet["id"]
+	if !ok {
+		err = fmt.Errorf("cannot get id property of patchset: %+v", patchSet)
+		return
+	}
+	patchSetID, ok := iPatchSetID.(string)
+	if !ok {
+		err = fmt.Errorf("cannot get string id property of patchset: %+v", iPatchSetID)
+		return
+	}
+	copyFields := []string{"wip", "open", "url", "summary", "repository", "branch", "changeset_number", "changeset_status", "changeset_status_value", "patchset_number", "patchset_revision", "patchset_ref"}
+	for _, approval := range approvals {
+		rich := make(map[string]interface{})
+		for _, field := range RawFields {
+			v, _ := patchSet[field]
+			rich[field] = v
+		}
+		for _, field := range copyFields {
+			rich[field] = patchSet[field]
+		}
+		rich["approval_author_name"] = nil
+		rich["approval_author_domain"] = nil
+		authorName, ok := Dig(approval, []string{"by", "name"}, false, true)
+		if ok {
+			rich["approval_author_name"] = authorName
+			iAuthorEmail, ok := Dig(approval, []string{"by", "email"}, false, true)
+			if ok {
+				authorEmail, ok := iAuthorEmail.(string)
+				if ok {
+					ary := strings.Split(authorEmail, "@")
+					if len(ary) > 1 {
+						rich["approval_author_domain"] = strings.TrimSpace(ary[1])
+					}
+				}
+			}
+		}
+		//
+		var created time.Time
+		iCreated, ok := approval["grantedOn"]
+		if ok {
+			created, ok = iCreated.(time.Time)
+		}
+		if !ok {
+			err = fmt.Errorf("cannot read grantedOn property from approval: %+v", approval)
+			return
+		}
+		rich["approval_granted_on"] = created
+		rich["approval_value"], _ = approval["value"]
+		rich["approval_type"], _ = approval["type"]
+		desc := ""
+		iDesc, ok := approval["description"]
+		if ok {
+			desc, _ = iDesc.(string)
+		}
+		rich["approval_description_analyzed"] = desc
+		if len(desc) > KeywordMaxlength {
+			desc = desc[:KeywordMaxlength]
+		}
+		rich["approval_description"] = desc
+		rich["type"] = "approval"
+		rich["id"] = patchSetID + "_approval_" + fmt.Sprintf("%d.0", created.Unix())
+		if affs {
+			sCreated := ToYMDTHMSZDate(created)
+			authorKey := "by"
+			var affsItems map[string]interface{}
+			affsItems, err = j.AffsItems(ctx, approval, GerritApprovalRoles, sCreated)
+			if err != nil {
+				return
+			}
+			for prop, value := range affsItems {
+				rich[prop] = value
+			}
+			for _, suff := range AffsFields {
+				rich[Author+suff] = rich[authorKey+suff]
+			}
+			orgsKey := authorKey + MultiOrgNames
+			_, ok := Dig(rich, []string{orgsKey}, false, true)
+			if !ok {
+				rich[orgsKey] = []interface{}{}
+			}
+			CopyAffsRoleData(rich, patchSet, "changeset", "changeset")
+		}
+		for prop, value := range CommonFields(j, iCreated, Review) {
+			rich[prop] = value
+		}
+		for prop, value := range CommonFields(j, iCreated, "approval") {
+			rich[prop] = value
+		}
+		richItems = append(richItems, rich)
+	}
 	return
 }
 
