@@ -15,7 +15,7 @@ import (
 
 const (
 	// GerritBackendVersion - backend version
-	GerritBackendVersion = "0.0.0"
+	GerritBackendVersion = "0.1.0"
 	// GerritDefaultSSHKeyPath - default path to look for gerrit ssh private key
 	GerritDefaultSSHKeyPath = "$HOME/.ssh/id_rsa"
 	// GerritDefaultSSHPort - default gerrit ssh port
@@ -1438,11 +1438,11 @@ func (j *DSGerrit) EnrichItem(ctx *Ctx, item map[string]interface{}, author stri
 		for prop, value := range affsItems {
 			rich[prop] = value
 		}
-		changesetKey := Changeset + "_" + Author
+		changesetRole := Changeset + "_" + Author
 		for _, suff := range AffsFields {
 			rich[Author+suff] = rich[authorKey+suff]
 			// Copy to changeset object
-			rich[changesetKey+suff] = rich[authorKey+suff]
+			rich[changesetRole+suff] = rich[authorKey+suff]
 		}
 		orgsKey := authorKey + MultiOrgNames
 		_, ok := Dig(rich, []string{orgsKey}, false, true)
@@ -1450,7 +1450,7 @@ func (j *DSGerrit) EnrichItem(ctx *Ctx, item map[string]interface{}, author stri
 			rich[orgsKey] = []interface{}{}
 		}
 		// Copy to changeset object
-		rich[changesetKey+MultiOrgNames] = rich[orgsKey]
+		rich[changesetRole+MultiOrgNames] = rich[orgsKey]
 	}
 	for prop, value := range CommonFields(j, createdOn, Review) {
 		rich[prop] = value
@@ -1554,7 +1554,8 @@ func (j *DSGerrit) EnrichPatchsets(ctx *Ctx, review map[string]interface{}, patc
 			for prop, value := range affsItems {
 				rich[prop] = value
 			}
-			CopyAffsRoleData(rich, review, Changeset, Changeset)
+			role := Changeset + "_" + Author
+			CopyAffsRoleData(rich, review, role, role)
 		}
 		for prop, value := range CommonFields(j, iCreated, Review) {
 			rich[prop] = value
@@ -1671,7 +1672,8 @@ func (j *DSGerrit) EnrichApprovals(ctx *Ctx, patchSet map[string]interface{}, ap
 			if !ok {
 				rich[orgsKey] = []interface{}{}
 			}
-			CopyAffsRoleData(rich, patchSet, Changeset, Changeset)
+			role := Changeset + "_" + Author
+			CopyAffsRoleData(rich, patchSet, role, role)
 		}
 		for prop, value := range CommonFields(j, iCreated, Review) {
 			rich[prop] = value
@@ -1766,7 +1768,8 @@ func (j *DSGerrit) EnrichComments(ctx *Ctx, review map[string]interface{}, comme
 					rich[orgsKey] = []interface{}{}
 				}
 			}
-			CopyAffsRoleData(rich, review, Changeset, Changeset)
+			role := Changeset + "_" + Author
+			CopyAffsRoleData(rich, review, role, role)
 		}
 		for prop, value := range CommonFields(j, iCreated, Review) {
 			rich[prop] = value
