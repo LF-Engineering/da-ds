@@ -1399,7 +1399,7 @@ func (j *DSGerrit) EnrichItem(ctx *Ctx, item map[string]interface{}, author stri
 	status := j.LastChangesetApprovalValue(ctx, patchSets)
 	rich["status_value"] = status
 	rich["changeset_status_value"] = status
-	rich["changeset_status"] = status
+	rich["changeset_status"] = reviewStatus
 	iFirstReviewDt := j.FirstReviewDatetime(ctx, review, patchSets)
 	rich["first_review_date"] = iFirstReviewDt
 	rich["time_to_first_review"] = nil
@@ -1438,10 +1438,11 @@ func (j *DSGerrit) EnrichItem(ctx *Ctx, item map[string]interface{}, author stri
 		for prop, value := range affsItems {
 			rich[prop] = value
 		}
+		changesetKey := Changeset + "_" + Author
 		for _, suff := range AffsFields {
 			rich[Author+suff] = rich[authorKey+suff]
 			// Copy to changeset object
-			rich[Changeset+suff] = rich[authorKey+suff]
+			rich[changesetKey+suff] = rich[authorKey+suff]
 		}
 		orgsKey := authorKey + MultiOrgNames
 		_, ok := Dig(rich, []string{orgsKey}, false, true)
@@ -1449,7 +1450,7 @@ func (j *DSGerrit) EnrichItem(ctx *Ctx, item map[string]interface{}, author stri
 			rich[orgsKey] = []interface{}{}
 		}
 		// Copy to changeset object
-		rich[Changeset+MultiOrgNames] = rich[orgsKey]
+		rich[changesetKey+MultiOrgNames] = rich[orgsKey]
 	}
 	for prop, value := range CommonFields(j, createdOn, Review) {
 		rich[prop] = value
