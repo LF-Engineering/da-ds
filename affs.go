@@ -465,6 +465,12 @@ func IdenityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, aid inter
 		} else {
 			outItem[role+"_gender"] = Unknown
 		}
+		genderAcc, _ := profile["gender_acc"]
+		if genderAcc != nil {
+			outItem[role+"_gender_acc"] = genderAcc
+		} else {
+			outItem[role+"_gender_acc"] = nil
+		}
 		bot, ok := profile["is_bot"].(int64)
 		if ok && bot > 0 {
 			isBot = 1
