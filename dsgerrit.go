@@ -21,7 +21,7 @@ const (
 	// GerritDefaultSSHPort - default gerrit ssh port
 	GerritDefaultSSHPort = 29418
 	// GerritDefaultMaxReviews = default max reviews when processing gerrit
-	GerritDefaultMaxReviews = 500
+	GerritDefaultMaxReviews = 1000
 	// GerritCodeReviewApprovalType - code review approval type
 	GerritCodeReviewApprovalType = "Code-Review"
 )
@@ -56,7 +56,7 @@ type DSGerrit struct {
 	SSHKey              string // From DA_GERRIT_SSH_KEY - must contain full SSH private key - has higher priority than key path
 	SSHKeyPath          string // From DA_GERRIT_SSH_KEY_PATH - path to SSH private key, default GerritDefaultSSHKeyPath '~/.ssh/id_rsa'
 	SSHPort             int    // From DA_GERRIT_SSH_PORT, defaults to GerritDefaultSSHPort (29418)
-	MaxReviews          int    // From DA_GERRIT_MAX_REVIEWS, defaults to GerritDefaultMaxReviews (500)
+	MaxReviews          int    // From DA_GERRIT_MAX_REVIEWS, defaults to GerritDefaultMaxReviews (1000)
 	NoSSLVerify         bool   // From DA_GERRIT_NO_SSL_VERIFY
 	DisableHostKeyCheck bool   // From DA_GERRIT_DISABLE_HOST_KEY_CHECK
 	// Non-config variables
@@ -509,8 +509,6 @@ func (j *DSGerrit) DateField(*Ctx) string {
 
 // RichIDField - return rich ID field name
 func (j *DSGerrit) RichIDField(*Ctx) string {
-	// IMPL:
-	// _source.review_id  || id ?
 	return DefaultIDField
 }
 
@@ -930,7 +928,7 @@ func GerritEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs 
 // EnrichItems - perform the enrichment
 func (j *DSGerrit) EnrichItems(ctx *Ctx) (err error) {
 	Printf("enriching items\n")
-	err = ForEachESItem(ctx, j, true, ESBulkUploadFunc, GerritEnrichItemsFunc, nil)
+	err = ForEachESItem(ctx, j, true, ESBulkUploadFunc, GerritEnrichItemsFunc, nil, true)
 	return
 }
 
@@ -1825,7 +1823,35 @@ func (j *DSGerrit) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role s
 // roles can be static (always the same) or dynamic (per item)
 // second return parameter is static mode (true/false)
 // dynamic roles will use item to get its roles
-func (j *DSGerrit) AllRoles(ctx *Ctx, item map[string]interface{}) ([]string, bool) {
-	// IMPL:
-	return []string{Author}, true
+func (j *DSGerrit) AllRoles(ctx *Ctx, rich map[string]interface{}) (roles []string, static bool) {
+	roles = []string{Author}
+	if rich == nil {
+		return
+	}
+	iType, ok := Dig(rich, []string{"type"}, false, true)
+	if !ok {
+		return
+	}
+	tp, ok := iType.(string)
+	if !ok {
+		return
+	}
+	var possibleRoles []string
+	switch tp {
+	case "changeset":
+		possibleRoles = GerritReviewRoles
+	case "comment":
+		possibleRoles = GerritCommentRoles
+	case "patchset":
+		possibleRoles = []string{"uploader"}
+	case "approval":
+		possibleRoles = GerritApprovalRoles
+	}
+	for _, possibleRole := range possibleRoles {
+		_, ok := Dig(rich, []string{possibleRole + "_id"}, false, true)
+		if ok {
+			roles = append(roles, possibleRole)
+		}
+	}
+	return
 }

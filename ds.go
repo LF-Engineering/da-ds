@@ -361,33 +361,87 @@ func ItemsIdentitiesFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[
 	if ctx.Debug > 0 {
 		Printf("items identities %d/%d func\n", len(items), len(*docs))
 	}
+	var (
+		mtx *sync.Mutex
+		ch  chan error
+	)
+	if thrN > 1 {
+		mtx = &sync.Mutex{}
+		ch = make(chan error)
+	}
 	idents := make(map[[3]string]struct{})
 	for _, doc := range *docs {
 		idents[doc.([3]string)] = struct{}{}
 	}
-	for _, item := range items {
-		doc, ok := item.(map[string]interface{})["_source"]
+	procItem := func(c chan error, it interface{}) (e error) {
+		defer func() {
+			if c != nil {
+				c <- e
+			}
+		}()
+		doc, ok := it.(map[string]interface{})["_source"]
 		if !ok {
-			err = fmt.Errorf("Missing _source in item %+v", DumpKeys(item))
+			e = fmt.Errorf("Missing _source in item %+v", DumpKeys(it))
 			return
 		}
 		var identities map[[3]string]struct{}
-		identities, err = ds.GetItemIdentities(ctx, doc)
-		if err != nil {
-			err = fmt.Errorf("Cannot get identities from doc %+v", DumpKeys(doc))
+		identities, e = ds.GetItemIdentities(ctx, doc)
+		if e != nil {
+			e = fmt.Errorf("Cannot get identities from doc %+v", DumpKeys(doc))
 			return
 		}
 		if identities == nil {
-			continue
+			return
+		}
+		if thrN > 1 {
+			mtx.Lock()
 		}
 		for identity := range identities {
 			idents[identity] = struct{}{}
 		}
+		if thrN > 1 {
+			mtx.Unlock()
+		}
+		return
 	}
-	*docs = []interface{}{}
-	for ident := range idents {
-		*docs = append(*docs, ident)
+	updateDocs := func() {
+		*docs = []interface{}{}
+		for ident := range idents {
+			*docs = append(*docs, ident)
+		}
 	}
+	if thrN > 1 {
+		nThreads := 0
+		for _, item := range items {
+			go func(it interface{}) {
+				_ = procItem(ch, it)
+			}(item)
+			nThreads++
+			if nThreads == thrN {
+				err = <-ch
+				if err != nil {
+					return
+				}
+				nThreads--
+			}
+		}
+		for nThreads > 0 {
+			err = <-ch
+			nThreads--
+			if err != nil {
+				return
+			}
+		}
+		updateDocs()
+		return
+	}
+	for _, item := range items {
+		err = procItem(nil, item)
+		if err != nil {
+			return
+		}
+	}
+	updateDocs()
 	return
 }
 
@@ -398,23 +452,76 @@ func ItemsRefreshIdentitiesFunc(ctx *Ctx, ds DS, thrN int, richItems []interface
 	if ctx.Debug > 0 {
 		Printf("refresh identities %d/%d func\n", len(richItems), len(*docs))
 	}
+	var (
+		mtx *sync.Mutex
+		ch  chan error
+	)
+	if thrN > 1 {
+		mtx = &sync.Mutex{}
+		ch = make(chan error)
+	}
 	roles, staticRoles := ds.AllRoles(ctx, nil)
-	var values map[string]interface{}
-	for _, richItem := range richItems {
-		doc, ok := richItem.(map[string]interface{})["_source"]
+	procRich := func(c chan error, rItem interface{}) (e error) {
+		defer func() {
+			if c != nil {
+				c <- e
+			}
+		}()
+		var values map[string]interface{}
+		doc, ok := rItem.(map[string]interface{})["_source"]
 		if !ok {
-			err = fmt.Errorf("Missing _source in item %+v", DumpKeys(richItem))
+			e = fmt.Errorf("Missing _source in item %+v", DumpKeys(rItem))
 			return
 		}
 		rich, _ := doc.(map[string]interface{})
-		if !staticRoles {
-			roles, _ = ds.AllRoles(ctx, rich)
+		var rols []string
+		if staticRoles {
+			rols = roles
+		} else {
+			rols, _ = ds.AllRoles(ctx, rich)
 		}
-		values = AffsDataForRoles(ctx, ds, rich, roles)
+		values = AffsDataForRoles(ctx, ds, rich, rols)
 		for prop, val := range values {
 			rich[prop] = val
 		}
+		if thrN > 1 {
+			mtx.Lock()
+		}
 		*docs = append(*docs, rich)
+		if thrN > 1 {
+			mtx.Unlock()
+		}
+		return
+	}
+	if thrN > 1 {
+		nThreads := 0
+		for _, richItem := range richItems {
+			go func(rItem interface{}) {
+				_ = procRich(ch, rItem)
+			}(richItem)
+			nThreads++
+			if nThreads == thrN {
+				err = <-ch
+				if err != nil {
+					return
+				}
+				nThreads--
+			}
+		}
+		for nThreads > 0 {
+			err = <-ch
+			nThreads--
+			if err != nil {
+				return
+			}
+		}
+		return
+	}
+	for _, richItem := range richItems {
+		err = procRich(nil, richItem)
+		if err != nil {
+			return
+		}
 	}
 	return
 }
@@ -424,7 +531,7 @@ func ItemsRefreshIdentitiesFunc(ctx *Ctx, ds DS, thrN int, richItems []interface
 // Each identity is [3]string [name, username, email]
 func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 	Printf("uploading identities\n")
-	err = ForEachESItem(ctx, ds, true, DBUploadIdentitiesFunc, ItemsIdentitiesFunc, nil)
+	err = ForEachESItem(ctx, ds, true, DBUploadIdentitiesFunc, ItemsIdentitiesFunc, nil, true)
 	return
 }
 
@@ -432,7 +539,7 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 // We iterate over rich index to refresh its affiliation data
 func RefreshIdentities(ctx *Ctx, ds DS) (err error) {
 	Printf("refreshing identities\n")
-	err = ForEachESItem(ctx, ds, false, ESBulkUploadFunc, ItemsRefreshIdentitiesFunc, nil)
+	err = ForEachESItem(ctx, ds, false, ESBulkUploadFunc, ItemsRefreshIdentitiesFunc, nil, true)
 	return
 }
 
@@ -449,6 +556,7 @@ func ForEachESItem(
 	ufunct func(*Ctx, DS, int, *[]interface{}, *[]interface{}, bool) error,
 	uitems func(*Ctx, DS, int, []interface{}, *[]interface{}) error,
 	cacheFor *time.Duration,
+	mt bool,
 ) (err error) {
 	dateField := JSONEscape(ds.DateField(ctx))
 	originField := JSONEscape(ds.OriginField(ctx))
@@ -493,6 +601,10 @@ func ForEachESItem(
 		}
 	}()
 	thrN := GetThreadsNum(ctx)
+	fThrN := thrN
+	if !mt {
+		fThrN = 1
+	}
 	Printf("Multithreaded: %v, using %d threads\n", MT, thrN)
 	nThreads := 0
 	var (
@@ -517,7 +629,7 @@ func ForEachESItem(
 		if thrN > 1 {
 			mtx.Lock()
 		}
-		e = ufunct(ctx, ds, thrN, &docs, &outDocs, last)
+		e = ufunct(ctx, ds, fThrN, &docs, &outDocs, last)
 		return
 	}
 	needsOrigin := ds.ResumeNeedsOrigin(ctx)
@@ -630,7 +742,7 @@ func ForEachESItem(
 		if thrN > 1 {
 			mtx.Lock()
 		}
-		err = uitems(ctx, ds, thrN, items, &docs)
+		err = uitems(ctx, ds, fThrN, items, &docs)
 		if err != nil {
 			return
 		}
