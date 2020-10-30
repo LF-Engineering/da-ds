@@ -41,6 +41,8 @@ var (
 	GerritReviewRoles = []string{"owner"}
 	// GerritCommentRoles - roles to fetch affiliation data for comment
 	GerritCommentRoles = []string{"reviewer"}
+	// GerritPatchsetRoles - roles to fetch affiliation data for patchset
+	GerritPatchsetRoles = []string{"author", "uploader"}
 )
 
 // DSGerrit - DS implementation for stub - does nothing at all, just presents a skeleton code
@@ -1511,7 +1513,53 @@ func (j *DSGerrit) EnrichPatchsets(ctx *Ctx, review map[string]interface{}, patc
 		}
 		rich["type"] = "patchset"
 		rich["id"] = reviewID + "_patchset_" + fmt.Sprintf("%v", number)
+		if affs {
+			sCreated := ToYMDTHMSZDate(created)
+			var affsItems map[string]interface{}
+			affsItems, err = j.AffsItems(ctx, patchSet, GerritPatchsetRoles, sCreated)
+			if err != nil {
+				return
+			}
+			for prop, value := range affsItems {
+				rich[prop] = value
+			}
+			CopyAffsRoleData(rich, review, "changeset", "changeset")
+		}
+		for prop, value := range CommonFields(j, iCreated, Review) {
+			rich[prop] = value
+		}
+		for prop, value := range CommonFields(j, iCreated, "patchset") {
+			rich[prop] = value
+		}
+		richItems = append(richItems, rich)
+		iApprovals, ok := Dig(patchSet, []string{"approvals"}, false, true)
+		if ok {
+			approvalsAry, ok := iApprovals.([]interface{})
+			if ok {
+				var approvals []map[string]interface{}
+				for _, iApproval := range approvalsAry {
+					approval, ok := iApproval.(map[string]interface{})
+					if !ok {
+						continue
+					}
+					approvals = append(approvals, approval)
+				}
+				if len(approvals) > 0 {
+					var riches []interface{}
+					riches, err = j.EnrichApprovals(ctx, rich, approvals, affs)
+					if err != nil {
+						return
+					}
+					richItems = append(richItems, riches...)
+				}
+			}
+		}
 	}
+	return
+}
+
+// EnrichApprovals - return rich items from raw approvals
+func (j *DSGerrit) EnrichApprovals(ctx *Ctx, patchset map[string]interface{}, approvals []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
 	return
 }
 
