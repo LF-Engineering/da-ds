@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -83,6 +84,7 @@ func CacheSummary(ctx *Ctx) {
 		Printf("emails cache: %d entries\n", len(emailsCache))
 		Printf("uuids type 1 cache: %d entries\n", len(uuidsNonEmptyCache))
 		Printf("uuids type 2 cache: %d entries\n", len(uuidsAffsCache))
+		Printf("parse date cache: %d entries\n", len(parseDateCache))
 	}
 	if ctx.Debug >= 2 {
 		if len(identityCache) > 0 {
@@ -103,28 +105,96 @@ func CacheSummary(ctx *Ctx) {
 		if len(uuidsAffsCache) > 0 {
 			Printf("uuids type 2 cache:\n%s\n", PrintCache(uuidsAffsCache))
 		}
+		if len(parseDateCache) > 0 {
+			Printf("parse date cache:\n%s\n", PrintCache(parseDateCache))
+		}
 		PrintfNoRedacted("Redacted data: %s\n", GetRedacted())
 	}
 }
 
-// BytesToStringTrunc - truncate bytes stream to no more than maxLen
-func BytesToStringTrunc(data []byte, maxLen int) (str string) {
+// StringTrunc - truncate string to no more than maxLen
+func StringTrunc(data string, maxLen int, addLenInfo bool) (str string) {
+	lenInfo := ""
+	if addLenInfo {
+		lenInfo = "(" + strconv.Itoa(len(data)) + "): "
+	}
 	if len(data) <= maxLen {
-		return string(data)
+		return lenInfo + data
 	}
 	half := maxLen >> 1
-	str = string(data[:half]) + "(...)" + string(data[len(data)-half:])
+	str = lenInfo + data[:half] + "(...)" + data[len(data)-half:]
+	return
+}
+
+// IndexAt - index of substring starting at a given position
+func IndexAt(s, sep string, n int) int {
+	idx := strings.Index(s[n:], sep)
+	if idx > -1 {
+		idx += n
+	}
+	return idx
+}
+
+// MatchGroups - return regular expression matching groups as a map
+func MatchGroups(re *regexp.Regexp, arg string) (result map[string]string) {
+	match := re.FindStringSubmatch(arg)
+	result = make(map[string]string)
+	for i, name := range re.SubexpNames() {
+		if i > 0 && i <= len(match) {
+			result[name] = match[i]
+		}
+	}
+	return
+}
+
+// MatchGroupsArray - return regular expression matching groups as a map
+func MatchGroupsArray(re *regexp.Regexp, arg string) (result map[string][]string) {
+	match := re.FindAllStringSubmatch(arg, -1)
+	//Printf("match(%d,%d): %+v\n", len(match), len(re.SubexpNames()), match)
+	result = make(map[string][]string)
+	names := re.SubexpNames()
+	names = names[1:]
+	for idx, m := range match {
+		if idx == 0 {
+			for i, name := range names {
+				result[name] = []string{m[i+1]}
+			}
+			continue
+		}
+		for i, name := range names {
+			ary, _ := result[name]
+			result[name] = append(ary, m[i+1])
+		}
+	}
+	return
+}
+
+// BytesToStringTrunc - truncate bytes stream to no more than maxLen
+func BytesToStringTrunc(data []byte, maxLen int, addLenInfo bool) (str string) {
+	lenInfo := ""
+	if addLenInfo {
+		lenInfo = "(" + strconv.Itoa(len(data)) + "): "
+	}
+	if len(data) <= maxLen {
+		return lenInfo + string(data)
+	}
+	half := maxLen >> 1
+	str = lenInfo + string(data[:half]) + "(...)" + string(data[len(data)-half:])
 	return
 }
 
 // InterfaceToStringTrunc - truncate interface representation
-func InterfaceToStringTrunc(iface interface{}, maxLen int) (str string) {
+func InterfaceToStringTrunc(iface interface{}, maxLen int, addLenInfo bool) (str string) {
 	data := fmt.Sprintf("%+v", iface)
+	lenInfo := ""
+	if addLenInfo {
+		lenInfo = "(" + strconv.Itoa(len(data)) + "): "
+	}
 	if len(data) <= maxLen {
-		return data
+		return lenInfo + data
 	}
 	half := maxLen >> 1
-	str = data[:half] + "(...)" + data[len(data)-half:]
+	str = lenInfo + data[:half] + "(...)" + data[len(data)-half:]
 	return
 }
 
@@ -169,6 +239,31 @@ func KeysOnly(i interface{}) (o map[string]interface{}) {
 // DumpKeys - dump interface structure, but only keys, no values
 func DumpKeys(i interface{}) string {
 	return strings.Replace(fmt.Sprintf("%v", KeysOnly(i)), "map[]", "", -1)
+}
+
+// PreviewOnly - return a corresponding interface with preview values
+func PreviewOnly(i interface{}, l int) (o interface{}) {
+	if i == nil {
+		return
+	}
+	is, ok := i.(map[string]interface{})
+	if !ok {
+		str := InterfaceToStringTrunc(i, l, false)
+		str = strings.Replace(str, "\n", " ", -1)
+		o = str
+		return
+	}
+	iface := make(map[string]interface{})
+	for k, v := range is {
+		iface[k] = PreviewOnly(v, l)
+	}
+	o = iface
+	return
+}
+
+// DumpPreview - dump interface structure, keys and truncated values preview
+func DumpPreview(i interface{}, l int) string {
+	return strings.Replace(fmt.Sprintf("%v", PreviewOnly(i, l)), "map[]", "", -1)
 }
 
 // PartitionString - partition a string to [pre-sep, sep, post-sep]
@@ -277,7 +372,8 @@ func NoSSLVerify() {
 }
 
 // EnsurePath - craete archive directory (and all necessary parents as well)
-func EnsurePath(path string) (string, error) {
+// if noLastDir is set, then skip creating the last directory in the path
+func EnsurePath(path string, noLastDir bool) (string, error) {
 	ary := strings.Split(path, "/")
 	nonEmpty := []string{}
 	for i, dir := range ary {
@@ -287,7 +383,13 @@ func EnsurePath(path string) (string, error) {
 		nonEmpty = append(nonEmpty, dir)
 	}
 	path = strings.Join(nonEmpty, "/")
-	return path, os.MkdirAll(path, 0755)
+	var createPath string
+	if noLastDir {
+		createPath = strings.Join(nonEmpty[:len(nonEmpty)-1], "/")
+	} else {
+		createPath = path
+	}
+	return path, os.MkdirAll(createPath, 0755)
 }
 
 // Base64EncodeCookies - encode cookies array (strings) to base64 stream of bytes
@@ -377,7 +479,7 @@ func RequestNoRetry(
 		req, err = http.NewRequest(method, url, nil)
 	}
 	if err != nil {
-		sPayload := BytesToStringTrunc(payload, MaxPayloadPrintfLen)
+		sPayload := BytesToStringTrunc(payload, MaxPayloadPrintfLen, true)
 		err = fmt.Errorf("new request error:%+v for method:%s url:%s payload:%s", err, method, url, sPayload)
 		return
 	}
@@ -391,14 +493,14 @@ func RequestNoRetry(
 	var resp *http.Response
 	resp, err = http.DefaultClient.Do(req)
 	if err != nil {
-		sPayload := BytesToStringTrunc(payload, MaxPayloadPrintfLen)
+		sPayload := BytesToStringTrunc(payload, MaxPayloadPrintfLen, true)
 		err = fmt.Errorf("do request error:%+v for method:%s url:%s headers:%v payload:%s", err, method, url, headers, sPayload)
 		return
 	}
 	var body []byte
 	body, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
-		sPayload := BytesToStringTrunc(payload, MaxPayloadPrintfLen)
+		sPayload := BytesToStringTrunc(payload, MaxPayloadPrintfLen, true)
 		err = fmt.Errorf("read request body error:%+v for method:%s url:%s headers:%v payload:%s", err, method, url, headers, sPayload)
 		return
 	}
@@ -417,8 +519,8 @@ func RequestNoRetry(
 	if hit {
 		err = jsoniter.Unmarshal(body, &result)
 		if err != nil {
-			sPayload := BytesToStringTrunc(payload, MaxPayloadPrintfLen)
-			sBody := BytesToStringTrunc(body, MaxPayloadPrintfLen)
+			sPayload := BytesToStringTrunc(payload, MaxPayloadPrintfLen, true)
+			sBody := BytesToStringTrunc(body, MaxPayloadPrintfLen, true)
 			err = fmt.Errorf("unmarshall request error:%+v for method:%s url:%s headers:%v status:%d payload:%s body:%s", err, method, url, headers, status, sPayload, sBody)
 			return
 		}
@@ -434,8 +536,8 @@ func RequestNoRetry(
 		}
 	}
 	if hit {
-		sPayload := BytesToStringTrunc(payload, MaxPayloadPrintfLen)
-		sBody := BytesToStringTrunc(body, MaxPayloadPrintfLen)
+		sPayload := BytesToStringTrunc(payload, MaxPayloadPrintfLen, true)
+		sBody := BytesToStringTrunc(body, MaxPayloadPrintfLen, true)
 		err = fmt.Errorf("status error:%+v for method:%s url:%s headers:%v status:%d payload:%s body:%s result:%+v", err, method, url, headers, status, sPayload, sBody, result)
 	}
 	if len(okStatuses) > 0 {
@@ -447,8 +549,8 @@ func RequestNoRetry(
 			}
 		}
 		if !hit {
-			sPayload := BytesToStringTrunc(payload, MaxPayloadPrintfLen)
-			sBody := BytesToStringTrunc(body, MaxPayloadPrintfLen)
+			sPayload := BytesToStringTrunc(payload, MaxPayloadPrintfLen, true)
+			sBody := BytesToStringTrunc(body, MaxPayloadPrintfLen, true)
 			err = fmt.Errorf("status not success:%+v for method:%s url:%s headers:%v status:%d payload:%s body:%s result:%+v", err, method, url, headers, status, sPayload, sBody, result)
 		}
 	}
@@ -550,7 +652,7 @@ func Request(
 	for {
 		result, status, isJSON, outCookies, err = RequestNoRetry(ctx, url, method, headers, payload, cookies, jsonStatuses, errorStatuses, okStatuses)
 		info := func() (inf string) {
-			inf = fmt.Sprintf("%s.%s:%s=%d", method, url, BytesToStringTrunc(payload, MaxPayloadPrintfLen), status)
+			inf = fmt.Sprintf("%s.%s:%s=%d", method, url, BytesToStringTrunc(payload, MaxPayloadPrintfLen, true), status)
 			if ctx.Debug > 1 {
 				inf += fmt.Sprintf(" error: %+v", err)
 			}

@@ -15,13 +15,15 @@ const (
 
 var (
 	// AffsFields - all properties added by affiliations (excluding multi org name)
-	AffsFields       = []string{"_id", "_uuid", "_name", "_user_name", "_domain", "_gender", "_gender_acc", "_org_name", "_bot"}
-	identityCache    = map[string][2]interface{}{}
-	identityCacheMtx *sync.RWMutex
-	rollsCache       = map[string][]string{}
-	rollsCacheMtx    *sync.RWMutex
-	i2uCache         = map[string]interface{}{}
-	i2uCacheMtx      *sync.RWMutex
+	AffsFields = []string{"_id", "_uuid", "_name", "_user_name", "_domain", "_gender", "_gender_acc", "_org_name", "_bot"}
+	// RequiredAffsFields - required affs fields
+	RequiredAffsFields = []string{"_org_name", "_name", "_user_name"}
+	identityCache      = map[string][2]interface{}{}
+	identityCacheMtx   *sync.RWMutex
+	rollsCache         = map[string][]string{}
+	rollsCacheMtx      *sync.RWMutex
+	i2uCache           = map[string]interface{}{}
+	i2uCacheMtx        *sync.RWMutex
 )
 
 // EmptyAffsItem - return empty affiliation sitem for a given role
@@ -395,16 +397,16 @@ func GetEnrollmentsMulti(ctx *Ctx, ds DS, uuid string, dt time.Time) (orgs []str
 }
 
 // CopyAffsRoleData - copy affiliations fields from source role to dest role
-func CopyAffsRoleData(item map[string]interface{}, fromRole, toRole string) {
+func CopyAffsRoleData(dst, src map[string]interface{}, fromRole, toRole string) {
 	for _, suff := range AffsFields {
-		item[toRole+suff], _ = Dig(item, []string{fromRole + suff}, false, true)
+		dst[toRole+suff], _ = Dig(src, []string{fromRole + suff}, false, true)
 	}
-	item[toRole+MultiOrgNames], _ = Dig(item, []string{fromRole + MultiOrgNames}, false, true)
+	dst[toRole+MultiOrgNames], _ = Dig(src, []string{fromRole + MultiOrgNames}, false, true)
 }
 
 // IdenityAffsData - add affiliations related data
 // identity - full identity
-// aid identity ID value (which is uuis), for example from "author_id", "creator_id" etc.
+// aid identity ID value (which is uuid), for example from "author_id", "creator_id" etc.
 // either identity or aid must be specified
 func IdenityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, aid interface{}, dt time.Time, role string) (outItem map[string]interface{}) {
 	outItem = EmptyAffsItem(role, false)

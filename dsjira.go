@@ -24,13 +24,13 @@ const (
 	// JiraAPIComment - comments API subpath
 	JiraAPIComment = "/comment"
 	// JiraBackendVersion - backend version
-	JiraBackendVersion = "0.1.0"
+	JiraBackendVersion = "0.1.1"
 	// JiraDefaultSearchField - default search field
 	JiraDefaultSearchField = "item_id"
-	// JiraDropCustomFields - drop custom fields from raw index
-	JiraDropCustomFields = false
 	// JiraFilterByProjectInComments - filter by project when searching for comments
 	JiraFilterByProjectInComments = false
+	// JiraDropCustomFields - drop custom fields from raw index
+	JiraDropCustomFields = true
 	// JiraMapCustomFields - run custom fields mapping
 	JiraMapCustomFields = true
 	// ClosedStatusCategoryKey - issue closed status key
@@ -48,13 +48,15 @@ var (
 		"issue_key":    {"key"},
 	}
 	// JiraRawMapping - Jira raw index mapping
-	JiraRawMapping = []byte(`{"dynamic":true,"properties":{"metadata__updated_on":{"type":"date"},"data":{"properties":{"renderedFields":{"dynamic":false,"properties":{}},"operations":{"dynamic":false,"properties":{}},"fields":{"dynamic":true,"properties":{"description":{"type":"text","index":true},"environment":{"type":"text","index":true}}},"changelog":{"properties":{"histories":{"dynamic":false,"properties":{}}}},"comments_data":{"properties":{"body":{"type":"text","index":true}}}}}}}`)
+	JiraRawMapping = []byte(`{"dynamic":true,"properties":{"metadata__updated_on":{"type":"date"},"data":{"properties":{"renderedFields":{"dynamic":false,"properties":{}},"operations":{"dynamic":false,"properties":{}},"fields":{"dynamic":true,"properties":{"description":{"type":"text","index":true},"workratio":{"type":"double"},"environment":{"type":"text","index":true}}},"changelog":{"properties":{"histories":{"dynamic":false,"properties":{}}}},"comments_data":{"properties":{"body":{"type":"text","index":true}}}}}}}`)
 	// JiraRichMapping - Jira rich index mapping
 	JiraRichMapping = []byte(`{"properties":{"metadata__updated_on":{"type":"date"},"main_description_analyzed":{"type":"text","index":true},"releases":{"type":"keyword"},"body":{"type":"text","index":true}}}`)
 	// JiraRoles - roles defined for Jira backend
 	JiraRoles = []string{"assignee", "reporter", "creator", Author, "updateAuthor"}
 	// JiraCategories - categories defined for Jira
 	JiraCategories = map[string]struct{}{"issue": {}}
+	// JiraKeepCustomFiled - we're dropping all but those custom fields
+	JiraKeepCustomFiled = map[string]struct{}{"Story Points": {}, "Sprint": {}}
 )
 
 // DSJira - DS implementation for Jira
@@ -184,7 +186,7 @@ func (j *DSJira) GenSearchFields(ctx *Ctx, issue interface{}, uuid string) (fiel
 		}
 	}
 	if ctx.Debug > 1 {
-		Printf("returing search fields %+v\n", fields)
+		Printf("returning search fields %+v\n", fields)
 	}
 	return
 }
@@ -207,11 +209,15 @@ func (j *DSJira) AddMetadata(ctx *Ctx, issue interface{}) (mItem map[string]inte
 	mItem[UUID] = uuid
 	mItem[DefaultOriginField] = origin
 	mItem[DefaultTagField] = tag
-	mItem["updated_on"] = updatedOn
+	mItem[DefaultOffsetField] = float64(updatedOn.Unix())
 	mItem["category"] = j.ItemCategory(issue)
 	mItem["search_fields"] = j.GenSearchFields(ctx, issue, uuid)
 	mItem[DefaultDateField] = ToESDate(updatedOn)
 	mItem[DefaultTimestampField] = ToESDate(timestamp)
+	mItem[ProjectSlug] = ctx.ProjectSlug
+	if ctx.Debug > 1 {
+		Printf("%s: %s: %v %v\n", origin, uuid, issueID, updatedOn)
+	}
 	return
 }
 
@@ -375,12 +381,15 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 		err = fmt.Errorf("unable to unmarshal fields from issue %+v", DumpKeys(issue))
 		return
 	}
+	if ctx.Debug > 1 {
+		Printf("before map custom: %+v\n", DumpPreview(issueFields, 100))
+	}
+	type mapping struct {
+		ID    string
+		Name  string
+		Value interface{}
+	}
 	if JiraMapCustomFields {
-		type mapping struct {
-			ID    string
-			Name  string
-			Value interface{}
-		}
 		m := make(map[string]mapping)
 		for k, v := range issueFields {
 			customField, ok := customFields[k]
@@ -397,6 +406,9 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 			issueFields[k] = v
 		}
 	}
+	if ctx.Debug > 1 {
+		Printf("after map custom: %+v\n", DumpPreview(issueFields, 100))
+	}
 	// Extra fields
 	if thrN > 1 {
 		mtx.Lock()
@@ -404,11 +416,18 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 	esItem := j.AddMetadata(ctx, issue)
 	// Seems like it doesn't make sense, because we just added those custom fields
 	if JiraDropCustomFields {
-		for k := range issueFields {
+		for k, v := range issueFields {
 			if strings.HasPrefix(strings.ToLower(k), "customfield_") {
-				delete(issueFields, k)
+				mp, _ := v.(mapping)
+				_, keep := JiraKeepCustomFiled[mp.Name]
+				if !keep {
+					delete(issueFields, k)
+				}
 			}
 		}
+	}
+	if ctx.Debug > 1 {
+		Printf("after drop: %+v\n", DumpPreview(issueFields, 100))
 	}
 	if ctx.Project != "" {
 		issue.(map[string]interface{})["project"] = ctx.Project
@@ -1056,7 +1075,7 @@ func JiraEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[
 // EnrichItems - perform the enrichment
 func (j *DSJira) EnrichItems(ctx *Ctx) (err error) {
 	Printf("enriching items\n")
-	err = ForEachESItem(ctx, j, true, ESBulkUploadFunc, JiraEnrichItemsFunc, nil)
+	err = ForEachESItem(ctx, j, true, ESBulkUploadFunc, JiraEnrichItemsFunc, nil, true)
 	return
 }
 
@@ -1344,8 +1363,7 @@ func (j *DSJira) AffsItems(ctx *Ctx, item map[string]interface{}, roles []string
 		for prop, value := range affsIdentity {
 			affsItems[prop] = value
 		}
-		suffs := []string{"_org_name", "_name", "_user_name"}
-		for _, suff := range suffs {
+		for _, suff := range RequiredAffsFields {
 			k := role + suff
 			_, ok := affsIdentity[k]
 			if !ok {

@@ -1,7 +1,7 @@
 package dads
 
 // CacheCleanupProb - probability of cache cleanup in %
-const CacheCleanupProb int = 10
+const CacheCleanupProb int = 4
 
 // OK - common constant string
 const OK string = "ok"
@@ -14,6 +14,12 @@ const Groupsio string = "groupsio"
 
 // Jira - common constant string
 const Jira string = "jira"
+
+// Git - common constant string
+const Git string = "git"
+
+// Gerrit - common constant string
+const Gerrit string = "gerrit"
 
 // Stub - common constant string
 const Stub string = "stub"
@@ -107,3 +113,21 @@ const Recipient string = "recipient"
 
 // From - common constant string
 const From = "from"
+
+// Commit - common constant string
+const Commit = "commit"
+
+// Review - common constant string
+const Review = "review"
+
+// Patchset - common constant string
+const Patchset = "patchset"
+
+// Changeset - common constant string
+const Changeset = "changeset"
+
+// Approval - common constant string
+const Approval = "approval"
+
+// ProjectSlug - common constant string
+const ProjectSlug = "project_slug"

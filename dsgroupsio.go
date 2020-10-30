@@ -19,7 +19,7 @@ import (
 
 const (
 	// GroupsioBackendVersion - backend version
-	GroupsioBackendVersion = "0.1.0"
+	GroupsioBackendVersion = "0.1.1"
 	// GroupsioURLRoot - root url for group name origin
 	GroupsioURLRoot = "https://groups.io/g/"
 	// GroupsioAPIURL - Groups.io API URL
@@ -42,10 +42,12 @@ const (
 	GroupsioMessageReceivedField = "received"
 	// GroupsioDefaultSearchField - default search field
 	GroupsioDefaultSearchField = "item_id"
-	// MaxMessageBodyLength - trucacte message bodies longer than this (per each multi-body email part)
-	MaxMessageBodyLength = 1000
-	// MaxRichMessageLines - maximum numbe rof message text/plain lines copied to rich index
-	MaxRichMessageLines = 10
+	// GroupsioMaxMessageBodyLength - trucacte message bodies longer than this (per each multi-body email part)
+	GroupsioMaxMessageBodyLength = 1000
+	// GroupsioMaxRichMessageLines - maximum numbe rof message text/plain lines copied to rich index
+	GroupsioMaxRichMessageLines = 10
+	// GroupsioMaxRecipients - maximum number of emails parsed from To:
+	GroupsioMaxRecipients = 50
 )
 
 var (
@@ -108,6 +110,7 @@ func (j *DSGroupsio) Validate() (err error) {
 	j.GroupName = ary[len(ary)-1]
 	if j.GroupName == "" {
 		err = fmt.Errorf("Group name must be set: [https://groups.io/g/]GROUP+channel")
+		return
 	}
 	j.ArchPath = os.ExpandEnv(j.ArchPath)
 	if strings.HasSuffix(j.ArchPath, "/") {
@@ -166,13 +169,17 @@ func (j *DSGroupsio) AddMetadata(ctx *Ctx, msg interface{}) (mItem map[string]in
 	mItem[UUID] = uuid
 	mItem[DefaultOriginField] = origin
 	mItem[DefaultTagField] = tag
-	mItem["updated_on"] = updatedOn
+	mItem[DefaultOffsetField] = float64(updatedOn.Unix())
 	mItem["category"] = j.ItemCategory(msg)
 	mItem["search_fields"] = make(map[string]interface{})
 	FatalOnError(DeepSet(mItem, []string{"search_fields", GroupsioDefaultSearchField}, msgID, false))
 	FatalOnError(DeepSet(mItem, []string{"search_fields", "group_name"}, j.GroupName, false))
 	mItem[DefaultDateField] = ToESDate(updatedOn)
 	mItem[DefaultTimestampField] = ToESDate(timestamp)
+	mItem[ProjectSlug] = ctx.ProjectSlug
+	if ctx.Debug > 1 {
+		Printf("%s: %s: %v %v\n", origin, uuid, msgID, updatedOn)
+	}
 	return
 }
 
@@ -181,7 +188,7 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 	var dirPath string
 	if j.SaveArchives {
 		dirPath = j.ArchPath + "/" + GroupsioURLRoot + j.GroupName
-		dirPath, err = EnsurePath(dirPath)
+		dirPath, err = EnsurePath(dirPath, false)
 		FatalOnError(err)
 		Printf("path to store mailing archives: %s\n", dirPath)
 	} else {
@@ -631,7 +638,7 @@ func (j *DSGroupsio) ElasticRichMapping() []byte {
 // (name, username, email) tripples, special value Nil "<nil>" means null
 // we use string and not *string which allows nil to allow usage as a map key
 // This one (Ex) also returns information about identity's origins (from, to, or both)
-func (j *DSGroupsio) GetItemIdentitiesEx(ctx *Ctx, doc interface{}) (identities map[[3]string]map[string]struct{}) {
+func (j *DSGroupsio) GetItemIdentitiesEx(ctx *Ctx, doc interface{}) (identities map[[3]string]map[string]struct{}, nRecipients int) {
 	init := false
 	props := []string{"From", "To"}
 	for _, prop := range props {
@@ -663,7 +670,7 @@ func (j *DSGroupsio) GetItemIdentitiesEx(ctx *Ctx, doc interface{}) (identities 
 				Printf("cannot get identities: cannot read string from %v\n", ifrom)
 				continue
 			}
-			emails, ok := ParseAddresses(ctx, from)
+			emails, ok := ParseAddresses(ctx, from, GroupsioMaxRecipients)
 			if !ok {
 				if ctx.Debug > 1 {
 					Printf("cannot get identities: cannot read email address(es) from %s\n", from)
@@ -682,6 +689,9 @@ func (j *DSGroupsio) GetItemIdentitiesEx(ctx *Ctx, doc interface{}) (identities 
 				}
 				identities[identity][lProp] = struct{}{}
 			}
+			if lProp == "to" {
+				nRecipients = len(emails)
+			}
 		}
 	}
 	return
@@ -691,7 +701,7 @@ func (j *DSGroupsio) GetItemIdentitiesEx(ctx *Ctx, doc interface{}) (identities 
 // (name, username, email) tripples, special value Nil "<nil>" means null
 // we use string and not *string which allows nil to allow usage as a map key
 func (j *DSGroupsio) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3]string]struct{}, err error) {
-	sIdentities := j.GetItemIdentitiesEx(ctx, doc)
+	sIdentities, _ := j.GetItemIdentitiesEx(ctx, doc)
 	if sIdentities == nil || len(sIdentities) == 0 {
 		return
 	}
@@ -743,7 +753,7 @@ func GroupsioEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, doc
 			e = fmt.Errorf("Failed to parse document %+v\n", doc)
 			return
 		}
-		identities := groupsio.GetItemIdentitiesEx(ctx, doc)
+		identities, nRecipients := groupsio.GetItemIdentitiesEx(ctx, doc)
 		if identities == nil || len(identities) == 0 {
 			if ctx.Debug > 1 {
 				Printf("no identities to enrich in %v\n", doc)
@@ -800,6 +810,7 @@ func GroupsioEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, doc
 			}
 			return
 		}
+		rich["n_recipients"] = nRecipients
 		e = EnrichItem(ctx, ds, rich)
 		if e != nil {
 			return
@@ -848,20 +859,55 @@ func GroupsioEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, doc
 // EnrichItems - perform the enrichment
 func (j *DSGroupsio) EnrichItems(ctx *Ctx) (err error) {
 	Printf("enriching items\n")
-	err = ForEachESItem(ctx, j, true, ESBulkUploadFunc, GroupsioEnrichItemsFunc, nil)
+	err = ForEachESItem(ctx, j, true, ESBulkUploadFunc, GroupsioEnrichItemsFunc, nil, true)
 	return
 }
 
 // EnrichItem - return rich item from raw item for a given author type/role
 func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role string, affs bool, extra interface{}) (rich map[string]interface{}, err error) {
-	// copy RawFields
 	rich = make(map[string]interface{})
 	msg, ok := item["data"].(map[string]interface{})
 	if !ok {
 		err = fmt.Errorf("missing data field in item %+v", DumpKeys(item))
 		return
 	}
-	msgDate, _ := Dig(msg, []string{GroupsioMessageDateField}, true, false)
+	msgDate, ok := Dig(msg, []string{GroupsioMessageDateField}, false, true)
+	// original raw format support
+	if !ok {
+		msgDate, ok = Dig(msg, []string{"Date"}, false, true)
+		if !ok {
+			Fatalf("cannot find date/Date field in %+v\n", DumpKeys(msg))
+			return
+		}
+	}
+	var (
+		msgTz       float64
+		msgDateInTz time.Time
+	)
+	iMsgDateInTz, ok1 := Dig(msg, []string{"date_in_tz"}, false, true)
+	if ok1 {
+		msgDateInTz, ok1 = iMsgDateInTz.(time.Time)
+	}
+	iMsgTz, ok2 := Dig(msg, []string{"date_tz"}, false, true)
+	if ok2 {
+		msgTz, ok2 = iMsgTz.(float64)
+	}
+	if !ok1 || !ok2 {
+		sdt := fmt.Sprintf("%v", msgDate)
+		_, msgDateInTzN, msgTzN, ok := ParseDateWithTz(sdt)
+		if ok {
+			if !ok1 {
+				msgDateInTz = msgDateInTzN
+			}
+			if !ok2 {
+				msgTz = msgTzN
+			}
+		}
+		if !ok && ctx.Debug > 0 {
+			Printf("unable to determine tz for %v/%v/%v\n", msgDate, iMsgDateInTz, iMsgTz)
+		}
+	}
+	// copy RawFields
 	if role == Author {
 		for _, field := range RawFields {
 			v, _ := item[field]
@@ -948,12 +994,22 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 			//Printf("getIValue(%v) -> key not found\n", key)
 			return
 		}
-		rich["Message-ID"], _ = Dig(msg, []string{GroupsioMessageIDField}, true, false)
+		rich["Message-ID"], ok = Dig(msg, []string{GroupsioMessageIDField}, false, true)
+		// original raw format support
+		if !ok {
+			rich["Message-ID"], ok = Dig(msg, []string{"Message-ID"}, false, true)
+			if !ok {
+				Fatalf("cannot find message-id/Message-ID field in %v\n", DumpKeys(msg))
+				return
+			}
+		}
 		rich["Date"] = msgDate
+		rich["Date_in_tz"] = msgDateInTz
+		rich["tz"] = msgTz
 		subj, _ := getStringValue(msg, "Subject")
 		rich["Subject_analyzed"] = subj
-		if len(subj) > MaxMessageBodyLength {
-			subj = subj[:MaxMessageBodyLength]
+		if len(subj) > GroupsioMaxMessageBodyLength {
+			subj = subj[:GroupsioMaxMessageBodyLength]
 		}
 		rich["Subject"] = subj
 		rich["email_date"], _ = getIValue(item, DefaultDateField)
@@ -983,38 +1039,45 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 					}
 				}
 			}
+		} else {
+			// original raw format support
+			plain, ok = Dig(msg, []string{"body", "plain"}, false, true)
+			if ok {
+				text, found = plain.(string)
+			}
 		}
 		if found {
 			rich["size"] = len(text)
 			ary := strings.Split(text, "\n")
-			if len(ary) > MaxRichMessageLines {
-				ary = ary[:MaxRichMessageLines]
+			if len(ary) > GroupsioMaxRichMessageLines {
+				ary = ary[:GroupsioMaxRichMessageLines]
 			}
 			text = strings.Join(ary, "\n")
-			if len(text) > MaxMessageBodyLength {
-				text = text[:MaxMessageBodyLength]
+			if len(text) > GroupsioMaxMessageBodyLength {
+				text = text[:GroupsioMaxMessageBodyLength]
 			}
 			rich["body_extract"] = text
 		} else {
 			rich["size"] = nil
 			rich["body_extract"] = ""
 		}
-		rich["tz"] = nil
-		rich["mbox_parse_warning"], _ = Dig(msg, []string{"MBox-Warn"}, true, false)
-		rich["mbox_bytes_length"], _ = Dig(msg, []string{"MBox-Bytes-Length"}, true, false)
-		rich["mbox_n_lines"], _ = Dig(msg, []string{"MBox-N-Lines"}, true, false)
-		rich["mbox_n_bodies"], _ = Dig(msg, []string{"MBox-N-Bodies"}, true, false)
-		rich["mbox_from"], _ = Dig(msg, []string{"MBox-From"}, true, false)
+		rich["mbox_parse_warning"], _ = Dig(msg, []string{"MBox-Warn"}, false, true)
+		rich["mbox_bytes_length"], _ = Dig(msg, []string{"MBox-Bytes-Length"}, false, true)
+		rich["mbox_n_lines"], _ = Dig(msg, []string{"MBox-N-Lines"}, false, true)
+		rich["mbox_n_bodies"], _ = Dig(msg, []string{"MBox-N-Bodies"}, false, true)
+		rich["mbox_from"], _ = Dig(msg, []string{"MBox-From"}, false, true)
 		rich["mbox_date"] = nil
 		rich["mbox_date_str"] = ""
-		dtStr, ok := Dig(msg, []string{"MBox-Date"}, true, false)
+		dtStr, ok := Dig(msg, []string{"MBox-Date"}, false, true)
 		if ok {
 			sdt, ok := dtStr.(string)
 			if ok {
 				rich["mbox_date_str"] = sdt
-				dt, valid := ParseMBoxDate(sdt)
+				dt, dttz, tz, valid := ParseDateWithTz(sdt)
 				if valid {
 					rich["mbox_date"] = dt
+					rich["mbox_date_tz"] = tz
+					rich["mbox_date_in_tz"] = dttz
 				}
 			}
 		}
@@ -1027,8 +1090,20 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 		var dt time.Time
 		dt, err = TimeParseInterfaceString(msgDate)
 		if err != nil {
-			Printf("cannot parse date %s\n", msgDate)
-			return
+			switch vdt := msgDate.(type) {
+			case string:
+				dt, _, _, ok = ParseDateWithTz(vdt)
+				if !ok {
+					err = fmt.Errorf("cannot parse date %s\n", vdt)
+					return
+				}
+			case time.Time:
+				dt = vdt
+			default:
+				err = fmt.Errorf("cannot parse date %T %v\n", vdt, vdt)
+				return
+			}
+			err = nil
 		}
 		ary, _ := extra.([3]string)
 		// (name, username, email)
@@ -1041,8 +1116,7 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 		for prop, value := range affsIdentity {
 			affsData[prop] = value
 		}
-		suffs := []string{"_org_name", "_name", "_user_name"}
-		for _, suff := range suffs {
+		for _, suff := range RequiredAffsFields {
 			k := role + suff
 			_, ok := affsIdentity[k]
 			if !ok {
@@ -1060,13 +1134,14 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 	}
 	if role == Author {
 		rich["mbox_author_domain"], _ = Dig(rich, []string{"author_domain"}, false, true)
-		CopyAffsRoleData(rich, Author, "From")
+		CopyAffsRoleData(rich, rich, Author, "From")
 	}
 	return
 }
 
 // AffsItems - return affiliations data items for given roles and date
 func (j *DSGroupsio) AffsItems(ctx *Ctx, rawItem map[string]interface{}, roles []string, date interface{}) (affsItems map[string]interface{}, err error) {
+	// Groups.io is not using this
 	return
 }
 
@@ -1098,6 +1173,9 @@ func (j *DSGroupsio) AllRoles(ctx *Ctx, rich map[string]interface{}) (roles []st
 		}
 		roles = append(roles, role)
 		i++
+		if i >= GroupsioMaxRecipients {
+			break
+		}
 	}
 	return
 }

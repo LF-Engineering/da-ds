@@ -10,6 +10,11 @@ import (
 	"time"
 )
 
+const (
+	// MBoxDropXFields - drop fields starting with X- - to avoid ES 1000 fields limit
+	MBoxDropXFields = true
+)
+
 var (
 	// LowerDayNames - downcased 3 letter US day names
 	LowerDayNames = map[string]struct{}{
@@ -53,6 +58,9 @@ var (
 	}
 	// SpacesRE - match 1 or more space characters
 	SpacesRE = regexp.MustCompile(`\s+`)
+	// TZOffsetRE - time zone offset that comes after +0... +1... -0... -1...
+	// Can be 3 disgits or 3 digits then whitespace and then anything
+	TZOffsetRE = regexp.MustCompile(`^(\d{3})(\s+.*$|$)`)
 )
 
 // ParseMBoxMsg - parse a raw MBox message into object to be inserte dinto raw ES
@@ -527,7 +535,11 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		dumpMBox()
 		return
 	}
-	var dt time.Time
+	var (
+		dt   time.Time
+		dttz time.Time
+		tz   float64
+	)
 	found := false
 	mdt, ok := item[GroupsioMessageDateField]
 	if !ok {
@@ -535,13 +547,18 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		if !ok {
 			Printf("%s(%d): missing Date & Received fields\n", groupName, len(msg))
 		}
-		var dts []time.Time
+		type DtTz struct {
+			Dt   time.Time
+			DtTz time.Time
+			Tz   float64
+		}
+		var dts []DtTz
 		for _, rcv := range rcvs {
 			ary := strings.Split(string(rcv), ";")
 			sdt := ary[len(ary)-1]
-			dt, ok := ParseMBoxDate(sdt)
+			dt, dttz, tz, ok := ParseDateWithTz(sdt)
 			if ok {
-				dts = append(dts, dt)
+				dts = append(dts, DtTz{Dt: dt, DtTz: dttz, Tz: tz})
 			}
 		}
 		nDts := len(dts)
@@ -551,9 +568,11 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 			return
 		}
 		if nDts > 1 {
-			sort.Slice(dts, func(i, j int) bool { return dts[i].After(dts[j]) })
+			sort.Slice(dts, func(i, j int) bool { return dts[i].Dt.After(dts[j].Dt) })
 		}
-		dt = dts[0]
+		dt = dts[0].Dt
+		dttz = dts[0].DtTz
+		tz = dts[0].Tz
 		found = true
 	}
 	if !found {
@@ -561,14 +580,17 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		if !ok {
 			Printf("%s(%d): non-string date field %v\n", groupName, len(msg), mdt)
 		}
-		dt, ok = ParseMBoxDate(sdt)
+		dt, dttz, tz, ok = ParseDateWithTz(sdt)
 		if !ok {
 			Printf("%s(%d): unable to parse date from '%s'\n", groupName, len(msg), sdt)
 			dumpMBox()
 			return
 		}
 	}
+	// item["Date"] = dt
 	item[GroupsioMessageDateField] = dt
+	item["date_tz"] = tz
+	item["date_in_tz"] = dttz
 	item["MBox-N-Bodies"] = len(bodies)
 	bodyKeys := make(map[string]struct{})
 	item["data"] = make(map[string]interface{})
@@ -580,7 +602,7 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		for i := range props {
 			props[i] = strings.TrimSpace(props[i])
 		}
-		sBody := BytesToStringTrunc(body.Data, MaxMessageBodyLength)
+		sBody := BytesToStringTrunc(body.Data, GroupsioMaxMessageBodyLength, false)
 		m := make(map[string]interface{})
 		m["data"] = sBody
 		m["content-type"] = string(body.ContentType)
@@ -612,90 +634,18 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 		}
 		//Printf("#%d: %s %s %d\n", i, string(body.ContentType), propertiesString(body.Properties), len(body.Data))
 	}
-	valid = true
-	return
-}
-
-// ParseMBoxDate - try to parse mbox date
-func ParseMBoxDate(indt string) (dt time.Time, valid bool) {
-	sdt := indt
-	// https://www.broobles.com/eml2mbox/mbox.html
-	// but the real world is not that simple
-	for _, r := range []string{">", ",", ")", "("} {
-		sdt = strings.Replace(sdt, r, "", -1)
-	}
-	for _, split := range []string{"+0", "+1", "."} {
-		ary := strings.Split(sdt, split)
-		sdt = ary[0]
-	}
-	for _, split := range []string{"-0", "-1"} {
-		ary := strings.Split(sdt, split)
-		lAry := len(ary)
-		if lAry > 1 {
-			_, err := strconv.Atoi(ary[lAry-1])
-			if err == nil {
-				sdt = strings.Join(ary[:lAry-1], split)
+	if MBoxDropXFields {
+		ks := []string{}
+		for k := range item {
+			lk := strings.ToLower(k)
+			if strings.HasPrefix(lk, "x-") {
+				ks = append(ks, k)
 			}
 		}
-	}
-	sdt = SpacesRE.ReplaceAllString(sdt, " ")
-	sdt = strings.ToLower(strings.TrimSpace(sdt))
-	ary := strings.Split(sdt, " ")
-	day := ary[0]
-	if len(day) > 3 {
-		day = day[:3]
-	}
-	_, ok := LowerDayNames[day]
-	if ok {
-		sdt = strings.Join(ary[1:], " ")
-	}
-	sdt = strings.TrimSpace(sdt)
-	for lm, m := range LowerFullMonthNames {
-		sdt = strings.Replace(sdt, lm, m, -1)
-	}
-	for lm, m := range LowerMonthNames {
-		sdt = strings.Replace(sdt, lm, m, -1)
-	}
-	ary = strings.Split(sdt, " ")
-	if len(ary) > 4 {
-		sdt = strings.Join(ary[:4], " ")
-	}
-	formats := []string{
-		"2006-01-02 15:04:05",
-		"2006-01-02t15:04:05",
-		"2006-01-02 15:04:05z",
-		"2006-01-02t15:04:05z",
-		"2 Jan 2006 15:04:05",
-		"02 Jan 2006 15:04:05",
-		"2 Jan 06 15:04:05",
-		"02 Jan 06 15:04:05",
-		"2 Jan 2006 15:04",
-		"02 Jan 2006 15:04",
-		"2 Jan 06 15:04",
-		"02 Jan 06 15:04",
-		"Jan 2 15:04:05 2006",
-		"Jan 02 15:04:05 2006",
-		"Jan 2 15:04:05 06",
-		"Jan 02 15:04:05 06",
-		"Jan 2 15:04 2006",
-		"Jan 02 15:04 2006",
-		"Jan 2 15:04 06",
-		"Jan 02 15:04 06",
-	}
-	var (
-		err  error
-		errs []error
-	)
-	for _, format := range formats {
-		dt, err = time.Parse(format, sdt)
-		if err == nil {
-			// Printf("Parsed %v\n", dt)
-			valid = true
-			return
+		for _, k := range ks {
+			delete(item, k)
 		}
-		errs = append(errs, err)
 	}
-	Printf("ParseMBoxDate: errors: %+v\n", errs)
-	Printf("ParseMBoxDate: '%s' -> '%s', day: %s\n", indt, sdt, day)
+	valid = true
 	return
 }

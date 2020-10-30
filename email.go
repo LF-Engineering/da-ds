@@ -60,7 +60,12 @@ func IsValidEmail(email string) (valid bool) {
 }
 
 // ParseAddresses - parse address string into one or more name/email pairs
-func ParseAddresses(ctx *Ctx, addrs string) (emails []*mail.Address, ok bool) {
+func ParseAddresses(ctx *Ctx, addrs string, maxAddrs int) (emails []*mail.Address, ok bool) {
+	defer func() {
+		if len(emails) > maxAddrs {
+			emails = emails[:maxAddrs]
+		}
+	}()
 	var e error
 	patterns := []string{" at ", "_at_", " en "}
 	addrs = strings.TrimSpace(addrs)
@@ -85,6 +90,9 @@ func ParseAddresses(ctx *Ctx, addrs string) (emails []*mail.Address, ok bool) {
 					if ctx.Debug > 1 {
 						Printf("unable to parse '%s' but '%s' parsed to %v ('%s','%s')\n", addrs, f, email, email.Name, email.Address)
 					}
+					if len(emails) >= maxAddrs {
+						break
+					}
 					continue
 				}
 				a := strings.Split(f, "@")
@@ -99,6 +107,9 @@ func ParseAddresses(ctx *Ctx, addrs string) (emails []*mail.Address, ok bool) {
 						emails = append(emails, email)
 						if ctx.Debug > 1 {
 							Printf("unable to parse '%s' but '%s' -> '%s' parsed to %v ('%s','%s')\n", addrs, f, nf, email, email.Name, email.Address)
+						}
+						if len(emails) > maxAddrs {
+							break
 						}
 					}
 				}

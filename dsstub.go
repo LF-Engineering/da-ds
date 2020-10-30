@@ -6,6 +6,11 @@ import (
 	"time"
 )
 
+const (
+	// StubBackendVersion - backend version
+	StubBackendVersion = "0.0.0"
+)
+
 // DSStub - DS implementation for stub - does nothing at all, just presents a skeleton code
 type DSStub struct {
 	DS          string
@@ -92,7 +97,7 @@ func (j *DSStub) FetchItems(ctx *Ctx) (err error) {
 		if allMsgsMtx != nil {
 			allMsgsMtx.Lock()
 		}
-		allMsgs = append(allMsgs, item)
+		allMsgs = append(allMsgs, esItem)
 		nMsgs := len(allMsgs)
 		if nMsgs >= ctx.ESBulkSize {
 			sendToElastic := func(c chan error) (ee error) {
@@ -213,6 +218,7 @@ func (j *DSStub) DateField(*Ctx) string {
 
 // RichIDField - return rich ID field name
 func (j *DSStub) RichIDField(*Ctx) string {
+	// IMPL:
 	return DefaultIDField
 }
 
@@ -262,7 +268,8 @@ func (j *DSStub) ItemID(item interface{}) string {
 func (j *DSStub) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string]interface{}) {
 	// IMPL:
 	mItem = make(map[string]interface{})
-	origin := "TODO"
+	// Change to unique datasource origin
+	origin := "stub"
 	tag := ctx.Tag
 	if tag == "" {
 		tag = origin
@@ -272,17 +279,18 @@ func (j *DSStub) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string]inter
 	uuid := UUIDNonEmpty(ctx, origin, itemID)
 	timestamp := time.Now()
 	mItem["backend_name"] = j.DS
-	mItem["backend_version"] = "0.0.0"
+	mItem["backend_version"] = StubBackendVersion
 	mItem["timestamp"] = fmt.Sprintf("%.06f", float64(timestamp.UnixNano())/1.0e3)
 	mItem[UUID] = uuid
 	mItem[DefaultOriginField] = origin
 	mItem[DefaultTagField] = tag
-	mItem["updated_on"] = updatedOn
+	mItem[DefaultOffsetField] = float64(updatedOn.Unix())
 	mItem["category"] = j.ItemCategory(item)
 	//mItem["search_fields"] = j.GenSearchFields(ctx, issue, uuid)
 	//mItem["search_fields"] = make(map[string]interface{})
 	mItem[DefaultDateField] = ToESDate(updatedOn)
 	mItem[DefaultTimestampField] = ToESDate(timestamp)
+	mItem[ProjectSlug] = ctx.ProjectSlug
 	return
 }
 
@@ -410,7 +418,7 @@ func StubEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[
 // EnrichItems - perform the enrichment
 func (j *DSStub) EnrichItems(ctx *Ctx) (err error) {
 	Printf("enriching items\n")
-	err = ForEachESItem(ctx, j, true, ESBulkUploadFunc, StubEnrichItemsFunc, nil)
+	err = ForEachESItem(ctx, j, true, ESBulkUploadFunc, StubEnrichItemsFunc, nil, true)
 	return
 }
 

@@ -86,7 +86,7 @@ func TestParseAddresses(t *testing.T) {
 		},
 	}
 	for index, test := range testCases {
-		gotEmails, gotOK := lib.ParseAddresses(&ctx, test.addr)
+		gotEmails, gotOK := lib.ParseAddresses(&ctx, test.addr, lib.GroupsioMaxRecipients)
 		if gotOK != test.expectedOK {
 			t.Errorf("test number %d, expected '%s' ok %v, got %v", index+1, test.addr, test.expectedOK, gotOK)
 		} else {
