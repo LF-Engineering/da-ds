@@ -31,10 +31,20 @@ func NewManager(Username string,
 	ESUrl string,
 	ESUsername string,
 	ESPassword string,
-	HttpTimeout time.Duration) *Manager {
-	mng := &Manager{Username: Username, Password: Password, FetcherBackendVersion: FetcherBackendVersion,
+	HttpTimeout time.Duration,
+	Repositories   []*Repository,
+	) *Manager {
+	mng := &Manager{
+		Username: Username,
+		Password: Password,
+		FetcherBackendVersion: FetcherBackendVersion,
 		EnricherBackendVersion: EnricherBackendVersion,
-		ESUrl: ESUrl, ESUsername: ESUsername, ESPassword: ESPassword, HttpTimeout: HttpTimeout}
+		ESUrl: ESUrl,
+		ESUsername: ESUsername,
+		ESPassword: ESPassword,
+		HttpTimeout: HttpTimeout,
+		Repositories: Repositories,
+	}
 
 	return mng
 }

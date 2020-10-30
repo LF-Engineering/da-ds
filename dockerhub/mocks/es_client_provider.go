@@ -9,14 +9,6 @@ type ESClientProvider struct {
 	mock.Mock
 }
 
-func (_m *ESClientProvider) DeleteIndex(index string, ignoreUnavailable bool) ([]byte, error) {
-	panic("implement me")
-}
-
-func (_m *ESClientProvider) Bulk(body []byte) ([]byte, error) {
-	panic("implement me")
-}
-
 // Add provides a mock function with given fields: index, documentID, body
 func (_m *ESClientProvider) Add(index string, documentID string, body []byte) ([]byte, error) {
 	ret := _m.Called(index, documentID, body)
@@ -40,6 +32,29 @@ func (_m *ESClientProvider) Add(index string, documentID string, body []byte) ([
 	return r0, r1
 }
 
+// Bulk provides a mock function with given fields: body
+func (_m *ESClientProvider) Bulk(body []byte) ([]byte, error) {
+	ret := _m.Called(body)
+
+	var r0 []byte
+	if rf, ok := ret.Get(0).(func([]byte) []byte); ok {
+		r0 = rf(body)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]byte)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func([]byte) error); ok {
+		r1 = rf(body)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // CreateIndex provides a mock function with given fields: index, body
 func (_m *ESClientProvider) CreateIndex(index string, body []byte) ([]byte, error) {
 	ret := _m.Called(index, body)
@@ -56,6 +71,29 @@ func (_m *ESClientProvider) CreateIndex(index string, body []byte) ([]byte, erro
 	var r1 error
 	if rf, ok := ret.Get(1).(func(string, []byte) error); ok {
 		r1 = rf(index, body)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// DeleteIndex provides a mock function with given fields: index, ignoreUnavailable
+func (_m *ESClientProvider) DeleteIndex(index string, ignoreUnavailable bool) ([]byte, error) {
+	ret := _m.Called(index, ignoreUnavailable)
+
+	var r0 []byte
+	if rf, ok := ret.Get(0).(func(string, bool) []byte); ok {
+		r0 = rf(index, ignoreUnavailable)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]byte)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, bool) error); ok {
+		r1 = rf(index, ignoreUnavailable)
 	} else {
 		r1 = ret.Error(1)
 	}

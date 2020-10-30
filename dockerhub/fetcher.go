@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	dads "github.com/LF-Engineering/da-ds"
-	"github.com/LF-Engineering/da-ds/utils/uuid"
 	"net/http"
 	"regexp"
 	"strings"
@@ -123,10 +122,8 @@ func (f *Fetcher) FetchItem(owner string, repository string) (*RepositoryRaw, er
 	raw.UpdatedOn = raw.Data.LastUpdated
 
 	// generate UUID
-	uid, err := uuid.Generate(raw.Data.FetchedOn)
-	if err != nil {
-		return nil, err
-	}
+	ctx := &dads.Ctx{}
+	uid := dads.UUIDNonEmpty(ctx, raw.Data.FetchedOn)
 	raw.UUID = uid
 
 	return raw, nil

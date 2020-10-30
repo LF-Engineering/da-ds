@@ -1,7 +1,10 @@
 package main
 
 import (
+	"encoding/json"
+	"flag"
 	"fmt"
+	"github.com/LF-Engineering/da-ds/dockerhub"
 	"math/rand"
 	"time"
 
@@ -17,9 +20,12 @@ func runDS(ctx *lib.Ctx) (err error) {
 		ds = &lib.DSJira{}
 	case lib.Groupsio:
 		ds = &lib.DSGroupsio{}
-	// todo: enable it later
-		/*case lib.Dockerhub:
-		ds = &lib.DSDockerhub{}*/
+	case dockerhub.Dockerhub:
+		manager, err := dockerhubEnvs(ctx)
+		if err != nil {
+			return err
+		}
+		return manager.Sync()
 	default:
 		err = fmt.Errorf("unknown data source type: " + ctx.DS)
 		return
@@ -63,4 +69,52 @@ func main() {
 	dtEnd := time.Now()
 	lib.CacheSummary(&ctx)
 	lib.Printf("Took: %v\n", dtEnd.Sub(dtStart))
+}
+
+// todo: if you want to use it later
+func dockerhubFlags() (*dockerhub.Manager, error) {
+	username := flag.String("username", "", "username")
+	password := flag.String("password", "", "password")
+	fetcherBackendVersion := flag.String("fetcher_version", "", "fetcher backend version")
+	enricherBackendVersion := flag.String("enricher_version", "", "enricher backend version")
+	esUrl := flag.String("enricher_version", "", "enricher backend version")
+	esUsername := flag.String("es_username", "", "elasticsearch username")
+	esPassword := flag.String("es_password", "", "elasticsearch password")
+	httpTimeout := flag.Duration("http_timeout", time.Duration(0), "http timeout")
+	repositoriesJson := flag.String("repositories", "", "repositories in json format e.g. [{'owner', 'repository'},...]")
+
+	flag.Parse()
+
+	var repositories []*dockerhub.Repository
+	if err := json.Unmarshal([]byte(*repositoriesJson), &repositories); err != nil {
+		return nil, err
+	}
+
+	return dockerhub.NewManager(*username, *password, *fetcherBackendVersion, *enricherBackendVersion,
+		*esUrl, *esUsername, *esPassword, *httpTimeout,  repositories), nil
+}
+
+func dockerhubEnvs(ctx *lib.Ctx) (*dockerhub.Manager, error) {
+	username := ctx.Env("USERNAME")
+	password := ctx.Env("PASSWORD")
+	fetcherBackendVersion := ctx.Env("FETCHER_BACKEND_VERSION")
+	enricherBackendVersion := ctx.Env("ENRICHER_BACKEND_VERSION")
+	esUrl := ctx.Env("ES_URL")
+	esUsername := ctx.Env("ES_USERNAME")
+	esPassword := ctx.Env("ES_PASSWORD")
+	httpTimeout := ctx.Env("HTTP_TIMEOUT") // "60s" 60 seconds...
+	repositoriesJson := ctx.Env("REPOSITORIES_JSON")
+
+	var repositories []*dockerhub.Repository
+	if err := json.Unmarshal([]byte(repositoriesJson), &repositories); err != nil {
+		return nil, err
+	}
+
+	timeout, err := time.ParseDuration(httpTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	return dockerhub.NewManager(username, password, fetcherBackendVersion, enricherBackendVersion,
+		esUrl, esUsername, esPassword, timeout,  repositories), nil
 }
