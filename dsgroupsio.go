@@ -56,7 +56,7 @@ var (
 	// GroupsioRichMapping - Groupsio rich index mapping
 	GroupsioRichMapping = []byte(`{"properties":{"metadata__updated_on":{"type":"date"},"Subject_analyzed":{"type":"text","fielddata":true,"index":true},"body":{"type":"text","index":true}}}`)
 	// GroupsioCategories - categories defined for Groupsio
-	GroupsioCategories = map[string]struct{}{"message": {}}
+	GroupsioCategories = map[string]struct{}{Message: {}}
 	// GroupsioMBoxMsgSeparator - used to split mbox file into separate messages
 	GroupsioMBoxMsgSeparator = []byte("\nFrom ")
 	// GroupsioMsgLineSeparator - used to split mbox message into its separate lines

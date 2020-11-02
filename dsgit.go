@@ -57,7 +57,7 @@ var (
 	// GitRichMapping - Git rich index mapping
 	GitRichMapping = []byte(`{"properties":{"metadata__updated_on":{"type":"date"},"message_analyzed":{"type":"text","index":true}}}`)
 	// GitCategories - categories defined for git
-	GitCategories = map[string]struct{}{"commit": {}}
+	GitCategories = map[string]struct{}{Commit: {}}
 	// GitDefaultEnv - default git command environment
 	GitDefaultEnv = map[string]string{"LANG": "C", "PAGER": ""}
 	// GitLogOptions - default git log options

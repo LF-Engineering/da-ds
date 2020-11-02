@@ -21,6 +21,9 @@ const Git string = "git"
 // Gerrit - common constant string
 const Gerrit string = "gerrit"
 
+// Confluence - common constant string
+const Confluence string = "confluence"
+
 // Stub - common constant string
 const Stub string = "stub"
 
@@ -128,6 +131,9 @@ const Changeset = "changeset"
 
 // Approval - common constant string
 const Approval = "approval"
+
+// HistoricalContent - common constant string
+const HistoricalContent = "historical content"
 
 // ProjectSlug - common constant string
 const ProjectSlug = "project_slug"

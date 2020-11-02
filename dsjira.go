@@ -54,7 +54,7 @@ var (
 	// JiraRoles - roles defined for Jira backend
 	JiraRoles = []string{"assignee", "reporter", "creator", Author, "updateAuthor"}
 	// JiraCategories - categories defined for Jira
-	JiraCategories = map[string]struct{}{"issue": {}}
+	JiraCategories = map[string]struct{}{Issue: {}}
 	// JiraKeepCustomFiled - we're dropping all but those custom fields
 	JiraKeepCustomFiled = map[string]struct{}{"Story Points": {}, "Sprint": {}}
 )
