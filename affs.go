@@ -397,11 +397,11 @@ func GetEnrollmentsMulti(ctx *Ctx, ds DS, uuid string, dt time.Time) (orgs []str
 }
 
 // CopyAffsRoleData - copy affiliations fields from source role to dest role
-func CopyAffsRoleData(dst, src map[string]interface{}, fromRole, toRole string) {
+func CopyAffsRoleData(dst, src map[string]interface{}, dstRole, srcRole string) {
 	for _, suff := range AffsFields {
-		dst[toRole+suff], _ = Dig(src, []string{fromRole + suff}, false, true)
+		dst[dstRole+suff], _ = Dig(src, []string{srcRole + suff}, false, true)
 	}
-	dst[toRole+MultiOrgNames], _ = Dig(src, []string{fromRole + MultiOrgNames}, false, true)
+	dst[dstRole+MultiOrgNames], _ = Dig(src, []string{srcRole + MultiOrgNames}, false, true)
 }
 
 // IdenityAffsData - add affiliations related data
@@ -465,6 +465,12 @@ func IdenityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, aid inter
 		} else {
 			outItem[role+"_gender"] = Unknown
 		}
+		genderAcc, _ := profile["gender_acc"]
+		if genderAcc != nil {
+			outItem[role+"_gender_acc"] = genderAcc
+		} else {
+			outItem[role+"_gender_acc"] = nil
+		}
 		bot, ok := profile["is_bot"].(int64)
 		if ok && bot > 0 {
 			isBot = 1
@@ -473,7 +479,8 @@ func IdenityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, aid inter
 	gender, ok := outItem[role+"_gender"]
 	if !ok || gender == nil {
 		outItem[role+"_gender"] = Unknown
-		outItem[role+"_gender_acc"] = 0
+		// outItem[role+"_gender_acc"] = 0
+		outItem[role+"_gender_acc"] = nil
 	}
 	if isBot == 0 {
 		outItem[role+"_bot"] = false
