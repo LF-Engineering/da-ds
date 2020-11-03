@@ -476,7 +476,8 @@ func (j *DSConfluence) DateField(*Ctx) string {
 
 // RichIDField - return rich ID field name
 func (j *DSConfluence) RichIDField(*Ctx) string {
-	return DefaultIDField
+	// Because in confluence one raw item generates no more than 1 rich item
+	return UUID
 }
 
 // RichAuthorField - return rich author field name
