@@ -106,6 +106,20 @@ func (j *DSConfluence) Enrich(ctx *Ctx) (err error) {
 
 // GetHistoricalContents - get historical contents from teh current content
 func (j *DSConfluence) GetHistoricalContents(ctx *Ctx, content map[string]interface{}, dateFrom time.Time) (contents []map[string]interface{}, err error) {
+	contentURL, _ := Dig(content, []string{"_links", "webui"}, true, false)
+	ancestors, ok := Dig(content, []string{"ancestors"}, false, true)
+	if !ok {
+		ancestors = []interface{}{}
+	}
+	content["content_url"] = contentURL
+	content["ancestors"] = ancestors
+	iVersionNumber, _ := Dig(content, []string{"version", "number"}, true, false)
+	lastVersion := int(iVersionNumber.(float64))
+	////
+	if lastVersion == 1 {
+		contents = append(contents, content)
+		return
+	}
 	iID, ok := content["id"]
 	if !ok {
 		err = fmt.Errorf("missing id property in content: %+v\n", content)
@@ -116,11 +130,6 @@ func (j *DSConfluence) GetHistoricalContents(ctx *Ctx, content map[string]interf
 		err = fmt.Errorf("id property is not a string: %+v\n", content)
 		return
 	}
-	contentURL, _ := Dig(content, []string{"_links", "webui"}, true, false)
-	ancestors, ok := Dig(content, []string{"ancestors"}, false, true)
-	if !ok {
-		ancestors = []interface{}{}
-	}
 	method := Get
 	cacheDur := time.Duration(24) * time.Hour
 	version := 1
@@ -129,7 +138,8 @@ func (j *DSConfluence) GetHistoricalContents(ctx *Ctx, content map[string]interf
 		status int
 	)
 	for {
-		url := j.URL + "/rest/api/content/" + id + "?version=" + strconv.Itoa(version) + "&status=historical&expand=" + neturl.QueryEscape("body.storage,history,version")
+		////url := j.URL + "/rest/api/content/" + id + "?version=" + strconv.Itoa(version) + "&status=historical&expand=" + neturl.QueryEscape("body.storage,history,version")
+		url := j.URL + "/rest/api/content/" + id + "?version=" + strconv.Itoa(version) + "&status=historical&expand=" + neturl.QueryEscape("history,version")
 		if ctx.Debug > 1 {
 			Printf("historical content url: %s\n", url)
 		}
@@ -195,8 +205,13 @@ func (j *DSConfluence) GetHistoricalContents(ctx *Ctx, content map[string]interf
 			break
 		}
 		version++
+		////
+		if version == lastVersion {
+			break
+		}
 	}
-	if ctx.Debug > 2 {
+	contents = append(contents, content)
+	if ctx.Debug > 1 {
 		Printf("final %s %d (%d historical contents)\n", id, version, len(contents))
 	}
 	return
@@ -218,7 +233,8 @@ func (j *DSConfluence) GetConfluenceContents(ctx *Ctx, fromDate, next string) (c
 	var url string
 	// Init state
 	if next == "i" {
-		url = j.URL + "/rest/api/content/search?cql=" + neturl.QueryEscape("lastModified>='"+fromDate+"' order by lastModified") + fmt.Sprintf("&limit=%d&expand=ancestors", j.MaxContents)
+		////url = j.URL + "/rest/api/content/search?cql=" + neturl.QueryEscape("lastModified>='"+fromDate+"' order by lastModified") + fmt.Sprintf("&limit=%d&expand=ancestors", j.MaxContents)
+		url = j.URL + "/rest/api/content/search?cql=" + neturl.QueryEscape("lastModified>='"+fromDate+"' order by lastModified") + fmt.Sprintf("&limit=%d", j.MaxContents) + "&expand=" + neturl.QueryEscape("ancestors,version")
 	} else {
 		url = j.URL + next
 	}
@@ -753,9 +769,10 @@ func (j *DSConfluence) EnrichItem(ctx *Ctx, item map[string]interface{}, author 
 	iVersion, _ := version["number"]
 	rich["version"] = iVersion
 	rich["date"], _ = version["when"]
-	base, _ := Dig(page, []string{"_links", "base"}, true, false)
+	////base, _ := Dig(page, []string{"_links", "base"}, true, false)
 	webUI, _ := Dig(page, []string{"_links", "webui"}, true, false)
-	rich["url"] = base.(string) + webUI.(string)
+	////rich["url"] = base.(string) + webUI.(string)
+	rich["url"] = j.URL + "/" + webUI.(string)
 	iSpace, ok := Dig(page, []string{"_expandable", "space"}, false, true)
 	if ok {
 		space, _ := iSpace.(string)
