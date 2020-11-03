@@ -494,6 +494,10 @@ func IdenityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, aid inter
 
 // AffsDataForRoles - return affs data for given roles
 func AffsDataForRoles(ctx *Ctx, ds DS, rich map[string]interface{}, roles []string) (data map[string]interface{}) {
+	// FIXME:
+	defer func() {
+		Printf("AffsDataForRoles: %+v --> %+v\n", roles, data)
+	}()
 	data = make(map[string]interface{})
 	authorField := ds.RichAuthorField(ctx)
 	if len(roles) == 0 {

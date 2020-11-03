@@ -454,7 +454,6 @@ func (j *DSConfluence) DateField(*Ctx) string {
 
 // RichIDField - return rich ID field name
 func (j *DSConfluence) RichIDField(*Ctx) string {
-	// IMPL:
 	return DefaultIDField
 }
 
@@ -742,7 +741,8 @@ func (j *DSConfluence) EnrichItem(ctx *Ctx, item map[string]interface{}, author 
 		rich["author_name"], _ = Dig(version, []string{"by", "displayName"}, true, false)
 	}
 	rich["message"], _ = Dig(version, []string{"message"}, false, true)
-	rich["version"], _ = version["number"]
+	iVersion, _ := version["number"]
+	rich["version"] = iVersion
 	rich["date"], _ = version["when"]
 	base, _ := Dig(page, []string{"_links", "base"}, true, false)
 	webUI, _ := Dig(page, []string{"_links", "webui"}, true, false)
@@ -779,22 +779,94 @@ func (j *DSConfluence) EnrichItem(ctx *Ctx, item map[string]interface{}, author 
 	}
 	rich["ancestors_titles"] = ancestorTitles
 	rich["ancestors_links"] = ancestorLinks
-	// FIXME
-	Printf("%+v\n", rich)
-	os.Exit(1)
+	iType, _ := Dig(page, []string{"type"}, true, false)
+	if iType.(string) == "page" && int(iVersion.(float64)) == 1 {
+		rich["type"] = "new_page"
+	}
+	rich["is_blogpost"] = 0
+	tp, _ := rich["type"].(string)
+	rich["is_"+tp] = 1
+	// can also be rich["date"]
+	updatedOn, _ := Dig(item, []string{j.DateField(ctx)}, true, false)
+	if affs {
+		authorKey := "by"
+		var affsItems map[string]interface{}
+		affsItems, err = j.AffsItems(ctx, item, ConfluenceContentRoles, updatedOn)
+		if err != nil {
+			return
+		}
+		for prop, value := range affsItems {
+			rich[prop] = value
+		}
+		for _, suff := range AffsFields {
+			rich[Author+suff] = rich[authorKey+suff]
+		}
+		orgsKey := authorKey + MultiOrgNames
+		_, ok := Dig(rich, []string{orgsKey}, false, true)
+		if !ok {
+			rich[orgsKey] = []interface{}{}
+		}
+	}
+	for prop, value := range CommonFields(j, updatedOn, Confluence) {
+		rich[prop] = value
+	}
 	return
 }
 
 // AffsItems - return affiliations data items for given roles and date
-func (j *DSConfluence) AffsItems(ctx *Ctx, rawItem map[string]interface{}, roles []string, date interface{}) (affsItems map[string]interface{}, err error) {
-	// IMPL:
+func (j *DSConfluence) AffsItems(ctx *Ctx, page map[string]interface{}, roles []string, date interface{}) (affsItems map[string]interface{}, err error) {
+	affsItems = make(map[string]interface{})
+	var dt time.Time
+	dt, err = TimeParseInterfaceString(date)
+	if err != nil {
+		return
+	}
+	for _, role := range roles {
+		identity := j.GetRoleIdentity(ctx, page, role)
+		if len(identity) == 0 {
+			continue
+		}
+		affsIdentity := IdenityAffsData(ctx, j, identity, nil, dt, role)
+		for prop, value := range affsIdentity {
+			affsItems[prop] = value
+		}
+		for _, suff := range RequiredAffsFields {
+			k := role + suff
+			_, ok := affsIdentity[k]
+			if !ok {
+				affsIdentity[k] = Unknown
+			}
+		}
+	}
 	return
 }
 
 // GetRoleIdentity - return identity data for a given role
-func (j *DSConfluence) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role string) map[string]interface{} {
-	// IMPL:
-	return map[string]interface{}{"name": nil, "username": nil, "email": nil}
+func (j *DSConfluence) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role string) (identity map[string]interface{}) {
+	iUser, ok := Dig(item, []string{"data", "version", "by"}, true, false)
+	user, _ := iUser.(map[string]interface{})
+	username := Nil
+	iUserName, ok := user["username"]
+	if ok {
+		username, _ = iUserName.(string)
+	} else {
+		iPublicName, ok := user["publicName"]
+		if ok {
+			username, _ = iPublicName.(string)
+		}
+	}
+	name := Nil
+	iDisplayName, ok := user["displayName"]
+	if ok {
+		name, _ = iDisplayName.(string)
+	}
+	email := Nil
+	iEmail, ok := user["email"]
+	if ok {
+		email, _ = iEmail.(string)
+	}
+	identity = map[string]interface{}{"name": name, "username": username, "email": email}
+	return
 }
 
 // AllRoles - return all roles defined for the backend
