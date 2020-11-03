@@ -712,8 +712,75 @@ func (j *DSConfluence) EnrichItem(ctx *Ctx, item map[string]interface{}, author 
 		v, _ := item[field]
 		rich[field] = v
 	}
-	Printf("%+v\n", rich)
+	page, ok := item["data"].(map[string]interface{})
+	if !ok {
+		err = fmt.Errorf("missing data field in item %+v", DumpKeys(item))
+		return
+	}
+	for _, field := range []string{"type", "id", "status", "title", "content_url"} {
+		rich[field], _ = page[field]
+	}
+	title := ""
+	iTitle, ok := page["title"]
+	if ok {
+		title, _ = iTitle.(string)
+	}
+	rich["title_analyzed"] = title
+	if len(title) > KeywordMaxlength {
+		title = title[:KeywordMaxlength]
+	}
+	rich["title"] = title
+	version, ok := page["version"].(map[string]interface{})
+	if !ok {
+		err = fmt.Errorf("missing version field in item %+v", DumpKeys(page))
+		return
+	}
+	userName, ok := Dig(version, []string{"by", "username"}, false, true)
+	if ok {
+		rich["author_name"] = userName
+	} else {
+		rich["author_name"], _ = Dig(version, []string{"by", "displayName"}, true, false)
+	}
+	rich["message"], _ = Dig(version, []string{"message"}, false, true)
+	rich["version"], _ = version["number"]
+	rich["date"], _ = version["when"]
+	base, _ := Dig(page, []string{"_links", "base"}, true, false)
+	webUI, _ := Dig(page, []string{"_links", "webui"}, true, false)
+	rich["url"] = base.(string) + webUI.(string)
+	iSpace, ok := Dig(page, []string{"_expandable", "space"}, false, true)
+	if ok {
+		space, _ := iSpace.(string)
+		space = strings.Replace(space, "/rest/api/space/", "", -1)
+		rich["space"] = space
+	}
+	var (
+		ancestorTitles []interface{}
+		ancestorLinks  []interface{}
+	)
+	iAncestors, ok := Dig(page, []string{"ancestors"}, false, true)
+	if ok {
+		ancestors, ok := iAncestors.([]interface{})
+		if ok {
+			for _, iAncestor := range ancestors {
+				ancestor, ok := iAncestor.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				ancestorTitle, ok := ancestor["title"]
+				if ok {
+					ancestorTitles = append(ancestorTitles, ancestorTitle)
+				} else {
+					ancestorTitles = append(ancestorTitles, "NO_TITLE")
+				}
+				ancestorLink, _ := Dig(ancestor, []string{"_links", "webui"}, true, false)
+				ancestorLinks = append(ancestorLinks, ancestorLink)
+			}
+		}
+	}
+	rich["ancestors_titles"] = ancestorTitles
+	rich["ancestors_links"] = ancestorLinks
 	// FIXME
+	Printf("%+v\n", rich)
 	os.Exit(1)
 	return
 }
