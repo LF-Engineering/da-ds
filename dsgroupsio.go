@@ -1112,24 +1112,28 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 			"username": ary[1],
 			"email":    ary[2],
 		}
-		affsIdentity := IdenityAffsData(ctx, j, identity, nil, dt, role)
-		for prop, value := range affsIdentity {
-			affsData[prop] = value
-		}
-		for _, suff := range RequiredAffsFields {
-			k := role + suff
-			_, ok := affsIdentity[k]
-			if !ok {
-				affsIdentity[k] = Unknown
+		affsIdentity, empty := IdenityAffsData(ctx, j, identity, nil, dt, role)
+		if empty {
+			Printf("no identity affiliation data for identity %+v\n", identity)
+		} else {
+			for prop, value := range affsIdentity {
+				affsData[prop] = value
 			}
-		}
-		for prop, value := range affsData {
-			rich[prop] = value
-		}
-		orgsKey := role + MultiOrgNames
-		_, ok := Dig(rich, []string{orgsKey}, false, true)
-		if !ok {
-			rich[orgsKey] = []interface{}{}
+			for _, suff := range RequiredAffsFields {
+				k := role + suff
+				_, ok := affsIdentity[k]
+				if !ok {
+					affsIdentity[k] = Unknown
+				}
+			}
+			for prop, value := range affsData {
+				rich[prop] = value
+			}
+			orgsKey := role + MultiOrgNames
+			_, ok := Dig(rich, []string{orgsKey}, false, true)
+			if !ok {
+				rich[orgsKey] = []interface{}{}
+			}
 		}
 	}
 	if role == Author {
@@ -1146,6 +1150,7 @@ func (j *DSGroupsio) AffsItems(ctx *Ctx, rawItem map[string]interface{}, roles [
 }
 
 // GetRoleIdentity - return identity data for a given role
+// groupsio si not using this
 func (j *DSGroupsio) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role string) map[string]interface{} {
 	return map[string]interface{}{"name": nil, "username": nil, "email": nil}
 }

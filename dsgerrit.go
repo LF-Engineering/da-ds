@@ -1795,7 +1795,11 @@ func (j *DSGerrit) AffsItems(ctx *Ctx, review map[string]interface{}, roles []st
 		if len(identity) == 0 {
 			continue
 		}
-		affsIdentity := IdenityAffsData(ctx, j, identity, nil, dt, role)
+		affsIdentity, empty := IdenityAffsData(ctx, j, identity, nil, dt, role)
+		if empty {
+			Printf("no identity affiliation data for identity %+v\n", identity)
+			continue
+		}
 		for prop, value := range affsIdentity {
 			affsItems[prop] = value
 		}

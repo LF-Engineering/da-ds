@@ -1359,7 +1359,11 @@ func (j *DSJira) AffsItems(ctx *Ctx, item map[string]interface{}, roles []string
 		if len(identity) == 0 {
 			continue
 		}
-		affsIdentity := IdenityAffsData(ctx, j, identity, nil, dt, role)
+		affsIdentity, empty := IdenityAffsData(ctx, j, identity, nil, dt, role)
+		if empty {
+			Printf("no identity affiliation data for identity %+v\n", identity)
+			continue
+		}
 		for prop, value := range affsIdentity {
 			affsItems[prop] = value
 		}
@@ -1377,6 +1381,7 @@ func (j *DSJira) AffsItems(ctx *Ctx, item map[string]interface{}, roles []string
 // GetRoleIdentity - return identity data for a given role
 func (j *DSJira) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role string) (identity map[string]interface{}) {
 	identity = make(map[string]interface{})
+	ident := make(map[string]interface{})
 	fields, _ := Dig(item, []string{"data", "fields"}, true, false)
 	user, ok := Dig(fields, []string{role}, false, true)
 	if !ok {
@@ -1387,9 +1392,19 @@ func (j *DSJira) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role str
 		{"username", "name"},
 		{"email", "emailAddress"},
 	}
+	any := false
 	for _, row := range data {
-		v, _ := Dig(user, []string{row[1]}, false, true)
-		identity[row[0]] = v
+		iV, ok := Dig(user, []string{row[1]}, false, true)
+		if !any && ok {
+			v, _ := iV.(string)
+			if v != "" {
+				any = true
+			}
+		}
+		ident[row[0]] = iV
+	}
+	if any {
+		identity = ident
 	}
 	return
 }

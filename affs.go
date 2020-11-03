@@ -31,6 +31,7 @@ func EmptyAffsItem(role string, undef bool) map[string]interface{} {
 	emp := ""
 	if undef {
 		emp = "-- UNDEFINED --"
+		// panic("track empty")
 	}
 	return map[string]interface{}{
 		role + "_id":         emp,
@@ -408,7 +409,7 @@ func CopyAffsRoleData(dst, src map[string]interface{}, dstRole, srcRole string) 
 // identity - full identity
 // aid identity ID value (which is uuid), for example from "author_id", "creator_id" etc.
 // either identity or aid must be specified
-func IdenityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, aid interface{}, dt time.Time, role string) (outItem map[string]interface{}) {
+func IdenityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, aid interface{}, dt time.Time, role string) (outItem map[string]interface{}, empty bool) {
 	outItem = EmptyAffsItem(role, false)
 	var uuid interface{}
 	if identity != nil {
@@ -439,6 +440,7 @@ func IdenityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, aid inter
 	}
 	if uuid == nil {
 		outItem = EmptyAffsItem(role, true)
+		empty = true
 		return
 	}
 	suuid, _ := uuid.(string)
@@ -494,10 +496,11 @@ func IdenityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, aid inter
 
 // AffsDataForRoles - return affs data for given roles
 func AffsDataForRoles(ctx *Ctx, ds DS, rich map[string]interface{}, roles []string) (data map[string]interface{}) {
-	// FIXME:
-	defer func() {
-		Printf("AffsDataForRoles: %+v --> %+v\n", roles, data)
-	}()
+	/*
+		defer func() {
+			Printf("AffsDataForRoles: %+v --> %+v\n", roles, data)
+		}()
+	*/
 	data = make(map[string]interface{})
 	authorField := ds.RichAuthorField(ctx)
 	if len(roles) == 0 {
@@ -527,19 +530,24 @@ func AffsDataForRoles(ctx *Ctx, ds DS, rich map[string]interface{}, roles []stri
 		if role == authorField {
 			idAuthor = id
 		}
-		affsIdentity := IdenityAffsData(ctx, ds, nil, id, date, role)
+		affsIdentity, empty := IdenityAffsData(ctx, ds, nil, id, date, role)
+		if empty {
+			Printf("no identity affiliation data for %s id %+v\n", role, id)
+			continue
+		}
 		for prop, value := range affsIdentity {
 			data[prop] = value
 		}
 	}
 	if idAuthor != nil && authorField != Author {
-		affsIdentity := IdenityAffsData(ctx, ds, nil, idAuthor, date, Author)
-		for prop, value := range affsIdentity {
-			data[prop] = value
+		affsIdentity, empty := IdenityAffsData(ctx, ds, nil, idAuthor, date, Author)
+		if !empty {
+			for prop, value := range affsIdentity {
+				data[prop] = value
+			}
+		} else {
+			Printf("no identity affiliation data for author role id %+v\n", idAuthor)
 		}
-	}
-	if ctx.Debug > 1 {
-		Printf("enriched %v\n", DumpKeys(data))
 	}
 	return
 }

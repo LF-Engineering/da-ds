@@ -603,6 +603,9 @@ func (j *DSConfluence) GetItemIdentities(ctx *Ctx, doc interface{}) (identities 
 	if ok {
 		email, _ = iEmail.(string)
 	}
+	if name == Nil && username == Nil && email == Nil {
+		return
+	}
 	identities = map[[3]string]struct{}{{name, username, email}: {}}
 	return
 }
@@ -826,7 +829,11 @@ func (j *DSConfluence) AffsItems(ctx *Ctx, page map[string]interface{}, roles []
 		if len(identity) == 0 {
 			continue
 		}
-		affsIdentity := IdenityAffsData(ctx, j, identity, nil, dt, role)
+		affsIdentity, empty := IdenityAffsData(ctx, j, identity, nil, dt, role)
+		if empty {
+			Printf("no identity affiliation data for identity %+v\n", identity)
+			continue
+		}
 		for prop, value := range affsIdentity {
 			affsItems[prop] = value
 		}
@@ -865,6 +872,9 @@ func (j *DSConfluence) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, ro
 	if ok {
 		email, _ = iEmail.(string)
 	}
+	if name == Nil && username == Nil && email == Nil {
+		return
+	}
 	identity = map[string]interface{}{"name": name, "username": username, "email": email}
 	return
 }
@@ -874,6 +884,5 @@ func (j *DSConfluence) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, ro
 // second return parameter is static mode (true/false)
 // dynamic roles will use item to get its roles
 func (j *DSConfluence) AllRoles(ctx *Ctx, item map[string]interface{}) ([]string, bool) {
-	// IMPL:
-	return []string{Author}, true
+	return []string{"by"}, true
 }

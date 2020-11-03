@@ -254,6 +254,9 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 						profname = &username
 					}
 				}
+				if pname == nil && pemail == nil && pusername == nil {
+					continue
+				}
 				// if username matches a real email and there is no email set, assume email=username
 				if pemail == nil && pusername != nil && IsValidEmail(username) {
 					pemail = &username
