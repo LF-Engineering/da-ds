@@ -560,7 +560,6 @@ func (j *DSConfluence) ItemUpdatedOn(item interface{}) time.Time {
 
 // ItemCategory - return unique identifier for an item
 func (j *DSConfluence) ItemCategory(item interface{}) string {
-	// IMPL:
 	return HistoricalContent
 }
 
@@ -613,7 +612,6 @@ func (j *DSConfluence) GetItemIdentities(ctx *Ctx, doc interface{}) (identities 
 // items is a current pack of input items
 // docs is a pointer to where extracted identities will be stored
 func ConfluenceEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]interface{}) (err error) {
-	// IMPL:
 	if ctx.Debug > 0 {
 		Printf("confluence enrich items %d/%d func\n", len(items), len(*docs))
 	}
@@ -650,20 +648,22 @@ func ConfluenceEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, d
 			e = fmt.Errorf("Failed to parse document %+v\n", doc)
 			return
 		}
-		if 1 == 0 {
-			Printf("%v\n", dbConfigured)
+		var rich map[string]interface{}
+		rich, e = ds.EnrichItem(ctx, doc, "", dbConfigured, nil)
+		if e != nil {
+			return
 		}
-		// Actual item enrichment
-		/*
-			    var rich map[string]interface{}
-					if thrN > 1 {
-						mtx.Lock()
-					}
-					*docs = append(*docs, rich)
-					if thrN > 1 {
-						mtx.Unlock()
-					}
-		*/
+		e = EnrichItem(ctx, ds, rich)
+		if e != nil {
+			return
+		}
+		if thrN > 1 {
+			mtx.Lock()
+		}
+		*docs = append(*docs, rich)
+		if thrN > 1 {
+			mtx.Unlock()
+		}
 		return
 	}
 	if thrN > 1 {
@@ -707,8 +707,14 @@ func (j *DSConfluence) EnrichItems(ctx *Ctx) (err error) {
 
 // EnrichItem - return rich item from raw item for a given author type
 func (j *DSConfluence) EnrichItem(ctx *Ctx, item map[string]interface{}, author string, affs bool, extra interface{}) (rich map[string]interface{}, err error) {
-	// IMPL:
-	rich = item
+	rich = make(map[string]interface{})
+	for _, field := range RawFields {
+		v, _ := item[field]
+		rich[field] = v
+	}
+	Printf("%+v\n", rich)
+	// FIXME
+	os.Exit(1)
 	return
 }
 
