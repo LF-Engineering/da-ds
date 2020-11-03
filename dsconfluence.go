@@ -98,6 +98,96 @@ func (j *DSConfluence) Enrich(ctx *Ctx) (err error) {
 	return
 }
 
+// GetHistoricalContents - get historical contents from teh current content
+func (j *DSConfluence) GetHistoricalContents(ctx *Ctx, content map[string]interface{}, dateFrom time.Time) (contents []map[string]interface{}, err error) {
+	iID, ok := content["id"]
+	if !ok {
+		err = fmt.Errorf("missing id property in content: %+v\n", content)
+		return
+	}
+	id, ok := iID.(string)
+	if !ok {
+		err = fmt.Errorf("id property is not a string: %+v\n", content)
+		return
+	}
+	contentURL, _ := Dig(content, []string{"_links", "webui"}, true, false)
+	ancestors, _ := Dig(content, []string{"ancestors"}, true, false)
+	method := Get
+	cacheDur := time.Duration(6) * time.Hour
+	version := 1
+	var (
+		res    interface{}
+		status int
+	)
+	for {
+		url := j.URL + "/rest/api/content/" + id + "?version=" + strconv.Itoa(version) + "&status=historical&expand=" + neturl.QueryEscape("body.storage,history,version")
+		res, status, _, err = Request(
+			ctx,
+			url,
+			method,
+			nil,
+			nil,
+			nil,
+			map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses: 200
+			nil,                                 // Error statuses
+			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
+			false,                               // retry
+			&cacheDur,                           // cache duration
+			false,                               // skip in dry-run mode
+		)
+		if status == 404 || status == 500 {
+			if ctx.Debug > 0 {
+				Printf("%s: v%d status %d\n", id, version, status)
+			}
+			continue
+		}
+		if err != nil {
+			return
+		}
+		result, ok := res.(map[string]interface{})
+		if !ok {
+			err = fmt.Errorf("cannot parse JSON from:\n%s\n", string(res.([]byte)))
+			return
+		}
+		iLatest, _ := Dig(result, []string{"history", "latest"}, true, false)
+		latest, ok := iLatest.(bool)
+		if !ok {
+			err = fmt.Errorf("cannot read latest property: %+v", result)
+			return
+		}
+		iWhen, _ := Dig(result, []string{"version", "when"}, false, true)
+		if !ok {
+			if ctx.Debug > 0 {
+				Printf("missing 'when' attribute for content %s version %d, skipping\n", id, version)
+			}
+			if latest {
+				break
+			}
+			version++
+			continue
+		}
+		var when time.Time
+		when, err = TimeParseInterfaceString(iWhen)
+		if err != nil {
+			return
+		}
+		if !when.Before(dateFrom) {
+			result["content_url"] = contentURL
+			result["ancestors"] = ancestors
+			contents = append(contents, result)
+		}
+		// FIXME
+		Printf("%s: v%d %+v,%v\n", id, version, when, latest)
+		if latest {
+			break
+		}
+		version++
+	}
+	// FIXME
+	Printf("final %s %d (%d historical contents)\n", id, version, len(contents))
+	return
+}
+
 // GetConfluenceContents - get confluence historical contents
 func (j *DSConfluence) GetConfluenceContents(ctx *Ctx, fromDate, next string) (contents []map[string]interface{}, newNext string, err error) {
 	if next == "" {
@@ -136,15 +226,9 @@ func (j *DSConfluence) GetConfluenceContents(ctx *Ctx, fromDate, next string) (c
 		err = fmt.Errorf("cannot parse JSON from:\n%s\n", string(res.([]byte)))
 		return
 	}
-	iLinks, ok := result["_links"]
+	iNext, ok := Dig(result, []string{"_links", "next"}, false, true)
 	if ok {
-		links, ok := iLinks.(map[string]interface{})
-		if ok {
-			iNext, ok := links["next"]
-			if ok {
-				newNext, _ = iNext.(string)
-			}
-		}
+		newNext, _ = iNext.(string)
 	}
 	iResults, ok := result["results"]
 	if ok {
@@ -163,10 +247,15 @@ func (j *DSConfluence) GetConfluenceContents(ctx *Ctx, fromDate, next string) (c
 
 // FetchItems - implement enrich data for confluence datasource
 func (j *DSConfluence) FetchItems(ctx *Ctx) (err error) {
-	var sDateFrom string
+	var (
+		sDateFrom string
+		dateFrom  time.Time
+	)
 	if ctx.DateFrom != nil {
-		sDateFrom = ToYMDHMDate(*ctx.DateFrom)
+		dateFrom = *ctx.DateFrom
+		sDateFrom = ToYMDHMDate(dateFrom)
 	} else {
+		dateFrom = DefaultDateFrom
 		sDateFrom = "1970-01-01 00:00"
 	}
 	next := "i"
@@ -190,18 +279,29 @@ func (j *DSConfluence) FetchItems(ctx *Ctx) (err error) {
 				c <- e
 			}
 		}()
-		esItem := j.AddMetadata(ctx, content)
-		if ctx.Project != "" {
-			content["project"] = ctx.Project
+		var contents []map[string]interface{}
+		contents, e = j.GetHistoricalContents(ctx, content, dateFrom)
+		if e != nil {
+			return
 		}
-		esItem["data"] = content
+		var esItems []interface{}
+		for _, content := range contents {
+			esItem := j.AddMetadata(ctx, content)
+			if ctx.Project != "" {
+				content["project"] = ctx.Project
+			}
+			esItem["data"] = content
+			esItems = append(esItems, esItem)
+		}
 		// FIXME
-		Printf("esItem: %+v\n", esItem)
-		os.Exit(1)
+		Printf("%d esItems\n", len(esItems))
+		if 1 == 1 {
+			return
+		}
 		if allContentsMtx != nil {
 			allContentsMtx.Lock()
 		}
-		allContents = append(allContents, esItem)
+		allContents = append(allContents, esItems...)
 		nContents := len(allContents)
 		if nContents >= ctx.ESBulkSize {
 			sendToElastic := func(c chan error) (ee error) {

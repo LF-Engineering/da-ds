@@ -24,6 +24,8 @@ var (
 	MappingNotAnalyzeString = []byte(`{"dynamic_templates":[{"notanalyzed":{"match":"*","match_mapping_type":"string","mapping":{"type":"keyword"}}},{"formatdate":{"match":"*","match_mapping_type":"date","mapping":{"type":"date","format":"strict_date_optional_time||epoch_millis"}}}]}`)
 	// RawFields - standard raw fields
 	RawFields = []string{DefaultDateField, DefaultTimestampField, DefaultOriginField, DefaultTagField, UUID, Offset}
+	// DefaultDateFrom - default date from
+	DefaultDateFrom = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
 )
 
 // DS - interface for all data source types

@@ -517,7 +517,7 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 	if ctx.DateFrom != nil {
 		from = *ctx.DateFrom
 	} else {
-		from = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
+		from = DefaultDateFrom
 	}
 	to = ctx.DateTo
 	url := j.URL + JiraAPIRoot + JiraAPISearch
