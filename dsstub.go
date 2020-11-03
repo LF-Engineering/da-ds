@@ -231,7 +231,7 @@ func (j *DSStub) RichIDField(*Ctx) string {
 	return DefaultIDField
 }
 
-// RichAuthorField - return rich ID field name
+// RichAuthorField - return rich author field name
 func (j *DSStub) RichAuthorField(*Ctx) string {
 	return DefaultAuthorField
 }

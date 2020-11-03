@@ -714,7 +714,7 @@ func (j *DSJira) RichIDField(*Ctx) string {
 	return DefaultIDField
 }
 
-// RichAuthorField - return rich ID field name
+// RichAuthorField - return rich author field name
 func (j *DSJira) RichAuthorField(*Ctx) string {
 	return JiraRichAuthorField
 }

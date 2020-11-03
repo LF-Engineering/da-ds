@@ -563,7 +563,7 @@ func (j *DSGroupsio) RichIDField(*Ctx) string {
 	return UUID
 }
 
-// RichAuthorField - return rich ID field name
+// RichAuthorField - return rich author field name
 func (j *DSGroupsio) RichAuthorField(*Ctx) string {
 	return DefaultAuthorField
 }

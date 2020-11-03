@@ -23,9 +23,13 @@ var (
 	// ConfluenceCategories - categories defined for Confluence
 	ConfluenceCategories = map[string]struct{}{HistoricalContent: {}}
 	// ConfluenceDefaultMaxContents - max contents to fetch at a time
-	ConfluenceDefaultMaxContents = 200
+	ConfluenceDefaultMaxContents = 1000
 	// ConfluenceDefaultSearchField - default search field
 	ConfluenceDefaultSearchField = "item_id"
+	// ConfluenceContentRoles - roles to fetch affiliation data for historical content
+	ConfluenceContentRoles = []string{"by"}
+	// ConfluenceRichAuthorField - rich index author field
+	ConfluenceRichAuthorField = "by"
 )
 
 // DSConfluence - DS implementation for confluence - does nothing at all, just presents a skeleton code
@@ -208,8 +212,8 @@ func (j *DSConfluence) GetConfluenceContents(ctx *Ctx, fromDate, next string) (c
 	}
 	method := Get
 	cacheDur := time.Duration(24) * time.Hour
-	// Init state
 	var url string
+	// Init state
 	if next == "i" {
 		url = j.URL + "/rest/api/content/search?cql=" + neturl.QueryEscape("lastModified>='"+fromDate+"' order by lastModified") + fmt.Sprintf("&limit=%d&expand=ancestors", j.MaxContents)
 	} else {
@@ -454,9 +458,9 @@ func (j *DSConfluence) RichIDField(*Ctx) string {
 	return DefaultIDField
 }
 
-// RichAuthorField - return rich ID field name
+// RichAuthorField - return rich author field name
 func (j *DSConfluence) RichAuthorField(*Ctx) string {
-	return DefaultAuthorField
+	return ConfluenceRichAuthorField
 }
 
 // OffsetField - return offset field used to detect where to restart from
@@ -573,9 +577,36 @@ func (j *DSConfluence) ElasticRichMapping() []byte {
 // GetItemIdentities return list of item's identities, each one is [3]string
 // (name, username, email) tripples, special value Nil "<nil>" means null
 // we use string and not *string which allows nil to allow usage as a map key
-func (j *DSConfluence) GetItemIdentities(ctx *Ctx, doc interface{}) (map[[3]string]struct{}, error) {
-	// IMPL:
-	return map[[3]string]struct{}{}, nil
+func (j *DSConfluence) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3]string]struct{}, err error) {
+	if ctx.Debug > 2 {
+		defer func() {
+			Printf("%+v -> %+v\n", DumpPreview(doc, 100), identities)
+		}()
+	}
+	iUser, ok := Dig(doc, []string{"data", "version", "by"}, true, false)
+	user, _ := iUser.(map[string]interface{})
+	username := Nil
+	iUserName, ok := user["username"]
+	if ok {
+		username, _ = iUserName.(string)
+	} else {
+		iPublicName, ok := user["publicName"]
+		if ok {
+			username, _ = iPublicName.(string)
+		}
+	}
+	name := Nil
+	iDisplayName, ok := user["displayName"]
+	if ok {
+		name, _ = iDisplayName.(string)
+	}
+	email := Nil
+	iEmail, ok := user["email"]
+	if ok {
+		email, _ = iEmail.(string)
+	}
+	identities = map[[3]string]struct{}{{name, username, email}: {}}
+	return
 }
 
 // ConfluenceEnrichItemsFunc - iterate items and enrich them
