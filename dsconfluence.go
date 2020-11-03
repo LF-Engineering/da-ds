@@ -130,6 +130,9 @@ func (j *DSConfluence) GetHistoricalContents(ctx *Ctx, content map[string]interf
 	)
 	for {
 		url := j.URL + "/rest/api/content/" + id + "?version=" + strconv.Itoa(version) + "&status=historical&expand=" + neturl.QueryEscape("body.storage,history,version")
+		if ctx.Debug > 1 {
+			Printf("historical content url: %s\n", url)
+		}
 		res, status, _, err = Request(
 			ctx,
 			url,
@@ -139,10 +142,10 @@ func (j *DSConfluence) GetHistoricalContents(ctx *Ctx, content map[string]interf
 			nil,
 			map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses: 200
 			nil,                                 // Error statuses
-			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
-			false,                               // retry
-			&cacheDur,                           // cache duration
-			false,                               // skip in dry-run mode
+			map[[2]int]struct{}{{200, 200}: {}, {500, 500}: {}, {404, 404}: {}}, // OK statuses: 200
+			false,     // retry
+			&cacheDur, // cache duration
+			false,     // skip in dry-run mode
 		)
 		if status == 404 || status == 500 {
 			if ctx.Debug > 0 {
@@ -218,6 +221,9 @@ func (j *DSConfluence) GetConfluenceContents(ctx *Ctx, fromDate, next string) (c
 		url = j.URL + "/rest/api/content/search?cql=" + neturl.QueryEscape("lastModified>='"+fromDate+"' order by lastModified") + fmt.Sprintf("&limit=%d&expand=ancestors", j.MaxContents)
 	} else {
 		url = j.URL + next
+	}
+	if ctx.Debug > 1 {
+		Printf("content url: %s\n", url)
 	}
 	res, status, _, err := Request(
 		ctx,
