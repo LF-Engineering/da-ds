@@ -3,6 +3,7 @@ package dads
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,6 +21,8 @@ var (
 	ConfluenceRichMapping = []byte(`{"properties":{"metadata__updated_on":{"type":"date"},"title_analyzed":{"type":"text","index":true}}}`)
 	// ConfluenceCategories - categories defined for Confluence
 	ConfluenceCategories = map[string]struct{}{HistoricalContent: {}}
+	// ConfluenceDefaultMaxContents - max contents to fetch at a time
+	ConfluenceDefaultMaxContents = 200
 )
 
 // DSConfluence - DS implementation for confluence - does nothing at all, just presents a skeleton code
@@ -28,6 +31,7 @@ type DSConfluence struct {
 	URL         string // From DA_CONFLUENCE_URL - Group name like GROUP-topic
 	NoSSLVerify bool   // From DA_CONFLUENCE_NO_SSL_VERIFY
 	MultiOrigin bool   // From DA_CONFLUENCE_MULTI_ORIGIN - allow multiple groups in a single index
+	MaxContents int    // From DA_CONFLUENCE_MAX_CONTENTS, defaults to ConfluenceDefaultMaxContents (200)
 }
 
 // ParseArgs - parse confluence specific environment variables
@@ -39,6 +43,15 @@ func (j *DSConfluence) ParseArgs(ctx *Ctx) (err error) {
 	j.MultiOrigin = StringToBool(os.Getenv(prefix + "MULTI_ORIGIN"))
 	if j.NoSSLVerify {
 		NoSSLVerify()
+	}
+	if ctx.Env("MAX_CONTENTS") != "" {
+		maxContents, err := strconv.Atoi(ctx.Env("MAX_CONTENTS"))
+		FatalOnError(err)
+		if maxContents > 0 {
+			j.MaxContents = maxContents
+		}
+	} else {
+		j.MaxContents = ConfluenceDefaultMaxContents
 	}
 	return
 }
@@ -84,57 +97,67 @@ func (j *DSConfluence) Enrich(ctx *Ctx) (err error) {
 	return
 }
 
+// GetConfluenceContents - get confluence historical contents
+func (j *DSConfluence) GetConfluenceContents(ctx *Ctx, fromDate, next string) (contents []map[string]interface{}, newNext string, err error) {
+	return
+}
+
 // FetchItems - implement enrich data for confluence datasource
 func (j *DSConfluence) FetchItems(ctx *Ctx) (err error) {
-	// IMPL:
-	var messages [][]byte
-	// Process messages (possibly in threads)
+	var sDateFrom string
+	if ctx.DateFrom != nil {
+		sDateFrom = ToYMDHMDate(*ctx.DateFrom)
+	} else {
+		sDateFrom = "1970-01-01 00:00"
+	}
+	next := "i"
 	var (
-		ch         chan error
-		allMsgs    []interface{}
-		allMsgsMtx *sync.Mutex
-		escha      []chan error
-		eschaMtx   *sync.Mutex
+		ch             chan error
+		allContents    []interface{}
+		allContentsMtx *sync.Mutex
+		escha          []chan error
+		eschaMtx       *sync.Mutex
 	)
 	thrN := GetThreadsNum(ctx)
 	if thrN > 1 {
 		ch = make(chan error)
-		allMsgsMtx = &sync.Mutex{}
+		allContentsMtx = &sync.Mutex{}
 		eschaMtx = &sync.Mutex{}
 	}
 	nThreads := 0
-	processMsg := func(c chan error, msg []byte) (wch chan error, e error) {
+	processContent := func(c chan error, content map[string]interface{}) (wch chan error, e error) {
 		defer func() {
 			if c != nil {
 				c <- e
 			}
 		}()
-		// FIXME: Real data processing here
-		item := map[string]interface{}{"id": time.Now().UnixNano(), "name": "xyz"}
-		esItem := j.AddMetadata(ctx, item)
+		esItem := j.AddMetadata(ctx, content)
 		if ctx.Project != "" {
-			item["project"] = ctx.Project
+			content["project"] = ctx.Project
 		}
-		esItem["data"] = item
-		if allMsgsMtx != nil {
-			allMsgsMtx.Lock()
+		esItem["data"] = content
+		// FIXME
+		Printf("esItem: %+v\n", esItem)
+		os.Exit(1)
+		if allContentsMtx != nil {
+			allContentsMtx.Lock()
 		}
-		allMsgs = append(allMsgs, esItem)
-		nMsgs := len(allMsgs)
-		if nMsgs >= ctx.ESBulkSize {
+		allContents = append(allContents, esItem)
+		nContents := len(allContents)
+		if nContents >= ctx.ESBulkSize {
 			sendToElastic := func(c chan error) (ee error) {
 				defer func() {
 					if c != nil {
 						c <- ee
 					}
 				}()
-				ee = SendToElastic(ctx, j, true, UUID, allMsgs)
+				ee = SendToElastic(ctx, j, true, UUID, allContents)
 				if ee != nil {
-					Printf("error %v sending %d messages to ElasticSearch\n", ee, len(allMsgs))
+					Printf("error %v sending %d historical contents to ElasticSearch\n", ee, len(allContents))
 				}
-				allMsgs = []interface{}{}
-				if allMsgsMtx != nil {
-					allMsgsMtx.Unlock()
+				allContents = []interface{}{}
+				if allContentsMtx != nil {
+					allContentsMtx.Unlock()
 				}
 				return
 			}
@@ -150,41 +173,51 @@ func (j *DSConfluence) FetchItems(ctx *Ctx) (err error) {
 				}
 			}
 		} else {
-			if allMsgsMtx != nil {
-				allMsgsMtx.Unlock()
+			if allContentsMtx != nil {
+				allContentsMtx.Unlock()
 			}
 		}
 		return
 	}
 	if thrN > 1 {
-		for _, message := range messages {
-			go func(msg []byte) {
-				var (
-					e    error
-					esch chan error
-				)
-				esch, e = processMsg(ch, msg)
-				if e != nil {
-					Printf("process error: %v\n", e)
-					return
-				}
-				if esch != nil {
-					if eschaMtx != nil {
-						eschaMtx.Lock()
+		for {
+			var contents []map[string]interface{}
+			contents, next, err = j.GetConfluenceContents(ctx, sDateFrom, next)
+			if err != nil {
+				return
+			}
+			for _, cont := range contents {
+				go func(content map[string]interface{}) {
+					var (
+						e    error
+						esch chan error
+					)
+					esch, e = processContent(ch, content)
+					if e != nil {
+						Printf("process error: %v\n", e)
+						return
 					}
-					escha = append(escha, esch)
-					if eschaMtx != nil {
-						eschaMtx.Unlock()
+					if esch != nil {
+						if eschaMtx != nil {
+							eschaMtx.Lock()
+						}
+						escha = append(escha, esch)
+						if eschaMtx != nil {
+							eschaMtx.Unlock()
+						}
 					}
+				}(cont)
+				nThreads++
+				if nThreads == thrN {
+					err = <-ch
+					if err != nil {
+						return
+					}
+					nThreads--
 				}
-			}(message)
-			nThreads++
-			if nThreads == thrN {
-				err = <-ch
-				if err != nil {
-					return
-				}
-				nThreads--
+			}
+			if next == "" {
+				break
 			}
 		}
 		for nThreads > 0 {
@@ -195,10 +228,20 @@ func (j *DSConfluence) FetchItems(ctx *Ctx) (err error) {
 			}
 		}
 	} else {
-		for _, message := range messages {
-			_, err = processMsg(nil, message)
+		for {
+			var contents []map[string]interface{}
+			contents, next, err = j.GetConfluenceContents(ctx, sDateFrom, next)
 			if err != nil {
 				return
+			}
+			for _, content := range contents {
+				_, err = processContent(nil, content)
+				if err != nil {
+					return
+				}
+			}
+			if next == "" {
+				break
 			}
 		}
 	}
@@ -208,14 +251,14 @@ func (j *DSConfluence) FetchItems(ctx *Ctx) (err error) {
 			return
 		}
 	}
-	nMsgs := len(allMsgs)
+	nContents := len(allContents)
 	if ctx.Debug > 0 {
-		Printf("%d remaining messages to send to ES\n", nMsgs)
+		Printf("%d remaining contents to send to ES\n", nContents)
 	}
-	if nMsgs > 0 {
-		err = SendToElastic(ctx, j, true, UUID, allMsgs)
+	if nContents > 0 {
+		err = SendToElastic(ctx, j, true, UUID, allContents)
 		if err != nil {
-			Printf("Error %v sending %d messages to ES\n", err, len(allMsgs))
+			Printf("Error %v sending %d contents to ES\n", err, len(allContents))
 		}
 	}
 	return
