@@ -146,7 +146,7 @@ func (j *DSConfluence) GetHistoricalContents(ctx *Ctx, content map[string]interf
 		)
 		if status == 404 || status == 500 {
 			if ctx.Debug > 0 {
-				Printf("%s: v%d status %d\n", id, version, status)
+				Printf("%s: v%d status %d: %s\n", id, version, status, url)
 			}
 			continue
 		}
