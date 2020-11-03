@@ -2,6 +2,7 @@ package dads
 
 import (
 	"fmt"
+	neturl "net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -99,6 +100,64 @@ func (j *DSConfluence) Enrich(ctx *Ctx) (err error) {
 
 // GetConfluenceContents - get confluence historical contents
 func (j *DSConfluence) GetConfluenceContents(ctx *Ctx, fromDate, next string) (contents []map[string]interface{}, newNext string, err error) {
+	if next == "" {
+		return
+	}
+	method := Get
+	cacheDur := time.Duration(6) * time.Hour
+	// Init state
+	var url string
+	if next == "i" {
+		url = j.URL + "/rest/api/content/search?cql=" + neturl.QueryEscape("lastModified>='"+fromDate+"' order by lastModified") + fmt.Sprintf("&limit=%d&expand=ancestors", j.MaxContents)
+	} else {
+		url = j.URL + next
+	}
+	res, status, _, err := Request(
+		ctx,
+		url,
+		method,
+		nil,
+		nil,
+		nil,
+		map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses: 200
+		nil,                                 // Error statuses
+		map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
+		false,                               // retry
+		&cacheDur,                           // cache duration
+		false,                               // skip in dry-run mode
+	)
+	// Printf("res=%v\n", res.(map[string]interface{}))
+	Printf("status=%d, err=%v\n", status, err)
+	if err != nil {
+		return
+	}
+	result, ok := res.(map[string]interface{})
+	if !ok {
+		err = fmt.Errorf("cannot parse JSON from:\n%s\n", string(res.([]byte)))
+		return
+	}
+	iLinks, ok := result["_links"]
+	if ok {
+		links, ok := iLinks.(map[string]interface{})
+		if ok {
+			iNext, ok := links["next"]
+			if ok {
+				newNext, _ = iNext.(string)
+			}
+		}
+	}
+	iResults, ok := result["results"]
+	if ok {
+		results, ok := iResults.([]interface{})
+		if ok {
+			for _, iResult := range results {
+				content, ok := iResult.(map[string]interface{})
+				if ok {
+					contents = append(contents, content)
+				}
+			}
+		}
+	}
 	return
 }
 
