@@ -537,7 +537,7 @@ func (j *DSConfluence) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string
 	}
 	FatalOnError(DeepSet(mItem, []string{"search_fields", ConfluenceDefaultSearchField}, itemID, false))
 	FatalOnError(DeepSet(mItem, []string{"search_fields", "content_id"}, id, false))
-	FatalOnError(DeepSet(mItem, []string{"search_fields", "ancestors_ids"}, ancestorIDs, false))
+	FatalOnError(DeepSet(mItem, []string{"search_fields", "ancestor_ids"}, ancestorIDs, false))
 	FatalOnError(DeepSet(mItem, []string{"search_fields", "version_number"}, versionNumber, false))
 	// Printf("%+v\n", mItem["search_fields"])
 	mItem[DefaultDateField] = ToESDate(updatedOn)

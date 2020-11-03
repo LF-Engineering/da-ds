@@ -1,7 +1,7 @@
 package dads
 
 // CacheCleanupProb - probability of cache cleanup in %
-const CacheCleanupProb int = 4
+const CacheCleanupProb int = 2
 
 // OK - common constant string
 const OK string = "ok"
