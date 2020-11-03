@@ -24,6 +24,8 @@ var (
 	ConfluenceCategories = map[string]struct{}{HistoricalContent: {}}
 	// ConfluenceDefaultMaxContents - max contents to fetch at a time
 	ConfluenceDefaultMaxContents = 200
+	// ConfluenceDefaultSearchField - default search field
+	ConfluenceDefaultSearchField = "item_id"
 )
 
 // DSConfluence - DS implementation for confluence - does nothing at all, just presents a skeleton code
@@ -111,9 +113,12 @@ func (j *DSConfluence) GetHistoricalContents(ctx *Ctx, content map[string]interf
 		return
 	}
 	contentURL, _ := Dig(content, []string{"_links", "webui"}, true, false)
-	ancestors, _ := Dig(content, []string{"ancestors"}, true, false)
+	ancestors, ok := Dig(content, []string{"ancestors"}, false, true)
+	if !ok {
+		ancestors = []interface{}{}
+	}
 	method := Get
-	cacheDur := time.Duration(6) * time.Hour
+	cacheDur := time.Duration(24) * time.Hour
 	version := 1
 	var (
 		res    interface{}
@@ -146,7 +151,7 @@ func (j *DSConfluence) GetHistoricalContents(ctx *Ctx, content map[string]interf
 		}
 		result, ok := res.(map[string]interface{})
 		if !ok {
-			err = fmt.Errorf("cannot parse JSON from:\n%s\n", string(res.([]byte)))
+			err = fmt.Errorf("cannot parse JSON from (status: %d):\n%s\n", status, string(res.([]byte)))
 			return
 		}
 		iLatest, _ := Dig(result, []string{"history", "latest"}, true, false)
@@ -176,25 +181,33 @@ func (j *DSConfluence) GetHistoricalContents(ctx *Ctx, content map[string]interf
 			result["ancestors"] = ancestors
 			contents = append(contents, result)
 		}
-		// FIXME
-		Printf("%s: v%d %+v,%v\n", id, version, when, latest)
+		if ctx.Debug > 2 {
+			Printf("%s: v%d %+v,%v (%s)\n", id, version, when, latest, url)
+		}
 		if latest {
 			break
 		}
 		version++
 	}
-	// FIXME
-	Printf("final %s %d (%d historical contents)\n", id, version, len(contents))
+	if ctx.Debug > 2 {
+		Printf("final %s %d (%d historical contents)\n", id, version, len(contents))
+	}
 	return
 }
 
 // GetConfluenceContents - get confluence historical contents
 func (j *DSConfluence) GetConfluenceContents(ctx *Ctx, fromDate, next string) (contents []map[string]interface{}, newNext string, err error) {
+	/*
+		Printf("GetConfluenceContents: in\n")
+		defer func() {
+			Printf("GetConfluenceContents: out %d\n", len(contents))
+		}()
+	*/
 	if next == "" {
 		return
 	}
 	method := Get
-	cacheDur := time.Duration(6) * time.Hour
+	cacheDur := time.Duration(24) * time.Hour
 	// Init state
 	var url string
 	if next == "i" {
@@ -217,13 +230,13 @@ func (j *DSConfluence) GetConfluenceContents(ctx *Ctx, fromDate, next string) (c
 		false,                               // skip in dry-run mode
 	)
 	// Printf("res=%v\n", res.(map[string]interface{}))
-	Printf("status=%d, err=%v\n", status, err)
+	// Printf("status=%d, err=%v\n", status, err)
 	if err != nil {
 		return
 	}
 	result, ok := res.(map[string]interface{})
 	if !ok {
-		err = fmt.Errorf("cannot parse JSON from:\n%s\n", string(res.([]byte)))
+		err = fmt.Errorf("cannot parse JSON from (status: %d):\n%s\n", status, string(res.([]byte)))
 		return
 	}
 	iNext, ok := Dig(result, []string{"_links", "next"}, false, true)
@@ -279,6 +292,7 @@ func (j *DSConfluence) FetchItems(ctx *Ctx) (err error) {
 				c <- e
 			}
 		}()
+		// Printf("processContent: in\n")
 		var contents []map[string]interface{}
 		contents, e = j.GetHistoricalContents(ctx, content, dateFrom)
 		if e != nil {
@@ -293,11 +307,7 @@ func (j *DSConfluence) FetchItems(ctx *Ctx) (err error) {
 			esItem["data"] = content
 			esItems = append(esItems, esItem)
 		}
-		// FIXME
-		Printf("%d esItems\n", len(esItems))
-		if 1 == 1 {
-			return
-		}
+		// Printf("processContent: out %d\n", len(contents))
 		if allContentsMtx != nil {
 			allContentsMtx.Lock()
 		}
@@ -480,13 +490,13 @@ func (j *DSConfluence) Origin(ctx *Ctx) string {
 
 // ItemID - return unique identifier for an item
 func (j *DSConfluence) ItemID(item interface{}) string {
-	// IMPL: toString(item["id"]) + '#v' + toString(item["version"]["number"])
-	return fmt.Sprintf("%d", time.Now().UnixNano())
+	id, _ := Dig(item, []string{"id"}, true, false)
+	versionNumber, _ := Dig(item, []string{"version", "number"}, true, false)
+	return id.(string) + "#v" + fmt.Sprintf("%.0f", versionNumber.(float64))
 }
 
 // AddMetadata - add metadata to the item
 func (j *DSConfluence) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string]interface{}) {
-	// IMPL:
 	mItem = make(map[string]interface{})
 	origin := j.URL
 	tag := ctx.Tag
@@ -505,9 +515,31 @@ func (j *DSConfluence) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string
 	mItem[DefaultTagField] = tag
 	mItem[DefaultOffsetField] = float64(updatedOn.Unix())
 	mItem["category"] = j.ItemCategory(item)
-	// FIXME: special confluence search fields (non standard)
-	//mItem["search_fields"] = j.GenSearchFields(ctx, issue, uuid)
-	//mItem["search_fields"] = make(map[string]interface{})
+	mItem["search_fields"] = make(map[string]interface{})
+	id, _ := Dig(item, []string{"id"}, true, false)
+	versionNumber, _ := Dig(item, []string{"version", "number"}, true, false)
+	var ancestorIDs []interface{}
+	iAncestors, ok := Dig(item, []string{"ancestors"}, false, true)
+	if ok {
+		ancestors, ok := iAncestors.([]interface{})
+		if ok {
+			for _, iAncestor := range ancestors {
+				ancestor, ok := iAncestor.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				ancestorID, ok := ancestor["id"]
+				if ok {
+					ancestorIDs = append(ancestorIDs, ancestorID)
+				}
+			}
+		}
+	}
+	FatalOnError(DeepSet(mItem, []string{"search_fields", ConfluenceDefaultSearchField}, itemID, false))
+	FatalOnError(DeepSet(mItem, []string{"search_fields", "content_id"}, id, false))
+	FatalOnError(DeepSet(mItem, []string{"search_fields", "ancestors_ids"}, ancestorIDs, false))
+	FatalOnError(DeepSet(mItem, []string{"search_fields", "version_number"}, versionNumber, false))
+	// Printf("%+v\n", mItem["search_fields"])
 	mItem[DefaultDateField] = ToESDate(updatedOn)
 	mItem[DefaultTimestampField] = ToESDate(timestamp)
 	mItem[ProjectSlug] = ctx.ProjectSlug
@@ -516,8 +548,10 @@ func (j *DSConfluence) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string
 
 // ItemUpdatedOn - return updated on date for an item
 func (j *DSConfluence) ItemUpdatedOn(item interface{}) time.Time {
-	// IMPL: toDatetime(item['version']['when'])
-	return time.Now()
+	iWhen, _ := Dig(item, []string{"version", "when"}, false, true)
+	when, err := TimeParseInterfaceString(iWhen)
+	FatalOnError(err)
+	return when
 }
 
 // ItemCategory - return unique identifier for an item
