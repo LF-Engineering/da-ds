@@ -287,7 +287,41 @@ func GetEnrollments(ctx *Ctx, ds DS, uuid string, dt time.Time, single bool) (or
 			orgs = append(orgs, rows...)
 		}
 	}
-	// Step 2: try global second, only if no project specific were found
+	// Step 2: Try foundation-f (for example cncf/* --> cncf-f)
+	// in single mode, if multiple companies are found, return the most recent
+	// in multiple mode this can return many different companies and this is ok
+	if pSlug != "" && len(orgs) == 0 {
+		ary := strings.Split(pSlug, "/")
+		if len(ary) > 1 {
+			slugF := ary[0] + "-f"
+			rows, ids := QueryToStringIntArrays(
+				ctx,
+				"select o.name, max(e.id) from enrollments e, organizations o where e.organization_id = o.id and e.uuid = ? and e.project_slug = ? and e.start <= ? and e.end > ? group by o.name order by e.id desc",
+				uuid,
+				slugF,
+				dt,
+				dt,
+			)
+			if single {
+				if len(rows) > 0 {
+					orgs = []string{rows[0]}
+					_ = SetDBSessionOrigin(ctx)
+					_, _ = ExecSQL(
+						ctx,
+						nil,
+						"insert ignore into enrollments(start, end, uuid, organization_id, project_slug, role) select start, end, uuid, organization_id, ?, ? from enrollments where id = ?",
+						pSlug,
+						"Contributor",
+						ids[0],
+					)
+					return
+				}
+			} else {
+				orgs = append(orgs, rows...)
+			}
+		}
+	}
+	// Step 3: try global second, only if no project specific were found
 	// in single mode, if multiple companies are found, return the most recent
 	// in multiple mode this can return many different companies and this is ok
 	if len(orgs) == 0 {
@@ -307,7 +341,7 @@ func GetEnrollments(ctx *Ctx, ds DS, uuid string, dt time.Time, single bool) (or
 			orgs = append(orgs, rows...)
 		}
 	}
-	// Step 3: try anything from the same foundation, only if nothing is found so far
+	// Step 4: try anything from the same foundation, only if nothing is found so far
 	// in single mode, if multiple companies are found, return the most recent
 	// in multiple mode this can return many different companies and this is ok
 	if pSlug != "" && len(orgs) == 0 {
@@ -341,7 +375,7 @@ func GetEnrollments(ctx *Ctx, ds DS, uuid string, dt time.Time, single bool) (or
 			}
 		}
 	}
-	// Step 4: try anything else, only if nothing is found so far
+	// Step 5: try anything else, only if nothing is found so far
 	// in single mode, if multiple companies are found, return the most recent
 	// in multiple mode this can return many different companies and this is ok
 	if len(orgs) == 0 {
