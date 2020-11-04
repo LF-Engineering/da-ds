@@ -158,10 +158,10 @@ func (j *DSConfluence) GetHistoricalContents(ctx *Ctx, content map[string]interf
 			false,     // skip in dry-run mode
 		)
 		if status == 404 || status == 500 {
-			if ctx.Debug > 2 {
+			if ctx.Debug > 1 {
 				Printf("%s: v%d status %d: %s\n", id, version, status, url)
 			}
-			continue
+			break
 		}
 		if err != nil {
 			return
@@ -177,7 +177,7 @@ func (j *DSConfluence) GetHistoricalContents(ctx *Ctx, content map[string]interf
 			err = fmt.Errorf("cannot read latest property: %+v", result)
 			return
 		}
-		iWhen, _ := Dig(result, []string{"version", "when"}, false, true)
+		iWhen, ok := Dig(result, []string{"version", "when"}, false, true)
 		if !ok {
 			if ctx.Debug > 0 {
 				Printf("missing 'when' attribute for content %s version %d, skipping\n", id, version)
