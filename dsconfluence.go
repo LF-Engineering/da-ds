@@ -158,7 +158,7 @@ func (j *DSConfluence) GetHistoricalContents(ctx *Ctx, content map[string]interf
 			false,     // skip in dry-run mode
 		)
 		if status == 404 || status == 500 {
-			if ctx.Debug > 0 {
+			if ctx.Debug > 2 {
 				Printf("%s: v%d status %d: %s\n", id, version, status, url)
 			}
 			continue
