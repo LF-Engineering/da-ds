@@ -106,11 +106,13 @@ func (j *DSConfluence) Enrich(ctx *Ctx) (err error) {
 
 // GetHistoricalContents - get historical contents from teh current content
 func (j *DSConfluence) GetHistoricalContents(ctx *Ctx, content map[string]interface{}, dateFrom time.Time) (contents []map[string]interface{}, err error) {
-	contentURL, _ := Dig(content, []string{"_links", "webui"}, true, false)
+	iContentURL, _ := Dig(content, []string{"_links", "webui"}, true, false)
 	ancestors, ok := Dig(content, []string{"ancestors"}, false, true)
 	if !ok {
 		ancestors = []interface{}{}
 	}
+	contentURL, _ := iContentURL.(string)
+	contentURL = j.URL + contentURL
 	content["content_url"] = contentURL
 	content["ancestors"] = ancestors
 	iVersionNumber, _ := Dig(content, []string{"version", "number"}, true, false)
@@ -773,7 +775,7 @@ func (j *DSConfluence) EnrichItem(ctx *Ctx, item map[string]interface{}, author 
 	////base, _ := Dig(page, []string{"_links", "base"}, true, false)
 	webUI, _ := Dig(page, []string{"_links", "webui"}, true, false)
 	////rich["url"] = base.(string) + webUI.(string)
-	rich["url"] = j.URL + "/" + webUI.(string)
+	rich["url"] = j.URL + webUI.(string)
 	iSpace, ok := Dig(page, []string{"_expandable", "space"}, false, true)
 	if ok {
 		space, _ := iSpace.(string)
