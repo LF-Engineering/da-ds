@@ -20,7 +20,7 @@ import (
 
 const (
 	// GitBackendVersion - backend version
-	GitBackendVersion = "0.1.0"
+	GitBackendVersion = "0.1.1"
 	// GitDefaultReposPath - default path where git repository clones
 	GitDefaultReposPath = "$HOME/.perceval/repositories"
 	// GitDefaultCachePath - default path where gitops cache files are stored

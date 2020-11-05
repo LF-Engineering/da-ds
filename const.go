@@ -24,6 +24,9 @@ const Gerrit string = "gerrit"
 // Confluence - common constant string
 const Confluence string = "confluence"
 
+// Rocketchat - common constant string
+const Rocketchat string = "rocketchat"
+
 // Stub - common constant string
 const Stub string = "stub"
 

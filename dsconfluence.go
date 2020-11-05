@@ -12,7 +12,7 @@ import (
 
 const (
 	// ConfluenceBackendVersion - backend version
-	ConfluenceBackendVersion = "0.0.1"
+	ConfluenceBackendVersion = "0.1.0"
 )
 
 var (
@@ -68,6 +68,9 @@ func (j *DSConfluence) Validate() (err error) {
 	j.URL = strings.TrimSpace(j.URL)
 	if strings.HasSuffix(j.URL, "/") {
 		j.URL = j.URL[:len(j.URL)-1]
+	}
+	if j.URL == "" {
+		err = fmt.Errorf("URL must be set")
 	}
 	return
 }

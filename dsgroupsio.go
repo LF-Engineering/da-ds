@@ -19,7 +19,7 @@ import (
 
 const (
 	// GroupsioBackendVersion - backend version
-	GroupsioBackendVersion = "0.1.1"
+	GroupsioBackendVersion = "0.1.2"
 	// GroupsioURLRoot - root url for group name origin
 	GroupsioURLRoot = "https://groups.io/g/"
 	// GroupsioAPIURL - Groups.io API URL
@@ -67,12 +67,12 @@ var (
 type DSGroupsio struct {
 	DS           string
 	GroupName    string // From DA_GROUPSIO_URL - Group name like GROUP-topic
-	NoSSLVerify  bool   // From DA_GROUPSIO_NO_SSL_VERIFY
 	Email        string // From DA_GROUPSIO_EMAIL
 	Password     string // From DA_GROUPSIO_PASSWORD
-	MultiOrigin  bool   // From DA_GROUPSIO_MULTI_ORIGIN - allow multiple groups in a single index
+	NoSSLVerify  bool   // From DA_GROUPSIO_NO_SSL_VERIFY
 	SaveArchives bool   // From DA_GROUPSIO_SAVE_ARCHIVES
 	ArchPath     string // From DA_GROUPSIO_ARCH_PATH - default GroupsioDefaultArchPath
+	MultiOrigin  bool   // From DA_GROUPSIO_MULTI_ORIGIN - allow multiple groups in a single index
 }
 
 // ParseArgs - parse stub specific environment variables
@@ -110,6 +110,10 @@ func (j *DSGroupsio) Validate() (err error) {
 	j.GroupName = ary[len(ary)-1]
 	if j.GroupName == "" {
 		err = fmt.Errorf("Group name must be set: [https://groups.io/g/]GROUP+channel")
+		return
+	}
+	if j.Email == "" || j.Password == "" {
+		err = fmt.Errorf("Email and Password must be set")
 		return
 	}
 	j.ArchPath = os.ExpandEnv(j.ArchPath)
