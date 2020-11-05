@@ -1576,6 +1576,7 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 		rich["program_language_summary"] = []interface{}{}
 	}
 	rich["commit_url"] = j.GetCommitURL(origin, hsh)
+	// Printf("commit_url: %+v\n", rich["commit_url"])
 	project, ok := Dig(commit, []string{"project"}, false, true)
 	if ok {
 		rich["project"] = project
