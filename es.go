@@ -463,6 +463,7 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 		url = ctx.ESURL + "/" + ctx.RichIndex + "/_doc/"
 	}
 	headers := map[string]string{"Content-Type": "application/json"}
+	retry := true
 	for _, item := range items {
 		doc, _ = jsoniter.Marshal(item)
 		id, _ := item.(map[string]interface{})[key].(string)
@@ -476,16 +477,27 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 			nil,                                 // JSON statuses
 			map[[2]int]struct{}{{400, 599}: {}}, // error statuses: 400-599
 			map[[2]int]struct{}{{200, 201}: {}}, // OK statuses: 200-201
-			true,                                // retry
+			retry,                               // retry
 			nil,                                 // cache duration
 			true,                                // skip in dry-run mode
 		)
 		if err != nil {
 			Printf("SendToElastic: error: %+v for %+v\n", err, item)
-			if ctx.AllowFail {
-				err = nil
-			} else {
+			switch ctx.AllowFail {
+			case 0:
+				// return error
 				return
+			case 1:
+				// ignore (do not continue)
+				err = nil
+				return
+			case 2:
+				// continue, but do not attempt to retry on next items
+				retry = false
+				err = nil
+			default:
+				// continue normally, so next items will attempt retry too
+				err = nil
 			}
 		}
 	}
