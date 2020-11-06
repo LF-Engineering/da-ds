@@ -282,8 +282,10 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 	if ctx.DateFrom != nil {
 		from = *ctx.DateFrom
 		from = from.Add(-1 * time.Second)
-		url += `&start_time=` + neturl.QueryEscape(ToYMDTHMSZDate(from))
+	} else {
+		from = time.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC)
 	}
+	url += `&start_time=` + neturl.QueryEscape(ToYMDTHMSZDate(from))
 	Printf("fetching messages from: %s\n", url)
 	// Groups.io blocks downloading archives more often than 24 hours
 	cacheMsgDur := time.Duration(24)*time.Hour + time.Duration(5)*time.Minute
