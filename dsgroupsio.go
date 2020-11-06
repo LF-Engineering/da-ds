@@ -48,6 +48,8 @@ const (
 	GroupsioMaxRichMessageLines = 10
 	// GroupsioMaxRecipients - maximum number of emails parsed from To:
 	GroupsioMaxRecipients = 50
+	// GroupsioMaxMessageProperties - maximum properties that can be set on the message object
+	GroupsioMaxMessageProperties = 255
 )
 
 var (

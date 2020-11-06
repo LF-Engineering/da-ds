@@ -79,6 +79,9 @@ func ParseMBoxMsg(ctx *Ctx, groupName string, msg []byte) (item map[string]inter
 	}
 	addRaw := func(k string, v []byte, replace int) {
 		// replace: 0-add new item, 1-replace current, 2-replace all
+		if len(raw) >= GroupsioMaxMessageProperties {
+			return
+		}
 		a, ok := raw[k]
 		if ok {
 			switch replace {
