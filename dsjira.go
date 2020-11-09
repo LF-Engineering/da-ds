@@ -54,7 +54,7 @@ var (
 	// JiraRoles - roles defined for Jira backend
 	JiraRoles = []string{"assignee", "reporter", "creator", Author, "updateAuthor"}
 	// JiraCategories - categories defined for Jira
-	JiraCategories = map[string]struct{}{"issue": {}}
+	JiraCategories = map[string]struct{}{Issue: {}}
 	// JiraKeepCustomFiled - we're dropping all but those custom fields
 	JiraKeepCustomFiled = map[string]struct{}{"Story Points": {}, "Sprint": {}}
 )
@@ -517,7 +517,7 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 	if ctx.DateFrom != nil {
 		from = *ctx.DateFrom
 	} else {
-		from = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
+		from = DefaultDateFrom
 	}
 	to = ctx.DateTo
 	url := j.URL + JiraAPIRoot + JiraAPISearch
@@ -714,7 +714,7 @@ func (j *DSJira) RichIDField(*Ctx) string {
 	return DefaultIDField
 }
 
-// RichAuthorField - return rich ID field name
+// RichAuthorField - return rich author field name
 func (j *DSJira) RichAuthorField(*Ctx) string {
 	return JiraRichAuthorField
 }
@@ -1359,7 +1359,11 @@ func (j *DSJira) AffsItems(ctx *Ctx, item map[string]interface{}, roles []string
 		if len(identity) == 0 {
 			continue
 		}
-		affsIdentity := IdenityAffsData(ctx, j, identity, nil, dt, role)
+		affsIdentity, empty := IdenityAffsData(ctx, j, identity, nil, dt, role)
+		if empty {
+			Printf("no identity affiliation data for identity %+v\n", identity)
+			continue
+		}
 		for prop, value := range affsIdentity {
 			affsItems[prop] = value
 		}
@@ -1377,6 +1381,7 @@ func (j *DSJira) AffsItems(ctx *Ctx, item map[string]interface{}, roles []string
 // GetRoleIdentity - return identity data for a given role
 func (j *DSJira) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role string) (identity map[string]interface{}) {
 	identity = make(map[string]interface{})
+	ident := make(map[string]interface{})
 	fields, _ := Dig(item, []string{"data", "fields"}, true, false)
 	user, ok := Dig(fields, []string{role}, false, true)
 	if !ok {
@@ -1387,9 +1392,19 @@ func (j *DSJira) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role str
 		{"username", "name"},
 		{"email", "emailAddress"},
 	}
+	any := false
 	for _, row := range data {
-		v, _ := Dig(user, []string{row[1]}, false, true)
-		identity[row[0]] = v
+		iV, ok := Dig(user, []string{row[1]}, false, true)
+		if !any && ok {
+			v, _ := iV.(string)
+			if v != "" {
+				any = true
+			}
+		}
+		ident[row[0]] = iV
+	}
+	if any {
+		identity = ident
 	}
 	return
 }

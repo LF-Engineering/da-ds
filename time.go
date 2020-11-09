@@ -52,6 +52,11 @@ func ToYMDDate(dt time.Time) string {
 	return fmt.Sprintf("%04d%02d%02d", dt.Year(), dt.Month(), dt.Day())
 }
 
+// ToYMDHMDate - return time formatted as YYYY-MM-DD HH:MI
+func ToYMDHMDate(dt time.Time) string {
+	return fmt.Sprintf("%04d-%02d-%02d %02d:%02d", dt.Year(), dt.Month(), dt.Day(), dt.Hour(), dt.Minute())
+}
+
 // ToYMDHMSDate - return time formatted as YYYY-MM-DD HH:MI:SS
 func ToYMDHMSDate(dt time.Time) string {
 	return fmt.Sprintf("%04d-%02d-%02d %02d:%02d:%02d", dt.Year(), dt.Month(), dt.Day(), dt.Hour(), dt.Minute(), dt.Second())

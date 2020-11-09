@@ -15,7 +15,7 @@ import (
 
 const (
 	// GerritBackendVersion - backend version
-	GerritBackendVersion = "0.1.0"
+	GerritBackendVersion = "0.1.1"
 	// GerritDefaultSSHKeyPath - default path to look for gerrit ssh private key
 	GerritDefaultSSHKeyPath = "$HOME/.ssh/id_rsa"
 	// GerritDefaultSSHPort - default gerrit ssh port
@@ -67,7 +67,7 @@ type DSGerrit struct {
 	VersionMinor   int      // gerrit minor version
 }
 
-// ParseArgs - parse stub specific environment variables
+// ParseArgs - parse gerrit specific environment variables
 func (j *DSGerrit) ParseArgs(ctx *Ctx) (err error) {
 	j.DS = Gerrit
 	prefix := "DA_GERRIT_"
@@ -121,8 +121,8 @@ func (j *DSGerrit) Validate() (err error) {
 		err = fmt.Errorf("Either SSH key or SSH key path must be set")
 		return
 	}
-	if j.User == "" {
-		err = fmt.Errorf("User must be set")
+	if j.URL == "" || j.User == "" {
+		err = fmt.Errorf("URL and user must be set")
 	}
 	return
 }
@@ -1795,7 +1795,11 @@ func (j *DSGerrit) AffsItems(ctx *Ctx, review map[string]interface{}, roles []st
 		if len(identity) == 0 {
 			continue
 		}
-		affsIdentity := IdenityAffsData(ctx, j, identity, nil, dt, role)
+		affsIdentity, empty := IdenityAffsData(ctx, j, identity, nil, dt, role)
+		if empty {
+			Printf("no identity affiliation data for identity %+v\n", identity)
+			continue
+		}
 		for prop, value := range affsIdentity {
 			affsItems[prop] = value
 		}

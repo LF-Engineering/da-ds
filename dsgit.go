@@ -20,7 +20,7 @@ import (
 
 const (
 	// GitBackendVersion - backend version
-	GitBackendVersion = "0.1.0"
+	GitBackendVersion = "0.1.1"
 	// GitDefaultReposPath - default path where git repository clones
 	GitDefaultReposPath = "$HOME/.perceval/repositories"
 	// GitDefaultCachePath - default path where gitops cache files are stored
@@ -57,7 +57,7 @@ var (
 	// GitRichMapping - Git rich index mapping
 	GitRichMapping = []byte(`{"properties":{"metadata__updated_on":{"type":"date"},"message_analyzed":{"type":"text","index":true}}}`)
 	// GitCategories - categories defined for git
-	GitCategories = map[string]struct{}{"commit": {}}
+	GitCategories = map[string]struct{}{Commit: {}}
 	// GitDefaultEnv - default git command environment
 	GitDefaultEnv = map[string]string{"LANG": "C", "PAGER": ""}
 	// GitLogOptions - default git log options
@@ -1576,6 +1576,7 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 		rich["program_language_summary"] = []interface{}{}
 	}
 	rich["commit_url"] = j.GetCommitURL(origin, hsh)
+	// Printf("commit_url: %+v\n", rich["commit_url"])
 	project, ok := Dig(commit, []string{"project"}, false, true)
 	if ok {
 		rich["project"] = project
@@ -1721,7 +1722,11 @@ func (j *DSGit) AffsItems(ctx *Ctx, commit map[string]interface{}, roles []strin
 		if len(identity) == 0 {
 			continue
 		}
-		affsIdentity := IdenityAffsData(ctx, j, identity, nil, dt, role)
+		affsIdentity, empty := IdenityAffsData(ctx, j, identity, nil, dt, role)
+		if empty {
+			Printf("no identity affiliation data for identity %+v\n", identity)
+			continue
+		}
 		for prop, value := range affsIdentity {
 			affsItems[prop] = value
 		}

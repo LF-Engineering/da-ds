@@ -24,6 +24,8 @@ var (
 	MappingNotAnalyzeString = []byte(`{"dynamic_templates":[{"notanalyzed":{"match":"*","match_mapping_type":"string","mapping":{"type":"keyword"}}},{"formatdate":{"match":"*","match_mapping_type":"date","mapping":{"type":"date","format":"strict_date_optional_time||epoch_millis"}}}]}`)
 	// RawFields - standard raw fields
 	RawFields = []string{DefaultDateField, DefaultTimestampField, DefaultOriginField, DefaultTagField, UUID, Offset}
+	// DefaultDateFrom - default date from
+	DefaultDateFrom = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
 )
 
 // DS - interface for all data source types
@@ -251,6 +253,9 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 					if profname == nil {
 						profname = &username
 					}
+				}
+				if pname == nil && pemail == nil && pusername == nil {
+					continue
 				}
 				// if username matches a real email and there is no email set, assume email=username
 				if pemail == nil && pusername != nil && IsValidEmail(username) {

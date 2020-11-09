@@ -30,6 +30,10 @@ func runDS(ctx *lib.Ctx) (err error) {
 		ds = &lib.DSGit{}
 	case lib.Gerrit:
 		ds = &lib.DSGerrit{}
+	case lib.Confluence:
+		ds = &lib.DSConfluence{}
+	case lib.Rocketchat:
+		ds = &lib.DSRocketchat{}
 	default:
 		err = fmt.Errorf("unknown data source type: " + ctx.DS)
 		return

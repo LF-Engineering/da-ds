@@ -19,7 +19,7 @@ import (
 
 const (
 	// GroupsioBackendVersion - backend version
-	GroupsioBackendVersion = "0.1.1"
+	GroupsioBackendVersion = "0.1.3"
 	// GroupsioURLRoot - root url for group name origin
 	GroupsioURLRoot = "https://groups.io/g/"
 	// GroupsioAPIURL - Groups.io API URL
@@ -48,6 +48,8 @@ const (
 	GroupsioMaxRichMessageLines = 10
 	// GroupsioMaxRecipients - maximum number of emails parsed from To:
 	GroupsioMaxRecipients = 50
+	// GroupsioMaxMessageProperties - maximum properties that can be set on the message object
+	GroupsioMaxMessageProperties = 255
 )
 
 var (
@@ -56,7 +58,7 @@ var (
 	// GroupsioRichMapping - Groupsio rich index mapping
 	GroupsioRichMapping = []byte(`{"properties":{"metadata__updated_on":{"type":"date"},"Subject_analyzed":{"type":"text","fielddata":true,"index":true},"body":{"type":"text","index":true}}}`)
 	// GroupsioCategories - categories defined for Groupsio
-	GroupsioCategories = map[string]struct{}{"message": {}}
+	GroupsioCategories = map[string]struct{}{Message: {}}
 	// GroupsioMBoxMsgSeparator - used to split mbox file into separate messages
 	GroupsioMBoxMsgSeparator = []byte("\nFrom ")
 	// GroupsioMsgLineSeparator - used to split mbox message into its separate lines
@@ -67,12 +69,12 @@ var (
 type DSGroupsio struct {
 	DS           string
 	GroupName    string // From DA_GROUPSIO_URL - Group name like GROUP-topic
-	NoSSLVerify  bool   // From DA_GROUPSIO_NO_SSL_VERIFY
 	Email        string // From DA_GROUPSIO_EMAIL
 	Password     string // From DA_GROUPSIO_PASSWORD
-	MultiOrigin  bool   // From DA_GROUPSIO_MULTI_ORIGIN - allow multiple groups in a single index
+	NoSSLVerify  bool   // From DA_GROUPSIO_NO_SSL_VERIFY
 	SaveArchives bool   // From DA_GROUPSIO_SAVE_ARCHIVES
 	ArchPath     string // From DA_GROUPSIO_ARCH_PATH - default GroupsioDefaultArchPath
+	MultiOrigin  bool   // From DA_GROUPSIO_MULTI_ORIGIN - allow multiple groups in a single index
 }
 
 // ParseArgs - parse stub specific environment variables
@@ -110,6 +112,10 @@ func (j *DSGroupsio) Validate() (err error) {
 	j.GroupName = ary[len(ary)-1]
 	if j.GroupName == "" {
 		err = fmt.Errorf("Group name must be set: [https://groups.io/g/]GROUP+channel")
+		return
+	}
+	if j.Email == "" || j.Password == "" {
+		err = fmt.Errorf("Email and Password must be set")
 		return
 	}
 	j.ArchPath = os.ExpandEnv(j.ArchPath)
@@ -276,8 +282,10 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 	if ctx.DateFrom != nil {
 		from = *ctx.DateFrom
 		from = from.Add(-1 * time.Second)
-		url += `&start_time=` + neturl.QueryEscape(ToYMDTHMSZDate(from))
+	} else {
+		from = time.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC)
 	}
+	url += `&start_time=` + neturl.QueryEscape(ToYMDTHMSZDate(from))
 	Printf("fetching messages from: %s\n", url)
 	// Groups.io blocks downloading archives more often than 24 hours
 	cacheMsgDur := time.Duration(24)*time.Hour + time.Duration(5)*time.Minute
@@ -563,7 +571,7 @@ func (j *DSGroupsio) RichIDField(*Ctx) string {
 	return UUID
 }
 
-// RichAuthorField - return rich ID field name
+// RichAuthorField - return rich author field name
 func (j *DSGroupsio) RichAuthorField(*Ctx) string {
 	return DefaultAuthorField
 }
@@ -1112,24 +1120,28 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 			"username": ary[1],
 			"email":    ary[2],
 		}
-		affsIdentity := IdenityAffsData(ctx, j, identity, nil, dt, role)
-		for prop, value := range affsIdentity {
-			affsData[prop] = value
-		}
-		for _, suff := range RequiredAffsFields {
-			k := role + suff
-			_, ok := affsIdentity[k]
-			if !ok {
-				affsIdentity[k] = Unknown
+		affsIdentity, empty := IdenityAffsData(ctx, j, identity, nil, dt, role)
+		if empty {
+			Printf("no identity affiliation data for identity %+v\n", identity)
+		} else {
+			for prop, value := range affsIdentity {
+				affsData[prop] = value
 			}
-		}
-		for prop, value := range affsData {
-			rich[prop] = value
-		}
-		orgsKey := role + MultiOrgNames
-		_, ok := Dig(rich, []string{orgsKey}, false, true)
-		if !ok {
-			rich[orgsKey] = []interface{}{}
+			for _, suff := range RequiredAffsFields {
+				k := role + suff
+				_, ok := affsIdentity[k]
+				if !ok {
+					affsIdentity[k] = Unknown
+				}
+			}
+			for prop, value := range affsData {
+				rich[prop] = value
+			}
+			orgsKey := role + MultiOrgNames
+			_, ok := Dig(rich, []string{orgsKey}, false, true)
+			if !ok {
+				rich[orgsKey] = []interface{}{}
+			}
 		}
 	}
 	if role == Author {
@@ -1146,6 +1158,7 @@ func (j *DSGroupsio) AffsItems(ctx *Ctx, rawItem map[string]interface{}, roles [
 }
 
 // GetRoleIdentity - return identity data for a given role
+// groupsio si not using this
 func (j *DSGroupsio) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role string) map[string]interface{} {
 	return map[string]interface{}{"name": nil, "username": nil, "email": nil}
 }

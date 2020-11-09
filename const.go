@@ -1,7 +1,7 @@
 package dads
 
 // CacheCleanupProb - probability of cache cleanup in %
-const CacheCleanupProb int = 4
+const CacheCleanupProb int = 2
 
 // OK - common constant string
 const OK string = "ok"
@@ -20,6 +20,12 @@ const Git string = "git"
 
 // Gerrit - common constant string
 const Gerrit string = "gerrit"
+
+// Confluence - common constant string
+const Confluence string = "confluence"
+
+// Rocketchat - common constant string
+const Rocketchat string = "rocketchat"
 
 // Stub - common constant string
 const Stub string = "stub"
@@ -128,6 +134,9 @@ const Changeset = "changeset"
 
 // Approval - common constant string
 const Approval = "approval"
+
+// HistoricalContent - common constant string
+const HistoricalContent = "historical content"
 
 // ProjectSlug - common constant string
 const ProjectSlug = "project_slug"

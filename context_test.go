@@ -229,7 +229,7 @@ func TestInit(t *testing.T) {
 		OnlyIdentities:   false,
 		ForceFull:        false,
 		LegacyUUID:       false,
-		AllowFail:        false,
+		AllowFail:        0,
 		Project:          "",
 		ProjectSlug:      "",
 		Category:         "",
@@ -434,7 +434,7 @@ func TestInit(t *testing.T) {
 				t,
 				copyContext(&defaultContext),
 				map[string]interface{}{
-					"AllowFail": true,
+					"AllowFail": 1,
 				},
 			),
 		},
