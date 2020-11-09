@@ -1,7 +1,8 @@
 package dockerhub
 
 const (
-	APIURL          = "https://hub.docker.com/v2"
+	APIUrl          = "https://hub.docker.com"
+	APIVersion      = "v2"
 	APILogin        = "users/login"
 	APIRepositories = "repositories"
 	Category        = "dockerhub-data"

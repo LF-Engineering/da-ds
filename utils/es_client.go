@@ -3,6 +3,9 @@ package utils
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/elastic/go-elasticsearch/v7/esapi"
 )
@@ -46,13 +49,12 @@ func (p *ESClientProvider) CreateIndex(index string, body []byte) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
+	defer res.Body.Close()
 
 	resBytes, err := toBytes(res)
 	if err != nil {
 		return nil, err
 	}
-
-	defer res.Body.Close()
 
 	return resBytes, nil
 }
@@ -65,12 +67,29 @@ func (p *ESClientProvider) DeleteIndex(index string, ignoreUnavailable bool) ([]
 	if err != nil {
 		return nil, err
 	}
+	defer res.Body.Close()
 
 	body, err := toBytes(res)
 	if err != nil {
 		return nil, err
 	}
-	return body, err
+
+	if res.StatusCode == 200 {
+		return body, nil
+	}
+
+	if res.IsError() {
+
+		var e map[string]interface{}
+		if err = json.NewDecoder(res.Body).Decode(&e); err != nil {
+			return nil, err
+		}
+
+		err = fmt.Errorf("[%s] %s: %s", res.Status(), e["error"].(map[string]interface{})["type"], e["error"].(map[string]interface{})["reason"])
+		return nil, err
+	}
+
+	return body, nil
 }
 
 // convert response to bytes
@@ -97,12 +116,27 @@ func (p *ESClientProvider) Add(index string, documentID string, body []byte) ([]
 	if err != nil {
 		return nil, err
 	}
+	defer res.Body.Close()
 
 	resBytes, err := toBytes(res)
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+
+	if res.StatusCode == 200 {
+		return resBytes, nil
+	}
+
+	if res.IsError() {
+
+		var e map[string]interface{}
+		if err = json.NewDecoder(res.Body).Decode(&e); err != nil {
+			return nil, err
+		}
+
+		err = fmt.Errorf("[%s] %s: %s", res.Status(), e["error"].(map[string]interface{})["type"], e["error"].(map[string]interface{})["reason"])
+		return nil, err
+	}
 
 	return resBytes, nil
 }
@@ -119,12 +153,74 @@ func (p *ESClientProvider) Bulk(body []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer res.Body.Close()
 
 	resBytes, err := toBytes(res)
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+
+	if res.StatusCode == 200 {
+		return resBytes, nil
+	}
+
+	if res.IsError() {
+
+		var e map[string]interface{}
+		if err = json.NewDecoder(res.Body).Decode(&e); err != nil {
+			return nil, err
+		}
+
+		err = fmt.Errorf("[%s] %s: %s", res.Status(), e["error"].(map[string]interface{})["type"], e["error"].(map[string]interface{})["reason"])
+		return nil, err
+	}
 
 	return resBytes, nil
+}
+
+func (p *ESClientProvider) Get(index string, query map[string]interface{}, result interface{}) (err error) {
+	var buf bytes.Buffer
+	err = json.NewEncoder(&buf).Encode(query)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(&buf)
+
+	res, err := p.client.Search(
+		p.client.Search.WithIndex(index),
+		p.client.Search.WithBody(&buf),
+	)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode == 200 {
+		// index exists so return true
+
+		fmt.Println(res.Body)
+		if err = json.NewDecoder(res.Body).Decode(result); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	if res.IsError() {
+		if res.StatusCode == 404 {
+			// index doesn't exist
+			return errors.New("index doesn't exist")
+		}
+
+		var e map[string]interface{}
+		if err = json.NewDecoder(res.Body).Decode(&e); err != nil {
+			return err
+		}
+
+		err = fmt.Errorf("[%s] %s: %s", res.Status(), e["error"].(map[string]interface{})["type"], e["error"].(map[string]interface{})["reason"])
+		return err
+	}
+
+	return nil
 }

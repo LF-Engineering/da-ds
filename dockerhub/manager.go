@@ -8,15 +8,19 @@ import (
 )
 
 type Manager struct {
-	Username       string
-	Password       string
-	FetcherBackendVersion string
+	Username               string
+	Password               string
+	FetcherBackendVersion  string
 	EnricherBackendVersion string
-	ESUrl          string
-	ESUsername     string
-	ESPassword     string
-	HttpTimeout    time.Duration
-	Repositories   []*Repository
+	EnrichOnly             bool
+	Enrich                 bool
+	ESUrl                  string
+	ESUsername             string
+	ESPassword             string
+	HttpTimeout            time.Duration
+	Repositories           []*Repository
+	FromDate               string
+	FromOffset             int64
 }
 
 type Repository struct {
@@ -28,22 +32,30 @@ func NewManager(Username string,
 	Password string,
 	FetcherBackendVersion string,
 	EnricherBackendVersion string,
+	EnrichOnly bool,
+	Enrich bool,
 	ESUrl string,
 	ESUsername string,
 	ESPassword string,
 	HttpTimeout time.Duration,
-	Repositories   []*Repository,
-	) *Manager {
+	Repositories []*Repository,
+	FromDate string,
+	FromOffset int64,
+) *Manager {
 	mng := &Manager{
-		Username: Username,
-		Password: Password,
-		FetcherBackendVersion: FetcherBackendVersion,
+		Username:               Username,
+		Password:               Password,
+		FetcherBackendVersion:  FetcherBackendVersion,
 		EnricherBackendVersion: EnricherBackendVersion,
-		ESUrl: ESUrl,
-		ESUsername: ESUsername,
-		ESPassword: ESPassword,
-		HttpTimeout: HttpTimeout,
-		Repositories: Repositories,
+		EnrichOnly:             EnrichOnly,
+		Enrich:                 Enrich,
+		ESUrl:                  ESUrl,
+		ESUsername:             ESUsername,
+		ESPassword:             ESPassword,
+		HttpTimeout:            HttpTimeout,
+		Repositories:           Repositories,
+		FromDate:               FromDate,
+		FromOffset:             FromOffset,
 	}
 
 	return mng
@@ -67,20 +79,36 @@ func (m *Manager) Sync() error {
 		}
 	}
 
-	for _, repo := range m.Repositories {
-		// Fetch data for single repo
-		raw, err := fetcher.FetchItem(repo.Owner, repo.Repository)
+	if m.EnrichOnly {
+		hits, err := enricher.GetPreviouslyFetchedData(m.Repositories)
 		if err != nil {
-			return errors.New(fmt.Sprintf("could not fetch data from repository: %s-%s", repo.Owner, repo.Repository))
+			return err
 		}
-		rawData = append(rawData, raw)
 
-		// Enrich data for single repo
-		enriched, err := enricher.EnrichItem(*raw)
-		if err != nil {
-			return errors.New(fmt.Sprintf("could not enrich data from repository: %s-%s", repo.Owner, repo.Repository))
+		for _, hit := range hits.Hits.Hits {
+			err = m.enrich(enricher, hit.Source, &Repository{hit.Source.Data.Namespace, hit.Source.Data.Name}, enrichData)
+			if err != nil {
+				return err
+			}
 		}
-		enrichData = append(enrichData, enriched)
+	}
+
+	for _, repo := range m.Repositories {
+		var raw *RepositoryRaw
+
+		if m.EnrichOnly == false {
+			// Fetch data for single repo
+			raw, err = fetcher.FetchItem(repo.Owner, repo.Repository)
+			if err != nil {
+				return errors.New(fmt.Sprintf("could not fetch data from repository: %s-%s", repo.Owner, repo.Repository))
+			}
+			rawData = append(rawData, raw)
+		}
+
+		err = m.enrich(enricher, raw, repo, enrichData)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Insert raw data to elasticsearch
@@ -95,6 +123,18 @@ func (m *Manager) Sync() error {
 		return err
 	}
 
+	return nil
+}
+
+func (m *Manager) enrich(enricher *Enricher, raw *RepositoryRaw, repo *Repository, enrichData []*RepositoryEnrich) error {
+	if m.Enrich {
+		// Enrich data for single repo
+		enriched, err := enricher.EnrichItem(*raw)
+		if err != nil {
+			return errors.New(fmt.Sprintf("could not enrich data from repository: %s-%s", repo.Owner, repo.Repository))
+		}
+		enrichData = append(enrichData, enriched)
+	}
 	return nil
 }
 

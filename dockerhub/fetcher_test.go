@@ -13,11 +13,11 @@ import (
 )
 
 func TestFetchItem(t *testing.T) {
-  // Arrange
+	// Arrange
 	owner := "hyperledger"
 	repo := "caliper"
 
-  params := &Params{
+	params := &Params{
 		Username:       "",
 		Password:       "",
 		BackendVersion: "0.0.1",
@@ -71,18 +71,18 @@ func TestFetchItem(t *testing.T) {
 }
 
 func TestFetchItem2(t *testing.T) {
-  // Arrange
+	// Arrange
 	owner := "hyperledger"
 	repo := "caliper"
 
-  params := &Params{
+	params := &Params{
 		Username:       "",
 		Password:       "",
 		BackendVersion: "0.0.1",
 	}
 	httpClientProviderMock := &mocks.HttpClientProvider{}
 
-b := `{
+	b := `{
     "user": "grimoirelab",
     "name": "perceval",
     "namespace": "grimoirelab",
@@ -121,9 +121,9 @@ b := `{
 		return
 	}
 
-	testTime := time.Date(2017, 1, 1, 0,0,0,0, time.UTC)
-	raw.Data.FetchedOn = fmt.Sprintf("%v", testTime.Unix())
-	uid, err := uuid.Generate(raw.Data.FetchedOn)
+	testTime := time.Date(2017, 1, 1, 0, 0, 0, 0, time.UTC)
+	raw.Data.FetchedOn = float64(testTime.Unix()) / 1.0e3
+	uid, err := uuid.Generate(fmt.Sprintf("%v", raw.Data.FetchedOn))
 	if err != nil {
 		t.Errorf("err: %v", err)
 		return

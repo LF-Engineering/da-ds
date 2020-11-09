@@ -42,6 +42,7 @@ type ESClientProvider interface {
 	CreateIndex(index string, body []byte) ([]byte, error)
 	DeleteIndex(index string, ignoreUnavailable bool) ([]byte, error)
 	Bulk(body []byte) ([]byte, error)
+	Get(index string, query map[string]interface{}, result interface{}) (err error)
 }
 
 // NewFetcher initiates a new dockerhub fetcher
@@ -57,7 +58,7 @@ func NewFetcher(params *Params, httpClientProvider HttpClientProvider, esClientP
 }
 
 func (f *Fetcher) Login(username string, password string) (string, error) {
-	url := fmt.Sprintf("%s/%s", APIURL, APILogin)
+	url := fmt.Sprintf("%s/%s/%s/%s", APIUrl, APIVersion, APIRepositories, APILogin)
 
 	payload := make(map[string]interface{})
 	payload["username"] = username
@@ -90,7 +91,7 @@ func (f *Fetcher) Login(username string, password string) (string, error) {
 
 // FetchItems ...
 func (f *Fetcher) FetchItem(owner string, repository string) (*RepositoryRaw, error) {
-	url := fmt.Sprintf("%s/%s/%s/%s", APIURL, APIRepositories, owner, repository)
+	url := fmt.Sprintf("%s/%s/%s", APIUrl, owner, repository)
 	headers := map[string]string{}
 	if f.Token != "" {
 		headers["Authorization"] = fmt.Sprintf("JWT %s", f.Token)
@@ -113,17 +114,21 @@ func (f *Fetcher) FetchItem(owner string, repository string) (*RepositoryRaw, er
 	raw.Category = Category
 	raw.ClassifiedFieldsFiltered = nil
 	timestamp := time.Now()
-	raw.Timestamp = fmt.Sprintf("%v", timestamp.UnixNano()/1.0e3)
+	raw.Timestamp = float64(timestamp.UnixNano()) / 1.0e3
 	raw.Data.FetchedOn = raw.Timestamp
 	raw.MetadataTimestamp = dads.ToESDate(timestamp)
 	raw.Origin = url
 	raw.SearchFields = &RepositorySearchFields{repository, fmt.Sprintf("%v", raw.Timestamp), owner}
 	raw.Tag = url
-	raw.UpdatedOn = raw.Data.LastUpdated
+	lastUpdated, err := time.Parse(time.RFC3339, raw.Data.LastUpdated)
+	if err != nil {
+		return nil, err
+	}
+	raw.UpdatedOn = float64(lastUpdated.UnixNano()) / 1.0e3
 
 	// generate UUID
 	ctx := &dads.Ctx{}
-	uid := dads.UUIDNonEmpty(ctx, raw.Data.FetchedOn)
+	uid := dads.UUIDNonEmpty(ctx, fmt.Sprintf("%v", raw.Data.FetchedOn))
 	raw.UUID = uid
 
 	return raw, nil

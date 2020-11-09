@@ -17,6 +17,40 @@ type Enricher struct {
 	BackendVersion        string
 }
 
+type TopHitsStruct struct {
+	Took   int    `json:"took"`
+	Hits   Hits   `json:"hits"`
+	Aggregations Aggregations `json:"aggregations"`
+}
+
+type Hits struct {
+	Total    Total        `json:"total"`
+	MaxScore float32      `json:"max_score"`
+	Hits     []NestedHits `json:"hits"`
+}
+
+type Total struct {
+	Value    int    `json:"value"`
+	Relation string `json:"relation"`
+}
+
+type NestedHits struct {
+	Index  string           `json:"_index"`
+	Type   string           `json:"_type"`
+	ID     string           `json:"_id"`
+	Score  float64          `json:"_score"`
+	Source *RepositoryRaw `json:"_source"`
+}
+
+type Aggregations struct {
+	LastDate LastDate `json:"last_date"`
+}
+
+type LastDate struct {
+	Value float64 `json:"value"`
+	ValueAsString string `json:"value_as_string"`
+}
+
 func NewEnricher(BackendVersion string, esClientProvider ESClientProvider) *Enricher {
 	return &Enricher{
 		DSName:                Dockerhub,
@@ -112,4 +146,71 @@ func (e *Enricher) BulkInsert(data []*RepositoryEnrich) ([]byte, error) {
 func (e *Enricher) HandleMapping(index string) error {
 	_, err := e.ElasticSearchProvider.CreateIndex(index, DockerhubRichMapping)
 	return err
+}
+
+func (e *Enricher) GetPreviouslyFetchedData(repositories []*Repository) (result *TopHitsStruct, err error) {
+
+	urls := make([]string, 0)
+
+	for _, repo := range repositories {
+		url := fmt.Sprintf("%s/%s/%s", APIUrl, repo.Owner, repo.Repository)
+
+		urls = append(urls, url)
+	}
+
+	hits := &TopHitsStruct{}
+
+	query := map[string]interface{}{
+		"size": 10000,
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{
+					{
+						"terms": map[string]interface{}{
+							"origin": urls,
+						},
+					},
+				},
+			},
+		},
+		"collapse": map[string]string{
+			"field": "origin",
+		},
+		"sort": []map[string]interface{}{
+			{
+				"metadata__updated_on": map[string]string{
+					"order": "desc",
+				},
+			},
+		},
+	}
+
+	err = e.ElasticSearchProvider.Get("sds-*-dockerhub-raw", query, hits)
+	if err != nil {
+		return nil, err
+	}
+
+	return hits, nil
+}
+
+func (e *Enricher) GetLastEnrichDate() (result float64, err error) {
+	hits := &TopHitsStruct{}
+
+	query := map[string]interface{}{
+		"size": 0,
+		"aggs": map[string]interface{}{
+			"last_date": map[string]interface{}{
+				"max": map[string]interface{}{
+						"field": "metadata__enriched_on",
+				},
+			},
+		},
+	}
+
+	err = e.ElasticSearchProvider.Get("sds-*-dockerhub", query, hits)
+	if err != nil {
+		return 0, err
+	}
+
+	return hits.Aggregations.LastDate.Value, nil
 }

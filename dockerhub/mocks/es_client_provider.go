@@ -100,3 +100,17 @@ func (_m *ESClientProvider) DeleteIndex(index string, ignoreUnavailable bool) ([
 
 	return r0, r1
 }
+
+// Get provides a mock function with given fields: index, query, result
+func (_m *ESClientProvider) Get(index string, query map[string]interface{}, result interface{}) error {
+	ret := _m.Called(index, query, result)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, map[string]interface{}, interface{}) error); ok {
+		r0 = rf(index, query, result)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}

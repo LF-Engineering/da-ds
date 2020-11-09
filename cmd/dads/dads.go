@@ -2,10 +2,10 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"github.com/LF-Engineering/da-ds/dockerhub"
 	"math/rand"
+	"strconv"
 	"time"
 
 	lib "github.com/LF-Engineering/da-ds"
@@ -75,30 +75,8 @@ func main() {
 	lib.Printf("Took: %v\n", dtEnd.Sub(dtStart))
 }
 
-// todo: if you want to use it later
-func dockerhubFlags() (*dockerhub.Manager, error) {
-	username := flag.String("username", "", "username")
-	password := flag.String("password", "", "password")
-	fetcherBackendVersion := flag.String("fetcher_version", "", "fetcher backend version")
-	enricherBackendVersion := flag.String("enricher_version", "", "enricher backend version")
-	esUrl := flag.String("enricher_version", "", "enricher backend version")
-	esUsername := flag.String("es_username", "", "elasticsearch username")
-	esPassword := flag.String("es_password", "", "elasticsearch password")
-	httpTimeout := flag.Duration("http_timeout", time.Duration(0), "http timeout")
-	repositoriesJson := flag.String("repositories", "", "repositories in json format e.g. [{'owner', 'repository'},...]")
-
-	flag.Parse()
-
-	var repositories []*dockerhub.Repository
-	if err := json.Unmarshal([]byte(*repositoriesJson), &repositories); err != nil {
-		return nil, err
-	}
-
-	return dockerhub.NewManager(*username, *password, *fetcherBackendVersion, *enricherBackendVersion,
-		*esUrl, *esUsername, *esPassword, *httpTimeout,  repositories), nil
-}
-
 func dockerhubEnvs(ctx *lib.Ctx) (*dockerhub.Manager, error) {
+	// Dockerhub credentials
 	username := ctx.Env("USERNAME")
 	password := ctx.Env("PASSWORD")
 	fetcherBackendVersion := ctx.Env("FETCHER_BACKEND_VERSION")
@@ -107,7 +85,12 @@ func dockerhubEnvs(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	esUsername := ctx.Env("ES_USERNAME")
 	esPassword := ctx.Env("ES_PASSWORD")
 	httpTimeout := ctx.Env("HTTP_TIMEOUT") // "60s" 60 seconds...
+	// flag projects json array
 	repositoriesJson := ctx.Env("REPOSITORIES_JSON")
+	enrichOnly := ctx.BoolEnv("Enrich_ONLY")
+	enrich := ctx.BoolEnv("Enrich")
+	fromDate := ctx.Env("FROM_DATE")
+	fromOffset, _ := strconv.ParseInt(ctx.Env("FROM_OFFSET"), 10, 64)
 
 	var repositories []*dockerhub.Repository
 	if err := json.Unmarshal([]byte(repositoriesJson), &repositories); err != nil {
@@ -120,5 +103,5 @@ func dockerhubEnvs(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	}
 
 	return dockerhub.NewManager(username, password, fetcherBackendVersion, enricherBackendVersion,
-		esUrl, esUsername, esPassword, timeout,  repositories), nil
+		enrichOnly, enrich, esUrl, esUsername, esPassword, timeout,  repositories, fromDate, fromOffset), nil
 }

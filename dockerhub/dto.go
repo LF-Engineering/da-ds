@@ -19,7 +19,7 @@ type RepositoryResponse struct {
 	FullDescription string      `json:"full_description"`
 	Affiliation     string      `json:"affiliation"`
 	Permissions     Permissions `json:"permissions"`
-	FetchedOn       string      `json:"fetched_on"`
+	FetchedOn       float64      `json:"fetched_on"`
 }
 
 type Permissions struct {
@@ -43,11 +43,11 @@ type RepositoryRaw struct {
 	UUID                     string                 `json:"uuid"`
 	SearchFields             *RepositorySearchFields `json:"search_fields"`
 	Origin                   string                 `json:"origin"`
-	UpdatedOn                string                 `json:"updated_on"`
+	UpdatedOn                float64                 `json:"updated_on"`
 	MetadataUpdatedOn        string                 `json:"metadata__updated_on"`
 	BackendName              string                 `json:"backend_name"`
 	MetadataTimestamp        string                 `json:"metadata__timestamp"`
-	Timestamp                string                 `json:"timestamp"`
+	Timestamp                float64                 `json:"timestamp"`
 	Category                 string                 `json:"category"`
 	ClassifiedFieldsFiltered *string                `json:"classified_fields_filtered"`
 }
