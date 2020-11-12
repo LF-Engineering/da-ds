@@ -18,8 +18,8 @@ type Enricher struct {
 }
 
 type TopHitsStruct struct {
-	Took   int    `json:"took"`
-	Hits   Hits   `json:"hits"`
+	Took         int          `json:"took"`
+	Hits         Hits         `json:"hits"`
 	Aggregations Aggregations `json:"aggregations"`
 }
 
@@ -35,10 +35,10 @@ type Total struct {
 }
 
 type NestedHits struct {
-	Index  string           `json:"_index"`
-	Type   string           `json:"_type"`
-	ID     string           `json:"_id"`
-	Score  float64          `json:"_score"`
+	Index  string         `json:"_index"`
+	Type   string         `json:"_type"`
+	ID     string         `json:"_id"`
+	Score  float64        `json:"_score"`
 	Source *RepositoryRaw `json:"_source"`
 }
 
@@ -47,8 +47,8 @@ type Aggregations struct {
 }
 
 type LastDate struct {
-	Value float64 `json:"value"`
-	ValueAsString string `json:"value_as_string"`
+	Value         float64 `json:"value"`
+	ValueAsString string  `json:"value_as_string"`
 }
 
 func NewEnricher(BackendVersion string, esClientProvider ESClientProvider) *Enricher {
@@ -148,15 +148,37 @@ func (e *Enricher) HandleMapping(index string) error {
 	return err
 }
 
-func (e *Enricher) GetPreviouslyFetchedData(repositories []*Repository) (result *TopHitsStruct, err error) {
+func (e *Enricher) GetPreviouslyFetchedDataItem(repo Repository, cmdLastDate *time.Time, lastDate *time.Time, noIncremental bool) (result *TopHitsStruct, err error) {
+	enrichIndex := fmt.Sprintf("sds-%s-%s-dockerhub", repo.Owner, repo.Repository)
+	rawIndex := fmt.Sprintf("%s-raw", enrichIndex)
 
-	urls := make([]string, 0)
+	// todo: remove
+	fmt.Println(rawIndex)
 
-	for _, repo := range repositories {
-		url := fmt.Sprintf("%s/%s/%s", APIUrl, repo.Owner, repo.Repository)
+	var lastEnrichDate *time.Time = nil
 
-		urls = append(urls, url)
+	if noIncremental == false {
+		if cmdLastDate != nil {
+			lastEnrichDate = cmdLastDate
+		} else {
+			esLastDate, err := e.ElasticSearchProvider.GetStat(enrichIndex, "metadata__enriched_on", "max", nil, nil)
+			if err != nil {
+				return nil, err
+			}
+
+			// use the minimum date
+
+			if lastDate != nil && esLastDate != nil && lastDate.After(esLastDate.(time.Time)) {
+				lastEnrichDate = esLastDate.(*time.Time)
+			} else {
+				lastEnrichDate = lastDate
+			}
+		}
 	}
+
+	fmt.Println(lastEnrichDate)
+
+	url := fmt.Sprintf("%s/%s/%s", APIUrl, repo.Owner, repo.Repository)
 
 	hits := &TopHitsStruct{}
 
@@ -164,13 +186,7 @@ func (e *Enricher) GetPreviouslyFetchedData(repositories []*Repository) (result 
 		"size": 10000,
 		"query": map[string]interface{}{
 			"bool": map[string]interface{}{
-				"must": []map[string]interface{}{
-					{
-						"terms": map[string]interface{}{
-							"origin": urls,
-						},
-					},
-				},
+				"must": []map[string]interface{}{},
 			},
 		},
 		"collapse": map[string]string{
@@ -185,32 +201,32 @@ func (e *Enricher) GetPreviouslyFetchedData(repositories []*Repository) (result 
 		},
 	}
 
-	err = e.ElasticSearchProvider.Get("sds-*-dockerhub-raw", query, hits)
+	conditions := []map[string]interface{}{
+		{
+			"term": map[string]interface{}{
+				"origin": url,
+			},
+		},
+	}
+
+	if lastEnrichDate != nil {
+		conditions = append(conditions,
+			map[string]interface{}{
+				"range": map[string]interface{}{
+					"metadata__updated_on": map[string]interface{}{
+						"gte": lastEnrichDate,
+					},
+				},
+			},
+		)
+	}
+
+	query["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"] = conditions
+
+	err = e.ElasticSearchProvider.Get(rawIndex, query, hits)
 	if err != nil {
 		return nil, err
 	}
 
 	return hits, nil
-}
-
-func (e *Enricher) GetLastEnrichDate() (result float64, err error) {
-	hits := &TopHitsStruct{}
-
-	query := map[string]interface{}{
-		"size": 0,
-		"aggs": map[string]interface{}{
-			"last_date": map[string]interface{}{
-				"max": map[string]interface{}{
-						"field": "metadata__enriched_on",
-				},
-			},
-		},
-	}
-
-	err = e.ElasticSearchProvider.Get("sds-*-dockerhub", query, hits)
-	if err != nil {
-		return 0, err
-	}
-
-	return hits.Aggregations.LastDate.Value, nil
 }

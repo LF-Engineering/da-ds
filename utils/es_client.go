@@ -22,6 +22,26 @@ type ESParams struct {
 	Password string
 }
 
+
+type TopHitsStruct struct {
+	Took   int    `json:"took"`
+	Aggregations Aggregations `json:"aggregations"`
+}
+
+type Total struct {
+	Value    int    `json:"value"`
+	Relation string `json:"relation"`
+}
+
+type Aggregations struct {
+	Stat Stat `json:"stat"`
+}
+
+type Stat struct {
+	Value interface{} `json:"value"`
+	ValueAsString string `json:"value_as_string"`
+}
+
 // NewESClientProvider ...
 func NewESClientProvider(params *ESParams) (*ESClientProvider, error) {
 	config := elasticsearch.Config{
@@ -223,4 +243,33 @@ func (p *ESClientProvider) Get(index string, query map[string]interface{}, resul
 	}
 
 	return nil
+}
+
+func (p *ESClientProvider) GetStat(index string, field string, aggType string, mustConditions []map[string]interface{}, mustNotConditions []map[string]interface{}) (result interface{}, err error) {
+
+	hits := &TopHitsStruct{}
+
+	q := map[string]interface{}{
+		"size": 0,
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": mustConditions,
+				"must_not": mustNotConditions,
+			},
+		},
+		"aggs": map[string]interface{}{
+			"stat": map[string]interface{}{
+				aggType: map[string]interface{}{
+					"field": field,
+				},
+			},
+		},
+	}
+
+	err = p.Get(index, q, hits)
+	if err != nil {
+		return nil, err
+	}
+
+	return hits.Aggregations.Stat.Value, nil
 }

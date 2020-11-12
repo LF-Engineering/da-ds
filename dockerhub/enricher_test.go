@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"github.com/LF-Engineering/da-ds/utils"
 	"testing"
+	"time"
 )
 
 func prepareEnrichObject() (*Enricher, error) {
 	esClientProvider, err := utils.NewESClientProvider(&utils.ESParams{
-		URL:      "http://localhost:9200",
+		URL:      "https://elastic:ERmFKFaCRu1w5HxJ2IBg3GOY@8ed2a45281aa4a8c86039183622b4f37.us-west-1.aws.found.io:9243",
 		Username: "elastic",
-		Password: "changeme",
+		Password: "ERmFKFaCRu1w5HxJ2IBg3GOY",
 	})
 	if err != nil {
 		fmt.Println("err22222 ", err.Error())
@@ -27,15 +28,20 @@ func TestGetPreviouslyFetchedData(t *testing.T) {
 	}
 
 	repos := []*Repository{
-		{"hyperledger", "besu"},
+		{"cncf", "envoy"},
 		{"hyperledger", "explorer"},
 	}
 
-	raws, err := srv.GetPreviouslyFetchedData(repos)
-	if err != nil {
-		t.Errorf("err: %v", err)
-		return
-	}
+    lastDate := "2019-10-20T18:07:47.729125Z"
+    d, err := time.Parse(time.RFC3339, lastDate)
 
-	t.Logf("results: %v", raws.Hits.Hits)
+    for _, repo := range repos {
+		raws, err := srv.GetPreviouslyFetchedDataItem(*repo, nil, &d, false)
+		if err != nil {
+			t.Errorf("err: %v", err)
+			return
+		}
+
+		t.Logf("results: %v", raws.Hits.Hits)
+	}
 }

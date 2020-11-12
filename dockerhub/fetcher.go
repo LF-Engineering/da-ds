@@ -43,6 +43,7 @@ type ESClientProvider interface {
 	DeleteIndex(index string, ignoreUnavailable bool) ([]byte, error)
 	Bulk(body []byte) ([]byte, error)
 	Get(index string, query map[string]interface{}, result interface{}) (err error)
+	GetStat(index string, field string, aggType string, mustConditions []map[string]interface{}, mustNotConditions []map[string]interface{}) (result interface{}, err error)
 }
 
 // NewFetcher initiates a new dockerhub fetcher
@@ -91,13 +92,14 @@ func (f *Fetcher) Login(username string, password string) (string, error) {
 
 // FetchItems ...
 func (f *Fetcher) FetchItem(owner string, repository string) (*RepositoryRaw, error) {
+	requestUrl := fmt.Sprintf("%s/%s/%s/%s/%s", APIUrl, APIVersion, APIRepositories, owner, repository)
 	url := fmt.Sprintf("%s/%s/%s", APIUrl, owner, repository)
 	headers := map[string]string{}
 	if f.Token != "" {
 		headers["Authorization"] = fmt.Sprintf("JWT %s", f.Token)
 	}
 
-	statusCode, resBody, err := f.HttpClientProvider.Request(url, "GET", headers, nil)
+	statusCode, resBody, err := f.HttpClientProvider.Request(requestUrl, "GET", headers, nil)
 	if err != nil || statusCode != http.StatusOK {
 		return nil, err
 	}
@@ -184,4 +186,12 @@ func (f *Fetcher) BulkInsert(data []*RepositoryRaw) ([]byte, error) {
 func (f *Fetcher) HandleMapping(index string) error {
 	_, err := f.ElasticSearchProvider.CreateIndex(index, DockerhubRawMapping)
 	return err
+}
+
+func (f *Fetcher) GetLastDate(repo *Repository) (*time.Time, error) {
+	lastDate, err := f.ElasticSearchProvider.GetStat(fmt.Sprintf("sds-%s-%s-dockerhub-raw", repo.Owner, repo.Repository), "metadata__updated_on", "max", nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	return lastDate.(*time.Time), nil
 }

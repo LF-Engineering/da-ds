@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/LF-Engineering/da-ds/utils"
+	"log"
 	"time"
 )
 
@@ -21,6 +22,7 @@ type Manager struct {
 	Repositories           []*Repository
 	FromDate               string
 	FromOffset             int64
+	NoIncremental          bool
 }
 
 type Repository struct {
@@ -41,6 +43,7 @@ func NewManager(Username string,
 	Repositories []*Repository,
 	FromDate string,
 	FromOffset int64,
+	NoIncremental bool,
 ) *Manager {
 	mng := &Manager{
 		Username:               Username,
@@ -56,6 +59,7 @@ func NewManager(Username string,
 		Repositories:           Repositories,
 		FromDate:               FromDate,
 		FromOffset:             FromOffset,
+		NoIncremental:          NoIncremental,
 	}
 
 	return mng
@@ -65,6 +69,10 @@ func (m *Manager) Sync() error {
 	fetcher, enricher, err := buildServices(m)
 	if err != nil {
 		return err
+	}
+
+	if m.FromDate != "" && m.FromOffset > 0 {
+		return errors.New("can not feed using from_date and from_offset")
 	}
 
 	// Repo array
@@ -79,24 +87,10 @@ func (m *Manager) Sync() error {
 		}
 	}
 
-	if m.EnrichOnly {
-		hits, err := enricher.GetPreviouslyFetchedData(m.Repositories)
-		if err != nil {
-			return err
-		}
-
-		for _, hit := range hits.Hits.Hits {
-			err = m.enrich(enricher, hit.Source, &Repository{hit.Source.Data.Namespace, hit.Source.Data.Name}, enrichData)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	for _, repo := range m.Repositories {
-		var raw *RepositoryRaw
-
-		if m.EnrichOnly == false {
+	if !m.EnrichOnly{
+		// fetch data
+		for _, repo := range m.Repositories {
+			var raw *RepositoryRaw
 			// Fetch data for single repo
 			raw, err = fetcher.FetchItem(repo.Owner, repo.Repository)
 			if err != nil {
@@ -105,36 +99,57 @@ func (m *Manager) Sync() error {
 			rawData = append(rawData, raw)
 		}
 
-		err = m.enrich(enricher, raw, repo, enrichData)
+		// Insert raw data to elasticsearch
+		_, err = fetcher.BulkInsert(rawData)
 		if err != nil {
 			return err
 		}
 	}
 
-	// Insert raw data to elasticsearch
-	_, err = fetcher.BulkInsert(rawData)
-	if err != nil {
-		return err
-	}
+	if m.Enrich || m.EnrichOnly {
+		for _, repo := range m.Repositories {
+			var lastDate *time.Time
+			if m.FromDate == "" {
+				lastDate, err = fetcher.GetLastDate(repo)
+				if err != nil {
+					log.Println("[GetLastDate] could not get last date")
+				}
+			}
 
-	// Insert enriched data to elasticsearch
-	_, err = enricher.BulkInsert(enrichData)
-	if err != nil {
-		return err
+			d, err := time.Parse(time.RFC3339, m.FromDate)
+
+			esData, err := enricher.GetPreviouslyFetchedDataItem(*repo, &d, lastDate, m.NoIncremental)
+			if err != nil {
+				return err
+			}
+
+			if len(esData.Hits.Hits) > 0 {
+				err = m.enrich(enricher, esData.Hits.Hits[0].Source, repo, enrichData)
+				if err != nil {
+					return err
+				}
+			}
+
+		}
+
+		// Insert enriched data to elasticsearch
+		_, err = enricher.BulkInsert(enrichData)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
 func (m *Manager) enrich(enricher *Enricher, raw *RepositoryRaw, repo *Repository, enrichData []*RepositoryEnrich) error {
-	if m.Enrich {
-		// Enrich data for single repo
-		enriched, err := enricher.EnrichItem(*raw)
-		if err != nil {
-			return errors.New(fmt.Sprintf("could not enrich data from repository: %s-%s", repo.Owner, repo.Repository))
-		}
-		enrichData = append(enrichData, enriched)
+
+	// Enrich data for single repo
+	enriched, err := enricher.EnrichItem(*raw)
+	if err != nil {
+		return errors.New(fmt.Sprintf("could not enrich data from repository: %s-%s", repo.Owner, repo.Repository))
 	}
+	enrichData = append(enrichData, enriched)
 	return nil
 }
 

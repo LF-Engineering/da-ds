@@ -114,3 +114,26 @@ func (_m *ESClientProvider) Get(index string, query map[string]interface{}, resu
 
 	return r0
 }
+
+// GetStat provides a mock function with given fields: index, field, aggType, mustConditions, mustNotConditions
+func (_m *ESClientProvider) GetStat(index string, field string, aggType string, mustConditions []map[string]interface{}, mustNotConditions []map[string]interface{}) (interface{}, error) {
+	ret := _m.Called(index, field, aggType, mustConditions, mustNotConditions)
+
+	var r0 interface{}
+	if rf, ok := ret.Get(0).(func(string, string, string, []map[string]interface{}, []map[string]interface{}) interface{}); ok {
+		r0 = rf(index, field, aggType, mustConditions, mustNotConditions)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(interface{})
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, string, string, []map[string]interface{}, []map[string]interface{}) error); ok {
+		r1 = rf(index, field, aggType, mustConditions, mustNotConditions)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
