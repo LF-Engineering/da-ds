@@ -21,7 +21,6 @@ type Manager struct {
 	HttpTimeout            time.Duration
 	Repositories           []*Repository
 	FromDate               string
-	FromOffset             int64
 	NoIncremental          bool
 }
 
@@ -42,7 +41,6 @@ func NewManager(Username string,
 	HttpTimeout time.Duration,
 	Repositories []*Repository,
 	FromDate string,
-	FromOffset int64,
 	NoIncremental bool,
 ) *Manager {
 	mng := &Manager{
@@ -58,7 +56,6 @@ func NewManager(Username string,
 		HttpTimeout:            HttpTimeout,
 		Repositories:           Repositories,
 		FromDate:               FromDate,
-		FromOffset:             FromOffset,
 		NoIncremental:          NoIncremental,
 	}
 
@@ -69,10 +66,6 @@ func (m *Manager) Sync() error {
 	fetcher, enricher, err := buildServices(m)
 	if err != nil {
 		return err
-	}
-
-	if m.FromDate != "" && m.FromOffset > 0 {
-		return errors.New("can not feed using from_date and from_offset")
 	}
 
 	// Repo array
@@ -87,7 +80,7 @@ func (m *Manager) Sync() error {
 		}
 	}
 
-	if !m.EnrichOnly{
+	if !m.EnrichOnly {
 		// fetch data
 		for _, repo := range m.Repositories {
 			var raw *RepositoryRaw
@@ -108,7 +101,7 @@ func (m *Manager) Sync() error {
 
 	if m.Enrich || m.EnrichOnly {
 		for _, repo := range m.Repositories {
-			var lastDate *time.Time
+			var lastDate time.Time
 			if m.FromDate == "" {
 				lastDate, err = fetcher.GetLastDate(repo)
 				if err != nil {
@@ -116,15 +109,20 @@ func (m *Manager) Sync() error {
 				}
 			}
 
-			d, err := time.Parse(time.RFC3339, m.FromDate)
+			var fromDate *time.Time
 
-			esData, err := enricher.GetPreviouslyFetchedDataItem(*repo, &d, lastDate, m.NoIncremental)
+			d, err := time.Parse(time.RFC3339, m.FromDate)
+			if err == nil {
+				fromDate = &d
+			}
+
+			esData, err := enricher.GetPreviouslyFetchedDataItem(*repo, fromDate, &lastDate, m.NoIncremental)
 			if err != nil {
 				return err
 			}
 
 			if len(esData.Hits.Hits) > 0 {
-				err = m.enrich(enricher, esData.Hits.Hits[0].Source, repo, enrichData)
+				err = m.enrich(enricher, esData.Hits.Hits[0].Source, repo, &enrichData)
 				if err != nil {
 					return err
 				}
@@ -142,14 +140,14 @@ func (m *Manager) Sync() error {
 	return nil
 }
 
-func (m *Manager) enrich(enricher *Enricher, raw *RepositoryRaw, repo *Repository, enrichData []*RepositoryEnrich) error {
+func (m *Manager) enrich(enricher *Enricher, raw *RepositoryRaw, repo *Repository, enrichData *[]*RepositoryEnrich) error {
 
 	// Enrich data for single repo
 	enriched, err := enricher.EnrichItem(*raw)
 	if err != nil {
 		return errors.New(fmt.Sprintf("could not enrich data from repository: %s-%s", repo.Owner, repo.Repository))
 	}
-	enrichData = append(enrichData, enriched)
+	*enrichData = append(*enrichData, enriched)
 	return nil
 }
 

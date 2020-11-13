@@ -9,9 +9,9 @@ import (
 
 func prepareEnrichObject() (*Enricher, error) {
 	esClientProvider, err := utils.NewESClientProvider(&utils.ESParams{
-		URL:      "https://elastic:ERmFKFaCRu1w5HxJ2IBg3GOY@8ed2a45281aa4a8c86039183622b4f37.us-west-1.aws.found.io:9243",
+		URL:      "http://localhost:9200",
 		Username: "elastic",
-		Password: "ERmFKFaCRu1w5HxJ2IBg3GOY",
+		Password: "changeme",
 	})
 	if err != nil {
 		fmt.Println("err22222 ", err.Error())

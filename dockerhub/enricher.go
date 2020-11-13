@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	dads "github.com/LF-Engineering/da-ds"
+	"log"
 	"regexp"
 	"strings"
 	"time"
@@ -84,8 +84,8 @@ func (e *Enricher) EnrichItem(rawItem RepositoryRaw) (*RepositoryEnrich, error) 
 
 	enriched.BackendName = fmt.Sprintf("%sEnrich", strings.Title(e.DSName))
 	enriched.BackendVersion = e.BackendVersion
-	timestamp := time.Now()
-	enriched.MetadataEnrichedOn = dads.ToESDate(timestamp)
+	now := time.Now().UTC()
+	enriched.MetadataEnrichedOn = now
 
 	enriched.MetadataTimestamp = rawItem.MetadataTimestamp
 	enriched.MetadataUpdatedOn = rawItem.MetadataUpdatedOn
@@ -152,26 +152,26 @@ func (e *Enricher) GetPreviouslyFetchedDataItem(repo Repository, cmdLastDate *ti
 	enrichIndex := fmt.Sprintf("sds-%s-%s-dockerhub", repo.Owner, repo.Repository)
 	rawIndex := fmt.Sprintf("%s-raw", enrichIndex)
 
-	// todo: remove
-	fmt.Println(rawIndex)
-
 	var lastEnrichDate *time.Time = nil
 
 	if noIncremental == false {
 		if cmdLastDate != nil {
 			lastEnrichDate = cmdLastDate
-		} else {
-			esLastDate, err := e.ElasticSearchProvider.GetStat(enrichIndex, "metadata__enriched_on", "max", nil, nil)
+		} else if lastDate != nil {
+			lastEnrichDate = lastDate
+
+			enrichLastDate, err := e.ElasticSearchProvider.GetStat(enrichIndex, "metadata__enriched_on", "max", nil, nil)
 			if err != nil {
-				return nil, err
-			}
-
-			// use the minimum date
-
-			if lastDate != nil && esLastDate != nil && lastDate.After(esLastDate.(time.Time)) {
-				lastEnrichDate = esLastDate.(*time.Time)
+				log.Printf("Warning: %v", err)
 			} else {
-				lastEnrichDate = lastDate
+				// use the minimum date
+				//esLD := enrichLastDate.(*float64)
+				//sec, dec := math.Modf(*esLD)
+				//esDate := time.Unix(int64(sec), int64(dec*(1e9)))
+
+				if lastDate.After(enrichLastDate) {
+					lastEnrichDate = &enrichLastDate
+				}
 			}
 		}
 	}
@@ -190,7 +190,7 @@ func (e *Enricher) GetPreviouslyFetchedDataItem(repo Repository, cmdLastDate *ti
 			},
 		},
 		"collapse": map[string]string{
-			"field": "origin",
+			"field": "origin.keyword",
 		},
 		"sort": []map[string]interface{}{
 			{
@@ -204,17 +204,18 @@ func (e *Enricher) GetPreviouslyFetchedDataItem(repo Repository, cmdLastDate *ti
 	conditions := []map[string]interface{}{
 		{
 			"term": map[string]interface{}{
-				"origin": url,
+				"origin.keyword": url,
 			},
 		},
 	}
 
 	if lastEnrichDate != nil {
+		fmt.Printf("lastEnrichDate: %v", lastEnrichDate)
 		conditions = append(conditions,
 			map[string]interface{}{
 				"range": map[string]interface{}{
 					"metadata__updated_on": map[string]interface{}{
-						"gte": lastEnrichDate,
+						"gte": (*lastEnrichDate).Format(time.RFC3339),
 					},
 				},
 			},

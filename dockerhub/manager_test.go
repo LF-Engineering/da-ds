@@ -16,15 +16,14 @@ func prepareManagerObject() *Manager {
 		"",
 		"0.0.1",
 		"0.0.1",
-		false,
 		true,
+		false,
 		"http://localhost:9200",
 		"elastic",
 		"changeme",
 		60*time.Second,
 		repos,
 		"",
-		0,
 		false,
 	)
 

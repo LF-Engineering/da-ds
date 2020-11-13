@@ -122,7 +122,7 @@ func TestFetchItem2(t *testing.T) {
 	}
 
 	testTime := time.Date(2017, 1, 1, 0, 0, 0, 0, time.UTC)
-	raw.Data.FetchedOn = float64(testTime.Unix()) / 1.0e3
+	raw.Data.FetchedOn = testTime.UnixNano()
 	uid, err := uuid.Generate(fmt.Sprintf("%v", raw.Data.FetchedOn))
 	if err != nil {
 		t.Errorf("err: %v", err)

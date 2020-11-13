@@ -1,5 +1,7 @@
 package dockerhub
 
+import "time"
+
 // RepositoryResponse data model represents dockerhub get repository results
 type RepositoryResponse struct {
 	User            string      `json:"user"`
@@ -13,13 +15,13 @@ type RepositoryResponse struct {
 	CanEdit         bool        `json:"can_edit"`
 	StarCount       int         `json:"star_count"`
 	PullCount       int         `json:"pull_count"`
-	LastUpdated     string      `json:"last_updated"`
+	LastUpdated     time.Time   `json:"last_updated"`
 	IsMigrated      bool        `json:"is_migrated"`
 	HasStarred      bool        `json:"has_starred"`
 	FullDescription string      `json:"full_description"`
 	Affiliation     string      `json:"affiliation"`
 	Permissions     Permissions `json:"permissions"`
-	FetchedOn       float64      `json:"fetched_on"`
+	FetchedOn       int64       `json:"fetched_on"`
 }
 
 type Permissions struct {
@@ -37,19 +39,19 @@ type RepositorySearchFields struct {
 
 // RepositoryRaw data model represents es schema
 type RepositoryRaw struct {
-	BackendVersion           string                 `json:"backend_version"`
+	BackendVersion           string                  `json:"backend_version"`
 	Data                     *RepositoryResponse     `json:"data"`
-	Tag                      string                 `json:"tag"`
-	UUID                     string                 `json:"uuid"`
+	Tag                      string                  `json:"tag"`
+	UUID                     string                  `json:"uuid"`
 	SearchFields             *RepositorySearchFields `json:"search_fields"`
-	Origin                   string                 `json:"origin"`
-	UpdatedOn                float64                 `json:"updated_on"`
-	MetadataUpdatedOn        string                 `json:"metadata__updated_on"`
-	BackendName              string                 `json:"backend_name"`
-	MetadataTimestamp        string                 `json:"metadata__timestamp"`
-	Timestamp                float64                 `json:"timestamp"`
-	Category                 string                 `json:"category"`
-	ClassifiedFieldsFiltered *string                `json:"classified_fields_filtered"`
+	Origin                   string                  `json:"origin"`
+	UpdatedOn                int64                   `json:"updated_on"`
+	MetadataUpdatedOn        time.Time               `json:"metadata__updated_on"`
+	BackendName              string                  `json:"backend_name"`
+	MetadataTimestamp        time.Time               `json:"metadata__timestamp"`
+	Timestamp                int64                   `json:"timestamp"`
+	Category                 string                  `json:"category"`
+	ClassifiedFieldsFiltered *string                 `json:"classified_fields_filtered"`
 }
 
 type RepositoryEnrich struct {
@@ -70,22 +72,22 @@ type RepositoryEnrich struct {
 	DescriptionAnalyzed     string `json:"description_analyzed"`
 	FullDescriptionAnalyzed string `json:"full_description_analyzed"`
 
-	CreationDate         string   `json:"creation_date"`
-	IsDockerhubDockerhub int      `json:"is_dockerhub_dockerhub"`
+	CreationDate         time.Time `json:"creation_date"`
+	IsDockerhubDockerhub int       `json:"is_dockerhub_dockerhub"`
 	RepositoryLabels     *[]string `json:"repository_labels"`
-	MetadataFilterRaw    *string  `json:"metadata__filter_raw"`
+	MetadataFilterRaw    *string   `json:"metadata__filter_raw"`
 
-	LastUpdated        string `json:"last_updated"`
+	LastUpdated        string  `json:"last_updated"`
 	Offset             *string `json:"offset"`
-	MetadataEnrichedOn string `json:"metadata__enriched_on"`
+	MetadataEnrichedOn time.Time  `json:"metadata__enriched_on"`
 
-	BackendVersion    string `json:"backend_version"`
-	Tag               string `json:"tag"`
-	UUID              string `json:"uuid"`
-	Origin            string `json:"origin"`
-	MetadataUpdatedOn string `json:"metadata__updated_on"`
-	BackendName       string `json:"backend_name"`
-	MetadataTimestamp string `json:"metadata__timestamp"`
+	BackendVersion    string    `json:"backend_version"`
+	Tag               string    `json:"tag"`
+	UUID              string    `json:"uuid"`
+	Origin            string    `json:"origin"`
+	MetadataUpdatedOn time.Time `json:"metadata__updated_on"`
+	BackendName       string    `json:"backend_name"`
+	MetadataTimestamp time.Time `json:"metadata__timestamp"`
 }
 
 // LoginResponse from login dockerhub web API

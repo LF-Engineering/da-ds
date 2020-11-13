@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/LF-Engineering/da-ds/dockerhub"
 	"math/rand"
-	"strconv"
 	"time"
 
 	lib "github.com/LF-Engineering/da-ds"
@@ -94,7 +93,7 @@ func dockerhubEnvs(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	enrichOnly := ctx.BoolEnv("Enrich_ONLY")
 	enrich := ctx.BoolEnv("Enrich")
 	fromDate := ctx.Env("FROM_DATE")
-	fromOffset, _ := strconv.ParseInt(ctx.Env("FROM_OFFSET"), 10, 64)
+	noIncremental := ctx.BoolEnv("NO_INCREMENTAL")
 
 	var repositories []*dockerhub.Repository
 	if err := json.Unmarshal([]byte(repositoriesJson), &repositories); err != nil {
@@ -107,5 +106,5 @@ func dockerhubEnvs(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	}
 
 	return dockerhub.NewManager(username, password, fetcherBackendVersion, enricherBackendVersion,
-		enrichOnly, enrich, esUrl, esUsername, esPassword, timeout,  repositories, fromDate, fromOffset), nil
+		enrichOnly, enrich, esUrl, esUsername, esPassword, timeout,  repositories, fromDate, noIncremental), nil
 }

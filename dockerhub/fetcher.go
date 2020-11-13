@@ -43,7 +43,7 @@ type ESClientProvider interface {
 	DeleteIndex(index string, ignoreUnavailable bool) ([]byte, error)
 	Bulk(body []byte) ([]byte, error)
 	Get(index string, query map[string]interface{}, result interface{}) (err error)
-	GetStat(index string, field string, aggType string, mustConditions []map[string]interface{}, mustNotConditions []map[string]interface{}) (result interface{}, err error)
+	GetStat(index string, field string, aggType string, mustConditions []map[string]interface{}, mustNotConditions []map[string]interface{}) (result time.Time, err error)
 }
 
 // NewFetcher initiates a new dockerhub fetcher
@@ -115,18 +115,16 @@ func (f *Fetcher) FetchItem(owner string, repository string) (*RepositoryRaw, er
 	raw.BackendVersion = f.BackendVersion
 	raw.Category = Category
 	raw.ClassifiedFieldsFiltered = nil
-	timestamp := time.Now()
-	raw.Timestamp = float64(timestamp.UnixNano()) / 1.0e3
+	now := time.Now().UTC()
+	raw.Timestamp = now.UnixNano()
 	raw.Data.FetchedOn = raw.Timestamp
-	raw.MetadataTimestamp = dads.ToESDate(timestamp)
+	raw.MetadataTimestamp = now
 	raw.Origin = url
 	raw.SearchFields = &RepositorySearchFields{repository, fmt.Sprintf("%v", raw.Timestamp), owner}
 	raw.Tag = url
-	lastUpdated, err := time.Parse(time.RFC3339, raw.Data.LastUpdated)
-	if err != nil {
-		return nil, err
-	}
-	raw.UpdatedOn = float64(lastUpdated.UnixNano()) / 1.0e3
+	lastUpdated := raw.Data.LastUpdated
+	raw.UpdatedOn = lastUpdated.UnixNano()
+	raw.MetadataUpdatedOn = lastUpdated
 
 	// generate UUID
 	ctx := &dads.Ctx{}
@@ -188,10 +186,11 @@ func (f *Fetcher) HandleMapping(index string) error {
 	return err
 }
 
-func (f *Fetcher) GetLastDate(repo *Repository) (*time.Time, error) {
+func (f *Fetcher) GetLastDate(repo *Repository) (time.Time, error) {
 	lastDate, err := f.ElasticSearchProvider.GetStat(fmt.Sprintf("sds-%s-%s-dockerhub-raw", repo.Owner, repo.Repository), "metadata__updated_on", "max", nil, nil)
 	if err != nil {
-		return nil, err
+		return time.Now().UTC(), err
 	}
-	return lastDate.(*time.Time), nil
+
+	return lastDate, nil
 }

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/elastic/go-elasticsearch/v7/esapi"
+	"time"
 )
 
 // ESClientProvider ...
@@ -38,7 +39,7 @@ type Aggregations struct {
 }
 
 type Stat struct {
-	Value interface{} `json:"value"`
+	Value float64 `json:"value"`
 	ValueAsString string `json:"value_as_string"`
 }
 
@@ -245,7 +246,7 @@ func (p *ESClientProvider) Get(index string, query map[string]interface{}, resul
 	return nil
 }
 
-func (p *ESClientProvider) GetStat(index string, field string, aggType string, mustConditions []map[string]interface{}, mustNotConditions []map[string]interface{}) (result interface{}, err error) {
+func (p *ESClientProvider) GetStat(index string, field string, aggType string, mustConditions []map[string]interface{}, mustNotConditions []map[string]interface{}) (result time.Time, err error) {
 
 	hits := &TopHitsStruct{}
 
@@ -253,8 +254,6 @@ func (p *ESClientProvider) GetStat(index string, field string, aggType string, m
 		"size": 0,
 		"query": map[string]interface{}{
 			"bool": map[string]interface{}{
-				"must": mustConditions,
-				"must_not": mustNotConditions,
 			},
 		},
 		"aggs": map[string]interface{}{
@@ -266,10 +265,21 @@ func (p *ESClientProvider) GetStat(index string, field string, aggType string, m
 		},
 	}
 
-	err = p.Get(index, q, hits)
-	if err != nil {
-		return nil, err
+	if mustConditions != nil {
+		q["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"] =  mustConditions
 	}
 
-	return hits.Aggregations.Stat.Value, nil
+	if mustNotConditions != nil {
+		q["query"].(map[string]interface{})["bool"].(map[string]interface{})["must_not"] = mustNotConditions
+	}
+	err = p.Get(index, q, hits)
+	if err != nil {
+		return time.Now().UTC(), err
+	}
+	date, err := time.Parse(time.RFC3339, hits.Aggregations.Stat.ValueAsString)
+	if err != nil {
+		return time.Now().UTC(), err
+	}
+
+	return date, nil
 }
