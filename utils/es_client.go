@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/elastic/go-elasticsearch/v7/esapi"
+	"regexp"
+	"strings"
 	"time"
 )
 
@@ -23,9 +25,8 @@ type ESParams struct {
 	Password string
 }
 
-
 type TopHitsStruct struct {
-	Took   int    `json:"took"`
+	Took         int          `json:"took"`
 	Aggregations Aggregations `json:"aggregations"`
 }
 
@@ -39,8 +40,14 @@ type Aggregations struct {
 }
 
 type Stat struct {
-	Value float64 `json:"value"`
-	ValueAsString string `json:"value_as_string"`
+	Value         float64 `json:"value"`
+	ValueAsString string  `json:"value_as_string"`
+}
+
+type BulkData struct {
+	IndexName string
+	ID        string
+	Data      interface{}
 }
 
 // NewESClientProvider ...
@@ -199,6 +206,39 @@ func (p *ESClientProvider) Bulk(body []byte) ([]byte, error) {
 	return resBytes, nil
 }
 
+func (p *ESClientProvider) BulkInsert(data []*BulkData) ([]byte, error) {
+	lines := make([]interface{}, 0)
+
+	for _, item := range data {
+		indexName := item.IndexName
+		index := map[string]interface{}{
+			"index": map[string]string{
+				"_index": indexName,
+				"_id":    item.ID,
+			},
+		}
+		lines = append(lines, index)
+		lines = append(lines, "\n")
+		lines = append(lines, item.Data)
+		lines = append(lines, "\n")
+	}
+
+	body, err := json.Marshal(lines)
+	if err != nil {
+		return nil, errors.New("unable to convert body to json")
+	}
+
+	var re = regexp.MustCompile(`(}),"\\n",?`)
+	body = []byte(re.ReplaceAllString(strings.TrimSuffix(strings.TrimPrefix(string(body), "["), "]"), "$1\n"))
+
+	resData, err := p.Bulk(body)
+	if err != nil {
+		return nil, err
+	}
+
+	return resData, nil
+}
+
 func (p *ESClientProvider) Get(index string, query map[string]interface{}, result interface{}) (err error) {
 	var buf bytes.Buffer
 	err = json.NewEncoder(&buf).Encode(query)
@@ -253,8 +293,7 @@ func (p *ESClientProvider) GetStat(index string, field string, aggType string, m
 	q := map[string]interface{}{
 		"size": 0,
 		"query": map[string]interface{}{
-			"bool": map[string]interface{}{
-			},
+			"bool": map[string]interface{}{},
 		},
 		"aggs": map[string]interface{}{
 			"stat": map[string]interface{}{
@@ -266,7 +305,7 @@ func (p *ESClientProvider) GetStat(index string, field string, aggType string, m
 	}
 
 	if mustConditions != nil {
-		q["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"] =  mustConditions
+		q["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"] = mustConditions
 	}
 
 	if mustNotConditions != nil {

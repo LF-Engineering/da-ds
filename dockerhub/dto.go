@@ -77,9 +77,9 @@ type RepositoryEnrich struct {
 	RepositoryLabels     *[]string `json:"repository_labels"`
 	MetadataFilterRaw    *string   `json:"metadata__filter_raw"`
 
-	LastUpdated        string  `json:"last_updated"`
-	Offset             *string `json:"offset"`
-	MetadataEnrichedOn time.Time  `json:"metadata__enriched_on"`
+	LastUpdated        time.Time `json:"last_updated"`
+	Offset             *string   `json:"offset"`
+	MetadataEnrichedOn time.Time `json:"metadata__enriched_on"`
 
 	BackendVersion    string    `json:"backend_version"`
 	Tag               string    `json:"tag"`
@@ -88,6 +88,8 @@ type RepositoryEnrich struct {
 	MetadataUpdatedOn time.Time `json:"metadata__updated_on"`
 	BackendName       string    `json:"backend_name"`
 	MetadataTimestamp time.Time `json:"metadata__timestamp"`
+	BuildOnCloud      *string   `json:"build_on_cloud"`
+	ProjectTS         int64     `json:"project_ts"`
 }
 
 // LoginResponse from login dockerhub web API

@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 	dads "github.com/LF-Engineering/da-ds"
+	"github.com/LF-Engineering/da-ds/utils"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 )
@@ -44,6 +44,7 @@ type ESClientProvider interface {
 	Bulk(body []byte) ([]byte, error)
 	Get(index string, query map[string]interface{}, result interface{}) (err error)
 	GetStat(index string, field string, aggType string, mustConditions []map[string]interface{}, mustNotConditions []map[string]interface{}) (result time.Time, err error)
+	BulkInsert(data []*utils.BulkData) ([]byte, error)
 }
 
 // NewFetcher initiates a new dockerhub fetcher
@@ -128,52 +129,19 @@ func (f *Fetcher) FetchItem(owner string, repository string) (*RepositoryRaw, er
 
 	// generate UUID
 	ctx := &dads.Ctx{}
-	uid := dads.UUIDNonEmpty(ctx, fmt.Sprintf("%v", raw.Data.FetchedOn))
+	uid := dads.UUIDNonEmpty(ctx, raw.Origin, fmt.Sprintf("%v", raw.Data.FetchedOn))
 	raw.UUID = uid
 
 	return raw, nil
 }
 
-func (f *Fetcher) Insert(data *RepositoryRaw) ([]byte, error) {
+func (f *Fetcher) Insert(index string, data *RepositoryRaw) ([]byte, error) {
 	body, err := json.Marshal(data)
 	if err != nil {
 		return nil, errors.New("unable to convert body to json")
 	}
 
-	resData, err := f.ElasticSearchProvider.Add(fmt.Sprintf("sds-%s-%s-dockerhub-raw", data.Data.Namespace, data.Data.Name), data.UUID, body)
-	if err != nil {
-		return nil, err
-	}
-
-	return resData, nil
-}
-
-func (f *Fetcher) BulkInsert(data []*RepositoryRaw) ([]byte, error) {
-	raw := make([]interface{}, 0)
-
-	for _, item := range data {
-
-		index := map[string]interface{}{
-			"index": map[string]string{
-				"_index": fmt.Sprintf("sds-%s-%s-dockerhub-raw", item.Data.Namespace, item.Data.Name),
-				"_id":    item.UUID,
-			},
-		}
-		raw = append(raw, index)
-		raw = append(raw, "\n")
-		raw = append(raw, item)
-		raw = append(raw, "\n")
-	}
-
-	body, err := json.Marshal(raw)
-	if err != nil {
-		return nil, errors.New("unable to convert body to json")
-	}
-
-	var re = regexp.MustCompile(`(}),"\\n",?`)
-	body = []byte(re.ReplaceAllString(strings.TrimSuffix(strings.TrimPrefix(string(body), "["), "]"), "$1\n"))
-
-	resData, err := f.ElasticSearchProvider.Bulk(body)
+	resData, err := f.ElasticSearchProvider.Add(index, data.UUID, body)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +155,7 @@ func (f *Fetcher) HandleMapping(index string) error {
 }
 
 func (f *Fetcher) GetLastDate(repo *Repository) (time.Time, error) {
-	lastDate, err := f.ElasticSearchProvider.GetStat(fmt.Sprintf("sds-%s-%s-dockerhub-raw", repo.Owner, repo.Repository), "metadata__updated_on", "max", nil, nil)
+	lastDate, err := f.ElasticSearchProvider.GetStat(fmt.Sprintf("%s-raw", repo.ESIndex), "metadata__updated_on", "max", nil, nil)
 	if err != nil {
 		return time.Now().UTC(), err
 	}

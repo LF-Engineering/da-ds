@@ -27,6 +27,7 @@ type Manager struct {
 type Repository struct {
 	Owner      string
 	Repository string
+	ESIndex    string
 }
 
 func NewManager(Username string,
@@ -63,14 +64,15 @@ func NewManager(Username string,
 }
 
 func (m *Manager) Sync() error {
-	fetcher, enricher, err := buildServices(m)
+
+	if len(m.Repositories) == 0 {
+		return errors.New("no repositories found")
+	}
+
+	fetcher, enricher, esClientProvider, err := buildServices(m)
 	if err != nil {
 		return err
 	}
-
-	// Repo array
-	rawData := make([]*RepositoryRaw, 0)
-	enrichData := make([]*RepositoryEnrich, 0)
 
 	// Get dockerhub token if needed to get data from private repos
 	if m.Password != "" {
@@ -81,6 +83,8 @@ func (m *Manager) Sync() error {
 	}
 
 	if !m.EnrichOnly {
+		data := make([]*utils.BulkData, 0)
+
 		// fetch data
 		for _, repo := range m.Repositories {
 			var raw *RepositoryRaw
@@ -89,17 +93,23 @@ func (m *Manager) Sync() error {
 			if err != nil {
 				return errors.New(fmt.Sprintf("could not fetch data from repository: %s-%s", repo.Owner, repo.Repository))
 			}
-			rawData = append(rawData, raw)
+			data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s-raw", repo.ESIndex), ID: raw.UUID, Data: raw})
+
+			_ = fetcher.HandleMapping(fmt.Sprintf("%s-raw", repo.ESIndex))
 		}
 
-		// Insert raw data to elasticsearch
-		_, err = fetcher.BulkInsert(rawData)
-		if err != nil {
-			return err
+		if len(data) > 0 {
+			// Insert raw data to elasticsearch
+			_, err = esClientProvider.BulkInsert(data)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
 	if m.Enrich || m.EnrichOnly {
+		data := make([]*utils.BulkData, 0)
+
 		for _, repo := range m.Repositories {
 			var lastDate time.Time
 			if m.FromDate == "" {
@@ -116,42 +126,37 @@ func (m *Manager) Sync() error {
 				fromDate = &d
 			}
 
-			esData, err := enricher.GetPreviouslyFetchedDataItem(*repo, fromDate, &lastDate, m.NoIncremental)
+			esData, err := enricher.GetPreviouslyFetchedDataItem(repo, fromDate, &lastDate, m.NoIncremental)
 			if err != nil {
 				return err
 			}
 
 			if len(esData.Hits.Hits) > 0 {
-				err = m.enrich(enricher, esData.Hits.Hits[0].Source, repo, &enrichData)
+				// Enrich data for single repo
+				enriched, err := enricher.EnrichItem(*esData.Hits.Hits[0].Source)
 				if err != nil {
-					return err
+					return errors.New(fmt.Sprintf("could not enrich data from repository: %s-%s", repo.Owner, repo.Repository))
 				}
+				data = append(data, &utils.BulkData{IndexName: repo.ESIndex, ID: fmt.Sprintf("%s_%s", enriched.ID, enriched.RepositoryType), Data: enriched})
+
+				_ = enricher.HandleMapping(repo.ESIndex)
+
 			}
-
 		}
 
-		// Insert enriched data to elasticsearch
-		_, err = enricher.BulkInsert(enrichData)
-		if err != nil {
-			return err
+		if len(data) > 0 {
+			// Insert enriched data to elasticsearch
+			_, err = esClientProvider.BulkInsert(data)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
 	return nil
 }
 
-func (m *Manager) enrich(enricher *Enricher, raw *RepositoryRaw, repo *Repository, enrichData *[]*RepositoryEnrich) error {
-
-	// Enrich data for single repo
-	enriched, err := enricher.EnrichItem(*raw)
-	if err != nil {
-		return errors.New(fmt.Sprintf("could not enrich data from repository: %s-%s", repo.Owner, repo.Repository))
-	}
-	*enrichData = append(*enrichData, enriched)
-	return nil
-}
-
-func buildServices(m *Manager) (*Fetcher, *Enricher, error) {
+func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 	httpClientProvider := utils.NewHttpClientProvider(m.HttpTimeout)
 	params := &Params{
 		Username:       m.Username,
@@ -164,7 +169,7 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, error) {
 		Password: m.ESPassword,
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// Initialize fetcher object to get data from dockerhub api
@@ -173,5 +178,5 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, error) {
 	// Initialize enrich object to enrich raw data
 	enricher := NewEnricher(m.EnricherBackendVersion, esClientProvider)
 
-	return fetcher, enricher, err
+	return fetcher, enricher, esClientProvider, err
 }

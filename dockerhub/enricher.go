@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"regexp"
 	"strings"
 	"time"
 )
@@ -63,7 +62,7 @@ func (e *Enricher) EnrichItem(rawItem RepositoryRaw) (*RepositoryEnrich, error) 
 
 	enriched := RepositoryEnrich{}
 
-	enriched.ID = fmt.Sprintf("%s-%s", rawItem.Data.Namespace, rawItem.Data.Name)
+	enriched.ID = fmt.Sprintf("%s-%s", rawItem.Data.Name, rawItem.Data.Namespace)
 	enriched.IsEvent = 1
 	enriched.IsDockerImage = 0
 	enriched.IsDockerhubDockerhub = 1
@@ -81,6 +80,7 @@ func (e *Enricher) EnrichItem(rawItem RepositoryRaw) (*RepositoryEnrich, error) 
 	enriched.User = rawItem.Data.User
 	enriched.Status = rawItem.Data.Status
 	enriched.StarCount = rawItem.Data.StarCount
+	enriched.LastUpdated = rawItem.Data.LastUpdated
 
 	enriched.BackendName = fmt.Sprintf("%sEnrich", strings.Title(e.DSName))
 	enriched.BackendVersion = e.BackendVersion
@@ -103,39 +103,13 @@ func (e *Enricher) EnrichItem(rawItem RepositoryRaw) (*RepositoryEnrich, error) 
 	return &enriched, nil
 }
 
-func (e *Enricher) Insert(data *RepositoryEnrich) ([]byte, error) {
+func (e *Enricher) Insert(index string, data *RepositoryEnrich) ([]byte, error) {
 	body, err := json.Marshal(data)
 	if err != nil {
 		return nil, errors.New("unable to convert body to json")
 	}
 
-	resData, err := e.ElasticSearchProvider.Add(fmt.Sprintf("sds-%s-dockerhub-raw", data.ID), data.UUID, body)
-	if err != nil {
-		return nil, err
-	}
-
-	return resData, nil
-}
-
-func (e *Enricher) BulkInsert(data []*RepositoryEnrich) ([]byte, error) {
-	enriched := make([]interface{}, 0)
-
-	for _, item := range data {
-		enriched = append(enriched, map[string]interface{}{"index": map[string]string{"_index": fmt.Sprintf("sds-%s-dockerhub", item.ID), "_id": item.UUID}})
-		enriched = append(enriched, "\n")
-		enriched = append(enriched, item)
-		enriched = append(enriched, "\n")
-	}
-
-	body, err := json.Marshal(enriched)
-	if err != nil {
-		return nil, errors.New("unable to convert body to json")
-	}
-
-	var re = regexp.MustCompile(`(}),"\\n",?`)
-	body = []byte(re.ReplaceAllString(strings.TrimSuffix(strings.TrimPrefix(string(body), "["), "]"), "$1\n"))
-
-	resData, err := e.ElasticSearchProvider.Bulk(body)
+	resData, err := e.ElasticSearchProvider.Add(index, data.UUID, body)
 	if err != nil {
 		return nil, err
 	}
@@ -148,9 +122,8 @@ func (e *Enricher) HandleMapping(index string) error {
 	return err
 }
 
-func (e *Enricher) GetPreviouslyFetchedDataItem(repo Repository, cmdLastDate *time.Time, lastDate *time.Time, noIncremental bool) (result *TopHitsStruct, err error) {
-	enrichIndex := fmt.Sprintf("sds-%s-%s-dockerhub", repo.Owner, repo.Repository)
-	rawIndex := fmt.Sprintf("%s-raw", enrichIndex)
+func (e *Enricher) GetPreviouslyFetchedDataItem(repo *Repository, cmdLastDate *time.Time, lastDate *time.Time, noIncremental bool) (result *TopHitsStruct, err error) {
+	rawIndex := fmt.Sprintf("%s-raw", repo.ESIndex)
 
 	var lastEnrichDate *time.Time = nil
 
@@ -160,7 +133,7 @@ func (e *Enricher) GetPreviouslyFetchedDataItem(repo Repository, cmdLastDate *ti
 		} else if lastDate != nil {
 			lastEnrichDate = lastDate
 
-			enrichLastDate, err := e.ElasticSearchProvider.GetStat(enrichIndex, "metadata__enriched_on", "max", nil, nil)
+			enrichLastDate, err := e.ElasticSearchProvider.GetStat(repo.ESIndex, "metadata__enriched_on", "max", nil, nil)
 			if err != nil {
 				log.Printf("Warning: %v", err)
 			} else {

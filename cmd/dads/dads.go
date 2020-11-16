@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/LF-Engineering/da-ds/dockerhub"
+	"github.com/urfave/cli/v2"
 	"math/rand"
+	"os"
 	"time"
 
 	lib "github.com/LF-Engineering/da-ds"
@@ -67,6 +69,11 @@ func runDS(ctx *lib.Ctx) (err error) {
 
 func main() {
 	var ctx lib.Ctx
+
+	if err := (&cli.App{}).Run(os.Args); err != nil {
+
+	}
+
 	rand.Seed(time.Now().UnixNano())
 	dtStart := time.Now()
 	ctx.Init()

@@ -54,12 +54,6 @@ func TestFetchItem(t *testing.T) {
 
 	esClientProviderMock := &mocks.ESClientProvider{}
 
-	index := fmt.Sprintf("sds-%s-%s-dockerhub-raw", owner, repo)
-	dockerhubRawMapping := []byte(`{"mappings": {"dynamic":true,"properties":{"metadata__updated_on":{"type":"date"},"data":{"properties":{"description":{"type":"text","index":true},"full_description":{"type":"text","index":true}}}}}}`)
-
-	esClientProviderMock.On("CreateIndex", index, dockerhubRawMapping).Return(nil, nil)
-	esClientProviderMock.On("Add", index, mock.Anything, mock.Anything).Return([]byte("Index created"), nil)
-
 	srv := NewFetcher(params, httpClientProviderMock, esClientProviderMock)
 
 	// Act
@@ -135,7 +129,7 @@ func TestFetchItem2(t *testing.T) {
 
 }
 
-func prepareObject() (*Fetcher, error) {
+func prepareObject() (*Fetcher, ESClientProvider, error) {
 	httpClientProvider := utils.NewHttpClientProvider(5 * time.Second)
 
 	params := &Params{
@@ -152,42 +146,39 @@ func prepareObject() (*Fetcher, error) {
 		fmt.Println("err22222 ", err.Error())
 	}
 	srv := NewFetcher(params, httpClientProvider, esClientProvider)
-	return srv, err
+	return srv, esClientProvider, err
 }
 
 func TestBulkInsert(t *testing.T) {
-	srv, err := prepareObject()
+	srv, esClientProvider, err := prepareObject()
 	if err != nil {
 		t.Errorf("err: %v", err)
 		return
 	}
 
-	rawData := make([]*RepositoryRaw, 0)
-
-	raw, err := srv.FetchItem("hyperledger", "besu")
-	if err != nil {
-		t.Errorf("err: %v", err)
-		return
+	rawData := make([]*utils.BulkData, 0)
+	repos := []*Repository{
+		{"hyperledger", "besu", "sds-hyperledger-besu-dockerhub"},
+		{"hyperledger", "explorer", "sds-hyperledger-explorer-dockerhub"},
 	}
-	rawData = append(rawData, raw)
 
-	raw, err = srv.FetchItem("hyperledger", "explorer")
-	if err != nil {
-		t.Errorf("err: %v", err)
-		return
-	}
-	rawData = append(rawData, raw)
+	for _, repo := range repos {
+		raw, err := srv.FetchItem(repo.Owner, repo.Repository)
+		if err != nil {
+			t.Errorf("err: %v", err)
+			return
+		}
+		rawData = append(rawData, &utils.BulkData{IndexName: repo.ESIndex, ID: raw.UUID, Data: raw})
 
-	t.Logf("response: %v", rawData)
-
-	for _, item := range rawData {
-		err := srv.HandleMapping(fmt.Sprintf("sds-%s-%s-dockerhub-raw", item.Data.Namespace, item.Data.Name))
+		err = srv.HandleMapping(fmt.Sprintf("%s-raw", repo.ESIndex))
 		if err != nil {
 			t.Errorf("err: %v", err)
 		}
 	}
 
-	insert, err := srv.BulkInsert(rawData)
+	t.Logf("response: %v", rawData)
+
+	insert, err := esClientProvider.BulkInsert(rawData)
 	if err != nil {
 		t.Errorf("err: %v", err.Error())
 		return
