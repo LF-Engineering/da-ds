@@ -3,7 +3,7 @@ package dockerhub
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/LF-Engineering/da-ds/dockerhub/mocks"
+	"github.com/LF-Engineering/da-ds/mocks"
 	"github.com/LF-Engineering/da-ds/utils"
 	"github.com/LF-Engineering/da-ds/utils/uuid"
 	"github.com/stretchr/testify/assert"
@@ -116,7 +116,7 @@ func TestFetchItem2(t *testing.T) {
 	}
 
 	testTime := time.Date(2017, 1, 1, 0, 0, 0, 0, time.UTC)
-	raw.Data.FetchedOn = testTime.UnixNano()
+	raw.Data.FetchedOn = utils.ConvertTimeToFloat(testTime)
 	uid, err := uuid.Generate(fmt.Sprintf("%v", raw.Data.FetchedOn))
 	if err != nil {
 		t.Errorf("err: %v", err)
