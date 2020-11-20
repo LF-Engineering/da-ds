@@ -35,36 +35,8 @@ func ToUnicode(s string) (string, error) {
 
 func Generate(args ...string) (string, error) {
 	for i := range args {
-
-		//output := ""
-		//ss := args[i]
-		//for len(ss) > 0 {
-		//	r, size := utf8.DecodeRuneInString(ss)
-		//	if unicode.IsSymbol(r) {
-		//		output += string(rune(ss[0]))
-		//	} else {
-		//		output += string(r)
-		//	}
-		//	ss = ss[size:]
-		//}
-		//args[i] = output
-
 		// strip spaces
 		args[i] = strings.TrimSpace(args[i])
-
-		//// to unicode
-		//output, err := ToUnicode(args[i])
-		//if err != nil {
-		//	return "", err
-		//}
-		//
-		//args[i] = output
-
-		// remove surrogates
-		//output, err := strconv.Unquote(`"` + trimQuotes(args[i]) + `"`)
-		//if err != nil {
-		//	return "", err
-		//}
 
 		// check empty args
 		if args[i] == "" {
@@ -150,14 +122,6 @@ func GenerateIdentity(source, email, name, username string) (string, error) {
 
 		// strip spaces
 		args[i] = strings.TrimSpace(args[i])
-
-		//// to unicode
-		//output, err := ToUnicode(args[i])
-		//if err != nil {
-		//	return "", err
-		//}
-
-		//args[i] = strings.ToLower(output)
 
 		// remove surrogates
 		output, err := strconv.Unquote(`"` + trimQuotes(args[i]) + `"`)
