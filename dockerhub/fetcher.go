@@ -8,6 +8,7 @@ import (
 	"github.com/LF-Engineering/da-ds/utils"
 	"github.com/LF-Engineering/da-ds/utils/uuid"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -122,14 +123,14 @@ func (f *Fetcher) FetchItem(owner string, repository string) (*RepositoryRaw, er
 	raw.Data.FetchedOn = raw.Timestamp
 	raw.MetadataTimestamp = now
 	raw.Origin = url
-	raw.SearchFields = &RepositorySearchFields{repository, fmt.Sprintf("%v", raw.Timestamp), owner}
+	raw.SearchFields = &RepositorySearchFields{repository, fmt.Sprintf("%f", raw.Timestamp), owner}
 	raw.Tag = url
 	lastUpdated := raw.Data.LastUpdated
 	raw.UpdatedOn = utils.ConvertTimeToFloat(lastUpdated)
 	raw.MetadataUpdatedOn = lastUpdated
 
 	// generate UUID
-	uid, err := uuid.Generate(raw.Origin, fmt.Sprintf("%v", raw.Data.FetchedOn))
+	uid, err := uuid.Generate(raw.Origin, strconv.FormatFloat(raw.Data.FetchedOn, 'f', -1, 64))
 	if err != nil {
 		return nil, err
 	}
