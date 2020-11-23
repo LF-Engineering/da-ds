@@ -32,8 +32,8 @@ func TestGenerate(t *testing.T) {
 
 func TestGenerateIdentity(t *testing.T) {
 	t.Run("Basic Test", testUUID3)
-	t.Run("Case Insensitive Test", test_case_insensitive)
-	t.Run("Case Unaccent Test", test_case_unaccent_name)
+	t.Run("Case Insensitive Test", testCaseInsensitive)
+	t.Run("Case Unaccent Test", testCaseUnaccentName)
 	t.Run("Empty Source Test", testEmptySource)
 	t.Run("Empty Data Test", testNoneOrEmptyData)
 }
@@ -206,7 +206,7 @@ func testUUID3(t *testing.T) {
 	}
 }
 
-func test_case_insensitive(t *testing.T) {
+func testCaseInsensitive(t *testing.T) {
 	//"""Check if same values in lower or upper case produce the same UUID"""
 
 	inpStr := []string{"scm", "jsmith@example.com",
@@ -242,7 +242,7 @@ func test_case_insensitive(t *testing.T) {
 	assert.Equal(t, uuid_e, uuid_a)
 }
 
-func test_case_unaccent_name(t *testing.T) {
+func testCaseUnaccentName(t *testing.T) {
 	//""
 	//"Check if same values accent or unaccent produce the same UUID"
 	//""
