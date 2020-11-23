@@ -6,14 +6,39 @@ import (
 	dads "github.com/LF-Engineering/da-ds"
 	"github.com/stretchr/testify/assert"
 	"strconv"
-	"strings"
 	"testing"
-	"unicode"
-	"unicode/utf16"
-	"unicode/utf8"
 )
 
+type input struct {
+	source   *string
+	email    *string
+	name     *string
+	username *string
+}
+
 func TestToUnicode(t *testing.T) {
+	t.Run("Basic Test", testToUnicode)
+	t.Run("Unaccented Test", testUnaccent)
+}
+
+func TestGenerate(t *testing.T) {
+	t.Run("Basic Test", testGenerate)
+	t.Run("Generate vs Legacy UUID Test", testLegacyUUID)
+	t.Run("UUID2 Test", testUUID2)
+	t.Run("Empty value Test", testEmptyValue)
+	t.Run("Special Cases Test", testSpecialCases)
+	t.Run("Real Cases Test", testUUIDRealCases)
+}
+
+func TestGenerateIdentity(t *testing.T) {
+	t.Run("Basic Test", testUUID3)
+	t.Run("Case Insensitive Test", test_case_insensitive)
+	t.Run("Case Unaccent Test", test_case_unaccent_name)
+	t.Run("Empty Source Test", testEmptySource)
+	t.Run("Empty Data Test", testNoneOrEmptyData)
+}
+
+func testToUnicode(t *testing.T) {
 	/*"""Check unicode casting with several cases"""*/
 
 	result, _ := ToUnicode("abcdefghijk")
@@ -29,7 +54,7 @@ func TestToUnicode(t *testing.T) {
 	assert.Equal(t, result, "1234.4321")
 }
 
-func TestUnaccent(t *testing.T) {
+func testUnaccent(t *testing.T) {
 	/*"""Check unicode casting removing accents"""*/
 
 	result, _ := ToUnicode("Tomáš Čechvala")
@@ -42,7 +67,7 @@ func TestUnaccent(t *testing.T) {
 	assert.Equal(t, result, "1234")
 }
 
-func TestGenerate(t *testing.T) {
+func testGenerate(t *testing.T) {
 	type testData struct {
 		args   []string
 		result string
@@ -64,8 +89,7 @@ func TestGenerate(t *testing.T) {
 	}
 }
 
-func TestLegacyUUID(t *testing.T) {
-
+func testLegacyUUID(t *testing.T) {
 	uid := "6d1d2134e4c26e5631b86f13cb79253ff2b4208a"
 	origin := "https://hub.docker.com/hyperledger/explorer-db"
 
@@ -76,14 +100,6 @@ func TestLegacyUUID(t *testing.T) {
 	legacyUUID := dads.UUIDNonEmpty(ctx, origin, fmt.Sprintf("%f", f))
 
 	assert.Equal(t, uid, legacyUUID, "legacy UUID is not correct")
-}
-
-func TestUUID(t *testing.T) {
-
-	uid := "6d1d2134e4c26e5631b86f13cb79253ff2b4208a"
-	origin := "https://hub.docker.com/hyperledger/explorer-db"
-
-	f := 1.605627512585879e9
 
 	newUUID, err := Generate(origin, fmt.Sprintf("%f", f))
 	if err != nil {
@@ -92,7 +108,7 @@ func TestUUID(t *testing.T) {
 	assert.Equal(t, uid, newUUID, "new UUID is not correct")
 }
 
-func TestUUID2(t *testing.T) {
+func testUUID2(t *testing.T) {
 	/*""
 	"Check whether the function returns the expected UUID"
 	""*/
@@ -104,7 +120,7 @@ func TestUUID2(t *testing.T) {
 	assert.Equal(t, result, "47509b2f0d4ffc513ca9230838a69aa841d7f055")
 }
 
-func TestEmptyValue(t *testing.T) {
+func testEmptyValue(t *testing.T) {
 	//"""Check whether a UUID cannot be generated when a given value is not a str"""
 
 	_, err := Generate("1", "", "2", "3")
@@ -123,138 +139,141 @@ func TestEmptyValue(t *testing.T) {
 
 }
 
-func TestUnicode(t *testing.T) {
-	s := []byte("\xf1")
-	fmt.Println(s)
-	r := utf16.Decode([]uint16{uint16(s[0])})
-	fmt.Printf("%c\n", r[0])
-}
-
-func TestUnicode2(t *testing.T) {
-	ss := []byte("scm::John Ca\xf1as:jcanas")
-
-	output := ""
-	for _, r := range ss {
-		if !unicode.IsUpper(rune(r)) && unicode.IsPrint(rune(r)) && unicode.IsGraphic(rune(r)) && !unicode.IsSymbol(rune(r)) {
-			output += string(r)
-		} else {
-			fmt.Printf("%v\n", r)
-
-			u := utf16.Decode([]uint16{uint16(r)})
-			newR := fmt.Sprintf("%c", u[0])
-			output += newR
-			fmt.Println("surrogate:", newR)
-		}
-	}
-	fmt.Println(output)
-}
-
-func TestUnicode3(t *testing.T) {
-	ss := "Max Müster"
-	st := ""
-	for len(ss) > 0 {
-		r, size := utf8.DecodeRuneInString(ss)
-		if unicode.IsSymbol(r) {
-			st += string(rune(ss[0]))
-		} else {
-			st += string(r)
-		}
-		ss = ss[size:]
-	}
-
-	fmt.Printf("%s", strings.ToLower(st))
-}
-
-func TestUnicode4(t *testing.T) {
-	ss := "John Ca\xf1as"
-	st := ""
-	for len(ss) > 0 {
-		r, size := utf8.DecodeRuneInString(ss)
-		if unicode.IsSymbol(r) {
-			st += string(rune(ss[0]))
-		} else {
-			st += string(r)
-		}
-		ss = ss[size:]
-	}
-
-	fmt.Printf("%s", strings.ToLower(st))
-}
-
-func TestUUID3(t *testing.T) {
+func testUUID3(t *testing.T) {
 	//""
 	//"Check whether the function returns the expected UUID"
 	//""
 
-	result, _ := GenerateIdentity("scm", "jsmith@example.com", "John Smith", "jsmith")
-	assert.Equal(t, "a9b403e150dd4af8953a52a4bb841051e4b705d9", result)
-
-	result, _ = GenerateIdentity("scm", "jsmith@example.com", "", "")
-	assert.Equal(t, "3f0eb1c38060ce3bc6cb1676c8b9660e99354291", result)
-
-	result, _ = GenerateIdentity("scm", "", "John Smith", "jsmith")
-	assert.Equal(t, "a4b4591c3a2171710c157d7c278ea3cc03becf81", result)
-
-	result, _ = GenerateIdentity("scm", "", "John Smith", "")
-	assert.Equal(t, "76e3624e24aacae178d05352ad9a871dfaf81c13", result)
-
-	result, _ = GenerateIdentity("scm", "", "", "jsmith")
-	assert.Equal(t, "6e7ce2426673f8a23a72a343b1382dda84c0078b", result)
-
-	result, err := GenerateIdentity("scm", "", "John Ca\xf1as", "jcanas")
-	if err != nil {
-		fmt.Println(err)
+	type test struct {
+		name     string
+		input    input
+		expected string
 	}
-	assert.Equal(t, "c88e126749ff006eb1eea25e4bb4c1c125185ed2", result)
 
-	result, _ = GenerateIdentity("scm", "", "Max Müster", "mmuester")
-	assert.Equal(t, "9a0498297d9f0b7e4baf3e6b3740d22d2257367c", result)
+	testInput := [][]string{
+		{"scm", "jsmith@example.com", "John Smith", "jsmith"},
+		{"scm", "jsmith@example.com", "", ""},
+		{"scm", "", "John Smith", "jsmith"},
+		{"scm", "", "John Smith", ""},
+		{"scm", "", "", "jsmith"},
+		{"scm", "", "John Ca\xf1as", "jcanas"},
+		{"scm", "", "Max Müster", "mmuester"},
+	}
+
+	tests := []test{
+		{
+			"test1",
+			input{&testInput[0][0], &testInput[0][1], &testInput[0][2], &testInput[0][3]},
+			"a9b403e150dd4af8953a52a4bb841051e4b705d9",
+		},
+		{
+			"test2",
+			input{&testInput[1][0], &testInput[1][1], &testInput[1][2], &testInput[1][3]},
+			"3f0eb1c38060ce3bc6cb1676c8b9660e99354291",
+		},
+		{
+			"test3",
+			input{&testInput[2][0], &testInput[2][1], &testInput[2][2], &testInput[2][3]},
+			"a4b4591c3a2171710c157d7c278ea3cc03becf81",
+		},
+		{
+			"test4",
+			input{&testInput[3][0], &testInput[3][1], &testInput[3][2], &testInput[3][3]},
+			"76e3624e24aacae178d05352ad9a871dfaf81c13",
+		},
+		{
+			"test5",
+			input{&testInput[4][0], &testInput[4][1], &testInput[4][2], &testInput[4][3]},
+			"6e7ce2426673f8a23a72a343b1382dda84c0078b",
+		},
+		{
+			"test6",
+			input{&testInput[5][0], &testInput[5][1], &testInput[5][2], &testInput[5][3]},
+			"c88e126749ff006eb1eea25e4bb4c1c125185ed2",
+		},
+		{
+			"test7",
+			input{&testInput[6][0], &testInput[6][1], &testInput[6][2], &testInput[6][3]},
+			"9a0498297d9f0b7e4baf3e6b3740d22d2257367c",
+		},
+	}
+
+	for _, te := range tests {
+		t.Run(te.name, func(tt *testing.T) {
+			result, _ := GenerateIdentity(te.input.source, te.input.email, te.input.name, te.input.username)
+			assert.Equal(t, te.expected, result)
+		})
+	}
 }
 
-func Test_case_insensitive(t *testing.T) {
+func test_case_insensitive(t *testing.T) {
 	//"""Check if same values in lower or upper case produce the same UUID"""
 
-	uuid_a, _ := GenerateIdentity("scm", "jsmith@example.com",
-		"John Smith", "jsmith")
-	uuid_b, _ := GenerateIdentity("SCM", "jsmith@example.com",
-		"John Smith", "jsmith")
+	inpStr := []string{"scm", "jsmith@example.com",
+		"John Smith", "jsmith"}
+	inp := input{&inpStr[0], &inpStr[1], &inpStr[2], &inpStr[3]}
+	uuid_a, _ := GenerateIdentity(inp.source, inp.email, inp.name, inp.username)
+	inpStr = []string{"SCM", "jsmith@example.com",
+		"John Smith", "jsmith"}
+	inp = input{&inpStr[0], &inpStr[1], &inpStr[2], &inpStr[3]}
+	uuid_b, _ := GenerateIdentity(inp.source, inp.email, inp.name, inp.username)
 
 	assert.Equal(t, uuid_a, uuid_b)
 
-	uuid_c, _ := GenerateIdentity("scm", "jsmith@example.com",
-		"john smith", "jsmith")
+	inpStr = []string{"scm", "jsmith@example.com",
+		"john smith", "jsmith"}
+	inp = input{&inpStr[0], &inpStr[1], &inpStr[2], &inpStr[3]}
+	uuid_c, _ := GenerateIdentity(inp.source, inp.email, inp.name, inp.username)
 
 	assert.Equal(t, uuid_c, uuid_a)
 
-	uuid_d, _ := GenerateIdentity("scm", "jsmith@example.com",
-		"John Smith", "JSmith")
+	inpStr = []string{"scm", "jsmith@example.com",
+		"John Smith", "JSmith"}
+	inp = input{&inpStr[0], &inpStr[1], &inpStr[2], &inpStr[3]}
+	uuid_d, _ := GenerateIdentity(inp.source, inp.email, inp.name, inp.username)
 
 	assert.Equal(t, uuid_d, uuid_a)
 
-	uuid_e, _ := GenerateIdentity("scm", "JSMITH@example.com",
-		"John Smith", "jsmith")
+	inpStr = []string{"scm", "JSMITH@example.com",
+		"John Smith", "jsmith"}
+	inp = input{&inpStr[0], &inpStr[1], &inpStr[2], &inpStr[3]}
+	uuid_e, _ := GenerateIdentity(inp.source, inp.email, inp.name, inp.username)
 
 	assert.Equal(t, uuid_e, uuid_a)
 }
 
-func Test_case_unaccent_name(t *testing.T) {
+func test_case_unaccent_name(t *testing.T) {
 	//""
 	//"Check if same values accent or unaccent produce the same UUID"
 	//""
 
-	accent_result, _ := GenerateIdentity("scm", "", "Max Müster", "mmuester")
-	unaccent_result, _ := GenerateIdentity("scm", "", "Max Muster", "mmuester")
+	inpStr := []string{"scm", "", "Max Müster", "mmuester"}
+	inp := input{&inpStr[0], &inpStr[1], &inpStr[2], &inpStr[3]}
+	accent_result, _ := GenerateIdentity(inp.source, inp.email, inp.name, inp.username)
+	inpStr = []string{"scm", "", "Max Muster", "mmuester"}
+	inp = input{&inpStr[0], &inpStr[1], &inpStr[2], &inpStr[3]}
+	unaccent_result, _ := GenerateIdentity(inp.source, inp.email, inp.name, inp.username)
 	assert.Equal(t, accent_result, unaccent_result)
 	assert.Equal(t, accent_result, "9a0498297d9f0b7e4baf3e6b3740d22d2257367c")
 
-	accent_result, _ = GenerateIdentity("scm", "", "Santiago Dueñas", "")
-	unaccent_result, _ = GenerateIdentity("scm", "", "Santiago Duenas", "")
+	inpStr = []string{"scm", "", "Santiago Dueñas", ""}
+	inp = input{&inpStr[0], &inpStr[1], &inpStr[2], &inpStr[3]}
+	accent_result, _ = GenerateIdentity(inp.source, inp.email, inp.name, inp.username)
+	inpStr = []string{"scm", "", "Santiago Duenas", ""}
+	inp = input{&inpStr[0], &inpStr[1], &inpStr[2], &inpStr[3]}
+	unaccent_result, _ = GenerateIdentity(inp.source, inp.email, inp.name, inp.username)
 	assert.Equal(t, accent_result, unaccent_result)
 	assert.Equal(t, accent_result, "0f1dd18839007ee8a11d02572ca0a0f4eedaf2cd")
 
-	accent_result, _ = GenerateIdentity("scm", "", "Tomáš Čechvala", "")
-	partial_accent_result, _ := GenerateIdentity("scm", "", "Tomáš Cechvala", "")
-	unaccent_result, _ = GenerateIdentity("scm", "", "Tomas Cechvala", "")
+	inpStr = []string{"scm", "", "Tomáš Čechvala", ""}
+	inp = input{&inpStr[0], &inpStr[1], &inpStr[2], &inpStr[3]}
+	accent_result, _ = GenerateIdentity(inp.source, inp.email, inp.name, inp.username)
+	inpStr = []string{"scm", "", "Tomáš Cechvala", ""}
+	inp = input{&inpStr[0], &inpStr[1], &inpStr[2], &inpStr[3]}
+	partial_accent_result, _ := GenerateIdentity(inp.source, inp.email, inp.name, inp.username)
+	inpStr = []string{"scm", "", "Tomas Cechvala", ""}
+	inp = input{&inpStr[0], &inpStr[1], &inpStr[2], &inpStr[3]}
+	unaccent_result, _ = GenerateIdentity(inp.source, inp.email, inp.name, inp.username)
 	assert.Equal(t, accent_result, unaccent_result)
 	assert.Equal(t, accent_result, partial_accent_result)
 }
@@ -269,15 +288,17 @@ func Test_case_unaccent_name(t *testing.T) {
 //
 //}
 
-func Test_empty_source(t *testing.T) {
+func testEmptySource(t *testing.T) {
 	//"""Check whether uuid cannot be obtained giving a empty source"""
 
-	_, err := GenerateIdentity("", "", "Mishal\\udcc5 Pytasz", "")
+	inpStr := []string{"", "", "Mishal\\udcc5 Pytasz", ""}
+	inp := input{&inpStr[0], &inpStr[1], &inpStr[2], &inpStr[3]}
+	_, err := GenerateIdentity(inp.source, inp.email, inp.name, inp.username)
 	fmt.Println(err)
 	assert.Error(t, err)
 }
 
-func TestSpecialCases(t *testing.T) {
+func testSpecialCases(t *testing.T) {
 	type item struct {
 		name  string
 		input []string
@@ -328,15 +349,23 @@ func TestSpecialCases(t *testing.T) {
 	}
 }
 
-func Test_empty_data(t *testing.T) {
+func testNoneOrEmptyData(t *testing.T) {
 	//"""Check whether uuid cannot be obtained when identity data is empty"""
 
-	_, err := GenerateIdentity("scm", "", "", "")
+	inpStr := []string{"scm",  ""}
+	inp := input{&inpStr[0], nil, &inpStr[1], nil}
+	_, err := GenerateIdentity(inp.source, inp.email, inp.name, inp.username)
+	fmt.Println(err)
+	assert.Error(t, err)
+
+	inpStr = []string{"scm", "", "", ""}
+	inp = input{&inpStr[0], &inpStr[1], &inpStr[2], &inpStr[3]}
+	_, err = GenerateIdentity(inp.source, inp.email, inp.name, inp.username)
 	fmt.Println(err)
 	assert.Error(t, err)
 }
 
-func TestUUIDRealCases(t *testing.T) {
+func testUUIDRealCases(t *testing.T) {
 	type item struct {
 		name   string
 		result string

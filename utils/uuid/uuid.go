@@ -89,21 +89,36 @@ For instance, these combinations will produce the same UUID:
 :raises ValueError: when source is None or empty; each one of the
 parameters is None; parameters are empty.
 */
-func GenerateIdentity(source, email, name, username string) (string, error) {
+func GenerateIdentity(source, email, name, username *string) (string, error) {
 
-	if source == "" {
+	if source == nil || *source == "" {
 		return "", errors.New("source cannot be an empty string")
 	}
 
-	if email == "" && name == "" && username == "" {
+	if (email == nil || *email == "") && (name == nil || *name == "") && (username == nil || *username == "") {
 		return "", errors.New("identity data cannot be None or empty")
 	}
 
 	args := make([]string, 4)
-	args[0] = source
-	args[1] = email
-	args[2] = name
-	args[3] = username
+	args[0] = *source
+
+	if email == nil {
+		args[1] = "none"
+	} else {
+		args[1] = *email
+	}
+
+	if name == nil {
+		args[2] = "none"
+	} else {
+		args[2] = *name
+	}
+
+	if username == nil {
+		args[3] = "none"
+	} else {
+		args[3] = *username
+	}
 
 	for i := range args {
 
