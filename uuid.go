@@ -58,7 +58,9 @@ func UUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
 		cmdLine := []string{"uuid.py", "a"}
 		cmdLine = append(cmdLine, args...)
 		h, _, err = ExecCommand(ctx, cmdLine, "", nil)
-		FatalOnError(err)
+		if err != nil {
+			return ""
+		}
 		h = h[:len(h)-1]
 		return
 	}

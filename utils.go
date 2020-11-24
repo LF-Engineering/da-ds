@@ -392,6 +392,49 @@ func EnsurePath(path string, noLastDir bool) (string, error) {
 	return path, os.MkdirAll(createPath, 0755)
 }
 
+// Base64EncodeHeaders - encode headers to base64 stream of bytes
+func Base64EncodeHeaders(headers map[string][]string) (enc []byte) {
+	var err error
+	enc, err = jsoniter.Marshal(headers)
+	if err != nil {
+		return
+	}
+	// Printf("Base64EncodeHeaders.1(%+v) --> %s\n", headers, string(enc))
+	enc = []byte(base64.StdEncoding.EncodeToString(enc))
+	// Printf("Base64EncodeHeaders.2(%+v) --> %s\n", headers, string(enc))
+	return
+}
+
+// Base64DecodeHeaders - decode headers stored as stream of bytes to map of string arrays
+func Base64DecodeHeaders(enc []byte) (headers map[string][]string, err error) {
+	var bts []byte
+	bts, err = base64.StdEncoding.DecodeString(string(enc))
+	if err != nil {
+		return
+	}
+	// Printf("Base64DecodeHeaders.1(%s) --> %+v\n", string(enc), string(bts))
+	var result map[string]interface{}
+	err = jsoniter.Unmarshal(bts, &result)
+	// Printf("Base64DecodeHeaders.2(%s) --> %+v,%v\n", string(bts), result, err)
+	headers = make(map[string][]string)
+	for k, v := range result {
+		ary, ok := v.([]interface{})
+		if !ok {
+			continue
+		}
+		sAry := []string{}
+		for _, v := range ary {
+			vs, ok := v.(string)
+			if ok {
+				sAry = append(sAry, vs)
+			}
+		}
+		headers[k] = sAry
+	}
+	// Printf("Base64DecodeHeaders.3 --> %+v\n", headers)
+	return
+}
+
 // Base64EncodeCookies - encode cookies array (strings) to base64 stream of bytes
 func Base64EncodeCookies(cookies []string) (enc []byte) {
 	last := len(cookies) - 1
@@ -467,7 +510,7 @@ func RequestNoRetry(
 	payload []byte,
 	cookies []string,
 	jsonStatuses, errorStatuses, okStatuses map[[2]int]struct{},
-) (result interface{}, status int, isJSON bool, outCookies []string, err error) {
+) (result interface{}, status int, isJSON bool, outCookies []string, outHeaders map[string][]string, err error) {
 	var (
 		payloadBody *bytes.Reader
 		req         *http.Request
@@ -508,6 +551,7 @@ func RequestNoRetry(
 	for _, cookie := range resp.Cookies() {
 		outCookies = append(outCookies, CookieToString(cookie))
 	}
+	outHeaders = resp.Header
 	status = resp.StatusCode
 	hit := false
 	for r := range jsonStatuses {
@@ -568,7 +612,7 @@ func Request(
 	retryRequest bool,
 	cacheFor *time.Duration,
 	skipInDryRun bool,
-) (result interface{}, status int, outCookies []string, err error) {
+) (result interface{}, status int, outCookies []string, outHeaders map[string][]string, err error) {
 	if skipInDryRun && ctx.DryRun {
 		if ctx.Debug > 0 {
 			Printf("dry-run: %s.%s(#h=%d,pl=%d,cks=%d) skipped in dry-run mode\n", method, url, len(headers), len(payload), len(cookies))
@@ -586,9 +630,9 @@ func Request(
 			hsh := hex.EncodeToString(hash.Sum(nil))
 			cached, ok := GetL2Cache(ctx, hsh)
 			if ok {
-				// cache entry is 'status:isJson:b64cookies:data
+				// cache entry is 'status:isJson:b64cookies:headers:data
 				ary := bytes.Split(cached, []byte(":"))
-				if len(ary) > 3 {
+				if len(ary) >= 5 {
 					var e error
 					status, e = strconv.Atoi(string(ary[0]))
 					if e == nil {
@@ -597,16 +641,19 @@ func Request(
 						if e == nil {
 							outCookies, e = Base64DecodeCookies(ary[2])
 							if e == nil {
-								resData := bytes.Join(ary[3:], []byte(":"))
-								if iJSON == 0 {
-									result = resData
-									return
-								}
-								var r interface{}
-								e = jsoniter.Unmarshal(resData, &r)
+								outHeaders, e = Base64DecodeHeaders(ary[3])
 								if e == nil {
-									result = r
-									return
+									resData := bytes.Join(ary[4:], []byte(":"))
+									if iJSON == 0 {
+										result = resData
+										return
+									}
+									var r interface{}
+									e = jsoniter.Unmarshal(resData, &r)
+									if e == nil {
+										result = r
+										return
+									}
 								}
 							}
 						}
@@ -618,8 +665,9 @@ func Request(
 				if err != nil {
 					return
 				}
-				// cache entry is 'status:isJson:b64cookies:data
+				// cache entry is 'status:isJson:b64cookies:headers:data
 				b64cookies := Base64EncodeCookies(outCookies)
+				b64headers := Base64EncodeHeaders(outHeaders)
 				data := []byte(fmt.Sprintf("%d:", status))
 				if isJSON {
 					bts, e := jsoniter.Marshal(result)
@@ -629,28 +677,32 @@ func Request(
 					data = append(data, []byte("1:")...)
 					data = append(data, b64cookies...)
 					data = append(data, []byte(":")...)
+					data = append(data, b64headers...)
+					data = append(data, []byte(":")...)
 					data = append(data, bts...)
-					tag := FilterRedacted(fmt.Sprintf("%s.%s(#h=%d,pl=%d,cks=%d) -> sts=%d,js=1,resp=%d,cks=%d", method, url, len(headers), len(payload), len(cookies), status, len(bts), len(outCookies)))
+					tag := FilterRedacted(fmt.Sprintf("%s.%s(#h=%d,pl=%d,cks=%d) -> sts=%d,js=1,resp=%d,cks=%d,hdrs=%d", method, url, len(headers), len(payload), len(cookies), status, len(bts), len(outCookies), len(outHeaders)))
 					SetL2Cache(ctx, hsh, tag, data, cacheDuration)
 					return
 				}
 				data = append(data, []byte("0:")...)
 				data = append(data, b64cookies...)
 				data = append(data, []byte(":")...)
+				data = append(data, b64headers...)
+				data = append(data, []byte(":")...)
 				data = append(data, result.([]byte)...)
-				tag := FilterRedacted(fmt.Sprintf("%s.%s(#h=%d,pl=%d,cks=%d) -> sts=%d,js=0,resp=%d,cks=%d", method, url, len(headers), len(payload), len(cookies), status, len(result.([]byte)), len(outCookies)))
+				tag := FilterRedacted(fmt.Sprintf("%s.%s(#h=%d,pl=%d,cks=%d) -> sts=%d,js=0,resp=%d,cks=%d,hdrs=%d", method, url, len(headers), len(payload), len(cookies), status, len(result.([]byte)), len(outCookies), len(outHeaders)))
 				SetL2Cache(ctx, hsh, tag, data, cacheDuration)
 				return
 			}()
 		}
 	}
 	if !retryRequest {
-		result, status, isJSON, outCookies, err = RequestNoRetry(ctx, url, method, headers, payload, cookies, jsonStatuses, errorStatuses, okStatuses)
+		result, status, isJSON, outCookies, outHeaders, err = RequestNoRetry(ctx, url, method, headers, payload, cookies, jsonStatuses, errorStatuses, okStatuses)
 		return
 	}
 	retry := 0
 	for {
-		result, status, isJSON, outCookies, err = RequestNoRetry(ctx, url, method, headers, payload, cookies, jsonStatuses, errorStatuses, okStatuses)
+		result, status, isJSON, outCookies, outHeaders, err = RequestNoRetry(ctx, url, method, headers, payload, cookies, jsonStatuses, errorStatuses, okStatuses)
 		info := func() (inf string) {
 			inf = fmt.Sprintf("%s.%s:%s=%d", method, url, BytesToStringTrunc(payload, MaxPayloadPrintfLen, true), status)
 			if ctx.Debug > 1 {

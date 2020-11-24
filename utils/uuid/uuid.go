@@ -35,36 +35,8 @@ func ToUnicode(s string) (string, error) {
 
 func Generate(args ...string) (string, error) {
 	for i := range args {
-
-		//output := ""
-		//ss := args[i]
-		//for len(ss) > 0 {
-		//	r, size := utf8.DecodeRuneInString(ss)
-		//	if unicode.IsSymbol(r) {
-		//		output += string(rune(ss[0]))
-		//	} else {
-		//		output += string(r)
-		//	}
-		//	ss = ss[size:]
-		//}
-		//args[i] = output
-
 		// strip spaces
 		args[i] = strings.TrimSpace(args[i])
-
-		//// to unicode
-		//output, err := ToUnicode(args[i])
-		//if err != nil {
-		//	return "", err
-		//}
-		//
-		//args[i] = output
-
-		// remove surrogates
-		//output, err := strconv.Unquote(`"` + trimQuotes(args[i]) + `"`)
-		//if err != nil {
-		//	return "", err
-		//}
 
 		// check empty args
 		if args[i] == "" {
@@ -115,21 +87,36 @@ For instance, these combinations will produce the same UUID:
 :raises ValueError: when source is None or empty; each one of the
 parameters is None; parameters are empty.
 */
-func GenerateIdentity(source, email, name, username string) (string, error) {
+func GenerateIdentity(source, email, name, username *string) (string, error) {
 
-	if source == "" {
+	if source == nil || *source == "" {
 		return "", errors.New("source cannot be an empty string")
 	}
 
-	if email == "" && name == "" && username == "" {
+	if (email == nil || *email == "") && (name == nil || *name == "") && (username == nil || *username == "") {
 		return "", errors.New("identity data cannot be None or empty")
 	}
 
 	args := make([]string, 4)
-	args[0] = source
-	args[1] = email
-	args[2] = name
-	args[3] = username
+	args[0] = *source
+
+	if email == nil {
+		args[1] = "none"
+	} else {
+		args[1] = *email
+	}
+
+	if name == nil {
+		args[2] = "none"
+	} else {
+		args[2] = *name
+	}
+
+	if username == nil {
+		args[3] = "none"
+	} else {
+		args[3] = *username
+	}
 
 	for i := range args {
 
@@ -148,14 +135,6 @@ func GenerateIdentity(source, email, name, username string) (string, error) {
 
 		// strip spaces
 		args[i] = strings.TrimSpace(args[i])
-
-		//// to unicode
-		//output, err := ToUnicode(args[i])
-		//if err != nil {
-		//	return "", err
-		//}
-
-		//args[i] = strings.ToLower(output)
 
 		// remove surrogates
 		output, err := strconv.Unquote(`"` + trimQuotes(args[i]) + `"`)
