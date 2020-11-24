@@ -144,35 +144,59 @@ func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
 	} else {
 		dateFrom = DefaultDateFrom
 	}
-	rateLimit, rateLimitTimeToReset := -1, -1
-	// curl -s -H 'X-Auth-Token: token' -H 'X-User-Id: user' URL/api/v1/channels.info?roomName=channel | jq '.'
-	// 48 hours for caching channel info
+	rateLimit, rateLimitReset := -1, -1
+	trials := 0
 	cacheDur := time.Duration(48) * time.Hour
 	url := j.URL + "/api/v1/channels.info?roomName=" + neturl.QueryEscape(j.Channel)
 	method := Get
 	headers := map[string]string{"X-User-Id": j.User, "X-Auth-Token": j.Token}
-	res, status, _, outHeaders, err := Request(
-		ctx,
-		url,
-		method,
-		headers,
-		nil,
-		nil,
-		map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses: 200
-		nil,                                 // Error statuses
-		map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
-		true,                                // retry
-		&cacheDur,                           // cache duration
-		false,                               // skip in dry-run mode
+	var (
+		res        interface{}
+		status     int
+		outHeaders map[string][]string
 	)
-	rateLimit, rateLimitTimeToReset = UpdateRateLimit(ctx, j, outHeaders, "", "")
-	//Printf("res=%v\n", res.(map[string]interface{}))
-	Printf("res=%v\n", res)
-	Printf("rateLimit, rateLimitTimeToReset = (%d, %d)\n", rateLimit, rateLimitTimeToReset)
-	Printf("status=%d, err=%v, dateFrom=%v, outHeaders=%v\n", status, err, dateFrom, outHeaders)
-	if err != nil {
+	for {
+		err = SleepForRateLimit(ctx, j, rateLimit, rateLimitReset, j.MinRate, j.WaitRate)
+		if err != nil {
+			return
+		}
+		// curl -s -H 'X-Auth-Token: token' -H 'X-User-Id: user' URL/api/v1/channels.info?roomName=channel | jq '.'
+		// 48 hours for caching channel info
+		res, status, _, outHeaders, err = Request(
+			ctx,
+			url,
+			method,
+			headers,
+			nil,
+			nil,
+			map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses: 200
+			nil,                                 // Error statuses
+			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
+			true,                                // retry
+			&cacheDur,                           // cache duration
+			false,                               // skip in dry-run mode
+		)
+		rateLimit, rateLimitReset, _ = UpdateRateLimit(ctx, j, outHeaders, "", "")
+		//Printf("res=%v\n", res.(map[string]interface{}))
+		if err != nil {
+			return
+		}
+		// Rate limit
+		if status != 413 {
+			break
+		}
+		trials++
+		if trials == 2 {
+			break
+		}
+	}
+	channelInfo, ok := res.(map[string]interface{})["channel"]
+	if !ok {
+		data, _ := res.(map[string]interface{})
+		err = fmt.Errorf("Cannot read channel info from:\n%s\n", data)
 		return
 	}
+	Printf("dateFrom=%+v\nchannelInfo=%+v\n", dateFrom, channelInfo)
 	if 1 == 1 {
 		os.Exit(1)
 	}

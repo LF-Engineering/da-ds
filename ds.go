@@ -1048,7 +1048,7 @@ func EnrichItem(ctx *Ctx, ds DS, richItem map[string]interface{}) (err error) {
 }
 
 // UpdateRateLimit - generic function to get rate limit data from header
-func UpdateRateLimit(ctx *Ctx, ds DS, headers map[string][]string, rateLimitHeader, rateLimitResetHeader string) (rateLimit, rateLimitReset int) {
+func UpdateRateLimit(ctx *Ctx, ds DS, headers map[string][]string, rateLimitHeader, rateLimitResetHeader string) (rateLimit, rateLimitReset, secondsToReset int) {
 	if rateLimitHeader == "" {
 		rateLimitHeader = DefaultRateLimitHeader
 	}
@@ -1089,12 +1089,34 @@ func UpdateRateLimit(ctx *Ctx, ds DS, headers map[string][]string, rateLimitHead
 			var err error
 			rateLimitReset, err = strconv.Atoi(v[0])
 			if err == nil {
-				rateLimitReset = ds.CalculateTimeToReset(ctx, rateLimit, rateLimitReset)
+				secondsToReset = ds.CalculateTimeToReset(ctx, rateLimit, rateLimitReset)
 			}
 		}
 	}
 	if ctx.Debug > 1 {
-		Printf("UpdateRateLimit(%+v,%s,%s) --> (%d,%d)\n", headers, rateLimitHeader, rateLimitResetHeader, rateLimit, rateLimitReset)
+		Printf("UpdateRateLimit(%+v,%s,%s) --> (%d,%d,%d)\n", headers, rateLimitHeader, rateLimitResetHeader, rateLimit, rateLimitReset, secondsToReset)
 	}
+	return
+}
+
+// SleepForRateLimit - sleep for rate or return error when rate exceeded
+func SleepForRateLimit(ctx *Ctx, ds DS, rateLimit, rateLimitReset, minRate int, waitRate bool) (err error) {
+	if rateLimit < 0 || rateLimit > minRate {
+		if ctx.Debug > 1 {
+			Printf("rate limit is %d, min rate is %d, no need to wait\n", rateLimit, minRate)
+		}
+		return
+	}
+	secondsToReset := ds.CalculateTimeToReset(ctx, rateLimit, rateLimitReset)
+	if secondsToReset < 0 {
+		Printf("Warning: time to reset is negative %d, resetting to 0\n", secondsToReset)
+		secondsToReset = 0
+	}
+	if waitRate {
+		Printf("Waiting %d seconds for rate limit reset.\n", secondsToReset)
+		time.Sleep(time.Duration(secondsToReset) * time.Second)
+		return
+	}
+	err = fmt.Errorf("rate limit exceeded, not waiting %d seconds\n", secondsToReset)
 	return
 }
