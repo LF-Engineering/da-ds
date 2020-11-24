@@ -26,6 +26,8 @@ var (
 	RocketchatDefaultMaxItems = 100
 	// RocketchatDefaultMinRate - default min rate points (when not set)
 	RocketchatDefaultMinRate = 10
+	// RocketchatDefaultSearchField - default search field
+	RocketchatDefaultSearchField = "item_id"
 )
 
 // DSRocketchat - DS implementation for rocketchat - does nothing at all, just presents a skeleton code
@@ -272,19 +274,12 @@ func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
 		eschaMtx = &sync.Mutex{}
 	}
 	nThreads := 0
-	processMsg := func(c chan error, msg map[string]interface{}) (wch chan error, e error) {
+	processMsg := func(c chan error, item map[string]interface{}) (wch chan error, e error) {
 		defer func() {
 			if c != nil {
 				c <- e
 			}
 		}()
-		// FIXME: Real data processing here
-		//Printf("message(%v): %+v\n", msg["_id"], msg["channel_info"])
-		Printf("message(%v)\n", msg["_id"])
-		if 1 == 1 {
-			return
-		}
-		item := map[string]interface{}{"id": time.Now().UnixNano(), "name": "xyz"}
 		esItem := j.AddMetadata(ctx, item)
 		if ctx.Project != "" {
 			item["project"] = ctx.Project
@@ -470,19 +465,17 @@ func (j *DSRocketchat) ResumeNeedsOrigin(ctx *Ctx) bool {
 
 // Origin - return current origin
 func (j *DSRocketchat) Origin(ctx *Ctx) string {
-	// IMPL: you must change this, for example to j.URL/j.GroupName or somethign like this
 	return j.URL + "/" + j.Channel
 }
 
 // ItemID - return unique identifier for an item
 func (j *DSRocketchat) ItemID(item interface{}) string {
-	// IMPL:
-	return fmt.Sprintf("%d", time.Now().UnixNano())
+	id, _ := Dig(item, []string{"_id"}, true, false)
+	return id.(string)
 }
 
 // AddMetadata - add metadata to the item
 func (j *DSRocketchat) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string]interface{}) {
-	// IMPL:
 	mItem = make(map[string]interface{})
 	// Change to unique datasource origin
 	origin := j.Origin(ctx)
@@ -502,8 +495,12 @@ func (j *DSRocketchat) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string
 	mItem[DefaultTagField] = tag
 	mItem[DefaultOffsetField] = float64(updatedOn.Unix())
 	mItem["category"] = j.ItemCategory(item)
-	//mItem["search_fields"] = j.GenSearchFields(ctx, issue, uuid)
-	//mItem["search_fields"] = make(map[string]interface{})
+	mItem["search_fields"] = make(map[string]interface{})
+	channelID, _ := Dig(item, []string{"channel_info", "_id"}, true, false)
+	channelName, _ := Dig(item, []string{"channel_info", "name"}, true, false)
+	FatalOnError(DeepSet(mItem, []string{"search_fields", RocketchatDefaultSearchField}, itemID, false))
+	FatalOnError(DeepSet(mItem, []string{"search_fields", "channel_id"}, channelID, false))
+	FatalOnError(DeepSet(mItem, []string{"search_fields", "channel_name"}, channelName, false))
 	mItem[DefaultDateField] = ToESDate(updatedOn)
 	mItem[DefaultTimestampField] = ToESDate(timestamp)
 	mItem[ProjectSlug] = ctx.ProjectSlug
@@ -512,8 +509,10 @@ func (j *DSRocketchat) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string
 
 // ItemUpdatedOn - return updated on date for an item
 func (j *DSRocketchat) ItemUpdatedOn(item interface{}) time.Time {
-	// IMPL:
-	return time.Now()
+	iUpdated, _ := Dig(item, []string{"_updatedAt"}, true, false)
+	updated, err := TimeParseAny(iUpdated.(string))
+	FatalOnError(err)
+	return updated
 }
 
 // ItemCategory - return unique identifier for an item
