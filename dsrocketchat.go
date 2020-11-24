@@ -2,6 +2,7 @@ package dads
 
 import (
 	"fmt"
+	neturl "net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -84,10 +85,6 @@ func (j *DSRocketchat) Validate() (err error) {
 	if strings.HasSuffix(j.URL, "/") {
 		j.URL = j.URL[:len(j.URL)-1]
 	}
-	ary := strings.Split(j.URL, "://")
-	if len(ary) > 1 {
-		j.URL = ary[1]
-	}
 	j.Channel = strings.TrimSpace(j.Channel)
 	if j.URL == "" || j.Channel == "" || j.User == "" || j.Token == "" {
 		err = fmt.Errorf("URL, Channel, User, Token must all be set")
@@ -127,9 +124,82 @@ func (j *DSRocketchat) Enrich(ctx *Ctx) (err error) {
 	return
 }
 
+// CalculateTimeToReset - calculate time to reset rate limits based on rate limit value and rate limit reset value
+func (j *DSRocketchat) CalculateTimeToReset(ctx *Ctx, rateLimit, rateLimitReset int) (seconds int) {
+	seconds = int(int64(rateLimitReset)-(time.Now().UnixNano()/int64(1000000)))/1000 + 1
+	if seconds < 0 {
+		seconds = 0
+	}
+	if ctx.Debug > 1 {
+		Printf("CalculateTimeToReset(%d,%d) -> %d\n", rateLimit, rateLimitReset, seconds)
+	}
+	return
+}
+
 // FetchItems - implement enrich data for rocketchat datasource
 func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
-	// IMPL:
+	var dateFrom time.Time
+	if ctx.DateFrom != nil {
+		dateFrom = *ctx.DateFrom
+	} else {
+		dateFrom = DefaultDateFrom
+	}
+	rateLimit, rateLimitReset := -1, -1
+	trials := 0
+	cacheDur := time.Duration(48) * time.Hour
+	url := j.URL + "/api/v1/channels.info?roomName=" + neturl.QueryEscape(j.Channel)
+	method := Get
+	headers := map[string]string{"X-User-Id": j.User, "X-Auth-Token": j.Token}
+	var (
+		res        interface{}
+		status     int
+		outHeaders map[string][]string
+	)
+	for {
+		err = SleepForRateLimit(ctx, j, rateLimit, rateLimitReset, j.MinRate, j.WaitRate)
+		if err != nil {
+			return
+		}
+		// curl -s -H 'X-Auth-Token: token' -H 'X-User-Id: user' URL/api/v1/channels.info?roomName=channel | jq '.'
+		// 48 hours for caching channel info
+		res, status, _, outHeaders, err = Request(
+			ctx,
+			url,
+			method,
+			headers,
+			nil,
+			nil,
+			map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses: 200
+			nil,                                 // Error statuses
+			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
+			true,                                // retry
+			&cacheDur,                           // cache duration
+			false,                               // skip in dry-run mode
+		)
+		rateLimit, rateLimitReset, _ = UpdateRateLimit(ctx, j, outHeaders, "", "")
+		//Printf("res=%v\n", res.(map[string]interface{}))
+		if err != nil {
+			return
+		}
+		// Rate limit
+		if status != 413 {
+			break
+		}
+		trials++
+		if trials == 2 {
+			break
+		}
+	}
+	channelInfo, ok := res.(map[string]interface{})["channel"]
+	if !ok {
+		data, _ := res.(map[string]interface{})
+		err = fmt.Errorf("Cannot read channel info from:\n%s\n", data)
+		return
+	}
+	Printf("dateFrom=%+v\nchannelInfo=%+v\n", dateFrom, channelInfo)
+	if 1 == 1 {
+		os.Exit(1)
+	}
 	var messages [][]byte
 	// Process messages (possibly in threads)
 	var (

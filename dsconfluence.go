@@ -148,7 +148,7 @@ func (j *DSConfluence) GetHistoricalContents(ctx *Ctx, content map[string]interf
 		if ctx.Debug > 1 {
 			Printf("historical content url: %s\n", url)
 		}
-		res, status, _, err = Request(
+		res, status, _, _, err = Request(
 			ctx,
 			url,
 			method,
@@ -246,7 +246,7 @@ func (j *DSConfluence) GetConfluenceContents(ctx *Ctx, fromDate, next string) (c
 	if ctx.Debug > 1 {
 		Printf("content url: %s\n", url)
 	}
-	res, status, _, err := Request(
+	res, status, _, _, err := Request(
 		ctx,
 		url,
 		method,
@@ -914,4 +914,10 @@ func (j *DSConfluence) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, ro
 // dynamic roles will use item to get its roles
 func (j *DSConfluence) AllRoles(ctx *Ctx, item map[string]interface{}) ([]string, bool) {
 	return []string{"by"}, true
+}
+
+// CalculateTimeToReset - calculate time to reset rate limits based on rate limit value and rate limit reset value
+func (j *DSConfluence) CalculateTimeToReset(ctx *Ctx, rateLimit, rateLimitReset int) (seconds int) {
+	seconds = rateLimitReset
+	return
 }

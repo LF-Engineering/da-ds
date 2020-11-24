@@ -17,6 +17,10 @@ const (
 	BulkRefreshMode = "true"
 	// KeywordMaxlength - max description length
 	KeywordMaxlength = 1000
+	// DefaultRateLimitHeader - default value for rate limit header
+	DefaultRateLimitHeader = "X-RateLimit-Remaining"
+	// DefaultRateLimitResetHeader - default value for rate limit reset header
+	DefaultRateLimitResetHeader = "X-RateLimit-Reset"
 )
 
 var (
@@ -61,6 +65,7 @@ type DS interface {
 	AffsItems(*Ctx, map[string]interface{}, []string, interface{}) (map[string]interface{}, error)
 	GetRoleIdentity(*Ctx, map[string]interface{}, string) map[string]interface{}
 	AllRoles(*Ctx, map[string]interface{}) ([]string, bool)
+	CalculateTimeToReset(*Ctx, int, int) int
 }
 
 // CommonFields - common rich item fields
@@ -586,7 +591,7 @@ func ForEachESItem(
 		}
 		url := ctx.ESURL + "/_search/scroll"
 		payload := []byte(`{"scroll_id":"` + *scroll + `"}`)
-		_, _, _, err := Request(
+		_, _, _, _, err := Request(
 			ctx,
 			url,
 			Delete,
@@ -670,7 +675,7 @@ func ForEachESItem(
 			url = ctx.ESURL + "/_search/scroll"
 			payload = []byte(`{"scroll":"` + ctx.ESScrollWait + `","scroll_id":"` + *scroll + `"}`)
 		}
-		res, status, _, err = Request(
+		res, status, _, _, err = Request(
 			ctx,
 			url,
 			Post,
@@ -823,7 +828,7 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 	} else {
 		url = ctx.ESURL + "/" + ctx.RichIndex
 	}
-	_, _, _, err = Request(
+	_, _, _, _, err = Request(
 		ctx,
 		url,
 		Put,
@@ -846,7 +851,7 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 		mapping = ds.ElasticRichMapping()
 	}
 	url += "/_mapping"
-	_, _, _, err = Request(
+	_, _, _, _, err = Request(
 		ctx,
 		url,
 		Put,
@@ -862,7 +867,7 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 	)
 	FatalOnError(err)
 	// Global not analyze string mapping
-	_, _, _, err = Request(
+	_, _, _, _, err = Request(
 		ctx,
 		url,
 		Put,
@@ -1039,5 +1044,79 @@ func Enrich(ctx *Ctx, ds DS) (err error) {
 func EnrichItem(ctx *Ctx, ds DS, richItem map[string]interface{}) (err error) {
 	richItem[DefaultEnrichDateField] = time.Now()
 	richItem[ProjectSlug] = ctx.ProjectSlug
+	return
+}
+
+// UpdateRateLimit - generic function to get rate limit data from header
+func UpdateRateLimit(ctx *Ctx, ds DS, headers map[string][]string, rateLimitHeader, rateLimitResetHeader string) (rateLimit, rateLimitReset, secondsToReset int) {
+	if rateLimitHeader == "" {
+		rateLimitHeader = DefaultRateLimitHeader
+	}
+	if rateLimitResetHeader == "" {
+		rateLimitResetHeader = DefaultRateLimitResetHeader
+	}
+	v, ok := headers[rateLimitHeader]
+	if !ok {
+		lRateLimitHeader := strings.ToLower(rateLimitHeader)
+		for k, va := range headers {
+			kl := strings.ToLower(k)
+			if kl == lRateLimitHeader {
+				v = va
+				ok = true
+				break
+			}
+		}
+	}
+	if ok {
+		if len(v) > 0 {
+			rateLimit, _ = strconv.Atoi(v[0])
+		}
+	}
+	v, ok = headers[rateLimitResetHeader]
+	if !ok {
+		lRateLimitResetHeader := strings.ToLower(rateLimitResetHeader)
+		for k, va := range headers {
+			kl := strings.ToLower(k)
+			if kl == lRateLimitResetHeader {
+				v = va
+				ok = true
+				break
+			}
+		}
+	}
+	if ok {
+		if len(v) > 0 {
+			var err error
+			rateLimitReset, err = strconv.Atoi(v[0])
+			if err == nil {
+				secondsToReset = ds.CalculateTimeToReset(ctx, rateLimit, rateLimitReset)
+			}
+		}
+	}
+	if ctx.Debug > 1 {
+		Printf("UpdateRateLimit(%+v,%s,%s) --> (%d,%d,%d)\n", headers, rateLimitHeader, rateLimitResetHeader, rateLimit, rateLimitReset, secondsToReset)
+	}
+	return
+}
+
+// SleepForRateLimit - sleep for rate or return error when rate exceeded
+func SleepForRateLimit(ctx *Ctx, ds DS, rateLimit, rateLimitReset, minRate int, waitRate bool) (err error) {
+	if rateLimit < 0 || rateLimit > minRate {
+		if ctx.Debug > 1 {
+			Printf("rate limit is %d, min rate is %d, no need to wait\n", rateLimit, minRate)
+		}
+		return
+	}
+	secondsToReset := ds.CalculateTimeToReset(ctx, rateLimit, rateLimitReset)
+	if secondsToReset < 0 {
+		Printf("Warning: time to reset is negative %d, resetting to 0\n", secondsToReset)
+		secondsToReset = 0
+	}
+	if waitRate {
+		Printf("Waiting %d seconds for rate limit reset.\n", secondsToReset)
+		time.Sleep(time.Duration(secondsToReset) * time.Second)
+		return
+	}
+	err = fmt.Errorf("rate limit exceeded, not waiting %d seconds\n", secondsToReset)
 	return
 }
