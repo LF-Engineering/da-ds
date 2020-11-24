@@ -455,3 +455,9 @@ func (j *DSStub) AllRoles(ctx *Ctx, item map[string]interface{}) ([]string, bool
 	// IMPL:
 	return []string{Author}, true
 }
+
+// CalculateTimeToReset - calculate time to reset rate limits based on rate limit value and rate limit reset value
+func (j *DSStub) CalculateTimeToReset(ctx *Ctx, rateLimit, rateLimitReset int) (seconds int) {
+	seconds = rateLimitReset
+	return
+}

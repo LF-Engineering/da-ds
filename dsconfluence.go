@@ -915,3 +915,9 @@ func (j *DSConfluence) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, ro
 func (j *DSConfluence) AllRoles(ctx *Ctx, item map[string]interface{}) ([]string, bool) {
 	return []string{"by"}, true
 }
+
+// CalculateTimeToReset - calculate time to reset rate limits based on rate limit value and rate limit reset value
+func (j *DSConfluence) CalculateTimeToReset(ctx *Ctx, rateLimit, rateLimitReset int) (seconds int) {
+	seconds = rateLimitReset
+	return
+}

@@ -1416,3 +1416,9 @@ func (j *DSJira) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role str
 func (j *DSJira) AllRoles(ctx *Ctx, item map[string]interface{}) ([]string, bool) {
 	return JiraRoles, true
 }
+
+// CalculateTimeToReset - calculate time to reset rate limits based on rate limit value and rate limit reset value
+func (j *DSJira) CalculateTimeToReset(ctx *Ctx, rateLimit, rateLimitReset int) (seconds int) {
+	seconds = rateLimitReset
+	return
+}

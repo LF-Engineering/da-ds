@@ -124,6 +124,18 @@ func (j *DSRocketchat) Enrich(ctx *Ctx) (err error) {
 	return
 }
 
+// CalculateTimeToReset - calculate time to reset rate limits based on rate limit value and rate limit reset value
+func (j *DSRocketchat) CalculateTimeToReset(ctx *Ctx, rateLimit, rateLimitReset int) (seconds int) {
+	seconds = int(int64(rateLimitReset)-(time.Now().UnixNano()/int64(1000000)))/1000 + 1
+	if seconds < 0 {
+		seconds = 0
+	}
+	if ctx.Debug > 1 {
+		Printf("CalculateTimeToReset(%d,%d) -> %d\n", rateLimit, rateLimitReset, seconds)
+	}
+	return
+}
+
 // FetchItems - implement enrich data for rocketchat datasource
 func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
 	var dateFrom time.Time
@@ -132,6 +144,7 @@ func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
 	} else {
 		dateFrom = DefaultDateFrom
 	}
+	rateLimit, rateLimitTimeToReset := -1, -1
 	// curl -s -H 'X-Auth-Token: token' -H 'X-User-Id: user' URL/api/v1/channels.info?roomName=channel | jq '.'
 	// 48 hours for caching channel info
 	cacheDur := time.Duration(48) * time.Hour
@@ -152,8 +165,10 @@ func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
 		&cacheDur,                           // cache duration
 		false,                               // skip in dry-run mode
 	)
+	rateLimit, rateLimitTimeToReset = UpdateRateLimit(ctx, j, outHeaders, "", "")
 	//Printf("res=%v\n", res.(map[string]interface{}))
 	Printf("res=%v\n", res)
+	Printf("rateLimit, rateLimitTimeToReset = (%d, %d)\n", rateLimit, rateLimitTimeToReset)
 	Printf("status=%d, err=%v, dateFrom=%v, outHeaders=%v\n", status, err, dateFrom, outHeaders)
 	if err != nil {
 		return

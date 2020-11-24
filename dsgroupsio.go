@@ -1192,3 +1192,9 @@ func (j *DSGroupsio) AllRoles(ctx *Ctx, rich map[string]interface{}) (roles []st
 	}
 	return
 }
+
+// CalculateTimeToReset - calculate time to reset rate limits based on rate limit value and rate limit reset value
+func (j *DSGroupsio) CalculateTimeToReset(ctx *Ctx, rateLimit, rateLimitReset int) (seconds int) {
+	seconds = rateLimitReset
+	return
+}
