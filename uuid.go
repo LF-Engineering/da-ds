@@ -3,6 +3,7 @@ package dads
 import (
 	"crypto/sha1"
 	"encoding/hex"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -55,10 +56,14 @@ func UUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
 	}()
 	if ctx.LegacyUUID {
 		var err error
-		cmdLine := []string{"uuid.py", "a"}
+		cmdLine := []string{"../../uuid.py", "a"}
 		cmdLine = append(cmdLine, args...)
 		h, _, err = ExecCommand(ctx, cmdLine, "", nil)
-		FatalOnError(err)
+		if err != nil {
+			//FatalOnError(err)
+			fmt.Println(err)
+			return
+		}
 		h = h[:len(h)-1]
 		return
 	}
