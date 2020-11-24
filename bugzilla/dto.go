@@ -1,8 +1,10 @@
 package bugzilla
 
-import "time"
+import (
+	"time"
+)
 
-// BugResponse data model represents Bugzilla get bugs results
+// BugResponse data model represents Bugzilla get bugsList results
 type BugResponse struct {
 	ID               int       `json:"id"`
 	Product          string    `json:"product"`
@@ -12,6 +14,47 @@ type BugResponse struct {
 	Resolution       string    `json:"resolution"`
 	ShortDescription string    `json:"short_description"`
 	ChangedDate      time.Time `json:"changed_date"`
+}
+
+// BugResponse data model represents Bugzilla get bugDetail results
+type BugDetailResponse struct {
+	Bug BugDetailXML `xml:"bug"`
+}
+
+// BugDetailXML ...
+type BugDetailXML struct {
+	ID                 int    `xml:"bug_id"`
+	CreationDate       string `xml:"creation_ts"`
+	ShortDescription   string `xml:"short_desc"`
+	DeltaTS            string `xml:"delta_ts"`
+	ReporterAccessible int    `xml:"reporter_accessible"`
+	ClassificationID   int    `xml:"classification_id"`
+	Classification     string `xml:"classification"`
+	Product            string `xml:"product"`
+	Component          string `xml:"component"`
+	Version            string `xml:"version"`
+	RepPlatform        string `xml:"rep_platform"`
+	OpSys              string `xml:"op_sys"`
+	BugStatus          string `xml:"bug_status"`
+	Resolution         string `xml:"resolution"`
+	BugFileLoc         string `xml:"bug_file_loc"`
+	status_whiteboard  string `xml:"status_whiteboard"`
+	keywords           string `xml:"keywords"`
+	priority           string `xml:"priority"`
+	bug_severity       string `xml:"bug_severity"`
+	target_milestone   string `xml:"target_milestone"`
+	everconfirmed      string `xml:"everconfirmed"`
+	reporter           string `xml:"reporter"`
+	assigned_to        string `xml:"assigned_to"`
+	CC                 string `xml:"cc"`
+	CfOs               string `xml:"cf_os"`
+	CfRegressionType   string `xml:"cf_regression_type"`
+	LongDescription    struct {
+		CommentID int    `xml:"comment_id"`
+		Who       string `xml:"who"`
+		When      string `xml:"bug_when"`
+		TheText   string `xml:"thetext"`
+	} `xml:"long_desc"`
 }
 
 // SearchFields ...

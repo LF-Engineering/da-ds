@@ -74,8 +74,6 @@ func Generate(args ...string) (string, error) {
 
 	data := strings.Join(args, ":")
 
-	fmt.Println("uuid", data)
-
 	hash := sha1.New()
 	_, err := hash.Write([]byte(data))
 	if err != nil {
