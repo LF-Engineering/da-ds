@@ -20,7 +20,7 @@ type Manager struct {
 	ESPassword             string
 	HttpTimeout            time.Duration
 	Repositories           []*Repository
-	FromDate               string
+	FromDate               *time.Time
 	NoIncremental          bool
 }
 
@@ -37,11 +37,9 @@ func NewManager(Username string,
 	EnrichOnly bool,
 	Enrich bool,
 	ESUrl string,
-	ESUsername string,
-	ESPassword string,
 	HttpTimeout time.Duration,
 	Repositories []*Repository,
-	FromDate string,
+	FromDate *time.Time,
 	NoIncremental bool,
 ) *Manager {
 	mng := &Manager{
@@ -52,8 +50,6 @@ func NewManager(Username string,
 		EnrichOnly:             EnrichOnly,
 		Enrich:                 Enrich,
 		ESUrl:                  ESUrl,
-		ESUsername:             ESUsername,
-		ESPassword:             ESPassword,
 		HttpTimeout:            HttpTimeout,
 		Repositories:           Repositories,
 		FromDate:               FromDate,
@@ -111,19 +107,15 @@ func (m *Manager) Sync() error {
 		data := make([]*utils.BulkData, 0)
 
 		for _, repo := range m.Repositories {
+			var fromDate *time.Time
 			var lastDate time.Time
-			if m.FromDate == "" {
+			if m.FromDate == nil || (*m.FromDate).IsZero() {
 				lastDate, err = fetcher.GetLastDate(repo)
 				if err != nil {
 					log.Println("[GetLastDate] could not get last date")
 				}
-			}
-
-			var fromDate *time.Time
-
-			d, err := time.Parse(time.RFC3339, m.FromDate)
-			if err == nil {
-				fromDate = &d
+			} else {
+				fromDate = m.FromDate
 			}
 
 			esData, err := enricher.GetPreviouslyFetchedDataItem(repo, fromDate, &lastDate, m.NoIncremental)

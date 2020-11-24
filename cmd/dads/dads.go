@@ -89,17 +89,15 @@ func dockerhubEnvs(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	// Dockerhub credentials
 	username := ctx.Env("USERNAME")
 	password := ctx.Env("PASSWORD")
-	fetcherBackendVersion := ctx.Env("FETCHER_BACKEND_VERSION")
-	enricherBackendVersion := ctx.Env("ENRICHER_BACKEND_VERSION")
-	esUrl := ctx.Env("ES_URL")
-	esUsername := ctx.Env("ES_USERNAME")
-	esPassword := ctx.Env("ES_PASSWORD")
+	fetcherBackendVersion := "0.0.1" //ctx.Env("FETCHER_BACKEND_VERSION")
+	enricherBackendVersion := "0.0.1" //ctx.Env("ENRICHER_BACKEND_VERSION")
+	esUrl := ctx.ESURL
 	httpTimeout := ctx.Env("HTTP_TIMEOUT") // "60s" 60 seconds...
 	// flag projects json array
 	repositoriesJson := ctx.Env("REPOSITORIES_JSON")
-	enrichOnly := ctx.BoolEnv("Enrich_ONLY")
-	enrich := ctx.BoolEnv("Enrich")
-	fromDate := ctx.Env("FROM_DATE")
+	enrichOnly := ctx.NoRaw
+	enrich := ctx.Enrich
+	fromDate := ctx.DateFrom
 	noIncremental := ctx.BoolEnv("NO_INCREMENTAL")
 
 	var repositories []*dockerhub.Repository
@@ -113,5 +111,5 @@ func dockerhubEnvs(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	}
 
 	return dockerhub.NewManager(username, password, fetcherBackendVersion, enricherBackendVersion,
-		enrichOnly, enrich, esUrl, esUsername, esPassword, timeout,  repositories, fromDate, noIncremental), nil
+		enrichOnly, enrich, esUrl, timeout,  repositories, fromDate, noIncremental), nil
 }
