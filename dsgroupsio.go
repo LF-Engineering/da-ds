@@ -211,7 +211,7 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 	var res interface{}
 	var cookies []string
 	Printf("groupsio login via: %s\n", url)
-	res, _, cookies, err = Request(
+	res, _, cookies, _, err = Request(
 		ctx,
 		url,
 		method,
@@ -289,7 +289,7 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 	Printf("fetching messages from: %s\n", url)
 	// Groups.io blocks downloading archives more often than 24 hours
 	cacheMsgDur := time.Duration(24)*time.Hour + time.Duration(5)*time.Minute
-	res, status, _, err = Request(
+	res, status, _, _, err = Request(
 		ctx,
 		url,
 		method,

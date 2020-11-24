@@ -2,6 +2,7 @@ package dads
 
 import (
 	"fmt"
+	neturl "net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -84,10 +85,6 @@ func (j *DSRocketchat) Validate() (err error) {
 	if strings.HasSuffix(j.URL, "/") {
 		j.URL = j.URL[:len(j.URL)-1]
 	}
-	ary := strings.Split(j.URL, "://")
-	if len(ary) > 1 {
-		j.URL = ary[1]
-	}
 	j.Channel = strings.TrimSpace(j.Channel)
 	if j.URL == "" || j.Channel == "" || j.User == "" || j.Token == "" {
 		err = fmt.Errorf("URL, Channel, User, Token must all be set")
@@ -129,7 +126,41 @@ func (j *DSRocketchat) Enrich(ctx *Ctx) (err error) {
 
 // FetchItems - implement enrich data for rocketchat datasource
 func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
-	// IMPL:
+	var dateFrom time.Time
+	if ctx.DateFrom != nil {
+		dateFrom = *ctx.DateFrom
+	} else {
+		dateFrom = DefaultDateFrom
+	}
+	// curl -s -H 'X-Auth-Token: token' -H 'X-User-Id: user' URL/api/v1/channels.info?roomName=channel | jq '.'
+	// 48 hours for caching channel info
+	cacheDur := time.Duration(48) * time.Hour
+	url := j.URL + "/api/v1/channels.info?roomName=" + neturl.QueryEscape(j.Channel)
+	method := Get
+	headers := map[string]string{"X-User-Id": j.User, "X-Auth-Token": j.Token}
+	res, status, _, outHeaders, err := Request(
+		ctx,
+		url,
+		method,
+		headers,
+		nil,
+		nil,
+		map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses: 200
+		nil,                                 // Error statuses
+		map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
+		true,                                // retry
+		&cacheDur,                           // cache duration
+		false,                               // skip in dry-run mode
+	)
+	//Printf("res=%v\n", res.(map[string]interface{}))
+	Printf("res=%v\n", res)
+	Printf("status=%d, err=%v, dateFrom=%v, outHeaders=%v\n", status, err, dateFrom, outHeaders)
+	if err != nil {
+		return
+	}
+	if 1 == 1 {
+		os.Exit(1)
+	}
 	var messages [][]byte
 	// Process messages (possibly in threads)
 	var (

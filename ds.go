@@ -586,7 +586,7 @@ func ForEachESItem(
 		}
 		url := ctx.ESURL + "/_search/scroll"
 		payload := []byte(`{"scroll_id":"` + *scroll + `"}`)
-		_, _, _, err := Request(
+		_, _, _, _, err := Request(
 			ctx,
 			url,
 			Delete,
@@ -670,7 +670,7 @@ func ForEachESItem(
 			url = ctx.ESURL + "/_search/scroll"
 			payload = []byte(`{"scroll":"` + ctx.ESScrollWait + `","scroll_id":"` + *scroll + `"}`)
 		}
-		res, status, _, err = Request(
+		res, status, _, _, err = Request(
 			ctx,
 			url,
 			Post,
@@ -823,7 +823,7 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 	} else {
 		url = ctx.ESURL + "/" + ctx.RichIndex
 	}
-	_, _, _, err = Request(
+	_, _, _, _, err = Request(
 		ctx,
 		url,
 		Put,
@@ -846,7 +846,7 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 		mapping = ds.ElasticRichMapping()
 	}
 	url += "/_mapping"
-	_, _, _, err = Request(
+	_, _, _, _, err = Request(
 		ctx,
 		url,
 		Put,
@@ -862,7 +862,7 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 	)
 	FatalOnError(err)
 	// Global not analyze string mapping
-	_, _, _, err = Request(
+	_, _, _, _, err = Request(
 		ctx,
 		url,
 		Put,

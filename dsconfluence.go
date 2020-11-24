@@ -148,7 +148,7 @@ func (j *DSConfluence) GetHistoricalContents(ctx *Ctx, content map[string]interf
 		if ctx.Debug > 1 {
 			Printf("historical content url: %s\n", url)
 		}
-		res, status, _, err = Request(
+		res, status, _, _, err = Request(
 			ctx,
 			url,
 			method,
@@ -246,7 +246,7 @@ func (j *DSConfluence) GetConfluenceContents(ctx *Ctx, fromDate, next string) (c
 	if ctx.Debug > 1 {
 		Printf("content url: %s\n", url)
 	}
-	res, status, _, err := Request(
+	res, status, _, _, err := Request(
 		ctx,
 		url,
 		method,
