@@ -82,6 +82,7 @@ func (f *Fetcher) FetchItem(fromDate time.Time, limit int) (*time.Time, error) {
 		raw.BackendName = strings.Title(f.DSName)
 		raw.BackendVersion = f.BackendVersion
 		raw.Category = Category
+
 		// todo: review it in perceval
 		raw.ClassifiedFieldsFiltered = nil
 		now := time.Now().UTC()
@@ -89,10 +90,10 @@ func (f *Fetcher) FetchItem(fromDate time.Time, limit int) (*time.Time, error) {
 		raw.MetadataTimestamp = now
 		raw.SearchFields = &SearchFields{Component: bug.Component, Product: bug.Product, ItemID: strconv.Itoa(bug.ID)}
 		raw.Tag = f.Endpoint
-		// todo: get it from details
-		/*lastUpdated := raw.Data.LastUpdated
+
+		lastUpdated := now.UTC()
 		raw.UpdatedOn = lastUpdated.UnixNano()
-		raw.MetadataUpdatedOn = lastUpdated*/
+		raw.MetadataUpdatedOn = lastUpdated
 
 		// fetch details
 		detail, err := f.fetchDetails(bug.ID)
@@ -100,8 +101,7 @@ func (f *Fetcher) FetchItem(fromDate time.Time, limit int) (*time.Time, error) {
 			return nil, err
 		}
 
-		fmt.Println(detail)
-		//raw.Data = repoRes
+		raw.Data = &detail.Bug
 	}
 
 	return nil, nil
