@@ -26,6 +26,8 @@ var (
 	RocketchatDefaultMaxItems = 100
 	// RocketchatDefaultMinRate - default min rate points (when not set)
 	RocketchatDefaultMinRate = 10
+	// RocketchatDefaultSearchField - default search field
+	RocketchatDefaultSearchField = "item_id"
 )
 
 // DSRocketchat - DS implementation for rocketchat - does nothing at all, just presents a skeleton code
@@ -126,7 +128,7 @@ func (j *DSRocketchat) Enrich(ctx *Ctx) (err error) {
 
 // CalculateTimeToReset - calculate time to reset rate limits based on rate limit value and rate limit reset value
 func (j *DSRocketchat) CalculateTimeToReset(ctx *Ctx, rateLimit, rateLimitReset int) (seconds int) {
-	seconds = int(int64(rateLimitReset)-(time.Now().UnixNano()/int64(1000000)))/1000 + 1
+	seconds = (int(int64(rateLimitReset)-(time.Now().UnixNano()/int64(1000000))) / 1000) + 1
 	if seconds < 0 {
 		seconds = 0
 	}
@@ -136,16 +138,81 @@ func (j *DSRocketchat) CalculateTimeToReset(ctx *Ctx, rateLimit, rateLimitReset 
 	return
 }
 
+// GetRocketchatMessages - get confluence historical contents
+func (j *DSRocketchat) GetRocketchatMessages(ctx *Ctx, fromDate string, offset, rateLimit, rateLimitReset int) (messages []map[string]interface{}, newOffset, total, outRateLimit, outRateLimitReset int, err error) {
+	query := `{"_updatedAt": {"$gte": {"$date": "` + fromDate + `"}}}`
+	url := j.URL + fmt.Sprintf(
+		`/api/v1/channels.messages?roomName=%s&count=%d&offset=%d&sort=%s&query=%s`,
+		neturl.QueryEscape(j.Channel),
+		j.MaxItems,
+		offset,
+		neturl.QueryEscape(`{"_updatedAt": 1}`),
+		neturl.QueryEscape(query),
+	)
+	// Let's cache messages for 1 hour (so there are no rate limit hits during the development)
+	cacheDur := time.Duration(1) * time.Hour
+	method := Get
+	headers := map[string]string{"X-User-Id": j.User, "X-Auth-Token": j.Token}
+	//Printf("%s %+v\n", method, headers)
+	//Printf("URL: %s\n", url)
+	var (
+		res        interface{}
+		status     int
+		outHeaders map[string][]string
+	)
+	for {
+		err = SleepForRateLimit(ctx, j, rateLimit, rateLimitReset, j.MinRate, j.WaitRate)
+		if err != nil {
+			return
+		}
+		res, status, _, outHeaders, err = Request(
+			ctx,
+			url,
+			method,
+			headers,
+			nil,
+			nil,
+			map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses: 200
+			nil,                                 // Error statuses
+			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
+			true,                                // retry
+			&cacheDur,                           // cache duration
+			false,                               // skip in dry-run mode
+		)
+		rateLimit, rateLimitReset, _ = UpdateRateLimit(ctx, j, outHeaders, "", "")
+		if status == 413 {
+			continue
+		}
+		if err != nil {
+			return
+		}
+		break
+	}
+	data, _ := res.(map[string]interface{})
+	fTotal, _ := data["total"].(float64)
+	total = int(fTotal)
+	iMessages, _ := data["messages"].([]interface{})
+	for _, iMessage := range iMessages {
+		messages = append(messages, iMessage.(map[string]interface{}))
+	}
+	// Printf("MESSAGES: %d, TOTAL: %d, OFFSET: %d\n", len(messages), total, offset)
+	outRateLimit, outRateLimitReset, newOffset = rateLimit, rateLimitReset, offset+len(messages)
+	return
+}
+
 // FetchItems - implement enrich data for rocketchat datasource
 func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
-	var dateFrom time.Time
+	var (
+		dateFrom  time.Time
+		sDateFrom string
+	)
 	if ctx.DateFrom != nil {
 		dateFrom = *ctx.DateFrom
 	} else {
 		dateFrom = DefaultDateFrom
 	}
+	sDateFrom = ToESDate(dateFrom)
 	rateLimit, rateLimitReset := -1, -1
-	trials := 0
 	cacheDur := time.Duration(48) * time.Hour
 	url := j.URL + "/api/v1/channels.info?roomName=" + neturl.QueryEscape(j.Channel)
 	method := Get
@@ -177,18 +244,14 @@ func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
 			false,                               // skip in dry-run mode
 		)
 		rateLimit, rateLimitReset, _ = UpdateRateLimit(ctx, j, outHeaders, "", "")
-		//Printf("res=%v\n", res.(map[string]interface{}))
+		// Rate limit
+		if status == 413 {
+			continue
+		}
 		if err != nil {
 			return
 		}
-		// Rate limit
-		if status != 413 {
-			break
-		}
-		trials++
-		if trials == 2 {
-			break
-		}
+		break
 	}
 	channelInfo, ok := res.(map[string]interface{})["channel"]
 	if !ok {
@@ -196,11 +259,6 @@ func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
 		err = fmt.Errorf("Cannot read channel info from:\n%s\n", data)
 		return
 	}
-	Printf("dateFrom=%+v\nchannelInfo=%+v\n", dateFrom, channelInfo)
-	if 1 == 1 {
-		os.Exit(1)
-	}
-	var messages [][]byte
 	// Process messages (possibly in threads)
 	var (
 		ch         chan error
@@ -216,14 +274,12 @@ func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
 		eschaMtx = &sync.Mutex{}
 	}
 	nThreads := 0
-	processMsg := func(c chan error, msg []byte) (wch chan error, e error) {
+	processMsg := func(c chan error, item map[string]interface{}) (wch chan error, e error) {
 		defer func() {
 			if c != nil {
 				c <- e
 			}
 		}()
-		// FIXME: Real data processing here
-		item := map[string]interface{}{"id": time.Now().UnixNano(), "name": "xyz"}
 		esItem := j.AddMetadata(ctx, item)
 		if ctx.Project != "" {
 			item["project"] = ctx.Project
@@ -269,35 +325,47 @@ func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
 		}
 		return
 	}
+	offset, total := 0, 0
 	if thrN > 1 {
-		for _, message := range messages {
-			go func(msg []byte) {
-				var (
-					e    error
-					esch chan error
-				)
-				esch, e = processMsg(ch, msg)
-				if e != nil {
-					Printf("process error: %v\n", e)
-					return
-				}
-				if esch != nil {
-					if eschaMtx != nil {
-						eschaMtx.Lock()
+		for {
+			var messages []map[string]interface{}
+			messages, offset, total, rateLimit, rateLimitReset, err = j.GetRocketchatMessages(ctx, sDateFrom, offset, rateLimit, rateLimitReset)
+			if err != nil {
+				return
+			}
+			for _, message := range messages {
+				message["channel_info"] = channelInfo
+				go func(message map[string]interface{}) {
+					var (
+						e    error
+						esch chan error
+					)
+					esch, e = processMsg(ch, message)
+					if e != nil {
+						Printf("process error: %v\n", e)
+						return
 					}
-					escha = append(escha, esch)
-					if eschaMtx != nil {
-						eschaMtx.Unlock()
+					if esch != nil {
+						if eschaMtx != nil {
+							eschaMtx.Lock()
+						}
+						escha = append(escha, esch)
+						if eschaMtx != nil {
+							eschaMtx.Unlock()
+						}
 					}
+				}(message)
+				nThreads++
+				if nThreads == thrN {
+					err = <-ch
+					if err != nil {
+						return
+					}
+					nThreads--
 				}
-			}(message)
-			nThreads++
-			if nThreads == thrN {
-				err = <-ch
-				if err != nil {
-					return
-				}
-				nThreads--
+			}
+			if offset >= total {
+				break
 			}
 		}
 		for nThreads > 0 {
@@ -308,10 +376,21 @@ func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
 			}
 		}
 	} else {
-		for _, message := range messages {
-			_, err = processMsg(nil, message)
+		for {
+			var messages []map[string]interface{}
+			messages, offset, total, rateLimit, rateLimitReset, err = j.GetRocketchatMessages(ctx, sDateFrom, offset, rateLimit, rateLimitReset)
 			if err != nil {
 				return
+			}
+			for _, message := range messages {
+				message["channel_info"] = channelInfo
+				_, err = processMsg(nil, message)
+				if err != nil {
+					return
+				}
+			}
+			if offset >= total {
+				break
 			}
 		}
 	}
@@ -386,19 +465,17 @@ func (j *DSRocketchat) ResumeNeedsOrigin(ctx *Ctx) bool {
 
 // Origin - return current origin
 func (j *DSRocketchat) Origin(ctx *Ctx) string {
-	// IMPL: you must change this, for example to j.URL/j.GroupName or somethign like this
 	return j.URL + "/" + j.Channel
 }
 
 // ItemID - return unique identifier for an item
 func (j *DSRocketchat) ItemID(item interface{}) string {
-	// IMPL:
-	return fmt.Sprintf("%d", time.Now().UnixNano())
+	id, _ := Dig(item, []string{"_id"}, true, false)
+	return id.(string)
 }
 
 // AddMetadata - add metadata to the item
 func (j *DSRocketchat) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string]interface{}) {
-	// IMPL:
 	mItem = make(map[string]interface{})
 	// Change to unique datasource origin
 	origin := j.Origin(ctx)
@@ -418,8 +495,12 @@ func (j *DSRocketchat) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string
 	mItem[DefaultTagField] = tag
 	mItem[DefaultOffsetField] = float64(updatedOn.Unix())
 	mItem["category"] = j.ItemCategory(item)
-	//mItem["search_fields"] = j.GenSearchFields(ctx, issue, uuid)
-	//mItem["search_fields"] = make(map[string]interface{})
+	mItem["search_fields"] = make(map[string]interface{})
+	channelID, _ := Dig(item, []string{"channel_info", "_id"}, true, false)
+	channelName, _ := Dig(item, []string{"channel_info", "name"}, true, false)
+	FatalOnError(DeepSet(mItem, []string{"search_fields", RocketchatDefaultSearchField}, itemID, false))
+	FatalOnError(DeepSet(mItem, []string{"search_fields", "channel_id"}, channelID, false))
+	FatalOnError(DeepSet(mItem, []string{"search_fields", "channel_name"}, channelName, false))
 	mItem[DefaultDateField] = ToESDate(updatedOn)
 	mItem[DefaultTimestampField] = ToESDate(timestamp)
 	mItem[ProjectSlug] = ctx.ProjectSlug
@@ -428,8 +509,10 @@ func (j *DSRocketchat) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string
 
 // ItemUpdatedOn - return updated on date for an item
 func (j *DSRocketchat) ItemUpdatedOn(item interface{}) time.Time {
-	// IMPL:
-	return time.Now()
+	iUpdated, _ := Dig(item, []string{"_updatedAt"}, true, false)
+	updated, err := TimeParseAny(iUpdated.(string))
+	FatalOnError(err)
+	return updated
 }
 
 // ItemCategory - return unique identifier for an item
