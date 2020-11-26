@@ -27,16 +27,16 @@ dads: cmd/dads/dads.go ${GO_LIB_FILES}
 	 ${GO_ENV} ${GO_BUILD} -o dads cmd/dads/dads.go
 
 fmt: ${GO_BIN_FILES} ${GO_LIB_FILES} ${GO_TEST_FILES} ${GO_LIBTEST_FILES}
-	./for_each_go_file.sh "${GO_FMT}"
+	./scripts/for_each_go_file.sh "${GO_FMT}"
 
 lint: ${GO_BIN_FILES} ${GO_LIB_FILES} ${GO_TEST_FILES} ${GO_LIBTEST_FILES}
-	./for_each_go_file.sh "${GO_LINT}"
+	./scripts/for_each_go_file.sh "${GO_LINT}"
 
 vet: ${GO_BIN_FILES} ${GO_LIB_FILES} ${GO_TEST_FILES} ${GO_LIBTEST_FILES}
-	./vet_files.sh "${GO_VET}"
+	./scripts/vet_files.sh "${GO_VET}"
 
 imports: ${GO_BIN_FILES} ${GO_LIB_FILES} ${GO_TEST_FILES} ${GO_LIBTEST_FILES}
-	./for_each_go_file.sh "${GO_IMPORTS}"
+	./scripts/for_each_go_file.sh "${GO_IMPORTS}"
 
 const: ${GO_BIN_FILES} ${GO_LIB_FILES} ${GO_TEST_FILES} ${GO_LIBTEST_FILES}
 	${GO_CONST} ./...
