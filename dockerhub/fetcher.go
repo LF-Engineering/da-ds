@@ -24,7 +24,6 @@ type Fetcher struct {
 	Password              string
 	Token                 string
 	BackendVersion        string
-	Now                  func() time.Time
 }
 
 // Params required parameters for dockerhub fetcher
@@ -51,7 +50,7 @@ type ESClientProvider interface {
 }
 
 // NewFetcher initiates a new dockerhub fetcher
-func NewFetcher(params *Params, httpClientProvider HTTPClientProvider, esClientProvider ESClientProvider,timer func() time.Time) *Fetcher {
+func NewFetcher(params *Params, httpClientProvider HTTPClientProvider, esClientProvider ESClientProvider) *Fetcher {
 	return &Fetcher{
 		DSName:                Dockerhub,
 		HTTPClientProvider:    httpClientProvider,
@@ -59,7 +58,6 @@ func NewFetcher(params *Params, httpClientProvider HTTPClientProvider, esClientP
 		Username:              params.Username,
 		Password:              params.Password,
 		BackendVersion:        params.BackendVersion,
-		Now:                  timer,
 	}
 }
 
@@ -96,8 +94,8 @@ func (f *Fetcher) Login(username string, password string) (string, error) {
 	return "", errors.New("invalid login credentials")
 }
 
-// FetchItem fetches dockerhub repository
-func (f *Fetcher) FetchItem(owner string, repository string) (*RepositoryRaw, error) {
+// FetchItems ...
+func (f *Fetcher) FetchItem(owner string, repository string, now time.Time) (*RepositoryRaw, error) {
 	requestURL := fmt.Sprintf("%s/%s/%s/%s/%s", APIURL, APIVersion, APIRepositories, owner, repository)
 	url := fmt.Sprintf("%s/%s/%s", APIURL, owner, repository)
 	headers := map[string]string{}
@@ -121,16 +119,15 @@ func (f *Fetcher) FetchItem(owner string, repository string) (*RepositoryRaw, er
 	raw.BackendVersion = f.BackendVersion
 	raw.Category = Category
 	raw.ClassifiedFieldsFiltered = nil
-	now := f.Now().UTC()
+	now = now.UTC()
 	raw.Timestamp = utils.ConvertTimeToFloat(now)
 	raw.Data.FetchedOn = raw.Timestamp
 	raw.MetadataTimestamp = now
 	raw.Origin = url
 	raw.SearchFields = &RepositorySearchFields{repository, fmt.Sprintf("%f", raw.Timestamp), owner}
 	raw.Tag = url
-	lastUpdated := raw.Data.LastUpdated
-	raw.UpdatedOn = utils.ConvertTimeToFloat(lastUpdated)
-	raw.MetadataUpdatedOn = lastUpdated
+	raw.UpdatedOn = raw.Timestamp
+	raw.MetadataUpdatedOn = now
 
 	// generate UUID
 	uid, err := uuid.Generate(raw.Origin, strconv.FormatFloat(raw.Data.FetchedOn, 'f', -1, 64))
@@ -149,10 +146,10 @@ func (f *Fetcher) HandleMapping(index string) error {
 }
 
 // GetLastDate gets fetching lastDate
-func (f *Fetcher) GetLastDate(repo *Repository) (time.Time, error) {
+func (f *Fetcher) GetLastDate(repo *Repository, now time.Time) (time.Time, error) {
 	lastDate, err := f.ElasticSearchProvider.GetStat(fmt.Sprintf("%s-raw", repo.ESIndex), "metadata__updated_on", "max", nil, nil)
 	if err != nil {
-		return f.Now().UTC(), err
+		return now.UTC(), err
 	}
 
 	return lastDate, nil

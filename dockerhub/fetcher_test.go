@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-func TestFetchItem(t *testing.T) {
+func TestFetchItemBasic(t *testing.T) {
 	// Arrange
 	owner := "hyperledger"
 	repo := "caliper"
@@ -54,17 +54,17 @@ func TestFetchItem(t *testing.T) {
 
 	esClientProviderMock := &mocks.ESClientProvider{}
 
-	srv := NewFetcher(params, httpClientProviderMock, esClientProviderMock, time.Now)
+	srv := NewFetcher(params, httpClientProviderMock, esClientProviderMock)
 
 	// Act
-	_, err = srv.FetchItem(owner, repo)
+	_, err = srv.FetchItem(owner, repo, time.Now())
 
 	// Assert
 	assert.NoError(t, err)
 
 }
 
-func TestFetchItem2(t *testing.T) {
+func TestFetchItemFromAPI(t *testing.T) {
 	// Arrange
 	owner := "hyperledger"
 	repo := "caliper"
@@ -106,10 +106,10 @@ func TestFetchItem2(t *testing.T) {
 
 	esClientProviderMock := &mocks.ESClientProvider{}
 
-	srv := NewFetcher(params, httpClientProviderMock, esClientProviderMock, time.Now)
+	srv := NewFetcher(params, httpClientProviderMock, esClientProviderMock)
 
 	// Act
-	raw, err := srv.FetchItem(owner, repo)
+	raw, err := srv.FetchItem(owner, repo, time.Now())
 	if err != nil {
 		t.Errorf("cannot get data")
 		return
@@ -129,6 +129,119 @@ func TestFetchItem2(t *testing.T) {
 
 }
 
+func TestFetchItem(t *testing.T) {
+	// Arrange
+	httpClientProviderMock := &mocks.HttpClientProvider{}
+	esClientProviderMock := &mocks.ESClientProvider{}
+
+	type httpClientData struct {
+		owner      string
+		repository string
+	}
+	type test struct {
+		name           string
+		httpClientData httpClientData
+		expected       string
+	}
+
+	tests := []test{}
+
+	testOnap := test{
+		"OnapTest",
+		httpClientData{
+			"onap",
+			"sdnc-ueb-listener-image",
+		},
+		`{
+          "classified_fields_filtered" : null,
+          "origin" : "https://hub.docker.com/onap/sdnc-ueb-listener-image",
+          "metadata__timestamp" : "2020-07-31T15:51:45.585596Z",
+          "backend_name" : "Dockerhub",
+          "perceval_version" : "0.17.0",
+          "backend_version" : "0.6.0",
+          "uuid" : "974255f715035c22521d3324cff47968eb31a7d9",
+          "timestamp" : 1.596210705585596E9,
+          "metadata__updated_on" : "2020-07-31T15:51:45.585596Z",
+          "data" : {
+            "is_private" : false,
+            "status" : 1,
+            "fetched_on" : 1.596210705585596E9,
+            "name" : "sdnc-ueb-listener-image",
+            "can_edit" : false,
+            "description" : "",
+            "permissions" : {
+              "write" : false,
+              "read" : true,
+              "admin" : false
+            },
+            "has_starred" : false,
+            "namespace" : "onap",
+            "last_updated" : "2020-06-25T11:31:33.021314Z",
+            "affiliation" : null,
+            "is_migrated" : false,
+            "repository_type" : "image",
+            "user" : "onap",
+            "is_automated" : false,
+            "pull_count" : 684,
+            "full_description" : "",
+            "star_count" : 0
+          },
+          "category" : "dockerhub-data",
+          "updated_on" : 1.596210705585596E9,
+          "tag" : "https://hub.docker.com/onap/sdnc-ueb-listener-image",
+          "search_fields" : {
+            "item_id" : "1596210705.585596",
+            "namespace" : "onap",
+            "name" : "sdnc-ueb-listener-image"
+          }
+        }`,
+	}
+
+	tests = append(tests, testOnap)
+
+	for _, tst := range tests {
+		t.Run(tst.name, func(tt *testing.T) {
+			expectedRaw, err := toRepositoryRaw(tst.expected)
+			if err != nil {
+				t.Error(err)
+			}
+
+			data, err := json.Marshal(expectedRaw.Data)
+			if err != nil {
+				t.Error(err)
+			}
+
+			httpClientProviderMock.On("Request",
+				fmt.Sprintf("https://hub.docker.com/v2/repositories/%s/%s", tst.httpClientData.owner, tst.httpClientData.repository),
+				"GET", mock.Anything, mock.Anything).Return(200, data, nil)
+
+			params := &Params{
+				Username:       "",
+				Password:       "",
+				BackendVersion: expectedRaw.BackendVersion,
+			}
+
+			srv := NewFetcher(params, httpClientProviderMock, esClientProviderMock)
+
+			// Act
+			raw, err := srv.FetchItem(tst.httpClientData.owner, tst.httpClientData.repository, expectedRaw.MetadataUpdatedOn)
+			if err != nil {
+				tt.Error(err)
+			}
+			// Assert
+			assert.Equal(tt, expectedRaw.MetadataUpdatedOn.String(), raw.MetadataUpdatedOn.String())
+			assert.Equal(tt, expectedRaw.Data.FetchedOn, raw.Data.FetchedOn)
+			assert.Equal(tt, expectedRaw, *raw)
+		})
+	}
+}
+
+func toRepositoryRaw(b string) (RepositoryRaw, error) {
+	expectedRaw := RepositoryRaw{}
+	err := json.Unmarshal([]byte(b), &expectedRaw)
+	return expectedRaw, err
+}
+
 func prepareObject() (*Fetcher, ESClientProvider, error) {
 	httpClientProvider := utils.NewHTTPClientProvider(5 * time.Second)
 
@@ -145,7 +258,7 @@ func prepareObject() (*Fetcher, ESClientProvider, error) {
 	if err != nil {
 		fmt.Println("err22222 ", err.Error())
 	}
-	srv := NewFetcher(params, httpClientProvider, esClientProvider, time.Now)
+	srv := NewFetcher(params, httpClientProvider, esClientProvider)
 	return srv, esClientProvider, err
 }
 
@@ -163,7 +276,7 @@ func TestBulkInsert(t *testing.T) {
 	}
 
 	for _, repo := range repos {
-		raw, err := srv.FetchItem(repo.Owner, repo.Repository)
+		raw, err := srv.FetchItem(repo.Owner, repo.Repository, time.Now())
 		if err != nil {
 			t.Errorf("err: %v", err)
 			return
