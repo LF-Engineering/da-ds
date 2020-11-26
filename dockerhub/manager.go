@@ -85,12 +85,13 @@ func (m *Manager) Sync() error {
 		for _, repo := range m.Repositories {
 			var raw *RepositoryRaw
 			// Fetch data for single repo
-			raw, err = fetcher.FetchItem(repo.Owner, repo.Repository)
+			raw, err = fetcher.FetchItem(repo.Owner, repo.Repository, time.Now())
 			if err != nil {
 				return errors.New(fmt.Sprintf("could not fetch data from repository: %s-%s", repo.Owner, repo.Repository))
 			}
 			data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s-raw", repo.ESIndex), ID: raw.UUID, Data: raw})
 
+			// set mapping and create index if not exists
 			_ = fetcher.HandleMapping(fmt.Sprintf("%s-raw", repo.ESIndex))
 		}
 
@@ -110,7 +111,7 @@ func (m *Manager) Sync() error {
 			var fromDate *time.Time
 			var lastDate time.Time
 			if m.FromDate == nil || (*m.FromDate).IsZero() {
-				lastDate, err = fetcher.GetLastDate(repo)
+				lastDate, err = fetcher.GetLastDate(repo, time.Now())
 				if err != nil {
 					log.Println("[GetLastDate] could not get last date")
 				}
@@ -125,7 +126,7 @@ func (m *Manager) Sync() error {
 
 			if len(esData.Hits.Hits) > 0 {
 				// Enrich data for single repo
-				enriched, err := enricher.EnrichItem(*esData.Hits.Hits[0].Source)
+				enriched, err := enricher.EnrichItem(*esData.Hits.Hits[0].Source, time.Now())
 				if err != nil {
 					return errors.New(fmt.Sprintf("could not enrich data from repository: %s-%s", repo.Owner, repo.Repository))
 				}
@@ -165,10 +166,10 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 	}
 
 	// Initialize fetcher object to get data from dockerhub api
-	fetcher := NewFetcher(params, httpClientProvider, esClientProvider, time.Now)
+	fetcher := NewFetcher(params, httpClientProvider, esClientProvider)
 
 	// Initialize enrich object to enrich raw data
-	enricher := NewEnricher(m.EnricherBackendVersion, esClientProvider, time.Now)
+	enricher := NewEnricher(m.EnricherBackendVersion, esClientProvider)
 
 	return fetcher, enricher, esClientProvider, err
 }
