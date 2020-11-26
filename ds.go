@@ -1117,6 +1117,6 @@ func SleepForRateLimit(ctx *Ctx, ds DS, rateLimit, rateLimitReset, minRate int, 
 		time.Sleep(time.Duration(secondsToReset) * time.Second)
 		return
 	}
-	err = fmt.Errorf("rate limit exceeded, not waiting %d seconds\n", secondsToReset)
+	err = fmt.Errorf("rate limit exceeded, not waiting %d seconds", secondsToReset)
 	return
 }

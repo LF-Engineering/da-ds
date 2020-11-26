@@ -18,7 +18,7 @@ type Fetcher struct {
 	DSName                string // Datasource will be used as key for ES
 	IncludeArchived       bool
 	MultiOrigin           bool // can we store multiple endpoints in a single index?
-	HttpClientProvider    HttpClientProvider
+	HTTPClientProvider    HTTPClientProvider
 	ElasticSearchProvider ESClientProvider
 	Username              string
 	Password              string
@@ -33,8 +33,8 @@ type Params struct {
 	BackendVersion string
 }
 
-// HttpClientProvider used in connecting to remote http server
-type HttpClientProvider interface {
+// HTTPClientProvider used in connecting to remote http server
+type HTTPClientProvider interface {
 	Request(url string, method string, header map[string]string, body []byte,params map[string]string) (statusCode int, resBody []byte, err error)
 }
 
@@ -50,10 +50,10 @@ type ESClientProvider interface {
 }
 
 // NewFetcher initiates a new dockerhub fetcher
-func NewFetcher(params *Params, httpClientProvider HttpClientProvider, esClientProvider ESClientProvider) *Fetcher {
+func NewFetcher(params *Params, httpClientProvider HTTPClientProvider, esClientProvider ESClientProvider) *Fetcher {
 	return &Fetcher{
 		DSName:                Dockerhub,
-		HttpClientProvider:    httpClientProvider,
+		HTTPClientProvider:    httpClientProvider,
 		ElasticSearchProvider: esClientProvider,
 		Username:              params.Username,
 		Password:              params.Password,
@@ -76,7 +76,7 @@ func (f *Fetcher) Login(username string, password string) (string, error) {
 
 	_, err = dads.Printf("dockerhub login via: %s\n", url)
 
-	statusCode, resBody, err := f.HttpClientProvider.Request(url, "Post", nil, p,nil)
+	statusCode, resBody, err := f.HTTPClientProvider.Request(url, "Post", nil, p,nil)
 
 	if statusCode == http.StatusOK {
 		res := LoginResponse{}
@@ -103,7 +103,7 @@ func (f *Fetcher) FetchItem(owner string, repository string) (*RepositoryRaw, er
 		headers["Authorization"] = fmt.Sprintf("JWT %s", f.Token)
 	}
 
-	statusCode, resBody, err := f.HttpClientProvider.Request(requestURL, "GET", headers, nil,nil)
+	statusCode, resBody, err := f.HTTPClientProvider.Request(requestURL, "GET", headers, nil,nil)
 	if err != nil || statusCode != http.StatusOK {
 		return nil, err
 	}

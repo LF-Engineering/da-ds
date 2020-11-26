@@ -38,7 +38,7 @@ type RepositorySearchFields struct {
 	Namespace string `json:"namespace"`
 }
 
-// RepositoryRaw data model represents es schema
+// RepositoryRaw represents dockerhub repository raw model
 type RepositoryRaw struct {
 	BackendVersion           string                  `json:"backend_version"`
 	Data                     *RepositoryResponse     `json:"data"`
@@ -55,6 +55,7 @@ type RepositoryRaw struct {
 	ClassifiedFieldsFiltered *string                 `json:"classified_fields_filtered"`
 }
 
+// RepositoryEnrich represents dockerhub repository enriched model
 type RepositoryEnrich struct {
 	ID             string `json:"id"`
 	Project        string `json:"project"`
