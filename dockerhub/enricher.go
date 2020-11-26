@@ -128,7 +128,7 @@ func (e *Enricher) GetPreviouslyFetchedDataItem(repo *Repository, cmdLastDate *t
 	var lastEnrichDate *time.Time = nil
 
 	if noIncremental == false {
-		if cmdLastDate != nil && !cmdLastDate.IsZero(){
+		if cmdLastDate != nil && !cmdLastDate.IsZero() {
 			lastEnrichDate = cmdLastDate
 		} else if lastDate != nil {
 			lastEnrichDate = lastDate

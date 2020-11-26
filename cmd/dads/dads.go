@@ -20,7 +20,7 @@ func runDS(ctx *lib.Ctx) (err error) {
 	case lib.Groupsio:
 		ds = &lib.DSGroupsio{}
 	case dockerhub.Dockerhub:
-		manager, err := dockerhubEnvs(ctx)
+		manager, err := buildDockerhubManager(ctx)
 		if err != nil {
 			return err
 		}
@@ -79,23 +79,23 @@ func main() {
 	lib.Printf("Took: %v\n", dtEnd.Sub(dtStart))
 }
 
-func dockerhubEnvs(ctx *lib.Ctx) (*dockerhub.Manager, error) {
+func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	// Dockerhub credentials
 	username := ctx.Env("USERNAME")
 	password := ctx.Env("PASSWORD")
-	fetcherBackendVersion := "0.0.1" //ctx.Env("FETCHER_BACKEND_VERSION")
+	fetcherBackendVersion := "0.0.1"  //ctx.Env("FETCHER_BACKEND_VERSION")
 	enricherBackendVersion := "0.0.1" //ctx.Env("ENRICHER_BACKEND_VERSION")
-	esUrl := ctx.ESURL
+	esURL := ctx.ESURL
 	httpTimeout := ctx.Env("HTTP_TIMEOUT") // "60s" 60 seconds...
 	// flag projects json array
-	repositoriesJson := ctx.Env("REPOSITORIES_JSON")
+	repositoriesJSON := ctx.Env("REPOSITORIES_JSON")
 	enrichOnly := ctx.NoRaw
 	enrich := ctx.Enrich
 	fromDate := ctx.DateFrom
 	noIncremental := ctx.BoolEnv("NO_INCREMENTAL")
 
 	var repositories []*dockerhub.Repository
-	if err := json.Unmarshal([]byte(repositoriesJson), &repositories); err != nil {
+	if err := json.Unmarshal([]byte(repositoriesJSON), &repositories); err != nil {
 		return nil, err
 	}
 
@@ -105,5 +105,5 @@ func dockerhubEnvs(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	}
 
 	return dockerhub.NewManager(username, password, fetcherBackendVersion, enricherBackendVersion,
-		enrichOnly, enrich, esUrl, timeout,  repositories, fromDate, noIncremental), nil
+		enrichOnly, enrich, esURL, timeout, repositories, fromDate, noIncremental), nil
 }

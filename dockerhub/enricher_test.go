@@ -32,10 +32,10 @@ func TestGetPreviouslyFetchedData(t *testing.T) {
 		{"hyperledger", "explorer", "sds-hyperledger-explorer-dockerhub"},
 	}
 
-    lastDate := "2019-10-20T18:07:47.729125Z"
-    d, err := time.Parse(time.RFC3339, lastDate)
+	lastDate := "2019-10-20T18:07:47.729125Z"
+	d, err := time.Parse(time.RFC3339, lastDate)
 
-    for _, repo := range repos {
+	for _, repo := range repos {
 		raws, err := srv.GetPreviouslyFetchedDataItem(repo, nil, &d, false)
 		if err != nil {
 			t.Errorf("err: %v", err)

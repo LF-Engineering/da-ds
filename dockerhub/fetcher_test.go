@@ -130,7 +130,7 @@ func TestFetchItem2(t *testing.T) {
 }
 
 func prepareObject() (*Fetcher, ESClientProvider, error) {
-	httpClientProvider := utils.NewHttpClientProvider(5 * time.Second)
+	httpClientProvider := utils.NewHTTPClientProvider(5 * time.Second)
 
 	params := &Params{
 		Username:       "",

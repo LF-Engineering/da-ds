@@ -6,33 +6,35 @@ import (
 	"time"
 )
 
-// HttpClientProvider ...
-type HttpClientProvider struct {
+// HTTPClientProvider ...
+type HTTPClientProvider struct {
 	httpclient *http.Client
 }
 
-// NewHttpClientProvider ...
-func NewHttpClientProvider(timeout time.Duration) *HttpClientProvider {
-	return &HttpClientProvider{
+// NewHTTPClientProvider ...
+func NewHTTPClientProvider(timeout time.Duration) *HTTPClientProvider {
+	return &HTTPClientProvider{
 		httpclient: &http.Client{
 			Timeout: timeout,
 		},
 	}
 }
 
+// Response returned from http request
 type Response struct {
 	StatusCode int
 	Body       []byte
 }
 
-func (h *HttpClientProvider) Request(url string, method string, header map[string]string, body []byte) (statusCode int, resBody []byte, err error) {
+// Request http
+func (h *HTTPClientProvider) Request(url string, method string, header map[string]string, body []byte) (statusCode int, resBody []byte, err error) {
 	req, err := http.NewRequest(method, url, bytes.NewBuffer(body))
 	if err != nil {
-		return 0,nil, err
+		return 0, nil, err
 	}
 
 	req.Header.Add("Content-Type", "application/json")
-	if header!=nil{
+	if header != nil {
 		for k, v := range header {
 			req.Header.Add(k, v)
 		}

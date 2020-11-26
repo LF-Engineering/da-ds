@@ -149,7 +149,7 @@ func (m *Manager) Sync() error {
 }
 
 func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
-	httpClientProvider := utils.NewHttpClientProvider(m.HttpTimeout)
+	httpClientProvider := utils.NewHTTPClientProvider(m.HttpTimeout)
 	params := &Params{
 		Username:       m.Username,
 		Password:       m.Password,

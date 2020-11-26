@@ -352,7 +352,7 @@ func testSpecialCases(t *testing.T) {
 func testNoneOrEmptyData(t *testing.T) {
 	//"""Check whether uuid cannot be obtained when identity data is empty"""
 
-	inpStr := []string{"scm",  ""}
+	inpStr := []string{"scm", ""}
 	inp := input{&inpStr[0], nil, &inpStr[1], nil}
 	_, err := GenerateIdentity(inp.source, inp.email, inp.name, inp.username)
 	fmt.Println(err)
