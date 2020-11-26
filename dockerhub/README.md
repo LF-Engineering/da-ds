@@ -33,7 +33,7 @@ These are the needed environment variables to run dockerhub:
 - DA_DOCKERHUB_HTTP_TIMEOUT=60s 
     - HTTP timeout duration.
     
-Example of running dads will be found at 
+Example of running dads at 
 `./scripts/dockerhub.sh`
 on the main directory.
 
