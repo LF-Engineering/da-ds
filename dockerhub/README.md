@@ -33,7 +33,6 @@ These are the needed environment variables to run dockerhub:
     
 Example of running dads at 
 `./scripts/dockerhub.sh`
-on the main directory.
 
 
 
