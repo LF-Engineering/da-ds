@@ -88,11 +88,4 @@ func TestFloatTime2(t *testing.T) {
 			assert.Equal(t, i.result, result)
 		})
 	}
-
-	//
-	//x := 1.605760484366669E9
-	//sec, dec := math.Modf(x)
-	//tt, _ := time.Unix(int64(sec), int64(dec)).MarshalJSON()
-	//fmt.Printf("%s\n", tt)
-	//fmt.Printf("%v\n", x)
 }
