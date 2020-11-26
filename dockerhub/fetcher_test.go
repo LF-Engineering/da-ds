@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/LF-Engineering/da-ds/mocks"
 	"github.com/LF-Engineering/da-ds/utils"
-	"github.com/LF-Engineering/da-ds/utils/uuid"
+	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"testing"
@@ -54,7 +54,7 @@ func TestFetchItem(t *testing.T) {
 
 	esClientProviderMock := &mocks.ESClientProvider{}
 
-	srv := NewFetcher(params, httpClientProviderMock, esClientProviderMock)
+	srv := NewFetcher(params, httpClientProviderMock, esClientProviderMock, time.Now)
 
 	// Act
 	_, err = srv.FetchItem(owner, repo)
@@ -106,7 +106,7 @@ func TestFetchItem2(t *testing.T) {
 
 	esClientProviderMock := &mocks.ESClientProvider{}
 
-	srv := NewFetcher(params, httpClientProviderMock, esClientProviderMock)
+	srv := NewFetcher(params, httpClientProviderMock, esClientProviderMock, time.Now)
 
 	// Act
 	raw, err := srv.FetchItem(owner, repo)
@@ -145,7 +145,7 @@ func prepareObject() (*Fetcher, ESClientProvider, error) {
 	if err != nil {
 		fmt.Println("err22222 ", err.Error())
 	}
-	srv := NewFetcher(params, httpClientProvider, esClientProvider)
+	srv := NewFetcher(params, httpClientProvider, esClientProvider, time.Now)
 	return srv, esClientProvider, err
 }
 

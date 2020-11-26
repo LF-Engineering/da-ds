@@ -16,7 +16,7 @@ func prepareEnrichObject() (*Enricher, error) {
 	if err != nil {
 		fmt.Println("err22222 ", err.Error())
 	}
-	srv := NewEnricher("0.0.1", esClientProvider)
+	srv := NewEnricher("0.0.1", esClientProvider, time.Now)
 	return srv, err
 }
 
