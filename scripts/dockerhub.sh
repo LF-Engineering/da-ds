@@ -1,20 +1,11 @@
 #!/bin/bash
-DA_DOCKERHUB_DB_HOST="" \
-DA_DOCKERHUB_DB_NAME="" \
-DA_DOCKERHUB_DB_PASS="" DA_DOCKERHUB_DB_PORT=0 \
-DA_DOCKERHUB_DB_USER="" \
 DA_DOCKERHUB_ENRICH=1 \
-DA_DOCKERHUB_ES_SCROLL_SIZE=1000 \
 DA_DOCKERHUB_ES_URL=http://elastic:changeme@127.0.0.1:9200 \
 DA_DOCKERHUB_NO_INCREMENTAL=1 \
-DA_DOCKERHUB_PASSWORD='' \
-DA_DOCKERHUB_PROJECT_SLUG=yocto \
-DA_DOCKERHUB_RAW_INDEX=sds-yocto-dockerhub-raw \
-DA_DOCKERHUB_REPOSITORIES_JSON='[{"Owner":"crops","Repository":"yocto-eol","ESIndex":"sds-yocto-dockerhub"}]' \
-DA_DOCKERHUB_RICH_INDEX=sds-yocto-dockerhub \
 DA_DOCKERHUB_USERNAME="" \
+DA_DOCKERHUB_PASSWORD='' \
+DA_DOCKERHUB_REPOSITORIES_JSON='[{"Owner":"crops","Repository":"yocto-eol","ESIndex":"sds-yocto-dockerhub"}]' \
 DA_DS=dockerhub \
-PROJECT_SLUG=yocto \
 DA_DOCKERHUB_HTTP_TIMEOUT=60s \
 ./dads
 
