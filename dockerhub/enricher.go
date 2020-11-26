@@ -14,6 +14,7 @@ type Enricher struct {
 	DSName                string // Datasource will be used as key for ES
 	ElasticSearchProvider ESClientProvider
 	BackendVersion        string
+	Now                  func() time.Time
 }
 
 type TopHitsStruct struct {
@@ -50,11 +51,12 @@ type LastDate struct {
 	ValueAsString string  `json:"value_as_string"`
 }
 
-func NewEnricher(BackendVersion string, esClientProvider ESClientProvider) *Enricher {
+func NewEnricher(backendVersion string, esClientProvider ESClientProvider, timer func() time.Time) *Enricher {
 	return &Enricher{
 		DSName:                Dockerhub,
 		ElasticSearchProvider: esClientProvider,
-		BackendVersion:        BackendVersion,
+		BackendVersion:        backendVersion,
+		Now:                  timer,
 	}
 }
 
@@ -84,7 +86,7 @@ func (e *Enricher) EnrichItem(rawItem RepositoryRaw) (*RepositoryEnrich, error) 
 
 	enriched.BackendName = fmt.Sprintf("%sEnrich", strings.Title(e.DSName))
 	enriched.BackendVersion = e.BackendVersion
-	now := time.Now().UTC()
+	now := e.Now().UTC()
 	enriched.MetadataEnrichedOn = now
 
 	enriched.MetadataTimestamp = rawItem.MetadataTimestamp
@@ -128,7 +130,7 @@ func (e *Enricher) GetPreviouslyFetchedDataItem(repo *Repository, cmdLastDate *t
 	var lastEnrichDate *time.Time = nil
 
 	if noIncremental == false {
-		if cmdLastDate != nil && !cmdLastDate.IsZero(){
+		if cmdLastDate != nil && !cmdLastDate.IsZero() {
 			lastEnrichDate = cmdLastDate
 		} else if lastDate != nil {
 			lastEnrichDate = lastDate

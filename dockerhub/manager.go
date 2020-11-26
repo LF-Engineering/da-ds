@@ -165,10 +165,10 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 	}
 
 	// Initialize fetcher object to get data from dockerhub api
-	fetcher := NewFetcher(params, httpClientProvider, esClientProvider)
+	fetcher := NewFetcher(params, httpClientProvider, esClientProvider, time.Now)
 
 	// Initialize enrich object to enrich raw data
-	enricher := NewEnricher(m.EnricherBackendVersion, esClientProvider)
+	enricher := NewEnricher(m.EnricherBackendVersion, esClientProvider, time.Now)
 
 	return fetcher, enricher, esClientProvider, err
 }

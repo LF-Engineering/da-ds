@@ -6,7 +6,7 @@ import (
 	"fmt"
 	dads "github.com/LF-Engineering/da-ds"
 	"github.com/LF-Engineering/da-ds/utils"
-	"github.com/LF-Engineering/da-ds/utils/uuid"
+	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 	"net/http"
 	"strconv"
 	"strings"
@@ -24,6 +24,7 @@ type Fetcher struct {
 	Password              string
 	Token                 string
 	BackendVersion        string
+	Now                  func() time.Time
 }
 
 // Params required parameters for dockerhub fetcher
@@ -50,7 +51,7 @@ type ESClientProvider interface {
 }
 
 // NewFetcher initiates a new dockerhub fetcher
-func NewFetcher(params *Params, httpClientProvider HttpClientProvider, esClientProvider ESClientProvider) *Fetcher {
+func NewFetcher(params *Params, httpClientProvider HttpClientProvider, esClientProvider ESClientProvider, timer func() time.Time) *Fetcher {
 	return &Fetcher{
 		DSName:                Dockerhub,
 		HttpClientProvider:    httpClientProvider,
@@ -58,6 +59,7 @@ func NewFetcher(params *Params, httpClientProvider HttpClientProvider, esClientP
 		Username:              params.Username,
 		Password:              params.Password,
 		BackendVersion:        params.BackendVersion,
+		Now:                  timer,
 	}
 }
 
@@ -118,7 +120,7 @@ func (f *Fetcher) FetchItem(owner string, repository string) (*RepositoryRaw, er
 	raw.BackendVersion = f.BackendVersion
 	raw.Category = Category
 	raw.ClassifiedFieldsFiltered = nil
-	now := time.Now().UTC()
+	now := f.Now().UTC()
 	raw.Timestamp = utils.ConvertTimeToFloat(now)
 	raw.Data.FetchedOn = raw.Timestamp
 	raw.MetadataTimestamp = now
@@ -161,7 +163,7 @@ func (f *Fetcher) HandleMapping(index string) error {
 func (f *Fetcher) GetLastDate(repo *Repository) (time.Time, error) {
 	lastDate, err := f.ElasticSearchProvider.GetStat(fmt.Sprintf("%s-raw", repo.ESIndex), "metadata__updated_on", "max", nil, nil)
 	if err != nil {
-		return time.Now().UTC(), err
+		return f.Now().UTC(), err
 	}
 
 	return lastDate, nil
