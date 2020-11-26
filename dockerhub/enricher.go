@@ -149,8 +149,6 @@ func (e *Enricher) GetPreviouslyFetchedDataItem(repo *Repository, cmdLastDate *t
 		}
 	}
 
-	fmt.Println(lastEnrichDate)
-
 	url := fmt.Sprintf("%s/%s/%s", APIUrl, repo.Owner, repo.Repository)
 
 	hits := &TopHitsStruct{}
@@ -183,7 +181,6 @@ func (e *Enricher) GetPreviouslyFetchedDataItem(repo *Repository, cmdLastDate *t
 	}
 
 	if lastEnrichDate != nil {
-		fmt.Printf("lastEnrichDate: %v", lastEnrichDate)
 		conditions = append(conditions,
 			map[string]interface{}{
 				"range": map[string]interface{}{

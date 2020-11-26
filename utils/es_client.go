@@ -246,8 +246,6 @@ func (p *ESClientProvider) Get(index string, query map[string]interface{}, resul
 		return err
 	}
 
-	fmt.Println(&buf)
-
 	res, err := p.client.Search(
 		p.client.Search.WithIndex(index),
 		p.client.Search.WithBody(&buf),
@@ -259,8 +257,6 @@ func (p *ESClientProvider) Get(index string, query map[string]interface{}, resul
 
 	if res.StatusCode == 200 {
 		// index exists so return true
-
-		fmt.Println(res.Body)
 		if err = json.NewDecoder(res.Body).Decode(result); err != nil {
 			return err
 		}
