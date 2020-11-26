@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bytes"
+	"encoding/csv"
 	"net/http"
 	"time"
 )
@@ -27,7 +28,7 @@ type Response struct {
 }
 
 // Request http
-func (h *HTTPClientProvider) Request(url string, method string, header map[string]string, body []byte) (statusCode int, resBody []byte, err error) {
+func (h *HTTPClientProvider) Request(url string, method string, header map[string]string, body []byte,params map[string]string) (statusCode int, resBody []byte, err error) {
 	req, err := http.NewRequest(method, url, bytes.NewBuffer(body))
 	if err != nil {
 		return 0, nil, err
@@ -37,6 +38,12 @@ func (h *HTTPClientProvider) Request(url string, method string, header map[strin
 	if header != nil {
 		for k, v := range header {
 			req.Header.Add(k, v)
+		}
+	}
+
+	if params != nil {
+		for k, v := range params {
+			req.URL.Query().Add(k, v)
 		}
 	}
 	// Do request
@@ -52,4 +59,21 @@ func (h *HTTPClientProvider) Request(url string, method string, header map[strin
 	}
 
 	return res.StatusCode, buf.Bytes(), nil
+}
+
+func (h *HTTPClientProvider) RequestCSV(url string) ([][]string, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+	reader := csv.NewReader(resp.Body)
+	reader.Comma = ','
+	data, err := reader.ReadAll()
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }
