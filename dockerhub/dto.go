@@ -24,6 +24,7 @@ type RepositoryResponse struct {
 	FetchedOn       float64     `json:"fetched_on"`
 }
 
+// Permissions response
 type Permissions struct {
 	Read  bool `json:"read"`
 	Write bool `json:"write"`

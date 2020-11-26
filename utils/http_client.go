@@ -61,6 +61,7 @@ func (h *HTTPClientProvider) Request(url string, method string, header map[strin
 	return res.StatusCode, buf.Bytes(), nil
 }
 
+// RequestCSV requests http API that returns csv result
 func (h *HTTPClientProvider) RequestCSV(url string) ([][]string, error) {
 	resp, err := http.Get(url)
 	if err != nil {

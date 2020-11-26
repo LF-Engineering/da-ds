@@ -6,7 +6,7 @@ import (
 	"fmt"
 	dads "github.com/LF-Engineering/da-ds"
 	"github.com/LF-Engineering/da-ds/utils"
-	"github.com/LF-Engineering/da-ds/utils/uuid"
+	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 	"net/http"
 	"strconv"
 	"strings"
@@ -35,7 +35,7 @@ type Params struct {
 
 // HttpClientProvider used in connecting to remote http server
 type HttpClientProvider interface {
-	Request(url string, method string, header map[string]string, body []byte) (statusCode int, resBody []byte, err error)
+	Request(url string, method string, header map[string]string, body []byte,params map[string]string) (statusCode int, resBody []byte, err error)
 }
 
 // ESClientProvider used in connecting to ES Client server
@@ -61,8 +61,9 @@ func NewFetcher(params *Params, httpClientProvider HttpClientProvider, esClientP
 	}
 }
 
+// Login dockerhub in order to obtain access token for fetching private repositories
 func (f *Fetcher) Login(username string, password string) (string, error) {
-	url := fmt.Sprintf("%s/%s/%s/%s", APIUrl, APIVersion, APIRepositories, APILogin)
+	url := fmt.Sprintf("%s/%s/%s/%s", APIURL, APIVersion, APIRepositories, APILogin)
 
 	payload := make(map[string]interface{})
 	payload["username"] = username
@@ -75,13 +76,13 @@ func (f *Fetcher) Login(username string, password string) (string, error) {
 
 	_, err = dads.Printf("dockerhub login via: %s\n", url)
 
-	statusCode, resBody, err := f.HttpClientProvider.Request(url, "Post", nil, p)
+	statusCode, resBody, err := f.HttpClientProvider.Request(url, "Post", nil, p,nil)
 
 	if statusCode == http.StatusOK {
 		res := LoginResponse{}
 		err = json.Unmarshal(resBody, &res)
 		if err != nil {
-			return "", errors.New(fmt.Sprintf("Cannot unmarshal result from %s\n", string(resBody)))
+			return "", fmt.Errorf("cannot unmarshal result from %s", string(resBody))
 		}
 
 		// Set token into the object fetcher object
@@ -93,16 +94,16 @@ func (f *Fetcher) Login(username string, password string) (string, error) {
 	return "", errors.New("invalid login credentials")
 }
 
-// FetchItems ...
+// FetchItem fetches dockerhub repository
 func (f *Fetcher) FetchItem(owner string, repository string) (*RepositoryRaw, error) {
-	requestUrl := fmt.Sprintf("%s/%s/%s/%s/%s", APIUrl, APIVersion, APIRepositories, owner, repository)
-	url := fmt.Sprintf("%s/%s/%s", APIUrl, owner, repository)
+	requestURL := fmt.Sprintf("%s/%s/%s/%s/%s", APIURL, APIVersion, APIRepositories, owner, repository)
+	url := fmt.Sprintf("%s/%s/%s", APIURL, owner, repository)
 	headers := map[string]string{}
 	if f.Token != "" {
 		headers["Authorization"] = fmt.Sprintf("JWT %s", f.Token)
 	}
 
-	statusCode, resBody, err := f.HttpClientProvider.Request(requestUrl, "GET", headers, nil)
+	statusCode, resBody, err := f.HttpClientProvider.Request(requestURL, "GET", headers, nil,nil)
 	if err != nil || statusCode != http.StatusOK {
 		return nil, err
 	}
@@ -139,25 +140,13 @@ func (f *Fetcher) FetchItem(owner string, repository string) (*RepositoryRaw, er
 	return raw, nil
 }
 
-func (f *Fetcher) Insert(index string, data *RepositoryRaw) ([]byte, error) {
-	body, err := json.Marshal(data)
-	if err != nil {
-		return nil, errors.New("unable to convert body to json")
-	}
-
-	resData, err := f.ElasticSearchProvider.Add(index, data.UUID, body)
-	if err != nil {
-		return nil, err
-	}
-
-	return resData, nil
-}
-
+// HandleMapping updates dockerhub raw mapping
 func (f *Fetcher) HandleMapping(index string) error {
 	_, err := f.ElasticSearchProvider.CreateIndex(index, DockerhubRawMapping)
 	return err
 }
 
+// GetLastDate gets fetching lastDate
 func (f *Fetcher) GetLastDate(repo *Repository) (time.Time, error) {
 	lastDate, err := f.ElasticSearchProvider.GetStat(fmt.Sprintf("%s-raw", repo.ESIndex), "metadata__updated_on", "max", nil, nil)
 	if err != nil {
