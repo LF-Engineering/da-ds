@@ -774,7 +774,6 @@ func (j *DSRocketchat) EnrichItem(ctx *Ctx, item map[string]interface{}, author 
 	for prop, value := range CommonFields(j, updatedOn, Message) {
 		rich[prop] = value
 	}
-	Printf("rich: %+v\n", rich)
 	return
 }
 
