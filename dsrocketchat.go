@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/LF-Engineering/dev-analytics-libraries/emoji"
 )
 
 const (
@@ -706,7 +708,110 @@ func (j *DSRocketchat) EnrichItem(ctx *Ctx, item map[string]interface{}, author 
 		rich["file_name"], _ = file["name"]
 		rich["file_type"], _ = file["type"]
 	}
+	iReplies, ok := message["replies"]
+	if ok {
+		replies, ok := iReplies.([]interface{})
+		if ok {
+			rich["replies"] = len(replies)
+		} else {
+			rich["replies"] = 0
+		}
+	} else {
+		rich["replies"] = 0
+	}
+	rich["total_reactions"] = 0
+	iReactions, ok := message["reactions"]
+	if ok {
+		reactions, _ := iReactions.(map[string]interface{})
+		rich["reactions"], rich["total_reactions"] = j.GetReactions(reactions)
+	}
+	rich["total_mentions"] = 0
+	iMentions, ok := message["mentions"]
+	if ok {
+		mentions, _ := iMentions.([]interface{})
+		mentionsAry := j.GetMentions(mentions)
+		rich["mentions"] = mentionsAry
+		rich["total_mentions"] = len(mentionsAry)
+	}
+	iChannelInfo, ok := message["channel_info"]
+	if ok {
+		channelInfo, _ := iChannelInfo.(map[string]interface{})
+		j.SetChannelInfo(rich, channelInfo)
+	}
+	rich["total_urls"] = 0
+	iURLs, ok := message["urls"]
+	if ok {
+		urls, _ := iURLs.([]interface{})
+		urlsAry := []interface{}{}
+		for _, iURL := range urls {
+			url, _ := iURL.(map[string]interface{})
+			urlsAry = append(urlsAry, url["url"])
+		}
+		rich["message_urls"] = urlsAry
+		rich["total_urls"] = len(urlsAry)
+	}
 	Printf("rich: %+v\n", rich)
+	return
+}
+
+// SetChannelInfo - set rich channel info from raw channel info
+func (j *DSRocketchat) SetChannelInfo(rich, channel map[string]interface{}) {
+	rich["channel_id"], _ = channel["_id"]
+	iUpdated, ok := channel["_updatedAt"]
+	if ok {
+		updated, err := TimeParseAny(iUpdated.(string))
+		if err == nil {
+			rich["channel_updated_at"] = updated
+		}
+	}
+	rich["channel_num_messages"], _ = channel["msgs"]
+	rich["channel_name"], _ = channel["name"]
+	rich["channel_num_users"], _ = channel["usersCount"]
+	rich["channel_topic"], _ = channel["topic"]
+	rich["avatar"], _ = Dig(channel, []string{"lastMessage", "avatar"}, false, true)
+}
+
+// GetMentions - convert raw mentions to rich mentions
+func (j *DSRocketchat) GetMentions(mentions []interface{}) (richMentions []map[string]interface{}) {
+	for _, iUsr := range mentions {
+		usr, _ := iUsr.(map[string]interface{})
+		userName, _ := usr["username"]
+		id, _ := usr["_id"]
+		name, _ := usr["name"]
+		richMentions = append(richMentions, map[string]interface{}{
+			"username": userName,
+			"id":       id,
+			"name":     name,
+		})
+	}
+	return
+}
+
+// GetReactions - convert raw reactions to rich reactions
+func (j *DSRocketchat) GetReactions(reactions map[string]interface{}) (richReactions []map[string]interface{}, nReactions int) {
+	for reactionType, iReactionData := range reactions {
+		reactionData, _ := iReactionData.(map[string]interface{})
+		userNames := []interface{}{}
+		names := []interface{}{}
+		iUserNames, ok := reactionData["usernames"]
+		if ok {
+			userNames, _ = iUserNames.([]interface{})
+		}
+		iNames, ok := reactionData["names"]
+		if ok {
+			names, _ = iNames.([]interface{})
+		}
+		data := emoji.GetEmojiUnicode(reactionType)
+		nUserNames := len(userNames)
+		richReactions = append(richReactions, map[string]interface{}{
+			"type":     reactionType,
+			"emoji":    data,
+			"username": userNames,
+			"names":    names,
+			"count":    nUserNames,
+		})
+		nReactions += nUserNames
+	}
 	return
 }
 

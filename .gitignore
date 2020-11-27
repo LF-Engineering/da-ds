@@ -18,6 +18,8 @@
 *.swp
 /dads
 /out
+/out-raw
+/out-rich
 *.secret
 *.mbox
 /data
