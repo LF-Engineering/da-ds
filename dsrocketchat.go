@@ -434,7 +434,6 @@ func (j *DSRocketchat) DateField(*Ctx) string {
 
 // RichIDField - return rich ID field name
 func (j *DSRocketchat) RichIDField(*Ctx) string {
-	// IMPL: uuid for 1:1 data sources, else some other field
 	return UUID
 }
 
