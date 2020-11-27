@@ -533,9 +533,32 @@ func (j *DSRocketchat) ElasticRichMapping() []byte {
 // GetItemIdentities return list of item's identities, each one is [3]string
 // (name, username, email) tripples, special value Nil "<nil>" means null
 // we use string and not *string which allows nil to allow usage as a map key
-func (j *DSRocketchat) GetItemIdentities(ctx *Ctx, doc interface{}) (map[[3]string]struct{}, error) {
-	// IMPL:
-	return map[[3]string]struct{}{}, nil
+func (j *DSRocketchat) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3]string]struct{}, err error) {
+	if ctx.Debug > 2 {
+		defer func() {
+			Printf("GetItemIdentities: %+v -> %+v\n", DumpPreview(doc, 100), identities)
+		}()
+	}
+	iUser, ok := Dig(doc, []string{"data", "u"}, false, true)
+	if !ok {
+		return
+	}
+	user, _ := iUser.(map[string]interface{})
+	username := Nil
+	iUserName, ok := user["username"]
+	if ok {
+		username, _ = iUserName.(string)
+	}
+	name := Nil
+	iName, ok := user["name"]
+	if ok {
+		name, _ = iName.(string)
+	}
+	if name == Nil && username == Nil {
+		return
+	}
+	identities = map[[3]string]struct{}{{name, username, Nil}: {}}
+	return
 }
 
 // RocketchatEnrichItemsFunc - iterate items and enrich them
