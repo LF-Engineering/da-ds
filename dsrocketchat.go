@@ -30,6 +30,8 @@ var (
 	RocketchatDefaultMinRate = 10
 	// RocketchatDefaultSearchField - default search field
 	RocketchatDefaultSearchField = "item_id"
+	// RocketchatRoles - roles to fetch affiliation data for rocketchat messages
+	RocketchatRoles = []string{"u"}
 )
 
 // DSRocketchat - DS implementation for rocketchat - does nothing at all, just presents a skeleton code
@@ -750,6 +752,29 @@ func (j *DSRocketchat) EnrichItem(ctx *Ctx, item map[string]interface{}, author 
 		rich["message_urls"] = urlsAry
 		rich["total_urls"] = len(urlsAry)
 	}
+	updatedOn, _ := Dig(item, []string{j.DateField(ctx)}, true, false)
+	if affs {
+		authorKey := "u"
+		var affsItems map[string]interface{}
+		affsItems, err = j.AffsItems(ctx, item, RocketchatRoles, updatedOn)
+		if err != nil {
+			return
+		}
+		for prop, value := range affsItems {
+			rich[prop] = value
+		}
+		for _, suff := range AffsFields {
+			rich[Author+suff] = rich[authorKey+suff]
+		}
+		orgsKey := authorKey + MultiOrgNames
+		_, ok := Dig(rich, []string{orgsKey}, false, true)
+		if !ok {
+			rich[orgsKey] = []interface{}{}
+		}
+	}
+	for prop, value := range CommonFields(j, updatedOn, Message) {
+		rich[prop] = value
+	}
 	Printf("rich: %+v\n", rich)
 	return
 }
@@ -816,15 +841,53 @@ func (j *DSRocketchat) GetReactions(reactions map[string]interface{}) (richReact
 }
 
 // AffsItems - return affiliations data items for given roles and date
-func (j *DSRocketchat) AffsItems(ctx *Ctx, rawItem map[string]interface{}, roles []string, date interface{}) (affsItems map[string]interface{}, err error) {
-	// IMPL:
+func (j *DSRocketchat) AffsItems(ctx *Ctx, message map[string]interface{}, roles []string, date interface{}) (affsItems map[string]interface{}, err error) {
+	affsItems = make(map[string]interface{})
+	var dt time.Time
+	dt, err = TimeParseInterfaceString(date)
+	if err != nil {
+		return
+	}
+	for _, role := range roles {
+		identity := j.GetRoleIdentity(ctx, message, role)
+		if len(identity) == 0 {
+			continue
+		}
+		affsIdentity, empty := IdenityAffsData(ctx, j, identity, nil, dt, role)
+		if empty {
+			Printf("no identity affiliation data for identity %+v\n", identity)
+			continue
+		}
+		for prop, value := range affsIdentity {
+			affsItems[prop] = value
+		}
+		for _, suff := range RequiredAffsFields {
+			k := role + suff
+			_, ok := affsIdentity[k]
+			if !ok {
+				affsIdentity[k] = Unknown
+			}
+		}
+	}
 	return
 }
 
 // GetRoleIdentity - return identity data for a given role
-func (j *DSRocketchat) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role string) map[string]interface{} {
-	// IMPL:
-	return map[string]interface{}{"name": nil, "username": nil, "email": nil}
+func (j *DSRocketchat) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role string) (identity map[string]interface{}) {
+	iUser, ok := Dig(item, []string{"data", "u"}, true, false)
+	user, _ := iUser.(map[string]interface{})
+	username := Nil
+	iUserName, ok := user["username"]
+	if ok {
+		username, _ = iUserName.(string)
+	}
+	name := Nil
+	iName, ok := user["name"]
+	if ok {
+		name, _ = iName.(string)
+	}
+	identity = map[string]interface{}{"name": name, "username": username, "email": Nil}
+	return
 }
 
 // AllRoles - return all roles defined for the backend
@@ -832,6 +895,5 @@ func (j *DSRocketchat) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, ro
 // second return parameter is static mode (true/false)
 // dynamic roles will use item to get its roles
 func (j *DSRocketchat) AllRoles(ctx *Ctx, item map[string]interface{}) ([]string, bool) {
-	// IMPL:
-	return []string{Author}, true
+	return []string{"u"}, true
 }
