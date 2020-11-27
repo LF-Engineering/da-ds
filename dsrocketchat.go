@@ -431,7 +431,7 @@ func (j *DSRocketchat) DateField(*Ctx) string {
 // RichIDField - return rich ID field name
 func (j *DSRocketchat) RichIDField(*Ctx) string {
 	// IMPL: uuid for 1:1 data sources, else some other field
-	return DefaultIDField
+	return UUID
 }
 
 // RichAuthorField - return rich author field name
@@ -565,7 +565,6 @@ func (j *DSRocketchat) GetItemIdentities(ctx *Ctx, doc interface{}) (identities 
 // items is a current pack of input items
 // docs is a pointer to where extracted identities will be stored
 func RocketchatEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]interface{}) (err error) {
-	// IMPL:
 	if ctx.Debug > 0 {
 		Printf("rocketchat enrich items %d/%d func\n", len(items), len(*docs))
 	}
@@ -602,20 +601,23 @@ func RocketchatEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, d
 			e = fmt.Errorf("Failed to parse document %+v\n", doc)
 			return
 		}
-		if 1 == 0 {
-			Printf("%v\n", dbConfigured)
-		}
 		// Actual item enrichment
-		/*
-			    var rich map[string]interface{}
-					if thrN > 1 {
-						mtx.Lock()
-					}
-					*docs = append(*docs, rich)
-					if thrN > 1 {
-						mtx.Unlock()
-					}
-		*/
+		var rich map[string]interface{}
+		rich, e = ds.EnrichItem(ctx, doc, "", dbConfigured, nil)
+		if e != nil {
+			return
+		}
+		e = EnrichItem(ctx, ds, rich)
+		if e != nil {
+			return
+		}
+		if thrN > 1 {
+			mtx.Lock()
+		}
+		*docs = append(*docs, rich)
+		if thrN > 1 {
+			mtx.Unlock()
+		}
 		return
 	}
 	if thrN > 1 {
@@ -659,8 +661,52 @@ func (j *DSRocketchat) EnrichItems(ctx *Ctx) (err error) {
 
 // EnrichItem - return rich item from raw item for a given author type
 func (j *DSRocketchat) EnrichItem(ctx *Ctx, item map[string]interface{}, author string, affs bool, extra interface{}) (rich map[string]interface{}, err error) {
-	// IMPL:
-	rich = item
+	rich = make(map[string]interface{})
+	for _, field := range RawFields {
+		v, _ := item[field]
+		rich[field] = v
+	}
+	message, ok := item["data"].(map[string]interface{})
+	if !ok {
+		err = fmt.Errorf("missing data field in item %+v", DumpKeys(item))
+		return
+	}
+	msg, _ := message["msg"]
+	rich["msg_analyzed"] = msg
+	rich["msg"] = msg
+	rich["rid"], _ = message["rid"]
+	rich["msg_id"], _ = message["_id"]
+	rich["msg_parent"], _ = message["parent"]
+	iAuthor, ok := message["u"]
+	if ok {
+		author, _ := iAuthor.(map[string]interface{})
+		rich["user_id"], _ = author["_id"]
+		rich["user_name"], _ = author["name"]
+		rich["user_username"], _ = author["username"]
+	}
+	rich["is_edited"] = 0
+	iEditor, ok := message["editedBy"]
+	if ok {
+		editor, _ := iEditor.(map[string]interface{})
+		iEdited, ok := editor["editedAt"]
+		if ok {
+			edited, err := TimeParseAny(iEdited.(string))
+			if err == nil {
+				rich["edited_at"] = edited
+			}
+		}
+		rich["edited_by_username"], _ = editor["username"]
+		rich["edited_by_user_id"], _ = editor["_id"]
+		rich["is_edited"] = 1
+	}
+	iFile, ok := message["file"]
+	if ok {
+		file, _ := iFile.(map[string]interface{})
+		rich["file_id"], _ = file["_id"]
+		rich["file_name"], _ = file["name"]
+		rich["file_type"], _ = file["type"]
+	}
+	Printf("rich: %+v\n", rich)
 	return
 }
 
