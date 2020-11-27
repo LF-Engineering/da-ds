@@ -1,13 +1,11 @@
 package dads
 
 import (
-	"crypto/sha1"
-	"encoding/hex"
+	"fmt"
 	"strings"
 	"sync"
 
-	"golang.org/x/text/transform"
-	"golang.org/x/text/unicode/norm"
+	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 )
 
 var (
@@ -62,31 +60,9 @@ func UUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
 		h = h[:len(h)-1]
 		return
 	}
-	stripF := func(str string) string {
-		isOk := func(r rune) bool {
-			return r < 32 || r >= 127
-		}
-		t := transform.Chain(norm.NFKD, transform.RemoveFunc(isOk))
-		str, _, _ = transform.String(t, str)
-		return str
-	}
-	arg := ""
-	for _, a := range args {
-		if a == "" {
-			Fatalf("UUIDNonEmpty(%v) - empty argument(s) not allowed", args)
-		}
-		if arg != "" {
-			arg += ":"
-		}
-		arg += stripF(a)
-	}
-	hash := sha1.New()
-	if ctx.Debug > 1 {
-		Printf("UUIDNonEmpty(%s)\n", arg)
-	}
-	_, err := hash.Write([]byte(arg))
+	var err error
+	h, err = uuid.Generate(args...)
 	FatalOnError(err)
-	h = hex.EncodeToString(hash.Sum(nil))
 	return
 }
 
@@ -129,33 +105,12 @@ func UUIDAffs(ctx *Ctx, args ...string) (h string) {
 		h = h[:len(h)-1]
 		return
 	}
-	stripF := func(str string) string {
-		isOk := func(r rune) bool {
-			return r < 32 || r >= 127
-		}
-		t := transform.Chain(norm.NFKD, transform.RemoveFunc(isOk))
-		str, _, _ = transform.String(t, str)
-		return str
+	var err error
+	if len(args) != 4 {
+		err = fmt.Errorf("GenerateIdentity requires exactly 4 asrguments, got %+v\n", args)
+	} else {
+		h, err = uuid.GenerateIdentity(&args[0], &args[1], &args[2], &args[3])
 	}
-	arg := ""
-	for i, a := range args {
-		if i == 0 && a == "" {
-			Fatalf("UUIDAffs(%v) - empty first argument not allowed", args)
-		}
-		if a == Nil {
-			a = None
-		}
-		if arg != "" {
-			arg += ":"
-		}
-		arg += stripF(a)
-	}
-	hash := sha1.New()
-	if ctx.Debug > 1 {
-		Printf("UUIDAffs(%s)\n", strings.ToLower(arg))
-	}
-	_, err := hash.Write([]byte(strings.ToLower(arg)))
 	FatalOnError(err)
-	h = hex.EncodeToString(hash.Sum(nil))
 	return
 }
