@@ -56,7 +56,6 @@ type RepositoryRaw struct {
 
 type RepositoryEnrich struct {
 	ID             string `json:"id"`
-	Project        string `json:"project"`
 	Affiliation    string `json:"affiliation"`
 	Description    string `json:"description"`
 	IsPrivate      bool   `json:"is_private"`
@@ -86,7 +85,7 @@ type RepositoryEnrich struct {
 	UUID              string    `json:"uuid"`
 	Origin            string    `json:"origin"`
 	MetadataUpdatedOn time.Time `json:"metadata__updated_on"`
-	BackendName       string    `json:"backend_name"`
+	BackendName       string    `json:"metadata__backend_name"`
 	MetadataTimestamp time.Time `json:"metadata__timestamp"`
 	BuildOnCloud      *string   `json:"build_on_cloud"`
 	ProjectTS         int64     `json:"project_ts"`

@@ -63,15 +63,14 @@ func (e *Enricher) EnrichItem(rawItem RepositoryRaw, now time.Time) (*Repository
 	enriched := RepositoryEnrich{}
 
 	enriched.ID = fmt.Sprintf("%s-%s", rawItem.Data.Name, rawItem.Data.Namespace)
-	enriched.IsEvent = 1
-	enriched.IsDockerImage = 0
+	enriched.IsEvent = 0
+	enriched.IsDockerImage = 1
 	enriched.IsDockerhubDockerhub = 1
 	enriched.Description = rawItem.Data.Description
 	enriched.DescriptionAnalyzed = rawItem.Data.Description
 
 	// todo: in python description is used ??
 	enriched.FullDescriptionAnalyzed = rawItem.Data.FullDescription
-	enriched.Project = rawItem.Data.Name
 	enriched.Affiliation = rawItem.Data.Affiliation
 	enriched.IsPrivate = rawItem.Data.IsPrivate
 	enriched.IsAutomated = rawItem.Data.IsAutomated
@@ -88,7 +87,7 @@ func (e *Enricher) EnrichItem(rawItem RepositoryRaw, now time.Time) (*Repository
 	enriched.MetadataEnrichedOn = now
 
 	enriched.MetadataTimestamp = rawItem.MetadataTimestamp
-	enriched.MetadataUpdatedOn = rawItem.MetadataUpdatedOn
+	enriched.MetadataUpdatedOn = rawItem.MetadataUpdatedOn.UTC()
 	enriched.CreationDate = rawItem.MetadataUpdatedOn
 
 	// todo: the 3 following fields filling is vague
