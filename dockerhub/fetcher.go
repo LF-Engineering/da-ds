@@ -35,7 +35,7 @@ type Params struct {
 
 // HttpClientProvider used in connecting to remote http server
 type HttpClientProvider interface {
-	Request(url string, method string, header map[string]string, body []byte) (statusCode int, resBody []byte, err error)
+	Request(url string, method string, header map[string]string, body []byte, params map[string]string) (statusCode int, resBody []byte, err error)
 }
 
 // ESClientProvider used in connecting to ES Client server
@@ -75,7 +75,7 @@ func (f *Fetcher) Login(username string, password string) (string, error) {
 
 	_, err = dads.Printf("dockerhub login via: %s\n", url)
 
-	statusCode, resBody, err := f.HttpClientProvider.Request(url, "Post", nil, p)
+	statusCode, resBody, err := f.HttpClientProvider.Request(url, "Post", nil, p,nil)
 
 	if statusCode == http.StatusOK {
 		res := LoginResponse{}
@@ -102,7 +102,7 @@ func (f *Fetcher) FetchItem(owner string, repository string) (*RepositoryRaw, er
 		headers["Authorization"] = fmt.Sprintf("JWT %s", f.Token)
 	}
 
-	statusCode, resBody, err := f.HttpClientProvider.Request(requestUrl, "GET", headers, nil)
+	statusCode, resBody, err := f.HttpClientProvider.Request(requestUrl, "GET", headers, nil,nil)
 	if err != nil || statusCode != http.StatusOK {
 		return nil, err
 	}
