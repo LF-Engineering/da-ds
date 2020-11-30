@@ -27,6 +27,7 @@ type Manager struct {
 type Repository struct {
 	Owner      string
 	Repository string
+	Project    string
 	ESIndex    string
 }
 
@@ -126,12 +127,11 @@ func (m *Manager) Sync() error {
 
 			if len(esData.Hits.Hits) > 0 {
 				// Enrich data for single repo
-				enriched, err := enricher.EnrichItem(*esData.Hits.Hits[0].Source, time.Now())
+				enriched, err := enricher.EnrichItem(*esData.Hits.Hits[0].Source, repo.Project, time.Now())
 				if err != nil {
 					return errors.New(fmt.Sprintf("could not enrich data from repository: %s-%s", repo.Owner, repo.Repository))
 				}
-				data = append(data, &utils.BulkData{IndexName: repo.ESIndex, ID: fmt.Sprintf("%s_%s", enriched.ID, enriched.RepositoryType), Data: enriched})
-
+				data = append(data, &utils.BulkData{IndexName: repo.ESIndex, ID: enriched.UUID, Data: enriched})
 				_ = enricher.HandleMapping(repo.ESIndex)
 
 			}
@@ -143,6 +143,22 @@ func (m *Manager) Sync() error {
 			if err != nil {
 				return err
 			}
+
+			// Add/Update latest document in each origin
+			for _, repo := range data {
+				repo.ID = fmt.Sprintf("%s_%s", repo.Data.(*RepositoryEnrich).ID, repo.Data.(*RepositoryEnrich).RepositoryType)
+				repo.Data.(*RepositoryEnrich).IsDockerImage = 1
+				repo.Data.(*RepositoryEnrich).IsEvent = 0
+
+				data = append(data, repo)
+			}
+
+			// Insert enriched data to elasticsearch
+			_, err = esClientProvider.BulkInsert(data)
+			if err != nil {
+				return err
+			}
+
 		}
 	}
 

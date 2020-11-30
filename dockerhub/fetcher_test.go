@@ -197,7 +197,113 @@ func TestFetchItem(t *testing.T) {
         }`,
 	}
 
+	testFabric := test{
+		"FabricTest",
+		httpClientData{
+			"hyperledger",
+			"fabric-zookeeper",
+		},
+		`{
+          "data" : {
+            "user" : "hyperledger",
+            "name" : "fabric-zookeeper",
+            "full_description" : "",
+            "affiliation" : null,
+            "repository_type" : "image",
+            "is_migrated" : false,
+            "can_edit" : false,
+            "fetched_on" : 1.606743763620021E9,
+            "pull_count" : 2386255,
+            "collaborator_count" : 0,
+            "last_updated" : "2020-11-17T01:43:05.870352Z",
+            "namespace" : "hyperledger",
+            "has_starred" : false,
+            "star_count" : 15,
+            "is_private" : false,
+            "permissions" : {
+              "read" : true,
+              "admin" : false,
+              "write" : false
+            },
+            "status" : 1,
+            "description" : "Fabric Zookeeper docker image for Hyperledger Project",
+            "is_automated" : false
+          },
+          "metadata__timestamp" : "2020-11-30T13:42:43.620021Z",
+          "backend_version" : "0.6.0",
+          "timestamp" : 1.606743763620021E9,
+          "category" : "dockerhub-data",
+          "classified_fields_filtered" : null,
+          "updated_on" : 1.606743763620021E9,
+          "metadata__updated_on" : "2020-11-30T13:42:43.620021Z",
+          "tag" : "https://hub.docker.com/hyperledger/fabric-zookeeper",
+          "uuid" : "6cd1f5d3faed10cbc9de853c372f06c036460a5e",
+          "origin" : "https://hub.docker.com/hyperledger/fabric-zookeeper",
+          "search_fields" : {
+            "name" : "fabric-zookeeper",
+            "namespace" : "hyperledger",
+            "item_id" : "1606743763.620021"
+          },
+          "backend_name" : "Dockerhub",
+          "perceval_version" : "0.17.1"
+        }`,
+	}
+
+	testSawtooth := test{
+		"SawtoothTest",
+		httpClientData{
+			"hyperledger",
+			"sawtooth-xo-tp-rust",
+		},
+		`{
+          "data" : {
+            "last_updated" : "2020-11-30T10:21:10.298838Z",
+            "fetched_on" : 1.606745324657876E9,
+            "collaborator_count" : 0,
+            "status" : 1,
+            "full_description" : "",
+            "star_count" : 0,
+            "is_automated" : false,
+            "permissions" : {
+              "write" : false,
+              "read" : true,
+              "admin" : false
+            },
+            "name" : "sawtooth-xo-tp-rust",
+            "affiliation" : null,
+            "namespace" : "hyperledger",
+            "can_edit" : false,
+            "is_private" : false,
+            "description" : "",
+            "pull_count" : 551,
+            "has_starred" : false,
+            "user" : "hyperledger",
+            "repository_type" : "image",
+            "is_migrated" : false
+          },
+          "timestamp" : 1.606745324657876E9,
+          "tag" : "https://hub.docker.com/hyperledger/sawtooth-xo-tp-rust",
+          "backend_name" : "Dockerhub",
+          "perceval_version" : "0.17.1",
+          "search_fields" : {
+            "name" : "sawtooth-xo-tp-rust",
+            "item_id" : "1606745324.657876",
+            "namespace" : "hyperledger"
+          },
+          "category" : "dockerhub-data",
+          "classified_fields_filtered" : null,
+          "metadata__timestamp" : "2020-11-30T14:08:44.657876Z",
+          "updated_on" : 1.606745324657876E9,
+          "metadata__updated_on" : "2020-11-30T14:08:44.657876Z",
+          "uuid" : "37e85829947b85fb216a668810dea6b20aa6c365",
+          "origin" : "https://hub.docker.com/hyperledger/sawtooth-xo-tp-rust",
+          "backend_version" : "0.6.0"
+        }`,
+	}
+
 	tests = append(tests, testOnap)
+	tests = append(tests, testFabric)
+	tests = append(tests, testSawtooth)
 
 	for _, tst := range tests {
 		t.Run(tst.name, func(tt *testing.T) {
@@ -231,6 +337,7 @@ func TestFetchItem(t *testing.T) {
 			// Assert
 			assert.Equal(tt, expectedRaw.MetadataUpdatedOn.String(), raw.MetadataUpdatedOn.String())
 			assert.Equal(tt, expectedRaw.Data.FetchedOn, raw.Data.FetchedOn)
+			assert.Equal(tt, expectedRaw.UUID, raw.UUID)
 			assert.Equal(tt, expectedRaw, *raw)
 		})
 	}
@@ -271,8 +378,8 @@ func TestBulkInsert(t *testing.T) {
 
 	rawData := make([]*utils.BulkData, 0)
 	repos := []*Repository{
-		{"hyperledger", "besu", "sds-hyperledger-besu-dockerhub"},
-		{"hyperledger", "explorer", "sds-hyperledger-explorer-dockerhub"},
+		{"hyperledger", "besu", "", "sds-hyperledger-besu-dockerhub"},
+		{"hyperledger", "explorer", "", "sds-hyperledger-explorer-dockerhub"},
 	}
 
 	for _, repo := range repos {
