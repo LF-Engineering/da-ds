@@ -7,7 +7,6 @@ import (
 	"github.com/LF-Engineering/da-ds/utils"
 	"github.com/stretchr/testify/assert"
 	"testing"
-	"time"
 )
 
 func prepareEnrichObject() (*Enricher, error) {
@@ -23,7 +22,7 @@ func prepareEnrichObject() (*Enricher, error) {
 	return srv, err
 }
 
-func TestGetPreviouslyFetchedData(t *testing.T) {
+/*func TestGetPreviouslyFetchedData(t *testing.T) {
 	srv, err := prepareEnrichObject()
 	if err != nil {
 		t.Errorf("err: %v", err)
@@ -48,7 +47,7 @@ func TestGetPreviouslyFetchedData(t *testing.T) {
 		t.Logf("results: %v", raws.Hits.Hits)
 	}
 }
-
+*/
 func TestEnrichItem(t *testing.T) {
 	// Arrange
 	esClientProviderMock := &mocks.ESClientProvider{}

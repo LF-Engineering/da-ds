@@ -107,27 +107,28 @@ func TestFetchItemFromAPI(t *testing.T) {
 	esClientProviderMock := &mocks.ESClientProvider{}
 
 	srv := NewFetcher(params, httpClientProviderMock, esClientProviderMock)
+	testTime := time.Date(2017, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	// Act
-	raw, err := srv.FetchItem(owner, repo, time.Now())
+	raw, err := srv.FetchItem(owner, repo, testTime)
 	if err != nil {
 		t.Errorf("cannot get data")
 		return
 	}
 
-	testTime := time.Date(2017, 1, 1, 0, 0, 0, 0, time.UTC)
-	raw.Data.FetchedOn = utils.ConvertTimeToFloat(testTime)
-	uid, err := uuid.Generate(fmt.Sprintf("%v", raw.Data.FetchedOn))
+	uid, err := uuid.Generate(raw.Origin, fmt.Sprintf("%f", raw.Data.FetchedOn))
 	if err != nil {
 		t.Errorf("err: %v", err)
 		return
 	}
 	raw.UUID = uid
 	// Assert
-	assert.Equal(t, "0fa16dc4edab9130a14914a8d797f634d13b4ff4", raw.UUID)
-	assert.Equal(t, "1483228800", raw.Data.FetchedOn)
+	assert.Equal(t, "152c1e2f550c723b71dcdb88b297874f92377ef7", raw.UUID)
+	assert.Equal(t, 1.4832288e09, raw.Data.FetchedOn)
 
 }
+
+
 
 func TestFetchItem(t *testing.T) {
 	// Arrange
