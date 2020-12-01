@@ -94,7 +94,7 @@ func (f *Fetcher) Login(username string, password string) (string, error) {
 	return "", errors.New("invalid login credentials")
 }
 
-// FetchItems ...
+// FetchItem pulls image data
 func (f *Fetcher) FetchItem(owner string, repository string, now time.Time) (*RepositoryRaw, error) {
 	requestURL := fmt.Sprintf("%s/%s/%s/%s/%s", APIURL, APIVersion, APIRepositories, owner, repository)
 	url := fmt.Sprintf("%s/%s/%s", APIURL, owner, repository)
