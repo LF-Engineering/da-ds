@@ -7,7 +7,6 @@ import (
 	"github.com/LF-Engineering/da-ds/utils"
 	"github.com/stretchr/testify/assert"
 	"testing"
-	"time"
 )
 
 func prepareEnrichObject() (*Enricher, error) {
@@ -21,32 +20,6 @@ func prepareEnrichObject() (*Enricher, error) {
 	}
 	srv := NewEnricher("0.0.1", esClientProvider)
 	return srv, err
-}
-
-func TestGetPreviouslyFetchedData(t *testing.T) {
-	srv, err := prepareEnrichObject()
-	if err != nil {
-		t.Errorf("err: %v", err)
-		return
-	}
-
-	repos := []*Repository{
-		{"cncf", "envoy", "", "sds-cncf-envoy-dockerhub"},
-		{"hyperledger", "explorer", "", "sds-hyperledger-explorer-dockerhub"},
-	}
-
-	lastDate := "2019-10-20T18:07:47.729125Z"
-	d, err := time.Parse(time.RFC3339, lastDate)
-
-	for _, repo := range repos {
-		raws, err := srv.GetFetchedDataItem(repo, nil, &d, false)
-		if err != nil {
-			t.Errorf("err: %v", err)
-			return
-		}
-
-		t.Logf("results: %v", raws.Hits.Hits)
-	}
 }
 
 func TestEnrichItem(t *testing.T) {

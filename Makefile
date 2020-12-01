@@ -31,7 +31,7 @@ fmt: ${GO_BIN_FILES} ${GO_LIB_FILES} ${GO_TEST_FILES} ${GO_LIBTEST_FILES}
 	./scripts/for_each_go_file.sh "${GO_FMT}"
 
 lint: ## Lint the files
-	golint -set_exit_status $(shell go list ./... | grep -v /vendor/)
+	golint -set_exit_status $(PKG_LIST)
 
 vet: ${GO_BIN_FILES} ${GO_LIB_FILES} ${GO_TEST_FILES} ${GO_LIBTEST_FILES}
 	./scripts/vet_files.sh "${GO_VET}"

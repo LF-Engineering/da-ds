@@ -1,7 +1,6 @@
 package dockerhub
 
 import (
-	"testing"
 	"time"
 )
 
@@ -26,13 +25,4 @@ func prepareManagerObject() *Manager {
 	)
 
 	return manager
-}
-
-func TestSync(t *testing.T) {
-	manager := prepareManagerObject()
-
-	err := manager.Sync()
-	if err != nil {
-		t.Logf("error: %v", err)
-	}
 }

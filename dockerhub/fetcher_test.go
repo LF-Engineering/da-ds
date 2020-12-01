@@ -107,25 +107,24 @@ func TestFetchItemFromAPI(t *testing.T) {
 	esClientProviderMock := &mocks.ESClientProvider{}
 
 	srv := NewFetcher(params, httpClientProviderMock, esClientProviderMock)
+	testTime := time.Date(2017, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	// Act
-	raw, err := srv.FetchItem(owner, repo, time.Now())
+	raw, err := srv.FetchItem(owner, repo, testTime)
 	if err != nil {
 		t.Errorf("cannot get data")
 		return
 	}
 
-	testTime := time.Date(2017, 1, 1, 0, 0, 0, 0, time.UTC)
-	raw.Data.FetchedOn = utils.ConvertTimeToFloat(testTime)
-	uid, err := uuid.Generate(fmt.Sprintf("%v", raw.Data.FetchedOn))
+	uid, err := uuid.Generate(raw.Origin, fmt.Sprintf("%f", raw.Data.FetchedOn))
 	if err != nil {
 		t.Errorf("err: %v", err)
 		return
 	}
 	raw.UUID = uid
 	// Assert
-	assert.Equal(t, "0fa16dc4edab9130a14914a8d797f634d13b4ff4", raw.UUID)
-	assert.Equal(t, "1483228800", raw.Data.FetchedOn)
+	assert.Equal(t, "152c1e2f550c723b71dcdb88b297874f92377ef7", raw.UUID)
+	assert.Equal(t, 1.4832288e09, raw.Data.FetchedOn)
 
 }
 
@@ -319,7 +318,7 @@ func TestFetchItem(t *testing.T) {
 
 			httpClientProviderMock.On("Request",
 				fmt.Sprintf("https://hub.docker.com/v2/repositories/%s/%s", tst.httpClientData.owner, tst.httpClientData.repository),
-				"GET", mock.Anything, mock.Anything).Return(200, data, nil)
+				"GET", mock.Anything, mock.Anything, mock.Anything).Return(200, data, nil)
 
 			params := &Params{
 				Username:       "",
@@ -367,43 +366,4 @@ func prepareObject() (*Fetcher, ESClientProvider, error) {
 	}
 	srv := NewFetcher(params, httpClientProvider, esClientProvider)
 	return srv, esClientProvider, err
-}
-
-func TestBulkInsert(t *testing.T) {
-	srv, esClientProvider, err := prepareObject()
-	if err != nil {
-		t.Errorf("err: %v", err)
-		return
-	}
-
-	rawData := make([]*utils.BulkData, 0)
-	repos := []*Repository{
-		{"hyperledger", "besu", "", "sds-hyperledger-besu-dockerhub"},
-		{"hyperledger", "explorer", "", "sds-hyperledger-explorer-dockerhub"},
-	}
-
-	for _, repo := range repos {
-		raw, err := srv.FetchItem(repo.Owner, repo.Repository, time.Now())
-		if err != nil {
-			t.Errorf("err: %v", err)
-			return
-		}
-		rawData = append(rawData, &utils.BulkData{IndexName: repo.ESIndex, ID: raw.UUID, Data: raw})
-
-		err = srv.HandleMapping(fmt.Sprintf("%s-raw", repo.ESIndex))
-		if err != nil {
-			t.Errorf("err: %v", err)
-		}
-	}
-
-	t.Logf("response: %v", rawData)
-
-	insert, err := esClientProvider.BulkInsert(rawData)
-	if err != nil {
-		t.Errorf("err: %v", err.Error())
-		return
-	}
-
-	t.Logf("response: %s", insert)
-
 }
