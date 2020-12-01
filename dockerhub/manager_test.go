@@ -7,8 +7,8 @@ import (
 
 func prepareManagerObject() *Manager {
 	repos := []*Repository{
-		{"envoyproxy", "envoy", "sds-cncf-envoy-dockerhub"},
-		{"hyperledger", "explorer", "sds-hyperledger-explorer-dockerhub"},
+		{"envoyproxy", "envoy", "", "sds-cncf-envoy-dockerhub"},
+		{"hyperledger", "explorer", "", "sds-hyperledger-explorer-dockerhub"},
 	}
 
 	manager := NewManager(

@@ -24,8 +24,10 @@ These are the needed environment variables to run dockerhub:
     - Optional, for dockerhub repository credentials
 - DA_DOCKERHUB_PASSWORD='' 
     - Optional, for dockerhub repository credentials
-- DA_DOCKERHUB_REPOSITORIES_JSON='[{"Owner":'{OWNER}',"Repository":"{REPOSITORY}","ESIndex":"{INDEX_NAME}"}]'
-    - JSON  e.g. '[{"Owner":"crops","Repository":"yocto-eol","ESIndex":"sds-yocto-dockerhub"}]'
+- DA_DOCKERHUB_PROJECT_SLUG='{SLUG}'
+    - Slug name e.g. yocto
+- DA_DOCKERHUB_REPOSITORIES_JSON='[{"Owner":'{OWNER}',"Repository":"{REPOSITORY}","Project":"{PROJECT}","ESIndex":"{INDEX_NAME}"}]'
+    - JSON  e.g. '[{"Owner":"crops","Repository":"yocto-eol","Project":"yocto","ESIndex":"sds-yocto-dockerhub"}]'
 - DA_DS='{DATASOURCE}' 
     - Datasource name should be 'dockerhub'
 - DA_DOCKERHUB_HTTP_TIMEOUT=60s 

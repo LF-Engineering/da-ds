@@ -64,13 +64,13 @@ func NewEnricher(backendVersion string, esClientProvider ESClientProvider) *Enri
 }
 
 // EnrichItem enriches raw item
-func (e *Enricher) EnrichItem(rawItem RepositoryRaw, now time.Time) (*RepositoryEnrich, error) {
+func (e *Enricher) EnrichItem(rawItem RepositoryRaw, project string,now time.Time) (*RepositoryEnrich, error) {
 
 	enriched := RepositoryEnrich{}
 
 	enriched.ID = fmt.Sprintf("%s-%s", rawItem.Data.Name, rawItem.Data.Namespace)
-	enriched.IsEvent = 0
-	enriched.IsDockerImage = 1
+	enriched.IsEvent = 1
+	enriched.IsDockerImage = 0
 	enriched.IsDockerhubDockerhub = 1
 	enriched.Description = rawItem.Data.Description
 	enriched.DescriptionAnalyzed = rawItem.Data.Description
@@ -86,6 +86,7 @@ func (e *Enricher) EnrichItem(rawItem RepositoryRaw, now time.Time) (*Repository
 	enriched.Status = rawItem.Data.Status
 	enriched.StarCount = rawItem.Data.StarCount
 	enriched.LastUpdated = rawItem.Data.LastUpdated
+	enriched.Project = project
 
 	enriched.BackendName = fmt.Sprintf("%sEnrich", strings.Title(e.DSName))
 	enriched.BackendVersion = e.BackendVersion

@@ -58,6 +58,7 @@ type RepositoryRaw struct {
 // RepositoryEnrich represents dockerhub repository enriched model
 type RepositoryEnrich struct {
 	ID             string `json:"id"`
+	Project        string `json:"project"`
 	Affiliation    string `json:"affiliation"`
 	Description    string `json:"description"`
 	IsPrivate      bool   `json:"is_private"`
