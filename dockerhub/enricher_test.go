@@ -3,7 +3,7 @@ package dockerhub
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/LF-Engineering/da-ds/mocks"
+	"github.com/LF-Engineering/da-ds/dockerhub/mocks"
 	"github.com/LF-Engineering/da-ds/utils"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -39,7 +39,7 @@ func TestGetPreviouslyFetchedData(t *testing.T) {
 	d, err := time.Parse(time.RFC3339, lastDate)
 
 	for _, repo := range repos {
-		raws, err := srv.GetPreviouslyFetchedDataItem(repo, nil, &d, false)
+		raws, err := srv.GetFetchedDataItem(repo, nil, &d, false)
 		if err != nil {
 			t.Errorf("err: %v", err)
 			return

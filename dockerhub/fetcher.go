@@ -108,6 +108,8 @@ func (f *Fetcher) FetchItem(owner string, repository string, now time.Time) (*Re
 		return nil, err
 	}
 
+	fmt.Println("hhhhhhh")
+	fmt.Println(string(resBody))
 	repoRes := &RepositoryResponse{}
 	if err := json.Unmarshal(resBody, &repoRes); err != nil {
 		return nil, errors.New("unable to resolve json request")
@@ -134,6 +136,8 @@ func (f *Fetcher) FetchItem(owner string, repository string, now time.Time) (*Re
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println("xxxxxx")
+	fmt.Println(uid)
 	raw.UUID = uid
 
 	return raw, nil
