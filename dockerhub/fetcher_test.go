@@ -359,49 +359,100 @@ func TestFetchItem(t *testing.T) {
 			"pushprox",
 		},
 		`{
-          "backend_name" : "Dockerhub",
-          "updated_on" : 1.599530819256249E9,
-          "perceval_version" : "0.17.0",
-          "data" : {
-            "is_automated" : false,
-            "permissions" : {
-              "write" : false,
-              "admin" : false,
-              "read" : true
-            },
-            "affiliation" : null,
-            "full_description" : null,
-            "is_private" : false,
-            "description" : "",
-            "name" : "pushprox",
-            "fetched_on" : 1.599530819256249E9,
-            "user" : "prom",
-            "can_edit" : false,
-            "is_migrated" : false,
-            "star_count" : 1,
-            "namespace" : "prom",
-            "has_starred" : false,
-            "status" : 1,
-            "last_updated" : "2020-06-23T07:56:26.882328Z",
-            "repository_type" : "image",
-            "pull_count" : 9076
-          },
-          "backend_version" : "0.6.0",
-          "classified_fields_filtered" : null,
-          "uuid" : "9067eabc9b8d3ec0fc72054f0e90feff2201c14d",
-          "metadata__timestamp" : "2020-09-08T02:06:59.256249Z",
-          "metadata__updated_on" : "2020-09-08T02:06:59.256249Z",
-          "tag" : "https://hub.docker.com/prom/pushprox",
+         "backend_name" : "Dockerhub",
+         "updated_on" : 1.599530819256249E9,
+         "perceval_version" : "0.17.0",
+         "data" : {
+           "is_automated" : false,
+           "permissions" : {
+             "write" : false,
+             "admin" : false,
+             "read" : true
+           },
+           "affiliation" : null,
+           "full_description" : null,
+           "is_private" : false,
+           "description" : "",
+           "name" : "pushprox",
+           "fetched_on" : 1.599530819256249E9,
+           "user" : "prom",
+           "can_edit" : false,
+           "is_migrated" : false,
+           "star_count" : 1,
+           "namespace" : "prom",
+           "has_starred" : false,
+           "status" : 1,
+           "last_updated" : "2020-06-23T07:56:26.882328Z",
+           "repository_type" : "image",
+           "pull_count" : 9076
+         },
+         "backend_version" : "0.6.0",
+         "classified_fields_filtered" : null,
+         "uuid" : "9067eabc9b8d3ec0fc72054f0e90feff2201c14d",
+         "metadata__timestamp" : "2020-09-08T02:06:59.256249Z",
+         "metadata__updated_on" : "2020-09-08T02:06:59.256249Z",
+         "tag" : "https://hub.docker.com/prom/pushprox",
+         "category" : "dockerhub-data",
+         "origin" : "https://hub.docker.com/prom/pushprox",
+         "timestamp" : 1.599530819256249E9,
+         "search_fields" : {
+           "name" : "pushprox",
+           "namespace" : "prom",
+           "item_id" : "1599530819.256249"
+         }
+     }`,
+	}
+
+	testEdgex := test{
+		"EdgexTest",
+		httpClientData{
+			"edgexfoundry",
+			"docker-core-command-go",
+		},
+		`{
+          "origin" : "https://hub.docker.com/edgexfoundry/docker-core-command-go",
           "category" : "dockerhub-data",
-          "origin" : "https://hub.docker.com/prom/pushprox",
-          "timestamp" : 1.599530819256249E9,
+          "classified_fields_filtered" : null,
+          "metadata__updated_on" : "2020-11-30T15:23:26.036942Z",
+          "metadata__timestamp" : "2020-11-30T15:23:26.036942Z",
+          "perceval_version" : "0.17.1",
+          "uuid" : "ee42deebb7b927d5e43be7a708f5608670db8599",
           "search_fields" : {
-            "name" : "pushprox",
-            "namespace" : "prom",
-            "item_id" : "1599530819.256249"
+            "item_id" : "1606749806.036942",
+            "namespace" : "edgexfoundry",
+            "name" : "docker-core-command-go"
+          },
+          "backend_name" : "Dockerhub",
+          "tag" : "https://hub.docker.com/edgexfoundry/docker-core-command-go",
+          "updated_on" : 1.606749806036942E9,
+          "backend_version" : "0.6.0",
+          "timestamp" : 1.606749806036942E9,
+          "data" : {
+            "fetched_on" : 1.606749806036942E9,
+            "is_automated" : false,
+            "affiliation" : null,
+            "namespace" : "edgexfoundry",
+            "status" : 1,
+            "is_migrated" : false,
+            "collaborator_count" : 0,
+            "has_starred" : false,
+            "is_private" : false,
+            "star_count" : 2,
+            "description" : "",
+            "permissions" : {
+              "read" : true,
+              "write" : false,
+              "admin" : false
+            },
+            "name" : "docker-core-command-go",
+            "repository_type" : "image",
+            "pull_count" : 709408,
+            "full_description" : null,
+            "user" : "edgexfoundry",
+            "can_edit" : false,
+            "last_updated" : "2020-11-18T17:41:09.216750Z"
           }
-        }
-      }`,
+        }`,
 	}
 
 	tests = append(tests, testOnap)
@@ -409,6 +460,7 @@ func TestFetchItem(t *testing.T) {
 	tests = append(tests, testSawtooth)
 	tests = append(tests, testYocto)
 	tests = append(tests, testPrometheus)
+	tests = append(tests, testEdgex)
 
 
 	for _, tst := range tests {
