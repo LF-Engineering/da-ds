@@ -23,14 +23,14 @@ STRIP=strip
 
 all: check ${BINARIES}
 
-dads: cmd/dads/dads.go ${GO_LIB_FILES}
+build: cmd/dads/dads.go ${GO_LIB_FILES}
 	 ${GO_ENV} ${GO_BUILD} -o dads cmd/dads/dads.go
 
 fmt: ${GO_BIN_FILES} ${GO_LIB_FILES} ${GO_TEST_FILES} ${GO_LIBTEST_FILES}
 	./scripts/for_each_go_file.sh "${GO_FMT}"
 
-lint: ${GO_BIN_FILES} ${GO_LIB_FILES} ${GO_TEST_FILES} ${GO_LIBTEST_FILES}
-	./scripts/for_each_go_file.sh "${GO_LINT}"
+lint: ## Lint the files
+	golint -set_exit_status $(shell go list ./... | grep -v /vendor/)
 
 vet: ${GO_BIN_FILES} ${GO_LIB_FILES} ${GO_TEST_FILES} ${GO_LIBTEST_FILES}
 	./scripts/vet_files.sh "${GO_VET}"
@@ -48,7 +48,7 @@ errcheck: ${GO_BIN_FILES} ${GO_LIB_FILES} ${GO_TEST_FILES} ${GO_LIBTEST_FILES}
 	${GO_ERRCHECK} ./...
 
 test:
-	${GO_TEST} ${GO_TEST_FILES}
+	go test ./... -v | grep -v /vendor/
 
 check: fmt lint imports vet const usedexports errcheck
 
