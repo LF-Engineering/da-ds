@@ -20,6 +20,7 @@ GO_ERRCHECK=errcheck -asserts -ignore '[FS]?[Pp]rint*' -ignoretests
 GO_TEST=go test
 BINARIES=dads
 STRIP=strip
+PKG_LIST := $(shell go list ./... | grep -v /vendor/)
 
 all: check ${BINARIES}
 
@@ -48,7 +49,7 @@ errcheck: ${GO_BIN_FILES} ${GO_LIB_FILES} ${GO_TEST_FILES} ${GO_LIBTEST_FILES}
 	${GO_ERRCHECK} ./...
 
 test:
-	go test ./... -v | grep -v /vendor/
+	go test -v $(PKG_LIST)
 
 check: fmt lint imports vet const usedexports errcheck
 
