@@ -109,7 +109,7 @@ func UUIDAffs(ctx *Ctx, args ...string) (h string) {
 	}
 	var err error
 	if len(args) != 4 {
-		err = fmt.Errorf("GenerateIdentity requires exactly 4 asrguments, got %+v\n", args)
+		err = fmt.Errorf("generateIdentity requires exactly 4 asrguments, got %+v", args)
 	} else {
 		h, err = uuid.GenerateIdentity(&args[0], &args[1], &args[2], &args[3])
 	}
