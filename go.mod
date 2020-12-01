@@ -1,6 +1,6 @@
 module github.com/LF-Engineering/da-ds
 
-go 1.13
+go 1.15
 
 require (
 	github.com/LF-Engineering/dev-analytics-libraries v0.0.0-20201126133451-e87329766817
