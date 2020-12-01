@@ -345,17 +345,70 @@ func TestFetchItem(t *testing.T) {
           "origin" : "https://hub.docker.com/crops/yocto-eol",
           "search_fields" : {
             "name" : "yocto-eol",
-            "item_id" : "1606771175.14455",
+            "item_id" : "1606771175.144550",
             "namespace" : "crops"
           },
           "uuid" : "455e6ac81de85c7b2e8dcc54ba5bfa413f962c55"
         }`,
 	}
 
+	testPrometheus := test{
+		"PrometheusTest",
+		httpClientData{
+			"prom",
+			"pushprox",
+		},
+		`{
+          "backend_name" : "Dockerhub",
+          "updated_on" : 1.599530819256249E9,
+          "perceval_version" : "0.17.0",
+          "data" : {
+            "is_automated" : false,
+            "permissions" : {
+              "write" : false,
+              "admin" : false,
+              "read" : true
+            },
+            "affiliation" : null,
+            "full_description" : null,
+            "is_private" : false,
+            "description" : "",
+            "name" : "pushprox",
+            "fetched_on" : 1.599530819256249E9,
+            "user" : "prom",
+            "can_edit" : false,
+            "is_migrated" : false,
+            "star_count" : 1,
+            "namespace" : "prom",
+            "has_starred" : false,
+            "status" : 1,
+            "last_updated" : "2020-06-23T07:56:26.882328Z",
+            "repository_type" : "image",
+            "pull_count" : 9076
+          },
+          "backend_version" : "0.6.0",
+          "classified_fields_filtered" : null,
+          "uuid" : "9067eabc9b8d3ec0fc72054f0e90feff2201c14d",
+          "metadata__timestamp" : "2020-09-08T02:06:59.256249Z",
+          "metadata__updated_on" : "2020-09-08T02:06:59.256249Z",
+          "tag" : "https://hub.docker.com/prom/pushprox",
+          "category" : "dockerhub-data",
+          "origin" : "https://hub.docker.com/prom/pushprox",
+          "timestamp" : 1.599530819256249E9,
+          "search_fields" : {
+            "name" : "pushprox",
+            "namespace" : "prom",
+            "item_id" : "1599530819.256249"
+          }
+        }
+      }`,
+	}
+
 	tests = append(tests, testOnap)
 	tests = append(tests, testFabric)
 	tests = append(tests, testSawtooth)
 	tests = append(tests, testYocto)
+	tests = append(tests, testPrometheus)
 
 
 	for _, tst := range tests {

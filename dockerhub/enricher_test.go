@@ -173,7 +173,7 @@ func TestEnrichItem(t *testing.T) {
           "repository_type" : "image",
           "build_on_cloud" : null,
           "description_analyzed" : "Fabric Zookeeper docker image for Hyperledger Project",
-          "full_description_analyzed" : "",
+          "full_description_analyzed" : "Fabric Zookeeper docker image for Hyperledger Project",
           "affiliation" : null,
           "creation_date" : "2020-11-30T13:42:43.620021Z",
           "metadata__enriched_on" : "2020-11-30T13:42:45.016479Z",
@@ -277,9 +277,170 @@ func TestEnrichItem(t *testing.T) {
         }`,
 	}
 
+	testYocto := test{
+		"YoctoTest",
+		`{
+          "timestamp" : 1.60677117514455E9,
+          "metadata__updated_on" : "2020-11-30T21:19:35.144550Z",
+          "classified_fields_filtered" : null,
+          "tag" : "https://hub.docker.com/crops/yocto-eol",
+          "metadata__timestamp" : "2020-11-30T21:19:35.144584Z",
+          "updated_on" : 1.60677117514455E9,
+          "perceval_version" : "0.17.1",
+          "backend_name" : "Dockerhub",
+          "data" : {
+            "last_updated" : "2020-07-09T03:35:44.222467Z",
+            "description" : "These images contain distros that have reached EOL. They are no longer updated, tested or supported.",
+            "full_description" : null,
+            "star_count" : 0,
+            "is_automated" : false,
+            "pull_count" : 55,
+            "can_edit" : false,
+            "permissions" : {
+              "read" : true,
+              "write" : false,
+              "admin" : false
+            },
+            "fetched_on" : 1.60677117514455E9,
+            "status" : 1,
+            "is_migrated" : false,
+            "has_starred" : false,
+            "repository_type" : "image",
+            "name" : "yocto-eol",
+            "collaborator_count" : 0,
+            "is_private" : false,
+            "user" : "crops",
+            "affiliation" : null,
+            "namespace" : "crops"
+          },
+          "category" : "dockerhub-data",
+          "backend_version" : "0.6.0",
+          "origin" : "https://hub.docker.com/crops/yocto-eol",
+          "search_fields" : {
+            "name" : "yocto-eol",
+            "item_id" : "1606771175.144550",
+            "namespace" : "crops"
+          },
+          "uuid" : "455e6ac81de85c7b2e8dcc54ba5bfa413f962c55"
+        }`,
+		`{
+          "description" : "These images contain distros that have reached EOL. They are no longer updated, tested or supported.",
+          "tag" : "https://hub.docker.com/crops/yocto-eol",
+          "pull_count" : 55,
+          "id" : "yocto-eol-crops",
+          "uuid" : "455e6ac81de85c7b2e8dcc54ba5bfa413f962c55",
+          "description_analyzed" : "These images contain distros that have reached EOL. They are no longer updated, tested or supported.",
+          "is_event" : 1,
+          "metadata__version" : "0.80.0",
+          "metadata__backend_name" : "DockerhubEnrich",
+          "status" : 1,
+          "full_description_analyzed" : "These images contain distros that have reached EOL. They are no longer updated, tested or supported.",
+          "build_on_cloud" : null,
+          "repository_type" : "image",
+          "offset" : null,
+          "user" : "crops",
+          "is_automated" : false,
+          "repository_labels" : null,
+          "is_private" : false,
+          "last_updated" : "2020-07-09T03:35:44.222467Z",
+          "metadata__timestamp" : "2020-11-30T21:19:35.144584Z",
+          "is_dockerhub_dockerhub" : 1,
+          "creation_date" : "2020-11-30T21:19:35.144550Z",
+          "metadata__updated_on" : "2020-11-30T21:19:35.144550Z",
+          "star_count" : 0,
+          "origin" : "https://hub.docker.com/crops/yocto-eol",
+          "metadata__enriched_on" : "2020-11-30T21:19:35.923369Z",
+          "metadata__filter_raw" : null,
+          "is_docker_image" : 0,
+          "affiliation" : null
+        }`,
+	}
+
+	testPrometheus := test{
+		"PrometheusTest",
+		`{
+          "backend_name" : "Dockerhub",
+          "updated_on" : 1.599530819256249E9,
+          "perceval_version" : "0.17.0",
+          "data" : {
+            "is_automated" : false,
+            "permissions" : {
+              "write" : false,
+              "admin" : false,
+              "read" : true
+            },
+            "affiliation" : null,
+            "full_description" : null,
+            "is_private" : false,
+            "description" : "",
+            "name" : "pushprox",
+            "fetched_on" : 1.599530819256249E9,
+            "user" : "prom",
+            "can_edit" : false,
+            "is_migrated" : false,
+            "star_count" : 1,
+            "namespace" : "prom",
+            "has_starred" : false,
+            "status" : 1,
+            "last_updated" : "2020-06-23T07:56:26.882328Z",
+            "repository_type" : "image",
+            "pull_count" : 9076
+          },
+          "backend_version" : "0.6.0",
+          "classified_fields_filtered" : null,
+          "uuid" : "9067eabc9b8d3ec0fc72054f0e90feff2201c14d",
+          "metadata__timestamp" : "2020-09-08T02:06:59.256295Z",
+          "metadata__updated_on" : "2020-09-08T02:06:59.256295Z",
+          "tag" : "https://hub.docker.com/prom/pushprox",
+          "category" : "dockerhub-data",
+          "origin" : "https://hub.docker.com/prom/pushprox",
+          "timestamp" : 1.599530819256249E9,
+          "search_fields" : {
+            "name" : "pushprox",
+            "namespace" : "prom",
+            "item_id" : "1599530819.256249"
+          }
+      }`,
+		`{
+         "tag" : "https://hub.docker.com/prom/pushprox",
+         "repository_type" : "image",
+         "user" : "prom",
+         "metadata__updated_on" : "2020-09-08T02:06:59.256295Z",
+         "description" : "",
+         "uuid" : "9067eabc9b8d3ec0fc72054f0e90feff2201c14d",
+         "id" : "pushprox-prom",
+         "full_description_analyzed" : "",
+         "project" : "Prometheus",
+         "is_automated" : false,
+         "affiliation" : null,
+         "is_event" : 1,
+         "last_updated" : "2020-06-23T07:56:26.882328Z",
+         "metadata__filter_raw" : null,
+         "offset" : null,
+         "origin" : "https://hub.docker.com/prom/pushprox",
+         "is_private" : false,
+         "metadata__backend_name" : "DockerhubEnrich",
+         "metadata__timestamp" : "2020-09-08T02:06:59.256295Z",
+         "is_dockerhub_dockerhub" : 1,
+         "is_docker_image" : 0,
+         "status" : 1,
+         "star_count" : 1,
+         "metadata__enriched_on" : "2020-11-30T12:01:04.359558Z",
+         "build_on_cloud" : null,
+         "description_analyzed" : "",
+         "metadata__version" : "0.80.0",
+         "pull_count" : 9076,
+         "repository_labels" : null,
+         "creation_date" : "2020-09-08T02:06:59.256295Z"
+       }`,
+	}
+
 	tests = append(tests, testOnap)
 	tests = append(tests, testFabric)
 	tests = append(tests, testSawtooth)
+	tests = append(tests, testYocto)
+	tests = append(tests, testPrometheus)
+
 
 	for _, tst := range tests {
 		t.Run(tst.name, func(tt *testing.T) {

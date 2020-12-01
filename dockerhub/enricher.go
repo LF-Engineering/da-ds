@@ -76,7 +76,11 @@ func (e *Enricher) EnrichItem(rawItem RepositoryRaw, project string,now time.Tim
 	enriched.DescriptionAnalyzed = rawItem.Data.Description
 
 	// todo: in python description is used ??
-	enriched.FullDescriptionAnalyzed = rawItem.Data.FullDescription
+	if rawItem.Data.FullDescription == "" {
+		enriched.FullDescriptionAnalyzed = rawItem.Data.Description
+	}else{
+		enriched.FullDescriptionAnalyzed = rawItem.Data.FullDescription
+	}
 	enriched.Affiliation = rawItem.Data.Affiliation
 	enriched.IsPrivate = rawItem.Data.IsPrivate
 	enriched.IsAutomated = rawItem.Data.IsAutomated
