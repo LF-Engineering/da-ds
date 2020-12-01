@@ -3,8 +3,6 @@ package dads
 import (
 	"os"
 	"testing"
-
-	lib "github.com/LF-Engineering/da-ds"
 )
 
 func TestUUIDNonEmpty(t *testing.T) {
@@ -22,15 +20,15 @@ func TestUUIDNonEmpty(t *testing.T) {
 		//{args: []string{"a", "§"}},
 		//{args: []string{"ds", "ę", "ąć∂į", "東京都"}},
 	}
-	lib.FatalOnError(os.Setenv("DA_DS", "ds"))
-	var ctx lib.Ctx
+	FatalOnError(os.Setenv("DA_DS", "ds"))
+	var ctx Ctx
 	ctx.Init()
 	for index, test := range testCases {
 		ctx.LegacyUUID = false
-		uuidGo := lib.UUIDNonEmpty(&ctx, test.args...)
-		lib.ResetUUIDCache()
+		uuidGo := UUIDNonEmpty(&ctx, test.args...)
+		ResetUUIDCache()
 		ctx.LegacyUUID = true
-		uuidPy := lib.UUIDNonEmpty(&ctx, test.args...)
+		uuidPy := UUIDNonEmpty(&ctx, test.args...)
 		if uuidGo != uuidPy {
 			t.Errorf("uuid non-empty test number %d, %+v gives %s using go code and %s using py code", index+1, test.args, uuidGo, uuidPy)
 		}
@@ -60,15 +58,15 @@ func TestUUIDAffs(t *testing.T) {
 		//{args: [4]string{"A", "ą", "c", "ę"}},
 		//{args: [4]string{"A", "ą", "ć", "ę"}},
 	}
-	lib.FatalOnError(os.Setenv("DA_DS", "ds"))
-	var ctx lib.Ctx
+	FatalOnError(os.Setenv("DA_DS", "ds"))
+	var ctx Ctx
 	ctx.Init()
 	for index, test := range testCases {
 		ctx.LegacyUUID = false
-		uuidGo := lib.UUIDAffs(&ctx, test.args[0], test.args[1], test.args[2], test.args[3])
-		lib.ResetUUIDCache()
+		uuidGo := UUIDAffs(&ctx, test.args[0], test.args[1], test.args[2], test.args[3])
+		ResetUUIDCache()
 		ctx.LegacyUUID = true
-		uuidPy := lib.UUIDAffs(&ctx, test.args[0], test.args[1], test.args[2], test.args[3])
+		uuidPy := UUIDAffs(&ctx, test.args[0], test.args[1], test.args[2], test.args[3])
 		if uuidGo != uuidPy {
 			t.Errorf("uuid affs test number %d, %+v gives %s using go code and %s using py code", index+1, test.args, uuidGo, uuidPy)
 		}
