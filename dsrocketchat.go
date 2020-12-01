@@ -256,7 +256,7 @@ func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
 	channelInfo, ok := res.(map[string]interface{})["channel"]
 	if !ok {
 		data, _ := res.(map[string]interface{})
-		err = fmt.Errorf("Cannot read channel info from:\n%s\n", data)
+		err = fmt.Errorf("cannot read channel info from:\n%s", data)
 		return
 	}
 	// Process messages (possibly in threads)
@@ -576,7 +576,7 @@ func RocketchatEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, d
 		}
 		doc, ok := src.(map[string]interface{})
 		if !ok {
-			e = fmt.Errorf("Failed to parse document %+v\n", doc)
+			e = fmt.Errorf("Failed to parse document %+v", doc)
 			return
 		}
 		if 1 == 0 {

@@ -31,47 +31,47 @@ func TestFloatTime2(t *testing.T) {
 		},
 		{
 			"hyperledger-aries_old",
-			1.578593623000436E9,
+			1.578593623000436e9,
 			"2020-01-09T18:13:43.000436+00:00",
 		},
 		{
 			"hyperledger-explorer-db",
-			1.605760867976719E9,
+			1.605760867976719e9,
 			"2020-11-19T04:41:07.976719+00:00",
 		},
 		{
 			"hyperledger-explorer-db_old",
-			1.578590780539522E9,
+			1.578590780539522e9,
 			"2020-01-09T17:26:20.539522+00:00",
 		},
 		{
 			"yocto-eol",
-			1.605787742136769E9,
+			1.605787742136769e9,
 			"2020-11-19T12:09:02.136769+00:00",
 		},
 		{
 			"yocto-eol_old",
-			1.596145933258305E9,
+			1.596145933258305e9,
 			"2020-07-30T21:52:13.258305+00:00",
 		},
 		{
 			"fluentd-kubernetes-daemonset",
-			1.605748553332666E9,
+			1.605748553332666e9,
 			"2020-11-19T01:15:53.332666+00:00",
 		},
 		{
 			"fluentd-kubernetes-daemonset_old",
-			1.596835322901541E9,
+			1.596835322901541e9,
 			"2020-08-07T21:22:02.901541+00:00",
 		},
 		{
 			"envoy",
-			1.605748149761947E9,
+			1.605748149761947e9,
 			"2020-11-19T01:09:09.761947+00:00",
 		},
 		{
 			"envoy_old",
-			1.596835145490981E9,
+			1.596835145490981e9,
 			"2020-08-07T21:19:05.490981+00:00",
 		},
 	}
@@ -84,15 +84,8 @@ func TestFloatTime2(t *testing.T) {
 			}
 
 			result := ConvertTimeToFloat(tm)
-			fmt.Println(fmt.Sprintf("%f",i.result), fmt.Sprintf("%f",result))
+			fmt.Println(fmt.Sprintf("%f", i.result), fmt.Sprintf("%f", result))
 			assert.Equal(t, i.result, result)
 		})
 	}
-
-	//
-	//x := 1.605760484366669E9
-	//sec, dec := math.Modf(x)
-	//tt, _ := time.Unix(int64(sec), int64(dec)).MarshalJSON()
-	//fmt.Printf("%s\n", tt)
-	//fmt.Printf("%v\n", x)
 }

@@ -3,7 +3,7 @@ package dockerhub
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/LF-Engineering/da-ds/mocks"
+	"github.com/LF-Engineering/da-ds/dockerhub/mocks"
 	"github.com/LF-Engineering/da-ds/utils"
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 	"github.com/stretchr/testify/assert"
@@ -22,7 +22,7 @@ func TestFetchItemBasic(t *testing.T) {
 		Password:       "",
 		BackendVersion: "0.0.1",
 	}
-	httpClientProviderMock := &mocks.HttpClientProvider{}
+	httpClientProviderMock := &mocks.HTTPClientProvider{}
 
 	fakeResult := make(map[string]interface{})
 	fakeResult["user"] = "hyperledger"
@@ -50,7 +50,7 @@ func TestFetchItemBasic(t *testing.T) {
 
 	httpClientProviderMock.On("Request",
 		fmt.Sprintf("https://hub.docker.com/v2/repositories/%s/%s", owner, repo),
-		"GET", mock.Anything, mock.Anything).Return(200, b, nil)
+		"GET", mock.Anything, mock.Anything, mock.Anything).Return(200, b, nil)
 
 	esClientProviderMock := &mocks.ESClientProvider{}
 
@@ -74,7 +74,7 @@ func TestFetchItemFromAPI(t *testing.T) {
 		Password:       "",
 		BackendVersion: "0.0.1",
 	}
-	httpClientProviderMock := &mocks.HttpClientProvider{}
+	httpClientProviderMock := &mocks.HTTPClientProvider{}
 
 	b := `{
     "user": "grimoirelab",
@@ -102,7 +102,7 @@ func TestFetchItemFromAPI(t *testing.T) {
 
 	httpClientProviderMock.On("Request",
 		fmt.Sprintf("https://hub.docker.com/v2/repositories/%s/%s", owner, repo),
-		"GET", mock.Anything, mock.Anything).Return(200, []byte(b), nil)
+		"GET", mock.Anything, mock.Anything, mock.Anything).Return(200, []byte(b), nil)
 
 	esClientProviderMock := &mocks.ESClientProvider{}
 
@@ -128,11 +128,9 @@ func TestFetchItemFromAPI(t *testing.T) {
 
 }
 
-
-
 func TestFetchItem(t *testing.T) {
 	// Arrange
-	httpClientProviderMock := &mocks.HttpClientProvider{}
+	httpClientProviderMock := &mocks.HTTPClientProvider{}
 	esClientProviderMock := &mocks.ESClientProvider{}
 
 	type httpClientData struct {
@@ -320,7 +318,7 @@ func TestFetchItem(t *testing.T) {
 
 			httpClientProviderMock.On("Request",
 				fmt.Sprintf("https://hub.docker.com/v2/repositories/%s/%s", tst.httpClientData.owner, tst.httpClientData.repository),
-				"GET", mock.Anything, mock.Anything).Return(200, data, nil)
+				"GET", mock.Anything, mock.Anything, mock.Anything).Return(200, data, nil)
 
 			params := &Params{
 				Username:       "",
@@ -351,7 +349,7 @@ func toRepositoryRaw(b string) (RepositoryRaw, error) {
 }
 
 func prepareObject() (*Fetcher, ESClientProvider, error) {
-	httpClientProvider := utils.NewHttpClientProvider(5 * time.Second)
+	httpClientProvider := utils.NewHTTPClientProvider(5 * time.Second)
 
 	params := &Params{
 		Username:       "",

@@ -3,7 +3,7 @@ package dockerhub
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/LF-Engineering/da-ds/mocks"
+	"github.com/LF-Engineering/da-ds/dockerhub/mocks"
 	"github.com/LF-Engineering/da-ds/utils"
 	"github.com/stretchr/testify/assert"
 	"testing"

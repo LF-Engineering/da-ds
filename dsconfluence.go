@@ -127,12 +127,12 @@ func (j *DSConfluence) GetHistoricalContents(ctx *Ctx, content map[string]interf
 	}
 	iID, ok := content["id"]
 	if !ok {
-		err = fmt.Errorf("missing id property in content: %+v\n", content)
+		err = fmt.Errorf("missing id property in content: %+v", content)
 		return
 	}
 	id, ok := iID.(string)
 	if !ok {
-		err = fmt.Errorf("id property is not a string: %+v\n", content)
+		err = fmt.Errorf("id property is not a string: %+v", content)
 		return
 	}
 	method := Get
@@ -173,7 +173,7 @@ func (j *DSConfluence) GetHistoricalContents(ctx *Ctx, content map[string]interf
 		}
 		result, ok := res.(map[string]interface{})
 		if !ok {
-			err = fmt.Errorf("cannot parse JSON from (status: %d):\n%s\n", status, string(res.([]byte)))
+			err = fmt.Errorf("cannot parse JSON from (status: %d):\n%s", status, string(res.([]byte)))
 			return
 		}
 		iLatest, _ := Dig(result, []string{"history", "latest"}, true, false)
@@ -267,7 +267,7 @@ func (j *DSConfluence) GetConfluenceContents(ctx *Ctx, fromDate, next string) (c
 	}
 	result, ok := res.(map[string]interface{})
 	if !ok {
-		err = fmt.Errorf("cannot parse JSON from (status: %d):\n%s\n", status, string(res.([]byte)))
+		err = fmt.Errorf("cannot parse JSON from (status: %d):\n%s", status, string(res.([]byte)))
 		return
 	}
 	iNext, ok := Dig(result, []string{"_links", "next"}, false, true)
@@ -675,7 +675,7 @@ func ConfluenceEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, d
 		}
 		doc, ok := src.(map[string]interface{})
 		if !ok {
-			e = fmt.Errorf("Failed to parse document %+v\n", doc)
+			e = fmt.Errorf("Failed to parse document %+v", doc)
 			return
 		}
 		var rich map[string]interface{}

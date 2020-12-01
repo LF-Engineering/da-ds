@@ -3,10 +3,10 @@ Dockerhub Datasource
 
 Dockerhub datasource is a package to fetch data 
 from dockerhub API and save it into Elasticsearch
- also after enriching it.
+ and Enrich saved data.
 
 
-## Docker Running instructions
+### Docker Running instructions
 
 To run dockerhub datasource from dads you 
 must set proper environment variables to 
@@ -17,7 +17,7 @@ These are the needed environment variables to run dockerhub:
 - DA_DOCKERHUB_ENRICH={1,0}
     - To decide whether will do enrichment step or not.
 - DA_DOCKERHUB_ES_URL=http://{ES_USERNAME}:{ES_PASSWORD}@{URL}:{PORT}
-    - Elasticsearch url included username and password
+    - Elasticsearch url included username, password, host and port
 - DA_DOCKERHUB_NO_INCREMENTAL={1,0} 
     - Starts from the beginning if 1 is selected and will not use date to continue enriching 
 - DA_DOCKERHUB_USERNAME=''
@@ -33,9 +33,8 @@ These are the needed environment variables to run dockerhub:
 - DA_DOCKERHUB_HTTP_TIMEOUT=60s 
     - HTTP timeout duration.
     
-Example of running dads will be found at 
-`dockerhub.sh`
-on the main directory.
+Example of running dads at 
+`./scripts/dockerhub.sh`
 
 
 
