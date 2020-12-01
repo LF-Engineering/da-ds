@@ -530,7 +530,6 @@ func TestInit(t *testing.T) {
 				"DA_DS_ONLY_IDENTITIES": " .0",
 				"DA_DS_FORCE_FULL":      "",
 				"DA_DS_LEGACY_UUID":     "  ",
-				"DA_DS_AllowFail":       "t",
 			},
 			dynamicSetFields(
 				t,
@@ -551,7 +550,6 @@ func TestInit(t *testing.T) {
 					"OnlyIdentities": false,
 					"ForceFull":      false,
 					"LegacyUUID":     false,
-					"AllowFail":      false,
 				},
 			),
 		},

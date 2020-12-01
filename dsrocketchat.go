@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/LF-Engineering/dev-analytics-libraries/emoji"
 )
 
 const (
@@ -28,6 +30,8 @@ var (
 	RocketchatDefaultMinRate = 10
 	// RocketchatDefaultSearchField - default search field
 	RocketchatDefaultSearchField = "item_id"
+	// RocketchatRoles - roles to fetch affiliation data for rocketchat messages
+	RocketchatRoles = []string{"u"}
 )
 
 // DSRocketchat - DS implementation for rocketchat - does nothing at all, just presents a skeleton code
@@ -430,8 +434,7 @@ func (j *DSRocketchat) DateField(*Ctx) string {
 
 // RichIDField - return rich ID field name
 func (j *DSRocketchat) RichIDField(*Ctx) string {
-	// IMPL: uuid for 1:1 data sources, else some other field
-	return DefaultIDField
+	return UUID
 }
 
 // RichAuthorField - return rich author field name
@@ -533,16 +536,38 @@ func (j *DSRocketchat) ElasticRichMapping() []byte {
 // GetItemIdentities return list of item's identities, each one is [3]string
 // (name, username, email) tripples, special value Nil "<nil>" means null
 // we use string and not *string which allows nil to allow usage as a map key
-func (j *DSRocketchat) GetItemIdentities(ctx *Ctx, doc interface{}) (map[[3]string]struct{}, error) {
-	// IMPL:
-	return map[[3]string]struct{}{}, nil
+func (j *DSRocketchat) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3]string]struct{}, err error) {
+	if ctx.Debug > 2 {
+		defer func() {
+			Printf("GetItemIdentities: %+v -> %+v\n", DumpPreview(doc, 100), identities)
+		}()
+	}
+	iUser, ok := Dig(doc, []string{"data", "u"}, false, true)
+	if !ok {
+		return
+	}
+	user, _ := iUser.(map[string]interface{})
+	username := Nil
+	iUserName, ok := user["username"]
+	if ok {
+		username, _ = iUserName.(string)
+	}
+	name := Nil
+	iName, ok := user["name"]
+	if ok {
+		name, _ = iName.(string)
+	}
+	if name == Nil && username == Nil {
+		return
+	}
+	identities = map[[3]string]struct{}{{name, username, Nil}: {}}
+	return
 }
 
 // RocketchatEnrichItemsFunc - iterate items and enrich them
 // items is a current pack of input items
 // docs is a pointer to where extracted identities will be stored
 func RocketchatEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]interface{}) (err error) {
-	// IMPL:
 	if ctx.Debug > 0 {
 		Printf("rocketchat enrich items %d/%d func\n", len(items), len(*docs))
 	}
@@ -579,20 +604,23 @@ func RocketchatEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, d
 			e = fmt.Errorf("Failed to parse document %+v", doc)
 			return
 		}
-		if 1 == 0 {
-			Printf("%v\n", dbConfigured)
-		}
 		// Actual item enrichment
-		/*
-			    var rich map[string]interface{}
-					if thrN > 1 {
-						mtx.Lock()
-					}
-					*docs = append(*docs, rich)
-					if thrN > 1 {
-						mtx.Unlock()
-					}
-		*/
+		var rich map[string]interface{}
+		rich, e = ds.EnrichItem(ctx, doc, "", dbConfigured, nil)
+		if e != nil {
+			return
+		}
+		e = EnrichItem(ctx, ds, rich)
+		if e != nil {
+			return
+		}
+		if thrN > 1 {
+			mtx.Lock()
+		}
+		*docs = append(*docs, rich)
+		if thrN > 1 {
+			mtx.Unlock()
+		}
 		return
 	}
 	if thrN > 1 {
@@ -636,21 +664,228 @@ func (j *DSRocketchat) EnrichItems(ctx *Ctx) (err error) {
 
 // EnrichItem - return rich item from raw item for a given author type
 func (j *DSRocketchat) EnrichItem(ctx *Ctx, item map[string]interface{}, author string, affs bool, extra interface{}) (rich map[string]interface{}, err error) {
-	// IMPL:
-	rich = item
+	rich = make(map[string]interface{})
+	for _, field := range RawFields {
+		v, _ := item[field]
+		rich[field] = v
+	}
+	message, ok := item["data"].(map[string]interface{})
+	if !ok {
+		err = fmt.Errorf("missing data field in item %+v", DumpKeys(item))
+		return
+	}
+	msg, _ := message["msg"]
+	rich["msg_analyzed"] = msg
+	rich["msg"] = msg
+	rich["rid"], _ = message["rid"]
+	rich["msg_id"], _ = message["_id"]
+	rich["msg_parent"], _ = message["parent"]
+	iAuthor, ok := message["u"]
+	if ok {
+		author, _ := iAuthor.(map[string]interface{})
+		rich["user_id"], _ = author["_id"]
+		rich["user_name"], _ = author["name"]
+		rich["user_username"], _ = author["username"]
+	}
+	rich["is_edited"] = 0
+	iEditor, ok := message["editedBy"]
+	if ok {
+		editor, _ := iEditor.(map[string]interface{})
+		iEdited, ok := editor["editedAt"]
+		if ok {
+			edited, err := TimeParseAny(iEdited.(string))
+			if err == nil {
+				rich["edited_at"] = edited
+			}
+		}
+		rich["edited_by_username"], _ = editor["username"]
+		rich["edited_by_user_id"], _ = editor["_id"]
+		rich["is_edited"] = 1
+	}
+	iFile, ok := message["file"]
+	if ok {
+		file, _ := iFile.(map[string]interface{})
+		rich["file_id"], _ = file["_id"]
+		rich["file_name"], _ = file["name"]
+		rich["file_type"], _ = file["type"]
+	}
+	iReplies, ok := message["replies"]
+	if ok {
+		replies, ok := iReplies.([]interface{})
+		if ok {
+			rich["replies"] = len(replies)
+		} else {
+			rich["replies"] = 0
+		}
+	} else {
+		rich["replies"] = 0
+	}
+	rich["total_reactions"] = 0
+	iReactions, ok := message["reactions"]
+	if ok {
+		reactions, _ := iReactions.(map[string]interface{})
+		rich["reactions"], rich["total_reactions"] = j.GetReactions(reactions)
+	}
+	rich["total_mentions"] = 0
+	iMentions, ok := message["mentions"]
+	if ok {
+		mentions, _ := iMentions.([]interface{})
+		mentionsAry := j.GetMentions(mentions)
+		rich["mentions"] = mentionsAry
+		rich["total_mentions"] = len(mentionsAry)
+	}
+	iChannelInfo, ok := message["channel_info"]
+	if ok {
+		channelInfo, _ := iChannelInfo.(map[string]interface{})
+		j.SetChannelInfo(rich, channelInfo)
+	}
+	rich["total_urls"] = 0
+	iURLs, ok := message["urls"]
+	if ok {
+		urls, _ := iURLs.([]interface{})
+		urlsAry := []interface{}{}
+		for _, iURL := range urls {
+			url, _ := iURL.(map[string]interface{})
+			urlsAry = append(urlsAry, url["url"])
+		}
+		rich["message_urls"] = urlsAry
+		rich["total_urls"] = len(urlsAry)
+	}
+	updatedOn, _ := Dig(item, []string{j.DateField(ctx)}, true, false)
+	if affs {
+		authorKey := "u"
+		var affsItems map[string]interface{}
+		affsItems, err = j.AffsItems(ctx, item, RocketchatRoles, updatedOn)
+		if err != nil {
+			return
+		}
+		for prop, value := range affsItems {
+			rich[prop] = value
+		}
+		for _, suff := range AffsFields {
+			rich[Author+suff] = rich[authorKey+suff]
+		}
+		orgsKey := authorKey + MultiOrgNames
+		_, ok := Dig(rich, []string{orgsKey}, false, true)
+		if !ok {
+			rich[orgsKey] = []interface{}{}
+		}
+	}
+	for prop, value := range CommonFields(j, updatedOn, Message) {
+		rich[prop] = value
+	}
+	return
+}
+
+// SetChannelInfo - set rich channel info from raw channel info
+func (j *DSRocketchat) SetChannelInfo(rich, channel map[string]interface{}) {
+	rich["channel_id"], _ = channel["_id"]
+	iUpdated, ok := channel["_updatedAt"]
+	if ok {
+		updated, err := TimeParseAny(iUpdated.(string))
+		if err == nil {
+			rich["channel_updated_at"] = updated
+		}
+	}
+	rich["channel_num_messages"], _ = channel["msgs"]
+	rich["channel_name"], _ = channel["name"]
+	rich["channel_num_users"], _ = channel["usersCount"]
+	rich["channel_topic"], _ = channel["topic"]
+	rich["avatar"], _ = Dig(channel, []string{"lastMessage", "avatar"}, false, true)
+}
+
+// GetMentions - convert raw mentions to rich mentions
+func (j *DSRocketchat) GetMentions(mentions []interface{}) (richMentions []map[string]interface{}) {
+	for _, iUsr := range mentions {
+		usr, _ := iUsr.(map[string]interface{})
+		userName, _ := usr["username"]
+		id, _ := usr["_id"]
+		name, _ := usr["name"]
+		richMentions = append(richMentions, map[string]interface{}{
+			"username": userName,
+			"id":       id,
+			"name":     name,
+		})
+	}
+	return
+}
+
+// GetReactions - convert raw reactions to rich reactions
+func (j *DSRocketchat) GetReactions(reactions map[string]interface{}) (richReactions []map[string]interface{}, nReactions int) {
+	for reactionType, iReactionData := range reactions {
+		reactionData, _ := iReactionData.(map[string]interface{})
+		userNames := []interface{}{}
+		names := []interface{}{}
+		iUserNames, ok := reactionData["usernames"]
+		if ok {
+			userNames, _ = iUserNames.([]interface{})
+		}
+		iNames, ok := reactionData["names"]
+		if ok {
+			names, _ = iNames.([]interface{})
+		}
+		data := emoji.GetEmojiUnicode(reactionType)
+		nUserNames := len(userNames)
+		richReactions = append(richReactions, map[string]interface{}{
+			"type":     reactionType,
+			"emoji":    data,
+			"username": userNames,
+			"names":    names,
+			"count":    nUserNames,
+		})
+		nReactions += nUserNames
+	}
 	return
 }
 
 // AffsItems - return affiliations data items for given roles and date
-func (j *DSRocketchat) AffsItems(ctx *Ctx, rawItem map[string]interface{}, roles []string, date interface{}) (affsItems map[string]interface{}, err error) {
-	// IMPL:
+func (j *DSRocketchat) AffsItems(ctx *Ctx, message map[string]interface{}, roles []string, date interface{}) (affsItems map[string]interface{}, err error) {
+	affsItems = make(map[string]interface{})
+	var dt time.Time
+	dt, err = TimeParseInterfaceString(date)
+	if err != nil {
+		return
+	}
+	for _, role := range roles {
+		identity := j.GetRoleIdentity(ctx, message, role)
+		if len(identity) == 0 {
+			continue
+		}
+		affsIdentity, empty := IdenityAffsData(ctx, j, identity, nil, dt, role)
+		if empty {
+			Printf("no identity affiliation data for identity %+v\n", identity)
+			continue
+		}
+		for prop, value := range affsIdentity {
+			affsItems[prop] = value
+		}
+		for _, suff := range RequiredAffsFields {
+			k := role + suff
+			_, ok := affsIdentity[k]
+			if !ok {
+				affsIdentity[k] = Unknown
+			}
+		}
+	}
 	return
 }
 
 // GetRoleIdentity - return identity data for a given role
-func (j *DSRocketchat) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role string) map[string]interface{} {
-	// IMPL:
-	return map[string]interface{}{"name": nil, "username": nil, "email": nil}
+func (j *DSRocketchat) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role string) (identity map[string]interface{}) {
+	iUser, ok := Dig(item, []string{"data", "u"}, true, false)
+	user, _ := iUser.(map[string]interface{})
+	username := Nil
+	iUserName, ok := user["username"]
+	if ok {
+		username, _ = iUserName.(string)
+	}
+	name := Nil
+	iName, ok := user["name"]
+	if ok {
+		name, _ = iName.(string)
+	}
+	identity = map[string]interface{}{"name": name, "username": username, "email": Nil}
+	return
 }
 
 // AllRoles - return all roles defined for the backend
@@ -658,6 +893,5 @@ func (j *DSRocketchat) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, ro
 // second return parameter is static mode (true/false)
 // dynamic roles will use item to get its roles
 func (j *DSRocketchat) AllRoles(ctx *Ctx, item map[string]interface{}) ([]string, bool) {
-	// IMPL:
-	return []string{Author}, true
+	return []string{"u"}, true
 }
