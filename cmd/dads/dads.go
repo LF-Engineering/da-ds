@@ -93,7 +93,6 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	enrich := ctx.Enrich
 	fromDate := ctx.DateFrom
 	noIncremental := ctx.BoolEnv("NO_INCREMENTAL")
-	project := ctx.Env("PROJECT")
 
 	var repositories []*dockerhub.Repository
 	if err := json.Unmarshal([]byte(repositoriesJSON), &repositories); err != nil {
@@ -106,5 +105,5 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	}
 
 	return dockerhub.NewManager(username, password, fetcherBackendVersion, enricherBackendVersion,
-		enrichOnly, enrich, esURL, timeout, repositories, fromDate, noIncremental,project), nil
+		enrichOnly, enrich, esURL, timeout, repositories, fromDate, noIncremental), nil
 }
