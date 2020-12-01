@@ -300,9 +300,63 @@ func TestFetchItem(t *testing.T) {
         }`,
 	}
 
+	testYocto := test{
+		"YoctoTest",
+		httpClientData{
+			"crops",
+			"yocto-eol",
+		},
+		`{
+          "timestamp" : 1.60677117514455E9,
+          "metadata__updated_on" : "2020-11-30T21:19:35.144550Z",
+          "classified_fields_filtered" : null,
+          "tag" : "https://hub.docker.com/crops/yocto-eol",
+          "metadata__timestamp" : "2020-11-30T21:19:35.144550Z",
+          "updated_on" : 1.60677117514455E9,
+          "perceval_version" : "0.17.1",
+          "backend_name" : "Dockerhub",
+          "data" : {
+            "last_updated" : "2020-07-09T03:35:44.222467Z",
+            "description" : "These images contain distros that have reached EOL. They are no longer updated, tested or supported.",
+            "full_description" : null,
+            "star_count" : 0,
+            "is_automated" : false,
+            "pull_count" : 55,
+            "can_edit" : false,
+            "permissions" : {
+              "read" : true,
+              "write" : false,
+              "admin" : false
+            },
+            "fetched_on" : 1.60677117514455E9,
+            "status" : 1,
+            "is_migrated" : false,
+            "has_starred" : false,
+            "repository_type" : "image",
+            "name" : "yocto-eol",
+            "collaborator_count" : 0,
+            "is_private" : false,
+            "user" : "crops",
+            "affiliation" : null,
+            "namespace" : "crops"
+          },
+          "category" : "dockerhub-data",
+          "backend_version" : "0.6.0",
+          "origin" : "https://hub.docker.com/crops/yocto-eol",
+          "search_fields" : {
+            "name" : "yocto-eol",
+            "item_id" : "1606771175.14455",
+            "namespace" : "crops"
+          },
+          "uuid" : "455e6ac81de85c7b2e8dcc54ba5bfa413f962c55"
+        }`,
+	}
+
 	tests = append(tests, testOnap)
 	tests = append(tests, testFabric)
 	tests = append(tests, testSawtooth)
+	tests = append(tests, testYocto)
+
 
 	for _, tst := range tests {
 		t.Run(tst.name, func(tt *testing.T) {
