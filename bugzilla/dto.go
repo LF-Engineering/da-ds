@@ -20,10 +20,9 @@ type BugResponse struct {
 	Priority         string            `json:"priority"`
 	BugStatus        string            `json:"bug_status"`
 	//Activity           []*BugActivityResponse `json:"activity"`
-	Severity string `json:"bug_severity"`
-	OpSys    string `json:"op_sys"`
 }
 
+// todo: clean it if not used
 // BugActivityResponse data model represents Bugzilla bugsActivity results
 type BugActivityResponse struct {
 	Added  string `json:"added"`
@@ -40,38 +39,11 @@ type BugDetailResponse struct {
 
 // BugDetailXML ...
 type BugDetailXML struct {
-	ID                 int    `xml:"bug_id"`
-	CreationDate       string `xml:"creation_ts"`
-	ShortDescription   string `xml:"short_desc"`
-	DeltaTS            string `xml:"delta_ts"`
-	ReporterAccessible int    `xml:"reporter_accessible"`
-	ClassificationID   int    `xml:"classification_id"`
-	Classification     string `xml:"classification"`
-	Product            string `xml:"product"`
-	Component          string `xml:"component"`
-	Version            string `xml:"version"`
-	RepPlatform        string `xml:"rep_platform"`
-	OpSys              string `xml:"op_sys"`
-	BugStatus          string `xml:"bug_status"`
-	Resolution         string `xml:"resolution"`
-	BugFileLoc         string `xml:"bug_file_loc"`
-	status_whiteboard  string `xml:"status_whiteboard"`
-	keywords           string `xml:"keywords"`
-	priority           string `xml:"priority"`
-	bug_severity       string `xml:"bug_severity"`
-	target_milestone   string `xml:"target_milestone"`
-	everconfirmed      string `xml:"everconfirmed"`
-	reporter           string `xml:"reporter"`
-	assigned_to        string `xml:"assigned_to"`
-	CC                 string `xml:"cc"`
-	CfOs               string `xml:"cf_os"`
-	CfRegressionType   string `xml:"cf_regression_type"`
-	LongDescription    struct {
-		CommentID int    `xml:"comment_id"`
-		Who       string `xml:"who"`
-		When      string `xml:"bug_when"`
-		TheText   string `xml:"thetext"`
-	} `xml:"long_desc"`
+	ID         int    `xml:"bug_id"`
+	CreationTS string `xml:"creation_ts"`
+	Priority   string `xml:"priority"`
+	Severity   string `xml:"bug_severity"`
+	OpSys      string `xml:"op_sys"`
 }
 
 // SearchFields ...
@@ -83,16 +55,27 @@ type SearchFields struct {
 
 // BugRaw data model represents es schema
 type BugRaw struct {
-	BackendVersion    string       `json:"backend_version"`
-	BackendName       string       `json:"backend_name"`
-	UUID              string       `json:"uuid"`
-	Origin            string       `json:"origin"`
-	Tag               string       `json:"tag"`
-	Product           string       `json:"product"`
-	Data              *BugResponse `json:"data"`
-	MetadataUpdatedOn time.Time    `json:"metadata__updated_on"`
-	MetadataTimestamp time.Time    `json:"metadata__timestamp"`
-	Timestamp         float64      `json:"timestamp"`
-	Category          string       `json:"category"`
+	BackendVersion string `json:"backend_version"`
+	BackendName    string `json:"backend_name"`
+	UUID           string `json:"uuid"`
+	BugID          int    `json:"bug_id"`
+	Origin         string `json:"origin"`
+	Tag            string `json:"tag"`
+	Product        string `json:"product"`
+	Component      string `json:"component"`
+	Assignee       struct {
+		Name  string `json:"name"`
+		Email string `json:"email"`
+	}
+	ShortDescription  string    `json:"short_description"`
+	BugStatus         string    `json:"bug_status"`
+	MetadataUpdatedOn time.Time `json:"metadata__updated_on"`
+	MetadataTimestamp time.Time `json:"metadata__timestamp"`
+	Timestamp         float64   `json:"timestamp"`
+	Category          string    `json:"category"`
+	CreationTS        time.Time `json:"creation_ts"`
+	Priority          string    `json:"priority"`
+	Severity          string    `json:"severity"`
+	OpSys             string    `json:"op_sys"`
 	//SearchFields             *SearchFields `json:"search_fields"`
 }

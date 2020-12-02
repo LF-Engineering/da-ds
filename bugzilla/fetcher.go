@@ -75,6 +75,10 @@ func (f *Fetcher) FetchItem(fromDate time.Time, limit int, now time.Time) ([]*Bu
 		raw.BackendVersion = f.BackendVersion
 		raw.BackendName = strings.Title(f.DSName)
 
+		detail, err := f.fetchDetails(bug.ID)
+		if err != nil {
+			return nil, err
+		}
 		// generate UUID
 		uid, err := uuid.Generate(f.Endpoint, strconv.Itoa(bug.ID))
 		if err != nil {
@@ -85,16 +89,25 @@ func (f *Fetcher) FetchItem(fromDate time.Time, limit int, now time.Time) ([]*Bu
 		raw.Tag = f.Endpoint
 		raw.Product = bug.Product
 
-		raw.Data.ID = bug.ID
-		raw.Data.Product = bug.Product
-		raw.Data.Component = bug.Component
-		raw.Data.AssignedTo = bug.AssignedTo
-		raw.Data.ShortDescription = bug.ShortDescription
-		raw.Data.CreationTS = bug.CreationTS
-		raw.Data.Priority = bug.Priority
-		raw.Data.BugStatus = bug.BugStatus
-		raw.Data.Severity = bug.Severity
-		raw.Data.OpSys = bug.OpSys
+		raw.BugID = bug.ID
+		raw.Product = bug.Product
+		raw.Component = bug.Component
+		raw.Assignee.Name = bug.AssignedTo.Name
+		raw.Assignee.Email = bug.AssignedTo.Email
+		raw.ShortDescription = bug.ShortDescription
+
+		fmt.Println("xxxxxxxx")
+		fmt.Println(detail.Bug.CreationTS)
+		t, err := time.Parse("2006-01-02 15:04:05", strings.TrimSuffix(detail.Bug.CreationTS, " +0000")) // todo: fix format layout
+		if err != nil {
+			return nil, err
+		}
+		raw.CreationTS = t
+
+		raw.Priority = detail.Bug.Priority
+		raw.BugStatus = bug.BugStatus
+		raw.Severity = detail.Bug.Severity
+		raw.OpSys = detail.Bug.OpSys
 
 		now = now.UTC()
 		raw.MetadataUpdatedOn = now
@@ -127,20 +140,14 @@ func (f *Fetcher) fetchBugList(fromDate time.Time, limit int) ([]*BugResponse, e
 		if err != nil {
 			continue
 		}
-		chDate, err := time.Parse("2006-01-02 15:04:05", b[7])
-		if err != nil {
-			continue
-		}
 
 		bugsRes = append(bugsRes, &BugResponse{
 			ID:               bugID,
 			Product:          b[1],
 			Component:        b[2],
-			AssignedTo:       b[3],
-			Status:           b[4],
-			Resolution:       b[5],
+			AssignedTo:       &AssigneeResponse{Name: b[3]},
 			ShortDescription: b[6],
-			ChangedDate:      chDate,
+			BugStatus:        b[4],
 		})
 	}
 
