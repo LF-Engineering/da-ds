@@ -89,7 +89,6 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	enricherBackendVersion := "0.0.1" //ctx.Env("ENRICHER_BACKEND_VERSION")
 	esURL := ctx.ESURL
 	httpTimeout := ctx.Env("HTTP_TIMEOUT") // "60s" 60 seconds...
-	// flag projects json array
 	repositoriesJSON := ctx.Env("REPOSITORIES_JSON")
 	enrichOnly := ctx.NoRaw
 	enrich := ctx.Enrich
