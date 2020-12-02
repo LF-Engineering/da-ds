@@ -1,26 +1,13 @@
 package dockerhub
 
 import (
-	"encoding/json"
 	"fmt"
-	"github.com/LF-Engineering/da-ds/dockerhub/mocks"
-	"github.com/LF-Engineering/da-ds/utils"
-	"github.com/stretchr/testify/assert"
 	"testing"
-)
 
-func prepareEnrichObject() (*Enricher, error) {
-	esClientProvider, err := utils.NewESClientProvider(&utils.ESParams{
-		URL:      "http://localhost:9200",
-		Username: "elastic",
-		Password: "changeme",
-	})
-	if err != nil {
-		fmt.Println("err22222 ", err.Error())
-	}
-	srv := NewEnricher("0.0.1", esClientProvider)
-	return srv, err
-}
+	"github.com/LF-Engineering/da-ds/dockerhub/mocks"
+	jsoniter "github.com/json-iterator/go"
+	"github.com/stretchr/testify/assert"
+)
 
 func TestEnrichItem(t *testing.T) {
 	// Arrange
@@ -522,7 +509,6 @@ func TestEnrichItem(t *testing.T) {
 	tests = append(tests, testPrometheus)
 	tests = append(tests, testEdgex)
 
-
 	for _, tst := range tests {
 		t.Run(tst.name, func(tt *testing.T) {
 			expectedRaw, err := toRepositoryRaw(tst.fetchData)
@@ -560,6 +546,6 @@ func TestEnrichItem(t *testing.T) {
 
 func toRepositoryEnrich(b string) (RepositoryEnrich, error) {
 	expectedEnrich := RepositoryEnrich{}
-	err := json.Unmarshal([]byte(b), &expectedEnrich)
+	err := jsoniter.Unmarshal([]byte(b), &expectedEnrich)
 	return expectedEnrich, err
 }

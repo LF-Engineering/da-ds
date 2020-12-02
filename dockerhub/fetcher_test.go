@@ -1,15 +1,16 @@
 package dockerhub
 
 import (
-	"encoding/json"
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/LF-Engineering/da-ds/dockerhub/mocks"
 	"github.com/LF-Engineering/da-ds/utils"
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"testing"
-	"time"
 )
 
 func TestFetchItemBasic(t *testing.T) {
@@ -43,7 +44,7 @@ func TestFetchItemBasic(t *testing.T) {
 	fakeResult["affiliation"] = nil
 	fakeResult["permissions"] = map[string]interface{}{"read": true, "write": false, "admin": false}
 
-	b, err := json.Marshal(fakeResult)
+	b, err := jsoniter.Marshal(fakeResult)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -462,7 +463,6 @@ func TestFetchItem(t *testing.T) {
 	tests = append(tests, testPrometheus)
 	tests = append(tests, testEdgex)
 
-
 	for _, tst := range tests {
 		t.Run(tst.name, func(tt *testing.T) {
 			expectedRaw, err := toRepositoryRaw(tst.expected)
@@ -470,7 +470,7 @@ func TestFetchItem(t *testing.T) {
 				t.Error(err)
 			}
 
-			data, err := json.Marshal(expectedRaw.Data)
+			data, err := jsoniter.Marshal(expectedRaw.Data)
 			if err != nil {
 				t.Error(err)
 			}
@@ -503,7 +503,7 @@ func TestFetchItem(t *testing.T) {
 
 func toRepositoryRaw(b string) (RepositoryRaw, error) {
 	expectedRaw := RepositoryRaw{}
-	err := json.Unmarshal([]byte(b), &expectedRaw)
+	err := jsoniter.Unmarshal([]byte(b), &expectedRaw)
 	return expectedRaw, err
 }
 

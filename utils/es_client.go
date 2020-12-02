@@ -6,11 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/elastic/go-elasticsearch/v7"
-	"github.com/elastic/go-elasticsearch/v7/esapi"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/elastic/go-elasticsearch/v7"
+	"github.com/elastic/go-elasticsearch/v7/esapi"
+	jsoniter "github.com/json-iterator/go"
 )
 
 // ESClientProvider ...
@@ -109,7 +111,7 @@ func (p *ESClientProvider) DeleteIndex(index string, ignoreUnavailable bool) ([]
 	if res.IsError() {
 
 		var e map[string]interface{}
-		if err = json.NewDecoder(res.Body).Decode(&e); err != nil {
+		if err = jsoniter.NewDecoder(res.Body).Decode(&e); err != nil {
 			return nil, err
 		}
 
@@ -158,7 +160,7 @@ func (p *ESClientProvider) Add(index string, documentID string, body []byte) ([]
 	if res.IsError() {
 
 		var e map[string]interface{}
-		if err = json.NewDecoder(res.Body).Decode(&e); err != nil {
+		if err = jsoniter.NewDecoder(res.Body).Decode(&e); err != nil {
 			return nil, err
 		}
 

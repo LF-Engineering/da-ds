@@ -1,16 +1,17 @@
 package dockerhub
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	dads "github.com/LF-Engineering/da-ds"
-	"github.com/LF-Engineering/da-ds/utils"
-	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	dads "github.com/LF-Engineering/da-ds"
+	"github.com/LF-Engineering/da-ds/utils"
+	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
+	jsoniter "github.com/json-iterator/go"
 )
 
 // Fetcher contains dockerhub datasource fetch logic
@@ -35,7 +36,7 @@ type Params struct {
 
 // HTTPClientProvider used in connecting to remote http server
 type HTTPClientProvider interface {
-	Request(url string, method string, header map[string]string, body []byte,params map[string]string) (statusCode int, resBody []byte, err error)
+	Request(url string, method string, header map[string]string, body []byte, params map[string]string) (statusCode int, resBody []byte, err error)
 }
 
 // ESClientProvider used in connecting to ES Client server
@@ -69,18 +70,18 @@ func (f *Fetcher) Login(username string, password string) (string, error) {
 	payload["username"] = username
 	payload["password"] = password
 
-	p, err := json.Marshal(payload)
+	p, err := jsoniter.Marshal(payload)
 	if err != nil {
 		return "", err
 	}
 
 	_, err = dads.Printf("dockerhub login via: %s\n", url)
 
-	statusCode, resBody, err := f.HTTPClientProvider.Request(url, "Post", nil, p,nil)
+	statusCode, resBody, err := f.HTTPClientProvider.Request(url, "Post", nil, p, nil)
 
 	if statusCode == http.StatusOK {
 		res := LoginResponse{}
-		err = json.Unmarshal(resBody, &res)
+		err = jsoniter.Unmarshal(resBody, &res)
 		if err != nil {
 			return "", fmt.Errorf("cannot unmarshal result from %s", string(resBody))
 		}
@@ -103,13 +104,13 @@ func (f *Fetcher) FetchItem(owner string, repository string, now time.Time) (*Re
 		headers["Authorization"] = fmt.Sprintf("JWT %s", f.Token)
 	}
 
-	statusCode, resBody, err := f.HTTPClientProvider.Request(requestURL, "GET", headers, nil,nil)
+	statusCode, resBody, err := f.HTTPClientProvider.Request(requestURL, "GET", headers, nil, nil)
 	if err != nil || statusCode != http.StatusOK {
 		return nil, err
 	}
 
 	repoRes := &RepositoryResponse{}
-	if err := json.Unmarshal(resBody, &repoRes); err != nil {
+	if err := jsoniter.Unmarshal(resBody, &repoRes); err != nil {
 		return nil, errors.New("unable to resolve json request")
 	}
 

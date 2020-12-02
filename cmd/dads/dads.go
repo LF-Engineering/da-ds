@@ -1,11 +1,13 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"github.com/LF-Engineering/da-ds/dockerhub"
 	"math/rand"
 	"time"
+
+	jsoniter "github.com/json-iterator/go"
+
+	"github.com/LF-Engineering/da-ds/dockerhub"
 
 	lib "github.com/LF-Engineering/da-ds"
 )
@@ -95,7 +97,7 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	noIncremental := ctx.BoolEnv("NO_INCREMENTAL")
 
 	var repositories []*dockerhub.Repository
-	if err := json.Unmarshal([]byte(repositoriesJSON), &repositories); err != nil {
+	if err := jsoniter.Unmarshal([]byte(repositoriesJSON), &repositories); err != nil {
 		return nil, err
 	}
 
