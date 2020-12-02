@@ -25,6 +25,7 @@ func ResetUUIDCache() {
 
 // UUIDNonEmpty - generate UUID of string args (all must be non-empty)
 // uses internal cache
+// used to generate document UUID's
 func UUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
 	k := strings.Join(args, ":")
 	if MT {
@@ -69,7 +70,6 @@ func UUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
 // UUIDAffs - generate UUID of string args
 // uses internal cache
 // downcases arguments, all but first can be empty
-// if argument is Nil "<nil>" replaces with "None"
 func UUIDAffs(ctx *Ctx, args ...string) (h string) {
 	k := strings.Join(args, ":")
 	if MT {
