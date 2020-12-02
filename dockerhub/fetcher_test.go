@@ -93,11 +93,11 @@ func TestFetchItemFromAPI(t *testing.T) {
     "build_on_cloud": null,
     "has_starred": false,
     "full_description": "# Perceval [![Build Status](https://travis-ci.org/grimoirelab/perceval.svg?branch=master)](https://travis-ci.org/grimoirelab/perceval) [![Coverage Status](https://img.shields.io/coveralls/grimoirelab/perceval.svg)](https://coveralls.io/r/grimoirelab/perceval?branch=master)\n\nSend Sir Perceval on a quest to retrieve and gather data from software\nrepositories.\n\n## Usage\n\n\nusage:",
-"affiliation": null,
-"permissions": {
-"read": true,
-"write": false,
-"admin": false
+	"affiliation": null,
+	"permissions": {
+	"read": true,
+	"write": false,
+	"admin": false
 }
 }`
 
