@@ -79,7 +79,7 @@ const TooManyScrolls = "Trying to create too many scroll contexts"
 const NoSearchContextFound = "No search context found for id"
 
 // Nil - common constant string
-const Nil = "<nil>"
+const Nil = "none"
 
 // None - common constant string
 const None = "None"

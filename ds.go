@@ -1101,7 +1101,7 @@ func UpdateRateLimit(ctx *Ctx, ds DS, headers map[string][]string, rateLimitHead
 
 // SleepForRateLimit - sleep for rate or return error when rate exceeded
 func SleepForRateLimit(ctx *Ctx, ds DS, rateLimit, rateLimitReset, minRate int, waitRate bool) (err error) {
-	if rateLimit < 0 || rateLimit > minRate {
+	if rateLimit <= 0 || rateLimit > minRate {
 		if ctx.Debug > 1 {
 			Printf("rate limit is %d, min rate is %d, no need to wait\n", rateLimit, minRate)
 		}
