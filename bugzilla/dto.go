@@ -4,16 +4,33 @@ import (
 	"time"
 )
 
+type AssigneeResponse struct {
+	Name  string `json:"name"`
+	Email string `json:"email"`
+}
+
 // BugResponse data model represents Bugzilla get bugsList results
 type BugResponse struct {
-	ID               int       `json:"id"`
-	Product          string    `json:"product"`
-	Component        string    `json:"component"`
-	AssignedTo       string    `json:"assigned_to"`
-	Status           string    `json:"status"`
-	Resolution       string    `json:"resolution"`
-	ShortDescription string    `json:"short_description"`
-	ChangedDate      time.Time `json:"changed_date"`
+	ID               int               `json:"id"`
+	Product          string            `json:"product"`
+	Component        string            `json:"component"`
+	AssignedTo       *AssigneeResponse `json:"assigned_to"`
+	ShortDescription string            `json:"short_description"`
+	CreationTS       time.Time         `json:"creation_ts"`
+	Priority         string            `json:"priority"`
+	BugStatus        string            `json:"bug_status"`
+	//Activity           []*BugActivityResponse `json:"activity"`
+	Severity string `json:"bug_severity"`
+	OpSys    string `json:"op_sys"`
+}
+
+// BugActivityResponse data model represents Bugzilla bugsActivity results
+type BugActivityResponse struct {
+	Added  string `json:"added"`
+	What   string `json:"what"`
+	Remove string `json:"remove"`
+	Who    string `json:"who"`
+	When   string `json:"when"`
 }
 
 // BugResponse data model represents Bugzilla get bugDetail results
@@ -66,18 +83,16 @@ type SearchFields struct {
 
 // BugRaw data model represents es schema
 type BugRaw struct {
-	BackendVersion           string        `json:"backend_version"`
-	BackendName              string        `json:"backend_name"`
-	UUID                     string        `json:"uuid"`
-	Origin                   string        `json:"origin"`
-	Tag                      string        `json:"tag"`
-	Product                  string        `json:"product"`
-	Data                     *BugResponse  `json:"data"`
-	UpdatedOn                int64         `json:"updated_on"`
-	MetadataUpdatedOn        time.Time     `json:"metadata__updated_on"`
-	MetadataTimestamp        time.Time     `json:"metadata__timestamp"`
-	Timestamp                int64         `json:"timestamp"`
-	Category                 string        `json:"category"`
-	ClassifiedFieldsFiltered *string       `json:"classified_fields_filtered"`
-	SearchFields             *SearchFields `json:"search_fields"`
+	BackendVersion    string       `json:"backend_version"`
+	BackendName       string       `json:"backend_name"`
+	UUID              string       `json:"uuid"`
+	Origin            string       `json:"origin"`
+	Tag               string       `json:"tag"`
+	Product           string       `json:"product"`
+	Data              *BugResponse `json:"data"`
+	MetadataUpdatedOn time.Time    `json:"metadata__updated_on"`
+	MetadataTimestamp time.Time    `json:"metadata__timestamp"`
+	Timestamp         float64      `json:"timestamp"`
+	Category          string       `json:"category"`
+	//SearchFields             *SearchFields `json:"search_fields"`
 }

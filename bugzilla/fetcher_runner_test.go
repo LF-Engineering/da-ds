@@ -1,6 +1,7 @@
 package bugzilla
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -19,12 +20,14 @@ func TestFetchItem(t *testing.T) {
 
 	esClientProviderMock := &mocks.ESClientProvider{}
 
-	httpClientProvider := utils.NewHttpClientProvider(50 * time.Second)
+	httpClientProvider := utils.NewHTTPClientProvider(50 * time.Second)
 	srv := NewFetcher(params, httpClientProvider, esClientProviderMock)
 
 	// Act
-	_, err := srv.FetchItem(time.Now(), 3)
+	now := time.Now()
+	bugs, err := srv.FetchItem(now, 3, now)
 
+	fmt.Println(len(bugs))
 	// Assert
 	assert.NoError(t, err)
 

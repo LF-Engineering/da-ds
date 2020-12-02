@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/LF-Engineering/da-ds/utils"
-	"github.com/LF-Engineering/da-ds/utils/uuid"
+	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 )
 
 // Fetcher contains datasource fetch logic
@@ -63,49 +63,49 @@ func NewFetcher(params *Params, httpClientProvider HttpClientProvider, esClientP
 }
 
 // FetchItems ...
-func (f *Fetcher) FetchItem(fromDate time.Time, limit int) (*time.Time, error) {
+func (f *Fetcher) FetchItem(fromDate time.Time, limit int, now time.Time) ([]*BugRaw, error) {
 	bugList, err := f.fetchBugList(fromDate, limit)
 	if err != nil {
 		return nil, err
 	}
 
+	bugs := make([]*BugRaw, 0)
 	for _, bug := range bugList {
 		raw := &BugRaw{}
+		raw.BackendVersion = f.BackendVersion
+		raw.BackendName = strings.Title(f.DSName)
+
 		// generate UUID
 		uid, err := uuid.Generate(f.Endpoint, strconv.Itoa(bug.ID))
 		if err != nil {
 			return nil, err
 		}
 		raw.UUID = uid
-		raw.Product = bug.Product
 		raw.Origin = f.Endpoint
-
-		raw.BackendName = strings.Title(f.DSName)
-		raw.BackendVersion = f.BackendVersion
-		raw.Category = Category
-		// todo: review it in perceval
-		raw.ClassifiedFieldsFiltered = nil
-		now := time.Now().UTC()
-		raw.Timestamp = now.UnixNano()
-		raw.MetadataTimestamp = now
-		raw.SearchFields = &SearchFields{Component: bug.Component, Product: bug.Product, ItemID: strconv.Itoa(bug.ID)}
 		raw.Tag = f.Endpoint
-		// todo: get it from details
-		/*lastUpdated := raw.Data.LastUpdated
-		raw.UpdatedOn = lastUpdated.UnixNano()
-		raw.MetadataUpdatedOn = lastUpdated*/
+		raw.Product = bug.Product
 
-		// fetch details
-		detail, err := f.fetchDetails(bug.ID)
-		if err != nil {
-			return nil, err
-		}
+		raw.Data.ID = bug.ID
+		raw.Data.Product = bug.Product
+		raw.Data.Component = bug.Component
+		raw.Data.AssignedTo = bug.AssignedTo
+		raw.Data.ShortDescription = bug.ShortDescription
+		raw.Data.CreationTS = bug.CreationTS
+		raw.Data.Priority = bug.Priority
+		raw.Data.BugStatus = bug.BugStatus
+		raw.Data.Severity = bug.Severity
+		raw.Data.OpSys = bug.OpSys
 
-		fmt.Println(detail)
-		//raw.Data = repoRes
+		now = now.UTC()
+		raw.MetadataUpdatedOn = now
+		raw.MetadataTimestamp = now
+		raw.Timestamp = utils.ConvertTimeToFloat(now)
+		raw.Category = Category
+
+		bugs = append(bugs, raw)
 	}
 
-	return nil, nil
+	return bugs, nil
 }
 
 func (f *Fetcher) fetchBugList(fromDate time.Time, limit int) ([]*BugResponse, error) {
