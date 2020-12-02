@@ -1,13 +1,13 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"github.com/LF-Engineering/da-ds/dockerhub"
-	"github.com/urfave/cli/v2"
 	"math/rand"
-	"os"
 	"time"
+
+	jsoniter "github.com/json-iterator/go"
+
+	"github.com/LF-Engineering/da-ds/dockerhub"
 
 	lib "github.com/LF-Engineering/da-ds"
 )
@@ -22,7 +22,7 @@ func runDS(ctx *lib.Ctx) (err error) {
 	case lib.Groupsio:
 		ds = &lib.DSGroupsio{}
 	case dockerhub.Dockerhub:
-		manager, err := dockerhubEnvs(ctx)
+		manager, err := buildDockerhubManager(ctx)
 		if err != nil {
 			return err
 		}
@@ -70,10 +70,6 @@ func runDS(ctx *lib.Ctx) (err error) {
 func main() {
 	var ctx lib.Ctx
 
-	if err := (&cli.App{}).Run(os.Args); err != nil {
-
-	}
-
 	rand.Seed(time.Now().UnixNano())
 	dtStart := time.Now()
 	ctx.Init()
@@ -85,25 +81,22 @@ func main() {
 	lib.Printf("Took: %v\n", dtEnd.Sub(dtStart))
 }
 
-func dockerhubEnvs(ctx *lib.Ctx) (*dockerhub.Manager, error) {
+func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	// Dockerhub credentials
 	username := ctx.Env("USERNAME")
 	password := ctx.Env("PASSWORD")
-	fetcherBackendVersion := ctx.Env("FETCHER_BACKEND_VERSION")
-	enricherBackendVersion := ctx.Env("ENRICHER_BACKEND_VERSION")
-	esUrl := ctx.Env("ES_URL")
-	esUsername := ctx.Env("ES_USERNAME")
-	esPassword := ctx.Env("ES_PASSWORD")
+	fetcherBackendVersion := "0.0.1"  //ctx.Env("FETCHER_BACKEND_VERSION")
+	enricherBackendVersion := "0.0.1" //ctx.Env("ENRICHER_BACKEND_VERSION")
+	esURL := ctx.ESURL
 	httpTimeout := ctx.Env("HTTP_TIMEOUT") // "60s" 60 seconds...
-	// flag projects json array
-	repositoriesJson := ctx.Env("REPOSITORIES_JSON")
-	enrichOnly := ctx.BoolEnv("Enrich_ONLY")
-	enrich := ctx.BoolEnv("Enrich")
-	fromDate := ctx.Env("FROM_DATE")
+	repositoriesJSON := ctx.Env("REPOSITORIES_JSON")
+	enrichOnly := ctx.NoRaw
+	enrich := ctx.Enrich
+	fromDate := ctx.DateFrom
 	noIncremental := ctx.BoolEnv("NO_INCREMENTAL")
 
 	var repositories []*dockerhub.Repository
-	if err := json.Unmarshal([]byte(repositoriesJson), &repositories); err != nil {
+	if err := jsoniter.Unmarshal([]byte(repositoriesJSON), &repositories); err != nil {
 		return nil, err
 	}
 
@@ -113,5 +106,5 @@ func dockerhubEnvs(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	}
 
 	return dockerhub.NewManager(username, password, fetcherBackendVersion, enricherBackendVersion,
-		enrichOnly, enrich, esUrl, esUsername, esPassword, timeout,  repositories, fromDate, noIncremental), nil
+		enrichOnly, enrich, esURL, timeout, repositories, fromDate, noIncremental), nil
 }

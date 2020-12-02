@@ -21,9 +21,10 @@ type RepositoryResponse struct {
 	FullDescription string      `json:"full_description"`
 	Affiliation     string      `json:"affiliation"`
 	Permissions     Permissions `json:"permissions"`
-	FetchedOn       float64       `json:"fetched_on"`
+	FetchedOn       float64     `json:"fetched_on"`
 }
 
+// Permissions response
 type Permissions struct {
 	Read  bool `json:"read"`
 	Write bool `json:"write"`
@@ -37,7 +38,7 @@ type RepositorySearchFields struct {
 	Namespace string `json:"namespace"`
 }
 
-// RepositoryRaw data model represents es schema
+// RepositoryRaw represents dockerhub repository raw model
 type RepositoryRaw struct {
 	BackendVersion           string                  `json:"backend_version"`
 	Data                     *RepositoryResponse     `json:"data"`
@@ -45,15 +46,16 @@ type RepositoryRaw struct {
 	UUID                     string                  `json:"uuid"`
 	SearchFields             *RepositorySearchFields `json:"search_fields"`
 	Origin                   string                  `json:"origin"`
-	UpdatedOn                float64                   `json:"updated_on"`
+	UpdatedOn                float64                 `json:"updated_on"`
 	MetadataUpdatedOn        time.Time               `json:"metadata__updated_on"`
 	BackendName              string                  `json:"backend_name"`
 	MetadataTimestamp        time.Time               `json:"metadata__timestamp"`
-	Timestamp                float64                   `json:"timestamp"`
+	Timestamp                float64                 `json:"timestamp"`
 	Category                 string                  `json:"category"`
 	ClassifiedFieldsFiltered *string                 `json:"classified_fields_filtered"`
 }
 
+// RepositoryEnrich represents dockerhub repository enriched model
 type RepositoryEnrich struct {
 	ID             string `json:"id"`
 	Project        string `json:"project"`
@@ -86,7 +88,7 @@ type RepositoryEnrich struct {
 	UUID              string    `json:"uuid"`
 	Origin            string    `json:"origin"`
 	MetadataUpdatedOn time.Time `json:"metadata__updated_on"`
-	BackendName       string    `json:"backend_name"`
+	BackendName       string    `json:"metadata__backend_name"`
 	MetadataTimestamp time.Time `json:"metadata__timestamp"`
 	BuildOnCloud      *string   `json:"build_on_cloud"`
 	ProjectTS         int64     `json:"project_ts"`

@@ -4,8 +4,6 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-
-	lib "github.com/LF-Engineering/da-ds"
 )
 
 func TestREs(t *testing.T) {
@@ -15,7 +13,7 @@ func TestREs(t *testing.T) {
 		expected map[string]string
 	}{
 		{
-			res: lib.GitCommitPattern.String(),
+			res: GitCommitPattern.String(),
 			str: "commit a8ea74789413b83a44a3edaf064c6be976968d9f",
 			expected: map[string]string{
 				"commit":  "a8ea74789413b83a44a3edaf064c6be976968d9f",
@@ -24,7 +22,7 @@ func TestREs(t *testing.T) {
 			},
 		},
 		{
-			res: lib.GitCommitPattern.String(),
+			res: GitCommitPattern.String(),
 			str: "commit 0979a920f7b2a5278fccea0d71c875d60bb8e3a3 363a8f133dc3adcb149e1c9e9ad801840ef39538",
 			expected: map[string]string{
 				"commit":  "0979a920f7b2a5278fccea0d71c875d60bb8e3a3",
@@ -33,7 +31,7 @@ func TestREs(t *testing.T) {
 			},
 		},
 		{
-			res: lib.GitCommitPattern.String(),
+			res: GitCommitPattern.String(),
 			str: "commit 294c2079398417d6b046f4a11eccd9a21a7e51a6 0979a920f7b2a5278fccea0d71c875d60bb8e3a3 (HEAD -> refs/heads/master, refs/remotes/origin/master, refs/remotes/origin/HEAD)",
 			expected: map[string]string{
 				"commit":  "294c2079398417d6b046f4a11eccd9a21a7e51a6",
@@ -42,7 +40,7 @@ func TestREs(t *testing.T) {
 			},
 		},
 		{
-			res: lib.GitHeaderPattern.String(),
+			res: GitHeaderPattern.String(),
 			str: "Author:     Łukasz Gryglicki <lgryglicki@cncf.io>",
 			expected: map[string]string{
 				"name":  "Author",
@@ -50,14 +48,14 @@ func TestREs(t *testing.T) {
 			},
 		},
 		{
-			res: lib.GitMessagePattern.String(),
+			res: GitMessagePattern.String(),
 			str: "    this is a message ",
 			expected: map[string]string{
 				"msg": "this is a message ",
 			},
 		},
 		{
-			res: lib.GitTrailerPattern.String(),
+			res: GitTrailerPattern.String(),
 			str: "Signed-off-by:\tŁukasz Gryglicki <lukaszgryglicki@o2.pl>",
 			expected: map[string]string{
 				"name":  "Signed-off-by",
@@ -65,7 +63,7 @@ func TestREs(t *testing.T) {
 			},
 		},
 		{
-			res: lib.GitActionPattern.String(),
+			res: GitActionPattern.String(),
 			str: "::100644 100644 100644 aaf94db0 e82bf6fa e82bf6fa MC\t\t.circleci/deployments/develop/api.deployment.yml.erb",
 			expected: map[string]string{
 				"sc":      "::",
@@ -77,7 +75,7 @@ func TestREs(t *testing.T) {
 			},
 		},
 		{
-			res: lib.GitActionPattern.String(),
+			res: GitActionPattern.String(),
 			str: ":000000 100644 0000000 66fd13c A\t.gitignore",
 			expected: map[string]string{
 				"sc":      ":",
@@ -89,7 +87,7 @@ func TestREs(t *testing.T) {
 			},
 		},
 		{
-			res: lib.GitStatsPattern.String(),
+			res: GitStatsPattern.String(),
 			str: "2 4 .circleci/deployments/{production => prod}/api.deployment.yml.erb",
 			expected: map[string]string{
 				"added":   "2",
@@ -98,7 +96,7 @@ func TestREs(t *testing.T) {
 			},
 		},
 		{
-			res: lib.GitAuthorsPattern.String(),
+			res: GitAuthorsPattern.String(),
 			str: "Lukasz Gryglicki and Justyna Gryglicka <us@cncf.io>",
 			expected: map[string]string{
 				"first_authors": "Lukasz Gryglicki",
@@ -107,7 +105,7 @@ func TestREs(t *testing.T) {
 			},
 		},
 		{
-			res: lib.GitAuthorsPattern.String(),
+			res: GitAuthorsPattern.String(),
 			str: "Lukasz Gryglicki, Alicja Gryglicka, Krzysztof Gryglicki and Justyna Gryglicka <family@cncf.io>",
 			expected: map[string]string{
 				"first_authors": "Lukasz Gryglicki, Alicja Gryglicka, Krzysztof Gryglicki",
@@ -116,7 +114,7 @@ func TestREs(t *testing.T) {
 			},
 		},
 		{
-			res: lib.GitAuthorsPattern.String(),
+			res: GitAuthorsPattern.String(),
 			str: "Lukasz Gryglicki <lgryglicki@cncf.io> and Justyna Gryglicka <jgryglicka@cncf.io> <us@cncf.io>",
 			expected: map[string]string{
 				"first_authors": "Lukasz Gryglicki <lgryglicki@cncf.io>",
@@ -125,7 +123,7 @@ func TestREs(t *testing.T) {
 			},
 		},
 		{
-			res: lib.GitCoAuthorsPattern.String(),
+			res: GitCoAuthorsPattern.String(),
 			str: "Co-authored-by:Lukasz Gryglicki<lgryglicki@cncf.io>",
 			expected: map[string]string{
 				"first_authors": "Lukasz Gryglicki",
@@ -133,7 +131,7 @@ func TestREs(t *testing.T) {
 			},
 		},
 		{
-			res: lib.GitCoAuthorsPattern.String(),
+			res: GitCoAuthorsPattern.String(),
 			str: "Co-authored-by:Lukasz Gryglicki<lgryglicki@cncf.io>\nCo-authored-by:Justyna Gryglicka<jgryglicka@cncf.io>",
 			expected: map[string]string{
 				"first_authors": "Lukasz Gryglicki",
@@ -166,7 +164,7 @@ func TestREs(t *testing.T) {
 	}
 	for index, test := range testCases {
 		re := regexp.MustCompile(test.res)
-		got := lib.MatchGroups(re, test.str)
+		got := MatchGroups(re, test.str)
 		if !sameResult(got, test.expected) {
 			t.Errorf("test number %d, expected '%s' matching '%s' result %v, got %v", index+1, test.str, test.res, test.expected, got)
 		}
@@ -180,7 +178,7 @@ func TestArrayREs(t *testing.T) {
 		expected map[string][]string
 	}{
 		{
-			res: lib.GitCoAuthorsPattern.String(),
+			res: GitCoAuthorsPattern.String(),
 			str: "Co-authored-by:Lukasz Gryglicki<lgryglicki@cncf.io>\nCo-authored-by:Justyna Gryglicka<jgryglicka@cncf.io>\n",
 			expected: map[string][]string{
 				"first_authors": {"Lukasz Gryglicki", "Justyna Gryglicka"},
@@ -215,7 +213,7 @@ func TestArrayREs(t *testing.T) {
 	}
 	for index, test := range testCases {
 		re := regexp.MustCompile(test.res)
-		got := lib.MatchGroupsArray(re, test.str)
+		got := MatchGroupsArray(re, test.str)
 		if !sameResult(got, test.expected) {
 			t.Errorf("test number %d, expected '%s' matching '%s' result %v, got %v", index+1, test.str, test.res, test.expected, got)
 		}

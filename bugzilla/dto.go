@@ -38,14 +38,14 @@ type BugDetailXML struct {
 	BugStatus          string `xml:"bug_status"`
 	Resolution         string `xml:"resolution"`
 	BugFileLoc         string `xml:"bug_file_loc"`
-	StatusWhiteboard  string `xml:"status_whiteboard"`
-	Keywords           string `xml:"keywords"`
-	Priority           string `xml:"priority"`
-	BugSeverity       string `xml:"bug_severity"`
-	TargetMilestone   string `xml:"target_milestone"`
-	EverConfirmed      string `xml:"everconfirmed"`
-	Reporter           string `xml:"reporter"`
-	AssignedTo        string `xml:"assigned_to"`
+	status_whiteboard  string `xml:"status_whiteboard"`
+	keywords           string `xml:"keywords"`
+	priority           string `xml:"priority"`
+	bug_severity       string `xml:"bug_severity"`
+	target_milestone   string `xml:"target_milestone"`
+	everconfirmed      string `xml:"everconfirmed"`
+	reporter           string `xml:"reporter"`
+	assigned_to        string `xml:"assigned_to"`
 	CC                 string `xml:"cc"`
 	CfOs               string `xml:"cf_os"`
 	CfRegressionType   string `xml:"cf_regression_type"`
@@ -72,7 +72,7 @@ type BugRaw struct {
 	Origin                   string        `json:"origin"`
 	Tag                      string        `json:"tag"`
 	Product                  string        `json:"product"`
-	Data                     *BugDetailXML  `json:"data"`
+	Data                     *BugResponse  `json:"data"`
 	UpdatedOn                int64         `json:"updated_on"`
 	MetadataUpdatedOn        time.Time     `json:"metadata__updated_on"`
 	MetadataTimestamp        time.Time     `json:"metadata__timestamp"`

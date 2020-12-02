@@ -1,38 +1,40 @@
 package dockerhub
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"strings"
 	"time"
 )
 
-// Fetcher contains dockerhub datasource fetch logic
+// Enricher contains dockerhub datasource enrich logic
 type Enricher struct {
 	DSName                string // Datasource will be used as key for ES
 	ElasticSearchProvider ESClientProvider
 	BackendVersion        string
 }
 
-type TopHitsStruct struct {
+// TopHits result
+type TopHits struct {
 	Took         int          `json:"took"`
 	Hits         Hits         `json:"hits"`
 	Aggregations Aggregations `json:"aggregations"`
 }
 
+// Hits result
 type Hits struct {
 	Total    Total        `json:"total"`
 	MaxScore float32      `json:"max_score"`
 	Hits     []NestedHits `json:"hits"`
 }
 
+// Total result
 type Total struct {
 	Value    int    `json:"value"`
 	Relation string `json:"relation"`
 }
 
+// NestedHits result
 type NestedHits struct {
 	Index  string         `json:"_index"`
 	Type   string         `json:"_type"`
@@ -41,24 +43,28 @@ type NestedHits struct {
 	Source *RepositoryRaw `json:"_source"`
 }
 
+// Aggregations result
 type Aggregations struct {
 	LastDate LastDate `json:"last_date"`
 }
 
+// LastDate result
 type LastDate struct {
 	Value         float64 `json:"value"`
 	ValueAsString string  `json:"value_as_string"`
 }
 
-func NewEnricher(BackendVersion string, esClientProvider ESClientProvider) *Enricher {
+// NewEnricher initiates a new Enricher
+func NewEnricher(backendVersion string, esClientProvider ESClientProvider) *Enricher {
 	return &Enricher{
 		DSName:                Dockerhub,
 		ElasticSearchProvider: esClientProvider,
-		BackendVersion:        BackendVersion,
+		BackendVersion:        backendVersion,
 	}
 }
 
-func (e *Enricher) EnrichItem(rawItem RepositoryRaw) (*RepositoryEnrich, error) {
+// EnrichItem enriches raw item
+func (e *Enricher) EnrichItem(rawItem RepositoryRaw, project string,now time.Time) (*RepositoryEnrich, error) {
 
 	enriched := RepositoryEnrich{}
 
@@ -70,8 +76,11 @@ func (e *Enricher) EnrichItem(rawItem RepositoryRaw) (*RepositoryEnrich, error) 
 	enriched.DescriptionAnalyzed = rawItem.Data.Description
 
 	// todo: in python description is used ??
-	enriched.FullDescriptionAnalyzed = rawItem.Data.FullDescription
-	enriched.Project = rawItem.Data.Name
+	if rawItem.Data.FullDescription == "" {
+		enriched.FullDescriptionAnalyzed = rawItem.Data.Description
+	}else{
+		enriched.FullDescriptionAnalyzed = rawItem.Data.FullDescription
+	}
 	enriched.Affiliation = rawItem.Data.Affiliation
 	enriched.IsPrivate = rawItem.Data.IsPrivate
 	enriched.IsAutomated = rawItem.Data.IsAutomated
@@ -81,14 +90,15 @@ func (e *Enricher) EnrichItem(rawItem RepositoryRaw) (*RepositoryEnrich, error) 
 	enriched.Status = rawItem.Data.Status
 	enriched.StarCount = rawItem.Data.StarCount
 	enriched.LastUpdated = rawItem.Data.LastUpdated
+	enriched.Project = project
 
 	enriched.BackendName = fmt.Sprintf("%sEnrich", strings.Title(e.DSName))
 	enriched.BackendVersion = e.BackendVersion
-	now := time.Now().UTC()
+	now = now.UTC()
 	enriched.MetadataEnrichedOn = now
 
 	enriched.MetadataTimestamp = rawItem.MetadataTimestamp
-	enriched.MetadataUpdatedOn = rawItem.MetadataUpdatedOn
+	enriched.MetadataUpdatedOn = rawItem.MetadataUpdatedOn.UTC()
 	enriched.CreationDate = rawItem.MetadataUpdatedOn
 
 	// todo: the 3 following fields filling is vague
@@ -103,32 +113,20 @@ func (e *Enricher) EnrichItem(rawItem RepositoryRaw) (*RepositoryEnrich, error) 
 	return &enriched, nil
 }
 
-func (e *Enricher) Insert(index string, data *RepositoryEnrich) ([]byte, error) {
-	body, err := json.Marshal(data)
-	if err != nil {
-		return nil, errors.New("unable to convert body to json")
-	}
-
-	resData, err := e.ElasticSearchProvider.Add(index, data.UUID, body)
-	if err != nil {
-		return nil, err
-	}
-
-	return resData, nil
-}
-
+// HandleMapping creates rich mapping
 func (e *Enricher) HandleMapping(index string) error {
 	_, err := e.ElasticSearchProvider.CreateIndex(index, DockerhubRichMapping)
 	return err
 }
 
-func (e *Enricher) GetPreviouslyFetchedDataItem(repo *Repository, cmdLastDate *time.Time, lastDate *time.Time, noIncremental bool) (result *TopHitsStruct, err error) {
+// GetFetchedDataItem gets fetched data items starting from lastDate
+func (e *Enricher) GetFetchedDataItem(repo *Repository, cmdLastDate *time.Time, lastDate *time.Time, noIncremental bool) (result *TopHits, err error) {
 	rawIndex := fmt.Sprintf("%s-raw", repo.ESIndex)
 
 	var lastEnrichDate *time.Time = nil
 
 	if noIncremental == false {
-		if cmdLastDate != nil {
+		if cmdLastDate != nil && !cmdLastDate.IsZero() {
 			lastEnrichDate = cmdLastDate
 		} else if lastDate != nil {
 			lastEnrichDate = lastDate
@@ -137,11 +135,6 @@ func (e *Enricher) GetPreviouslyFetchedDataItem(repo *Repository, cmdLastDate *t
 			if err != nil {
 				log.Printf("Warning: %v", err)
 			} else {
-				// use the minimum date
-				//esLD := enrichLastDate.(*float64)
-				//sec, dec := math.Modf(*esLD)
-				//esDate := time.Unix(int64(sec), int64(dec*(1e9)))
-
 				if lastDate.After(enrichLastDate) {
 					lastEnrichDate = &enrichLastDate
 				}
@@ -149,11 +142,9 @@ func (e *Enricher) GetPreviouslyFetchedDataItem(repo *Repository, cmdLastDate *t
 		}
 	}
 
-	fmt.Println(lastEnrichDate)
+	url := fmt.Sprintf("%s/%s/%s", APIURL, repo.Owner, repo.Repository)
 
-	url := fmt.Sprintf("%s/%s/%s", APIUrl, repo.Owner, repo.Repository)
-
-	hits := &TopHitsStruct{}
+	hits := &TopHits{}
 
 	query := map[string]interface{}{
 		"size": 10000,
@@ -183,7 +174,6 @@ func (e *Enricher) GetPreviouslyFetchedDataItem(repo *Repository, cmdLastDate *t
 	}
 
 	if lastEnrichDate != nil {
-		fmt.Printf("lastEnrichDate: %v", lastEnrichDate)
 		conditions = append(conditions,
 			map[string]interface{}{
 				"range": map[string]interface{}{

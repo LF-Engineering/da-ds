@@ -4,13 +4,11 @@ import (
 	"net/mail"
 	"os"
 	"testing"
-
-	lib "github.com/LF-Engineering/da-ds"
 )
 
 func TestParseAddresses(t *testing.T) {
-	var ctx lib.Ctx
-	lib.FatalOnError(os.Setenv("DA_DS", "ds"))
+	var ctx Ctx
+	FatalOnError(os.Setenv("DA_DS", "ds"))
 	ctx.Init()
 	ctx.Debug = 2
 	sameResult := func(a1, a2 []*mail.Address) bool {
@@ -86,7 +84,7 @@ func TestParseAddresses(t *testing.T) {
 		},
 	}
 	for index, test := range testCases {
-		gotEmails, gotOK := lib.ParseAddresses(&ctx, test.addr, lib.GroupsioMaxRecipients)
+		gotEmails, gotOK := ParseAddresses(&ctx, test.addr, GroupsioMaxRecipients)
 		if gotOK != test.expectedOK {
 			t.Errorf("test number %d, expected '%s' ok %v, got %v", index+1, test.addr, test.expectedOK, gotOK)
 		} else {

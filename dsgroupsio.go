@@ -758,7 +758,7 @@ func GroupsioEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, doc
 		}
 		doc, ok := src.(map[string]interface{})
 		if !ok {
-			e = fmt.Errorf("Failed to parse document %+v\n", doc)
+			e = fmt.Errorf("Failed to parse document %+v", doc)
 			return
 		}
 		identities, nRecipients := groupsio.GetItemIdentitiesEx(ctx, doc)
@@ -1102,13 +1102,13 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 			case string:
 				dt, _, _, ok = ParseDateWithTz(vdt)
 				if !ok {
-					err = fmt.Errorf("cannot parse date %s\n", vdt)
+					err = fmt.Errorf("cannot parse date %s", vdt)
 					return
 				}
 			case time.Time:
 				dt = vdt
 			default:
-				err = fmt.Errorf("cannot parse date %T %v\n", vdt, vdt)
+				err = fmt.Errorf("cannot parse date %T %v", vdt, vdt)
 				return
 			}
 			err = nil

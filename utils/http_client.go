@@ -7,26 +7,28 @@ import (
 	"time"
 )
 
-// HttpClientProvider ...
-type HttpClientProvider struct {
+// HTTPClientProvider ...
+type HTTPClientProvider struct {
 	httpclient *http.Client
 }
 
-// NewHttpClientProvider ...
-func NewHttpClientProvider(timeout time.Duration) *HttpClientProvider {
-	return &HttpClientProvider{
+// NewHTTPClientProvider ...
+func NewHTTPClientProvider(timeout time.Duration) *HTTPClientProvider {
+	return &HTTPClientProvider{
 		httpclient: &http.Client{
 			Timeout: timeout,
 		},
 	}
 }
 
+// Response returned from http request
 type Response struct {
 	StatusCode int
 	Body       []byte
 }
 
-func (h *HttpClientProvider) Request(url string, method string, header map[string]string, body []byte, params map[string]string) (statusCode int, resBody []byte, err error) {
+// Request http
+func (h *HTTPClientProvider) Request(url string, method string, header map[string]string, body []byte,params map[string]string) (statusCode int, resBody []byte, err error) {
 	req, err := http.NewRequest(method, url, bytes.NewBuffer(body))
 	if err != nil {
 		return 0, nil, err
@@ -59,7 +61,8 @@ func (h *HttpClientProvider) Request(url string, method string, header map[strin
 	return res.StatusCode, buf.Bytes(), nil
 }
 
-func (h *HttpClientProvider) RequestCSV(url string) ([][]string, error) {
+// RequestCSV requests http API that returns csv result
+func (h *HTTPClientProvider) RequestCSV(url string) ([][]string, error) {
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err

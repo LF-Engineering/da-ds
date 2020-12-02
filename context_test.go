@@ -8,13 +8,12 @@ import (
 	"testing"
 	"time"
 
-	lib "github.com/LF-Engineering/da-ds"
 	testlib "github.com/LF-Engineering/da-ds/test"
 )
 
 // Copies Ctx structure
-func copyContext(in *lib.Ctx) *lib.Ctx {
-	out := lib.Ctx{
+func copyContext(in *Ctx) *Ctx {
+	out := Ctx{
 		DS:               in.DS,
 		DSPrefix:         in.DSPrefix,
 		Debug:            in.Debug,
@@ -61,7 +60,7 @@ func copyContext(in *lib.Ctx) *lib.Ctx {
 }
 
 // Dynamically sets Ctx fields (uses map of field names into their new values)
-func dynamicSetFields(t *testing.T, ctx *lib.Ctx, fields map[string]interface{}) *lib.Ctx {
+func dynamicSetFields(t *testing.T, ctx *Ctx, fields map[string]interface{}) *Ctx {
 	// Prepare mapping field name -> index
 	valueOf := reflect.Indirect(reflect.ValueOf(*ctx))
 	nFields := valueOf.Type().NumField()
@@ -196,7 +195,7 @@ func dynamicSetFields(t *testing.T, ctx *lib.Ctx, fields map[string]interface{})
 
 func TestInit(t *testing.T) {
 	// This is the expected default struct state
-	defaultContext := lib.Ctx{
+	defaultContext := Ctx{
 		DS:               "ds",
 		DSPrefix:         "DA_DS_",
 		Debug:            0,
@@ -241,7 +240,7 @@ func TestInit(t *testing.T) {
 	}
 
 	// Set fake data source name to "ds" which will create prefix "DA_DS_"
-	lib.FatalOnError(os.Setenv("DA_DS", "ds"))
+	FatalOnError(os.Setenv("DA_DS", "ds"))
 
 	// Test cases
 	dtF := testlib.YMDHMS(2020, 9, 28, 9, 12, 17)
@@ -249,7 +248,7 @@ func TestInit(t *testing.T) {
 	var testCases = []struct {
 		name            string
 		environment     map[string]string
-		expectedContext *lib.Ctx
+		expectedContext *Ctx
 	}{
 		{
 			"Default values",
@@ -558,7 +557,7 @@ func TestInit(t *testing.T) {
 
 	// Execute test cases
 	for index, test := range testCases {
-		var gotContext lib.Ctx
+		var gotContext Ctx
 
 		// Remember initial environment
 		currEnv := make(map[string]string)

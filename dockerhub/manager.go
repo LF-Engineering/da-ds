@@ -8,6 +8,7 @@ import (
 	"time"
 )
 
+// Manager describes dockerhub manager
 type Manager struct {
 	Username               string
 	Password               string
@@ -18,51 +19,51 @@ type Manager struct {
 	ESUrl                  string
 	ESUsername             string
 	ESPassword             string
-	HttpTimeout            time.Duration
+	HTTPTimeout            time.Duration
 	Repositories           []*Repository
-	FromDate               string
+	FromDate               *time.Time
 	NoIncremental          bool
 }
 
+// Repository represents dockerhub repository data
 type Repository struct {
 	Owner      string
 	Repository string
+	Project    string
 	ESIndex    string
 }
 
-func NewManager(Username string,
-	Password string,
-	FetcherBackendVersion string,
-	EnricherBackendVersion string,
-	EnrichOnly bool,
-	Enrich bool,
-	ESUrl string,
-	ESUsername string,
-	ESPassword string,
-	HttpTimeout time.Duration,
-	Repositories []*Repository,
-	FromDate string,
-	NoIncremental bool,
+// NewManager initiates dockerhub manager instance
+func NewManager(username string,
+	password string,
+	fetcherBackendVersion string,
+	enricherBackendVersion string,
+	enrichOnly bool,
+	enrich bool,
+	eSUrl string,
+	httpTimeout time.Duration,
+	repositories []*Repository,
+	fromDate *time.Time,
+	noIncremental bool,
 ) *Manager {
 	mng := &Manager{
-		Username:               Username,
-		Password:               Password,
-		FetcherBackendVersion:  FetcherBackendVersion,
-		EnricherBackendVersion: EnricherBackendVersion,
-		EnrichOnly:             EnrichOnly,
-		Enrich:                 Enrich,
-		ESUrl:                  ESUrl,
-		ESUsername:             ESUsername,
-		ESPassword:             ESPassword,
-		HttpTimeout:            HttpTimeout,
-		Repositories:           Repositories,
-		FromDate:               FromDate,
-		NoIncremental:          NoIncremental,
+		Username:               username,
+		Password:               password,
+		FetcherBackendVersion:  fetcherBackendVersion,
+		EnricherBackendVersion: enricherBackendVersion,
+		EnrichOnly:             enrichOnly,
+		Enrich:                 enrich,
+		ESUrl:                  eSUrl,
+		HTTPTimeout:            httpTimeout,
+		Repositories:           repositories,
+		FromDate:               fromDate,
+		NoIncremental:          noIncremental,
 	}
 
 	return mng
 }
 
+// Sync runs dockerhub fetch and enrich according to passed parameters
 func (m *Manager) Sync() error {
 
 	if len(m.Repositories) == 0 {
@@ -89,12 +90,13 @@ func (m *Manager) Sync() error {
 		for _, repo := range m.Repositories {
 			var raw *RepositoryRaw
 			// Fetch data for single repo
-			raw, err = fetcher.FetchItem(repo.Owner, repo.Repository)
+			raw, err = fetcher.FetchItem(repo.Owner, repo.Repository, time.Now())
 			if err != nil {
-				return errors.New(fmt.Sprintf("could not fetch data from repository: %s-%s", repo.Owner, repo.Repository))
+				return fmt.Errorf("could not fetch data from repository: %s-%s", repo.Owner, repo.Repository)
 			}
 			data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s-raw", repo.ESIndex), ID: raw.UUID, Data: raw})
 
+			// set mapping and create index if not exists
 			_ = fetcher.HandleMapping(fmt.Sprintf("%s-raw", repo.ESIndex))
 		}
 
@@ -111,34 +113,29 @@ func (m *Manager) Sync() error {
 		data := make([]*utils.BulkData, 0)
 
 		for _, repo := range m.Repositories {
+			var fromDate *time.Time
 			var lastDate time.Time
-			if m.FromDate == "" {
-				lastDate, err = fetcher.GetLastDate(repo)
+			if m.FromDate == nil || (*m.FromDate).IsZero() {
+				lastDate, err = fetcher.GetLastDate(repo, time.Now())
 				if err != nil {
 					log.Println("[GetLastDate] could not get last date")
 				}
+			} else {
+				fromDate = m.FromDate
 			}
 
-			var fromDate *time.Time
-
-			d, err := time.Parse(time.RFC3339, m.FromDate)
-			if err == nil {
-				fromDate = &d
-			}
-
-			esData, err := enricher.GetPreviouslyFetchedDataItem(repo, fromDate, &lastDate, m.NoIncremental)
+			esData, err := enricher.GetFetchedDataItem(repo, fromDate, &lastDate, m.NoIncremental)
 			if err != nil {
 				return err
 			}
 
 			if len(esData.Hits.Hits) > 0 {
 				// Enrich data for single repo
-				enriched, err := enricher.EnrichItem(*esData.Hits.Hits[0].Source)
+				enriched, err := enricher.EnrichItem(*esData.Hits.Hits[0].Source, repo.Project, time.Now())
 				if err != nil {
-					return errors.New(fmt.Sprintf("could not enrich data from repository: %s-%s", repo.Owner, repo.Repository))
+					return fmt.Errorf("could not enrich data from repository: %s-%s", repo.Owner, repo.Repository)
 				}
-				data = append(data, &utils.BulkData{IndexName: repo.ESIndex, ID: fmt.Sprintf("%s_%s", enriched.ID, enriched.RepositoryType), Data: enriched})
-
+				data = append(data, &utils.BulkData{IndexName: repo.ESIndex, ID: enriched.UUID, Data: enriched})
 				_ = enricher.HandleMapping(repo.ESIndex)
 
 			}
@@ -150,6 +147,22 @@ func (m *Manager) Sync() error {
 			if err != nil {
 				return err
 			}
+
+			// Add/Update latest document in each origin
+			for _, repo := range data {
+				repo.ID = fmt.Sprintf("%s_%s", repo.Data.(*RepositoryEnrich).ID, repo.Data.(*RepositoryEnrich).RepositoryType)
+				repo.Data.(*RepositoryEnrich).IsDockerImage = 1
+				repo.Data.(*RepositoryEnrich).IsEvent = 0
+
+				data = append(data, repo)
+			}
+
+			// Insert enriched data to elasticsearch
+			_, err = esClientProvider.BulkInsert(data)
+			if err != nil {
+				return err
+			}
+
 		}
 	}
 
@@ -157,7 +170,7 @@ func (m *Manager) Sync() error {
 }
 
 func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
-	httpClientProvider := utils.NewHttpClientProvider(m.HttpTimeout)
+	httpClientProvider := utils.NewHTTPClientProvider(m.HTTPTimeout)
 	params := &Params{
 		Username:       m.Username,
 		Password:       m.Password,

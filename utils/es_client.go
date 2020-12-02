@@ -6,11 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/elastic/go-elasticsearch/v7"
-	"github.com/elastic/go-elasticsearch/v7/esapi"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/elastic/go-elasticsearch/v7"
+	"github.com/elastic/go-elasticsearch/v7/esapi"
+	jsoniter "github.com/json-iterator/go"
 )
 
 // ESClientProvider ...
@@ -25,25 +27,24 @@ type ESParams struct {
 	Password string
 }
 
+// TopHitsStruct result
 type TopHitsStruct struct {
 	Took         int          `json:"took"`
 	Aggregations Aggregations `json:"aggregations"`
 }
 
-type Total struct {
-	Value    int    `json:"value"`
-	Relation string `json:"relation"`
-}
-
+// Aggregations represents elastic Aggregations result
 type Aggregations struct {
 	Stat Stat `json:"stat"`
 }
 
+// Stat represents elastic stat result
 type Stat struct {
 	Value         float64 `json:"value"`
 	ValueAsString string  `json:"value_as_string"`
 }
 
+// BulkData to be saved using bulkIndex
 type BulkData struct {
 	IndexName string
 	ID        string
@@ -87,6 +88,7 @@ func (p *ESClientProvider) CreateIndex(index string, body []byte) ([]byte, error
 	return resBytes, nil
 }
 
+// DeleteIndex removes existing index
 func (p *ESClientProvider) DeleteIndex(index string, ignoreUnavailable bool) ([]byte, error) {
 	res, err := esapi.IndicesDeleteRequest{
 		Index:             []string{index},
@@ -109,7 +111,7 @@ func (p *ESClientProvider) DeleteIndex(index string, ignoreUnavailable bool) ([]
 	if res.IsError() {
 
 		var e map[string]interface{}
-		if err = json.NewDecoder(res.Body).Decode(&e); err != nil {
+		if err = jsoniter.NewDecoder(res.Body).Decode(&e); err != nil {
 			return nil, err
 		}
 
@@ -158,7 +160,7 @@ func (p *ESClientProvider) Add(index string, documentID string, body []byte) ([]
 	if res.IsError() {
 
 		var e map[string]interface{}
-		if err = json.NewDecoder(res.Body).Decode(&e); err != nil {
+		if err = jsoniter.NewDecoder(res.Body).Decode(&e); err != nil {
 			return nil, err
 		}
 
@@ -206,6 +208,7 @@ func (p *ESClientProvider) Bulk(body []byte) ([]byte, error) {
 	return resBytes, nil
 }
 
+// BulkInsert inserts more than one item using one request
 func (p *ESClientProvider) BulkInsert(data []*BulkData) ([]byte, error) {
 	lines := make([]interface{}, 0)
 
@@ -239,14 +242,13 @@ func (p *ESClientProvider) BulkInsert(data []*BulkData) ([]byte, error) {
 	return resData, nil
 }
 
+// Get query result
 func (p *ESClientProvider) Get(index string, query map[string]interface{}, result interface{}) (err error) {
 	var buf bytes.Buffer
 	err = json.NewEncoder(&buf).Encode(query)
 	if err != nil {
 		return err
 	}
-
-	fmt.Println(&buf)
 
 	res, err := p.client.Search(
 		p.client.Search.WithIndex(index),
@@ -259,8 +261,6 @@ func (p *ESClientProvider) Get(index string, query map[string]interface{}, resul
 
 	if res.StatusCode == 200 {
 		// index exists so return true
-
-		fmt.Println(res.Body)
 		if err = json.NewDecoder(res.Body).Decode(result); err != nil {
 			return err
 		}
@@ -286,6 +286,7 @@ func (p *ESClientProvider) Get(index string, query map[string]interface{}, resul
 	return nil
 }
 
+// GetStat gets statistics ex. max min, avg
 func (p *ESClientProvider) GetStat(index string, field string, aggType string, mustConditions []map[string]interface{}, mustNotConditions []map[string]interface{}) (result time.Time, err error) {
 
 	hits := &TopHitsStruct{}

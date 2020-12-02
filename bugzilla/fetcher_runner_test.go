@@ -1,11 +1,12 @@
 package bugzilla
 
 import (
+	"testing"
+	"time"
+
 	"github.com/LF-Engineering/da-ds/bugzilla/mocks"
 	"github.com/LF-Engineering/da-ds/utils"
 	"github.com/stretchr/testify/assert"
-	"testing"
-	"time"
 )
 
 func TestFetchItem(t *testing.T) {
@@ -22,7 +23,7 @@ func TestFetchItem(t *testing.T) {
 	srv := NewFetcher(params, httpClientProvider, esClientProviderMock)
 
 	// Act
-	_, err := srv.FetchItem(time.Now(),3)
+	_, err := srv.FetchItem(time.Now(), 3)
 
 	// Assert
 	assert.NoError(t, err)
