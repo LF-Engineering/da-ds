@@ -120,7 +120,7 @@ func (f *Fetcher) FetchItem(fromDate time.Time, limit int, now time.Time) ([]*Bu
 }
 
 func (f *Fetcher) fetchBugList(fromDate time.Time, limit int) ([]*BugResponse, error) {
-	url := fmt.Sprintf("%s/buglist.cgi?chfieldfrom=%s&ctype=csv&limit=%v&order=changeddate", f.Endpoint, "2020-01-01%12:00:00", limit)
+	url := fmt.Sprintf("%s/buglist.cgi?chfieldfrom=%s&ctype=csv&limit=%v&order=changeddate", f.Endpoint, fromDate.Format("2006-01-02 15:04:05"), limit)
 
 	bugs, err := f.HttpClientProvider.RequestCSV(url)
 	if err != nil {
