@@ -75,7 +75,7 @@ func (f *Fetcher) Login(username string, password string) (string, error) {
 		return "", err
 	}
 
-	_, err = dads.Printf("dockerhub login via: %s\n", url)
+	dads.Printf("dockerhub login via: %s\n", url)
 
 	statusCode, resBody, err := f.HTTPClientProvider.Request(url, "Post", nil, p, nil)
 

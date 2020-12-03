@@ -15,7 +15,7 @@ GO_LINT=golint -set_exit_status
 GO_VET=go vet
 GO_IMPORTS=goimports -w
 GO_USEDEXPORTS=usedexports
-GO_ERRCHECK=errcheck -asserts -ignore '[FS]?[Pp]rint*' -ignoretests
+GO_ERRCHECK=errcheck -verbose -asserts -ignoretests -ignoregenerated
 GO_TEST=go test
 BINARIES=dads
 STRIP=strip
@@ -42,7 +42,7 @@ usedexports: ${GO_BIN_FILES} ${GO_LIB_FILES} ${GO_TEST_FILES} ${GO_LIBTEST_FILES
 	${GO_USEDEXPORTS} ./...
 
 errcheck: ${GO_BIN_FILES} ${GO_LIB_FILES} ${GO_TEST_FILES} ${GO_LIBTEST_FILES}
-	${GO_ERRCHECK} ./... | grep -v mocks
+	${GO_ERRCHECK} ./...
 
 test:
 	go test -v $(PKG_LIST)
