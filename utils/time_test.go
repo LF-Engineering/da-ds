@@ -2,11 +2,12 @@ package utils
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"log"
 	"math"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFloatTime(t *testing.T) {

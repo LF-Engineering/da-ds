@@ -9,6 +9,6 @@ jobs:
       - checkout
 
       - run: go get -u golang.org/x/lint/golint
-      - run: make lint
+      - run: make check
       - run: make test
       - run: make build

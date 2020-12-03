@@ -6,6 +6,7 @@ require (
 	github.com/LF-Engineering/dev-analytics-libraries v0.0.0-20201126133451-e87329766817
 	github.com/elastic/go-elasticsearch/v7 v7.9.0
 	github.com/go-sql-driver/mysql v1.5.0
+	github.com/jgautheron/goconst v0.0.0-20201117150253-ccae5bf973f3 // indirect
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/json-iterator/go v1.1.10
 	github.com/stretchr/testify v1.6.1

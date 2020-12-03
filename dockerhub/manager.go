@@ -3,9 +3,10 @@ package dockerhub
 import (
 	"errors"
 	"fmt"
-	"github.com/LF-Engineering/da-ds/utils"
 	"log"
 	"time"
+
+	"github.com/LF-Engineering/da-ds/utils"
 )
 
 // Manager describes dockerhub manager
