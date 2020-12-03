@@ -96,8 +96,6 @@ func (f *Fetcher) FetchItem(fromDate time.Time, limit int, now time.Time) ([]*Bu
 		raw.Assignee.Email = bug.AssignedTo.Email
 		raw.ShortDescription = bug.ShortDescription
 
-		fmt.Println("xxxxxxxx")
-		fmt.Println(detail.Bug.CreationTS)
 		t, err := time.Parse("2006-01-02 15:04:05", strings.TrimSuffix(detail.Bug.CreationTS, " +0000")) // todo: fix format layout
 		if err != nil {
 			return nil, err

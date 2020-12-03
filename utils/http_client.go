@@ -28,7 +28,7 @@ type Response struct {
 }
 
 // Request http
-func (h *HTTPClientProvider) Request(url string, method string, header map[string]string, body []byte,params map[string]string) (statusCode int, resBody []byte, err error) {
+func (h *HTTPClientProvider) Request(url string, method string, header map[string]string, body []byte, params map[string]string) (statusCode int, resBody []byte, err error) {
 	req, err := http.NewRequest(method, url, bytes.NewBuffer(body))
 	if err != nil {
 		return 0, nil, err

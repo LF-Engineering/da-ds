@@ -64,7 +64,7 @@ func NewEnricher(backendVersion string, esClientProvider ESClientProvider) *Enri
 }
 
 // EnrichItem enriches raw item
-func (e *Enricher) EnrichItem(rawItem RepositoryRaw, project string,now time.Time) (*RepositoryEnrich, error) {
+func (e *Enricher) EnrichItem(rawItem RepositoryRaw, project string, now time.Time) (*RepositoryEnrich, error) {
 
 	enriched := RepositoryEnrich{}
 
@@ -78,7 +78,7 @@ func (e *Enricher) EnrichItem(rawItem RepositoryRaw, project string,now time.Tim
 	// todo: in python description is used ??
 	if rawItem.Data.FullDescription == "" {
 		enriched.FullDescriptionAnalyzed = rawItem.Data.Description
-	}else{
+	} else {
 		enriched.FullDescriptionAnalyzed = rawItem.Data.FullDescription
 	}
 	enriched.Affiliation = rawItem.Data.Affiliation
