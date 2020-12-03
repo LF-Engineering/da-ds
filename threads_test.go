@@ -3,19 +3,17 @@ package dads
 import (
 	"os"
 	"testing"
-
-	lib "github.com/LF-Engineering/da-ds"
 )
 
 func TestGetThreadsNum(t *testing.T) {
 	// Environment context parse
-	var ctx lib.Ctx
-	lib.FatalOnError(os.Setenv("DA_DS", "ds"))
+	var ctx Ctx
+	FatalOnError(os.Setenv("DA_DS", "ds"))
 	ctx.Init()
 
 	// Get actual number of threads available
-	nThreads := lib.GetThreadsNum(&ctx)
-	lib.ResetThreadsNum(&ctx)
+	nThreads := GetThreadsNum(&ctx)
+	ResetThreadsNum(&ctx)
 
 	// Set context's ST/NCPUs manually (don't need to repeat tests from context_test.go)
 	var testCases = []struct {
@@ -49,13 +47,13 @@ func TestGetThreadsNum(t *testing.T) {
 		ctx.NCPUs = test.NCPUs
 		ctx.NCPUsScale = test.NCPUsScale
 		expected := test.expected
-		got := lib.GetThreadsNum(&ctx)
+		got := GetThreadsNum(&ctx)
 		if got != expected {
 			t.Errorf(
 				"test number %d, expected to return %d threads, got %d (default is %d on this machine)",
 				index+1, expected, got, nThreads,
 			)
 		}
-		lib.ResetThreadsNum(&ctx)
+		ResetThreadsNum(&ctx)
 	}
 }

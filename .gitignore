@@ -37,3 +37,6 @@
 /check.txt
 /uuid/uuid
 /uuid/duuid
+
+.DS_Store
+.idea

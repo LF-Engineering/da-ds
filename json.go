@@ -1,16 +1,14 @@
 package dads
 
 import (
-	"encoding/json"
-
 	jsoniter "github.com/json-iterator/go"
 )
 
 // PrettyPrintJSON - pretty formats raw JSON bytes
 func PrettyPrintJSON(jsonBytes []byte) []byte {
 	var jsonObj interface{}
-	FatalOnError(json.Unmarshal(jsonBytes, &jsonObj))
-	pretty, err := json.MarshalIndent(jsonObj, "", "  ")
+	FatalOnError(jsoniter.Unmarshal(jsonBytes, &jsonObj))
+	pretty, err := jsoniter.MarshalIndent(jsonObj, "", "  ")
 	FatalOnError(err)
 	return pretty
 }

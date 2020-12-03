@@ -1,0 +1,17 @@
+# Check https://circleci.com/docs/2.0/language-go/ for more details
+version: 2
+jobs:
+  build:
+    docker:
+      - image: golang:1.15
+    working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
+    steps:
+      - checkout
+
+      - run: go get -u golang.org/x/lint/golint
+      - run: go get golang.org/x/tools/cmd/goimports
+      - run: go get github.com/jgautheron/usedexports
+      - run: go get -u github.com/kisielk/errcheck
+      - run: make check
+      - run: make test
+      - run: make build

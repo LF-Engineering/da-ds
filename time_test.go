@@ -2,8 +2,6 @@ package dads
 
 import (
 	"testing"
-
-	lib "github.com/LF-Engineering/da-ds"
 )
 
 func TestParseDateWithTz(t *testing.T) {
@@ -43,13 +41,13 @@ func TestParseDateWithTz(t *testing.T) {
 	}
 	// Execute test cases
 	for index, test := range testCases {
-		gotDt, _, gotTz, gotValid := lib.ParseDateWithTz(test.input)
+		gotDt, _, gotTz, gotValid := ParseDateWithTz(test.input)
 		if gotValid != test.expectedValid {
 			t.Errorf("test number %d, expected '%s' validation result %v, got %v", index+1, test.input, test.expectedValid, gotValid)
 		} else {
 			gotStr := ""
 			if gotValid {
-				gotStr = lib.ToYMDTHMSZDate(gotDt)
+				gotStr = ToYMDTHMSZDate(gotDt)
 			}
 			if gotStr != test.expectedStr {
 				t.Errorf("test number %d, expected '%s' to parse to '%s'/%.1f, got '%s'/%.1f", index+1, test.input, test.expectedStr, test.expectedTz, gotStr, gotTz)
