@@ -92,7 +92,7 @@ func TimeParseAny(dtStr string) (time.Time, error) {
 			return t, e
 		}
 	}
-	e := fmt.Errorf("Error:\nCannot parse date: '%v'\n", dtStr)
+	e := fmt.Errorf("Error:\nCannot parse date: '%v'", dtStr)
 	return time.Now(), e
 }
 

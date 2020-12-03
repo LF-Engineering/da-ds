@@ -871,7 +871,7 @@ func GerritEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs 
 		}
 		doc, ok := src.(map[string]interface{})
 		if !ok {
-			e = fmt.Errorf("Failed to parse document %+v\n", doc)
+			e = fmt.Errorf("Failed to parse document %+v", doc)
 			return
 		}
 		richItems, e := getRichItems(doc)
