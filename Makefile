@@ -19,7 +19,7 @@ GO_ERRCHECK=errcheck -asserts -ignore '[FS]?[Pp]rint*' -ignoretests
 GO_TEST=go test
 BINARIES=dads
 STRIP=strip
-PKG_LIST := $(shell go list ./... | grep -v /vendor/)
+PKG_LIST := $(shell go list ./... | grep -v mock)
 
 all: check ${BINARIES}
 
@@ -33,7 +33,7 @@ lint: ## Lint the files
 	golint -set_exit_status $(PKG_LIST)
 
 vet: ${GO_BIN_FILES} ${GO_LIB_FILES} ${GO_TEST_FILES} ${GO_LIBTEST_FILES}
-	./scripts/vet_files.sh "${GO_VET}"
+	go vet $(PKG_LIST)
 
 imports: ${GO_BIN_FILES} ${GO_LIB_FILES} ${GO_TEST_FILES} ${GO_LIBTEST_FILES}
 	./scripts/for_each_go_file.sh "${GO_IMPORTS}"
