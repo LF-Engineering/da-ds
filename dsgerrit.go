@@ -644,7 +644,7 @@ func (j *DSGerrit) IdentityForObject(ctx *Ctx, obj map[string]interface{}) (iden
 }
 
 // GetItemIdentities return list of item's identities, each one is [3]string
-// (name, username, email) tripples, special value Nil "<nil>" means null
+// (name, username, email) tripples, special value Nil "none" means null
 // we use string and not *string which allows nil to allow usage as a map key
 func (j *DSGerrit) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3]string]struct{}, err error) {
 	if ctx.Debug > 2 {
@@ -871,7 +871,7 @@ func GerritEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs 
 		}
 		doc, ok := src.(map[string]interface{})
 		if !ok {
-			e = fmt.Errorf("failed to parse document %+v", doc)
+			e = fmt.Errorf("Failed to parse document %+v", doc)
 			return
 		}
 		richItems, e := getRichItems(doc)

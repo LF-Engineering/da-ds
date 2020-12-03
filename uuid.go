@@ -25,6 +25,7 @@ func ResetUUIDCache() {
 
 // UUIDNonEmpty - generate UUID of string args (all must be non-empty)
 // uses internal cache
+// used to generate document UUID's
 func UUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
 	k := strings.Join(args, ":")
 	if MT {
@@ -56,9 +57,7 @@ func UUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
 		cmdLine := []string{"uuid.py", "a"}
 		cmdLine = append(cmdLine, args...)
 		h, _, err = ExecCommand(ctx, cmdLine, "", nil)
-		if err != nil {
-			return ""
-		}
+		FatalOnError(err)
 		h = h[:len(h)-1]
 		return
 	}
@@ -71,7 +70,6 @@ func UUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
 // UUIDAffs - generate UUID of string args
 // uses internal cache
 // downcases arguments, all but first can be empty
-// if argument is Nil "<nil>" replaces with "None"
 func UUIDAffs(ctx *Ctx, args ...string) (h string) {
 	k := strings.Join(args, ":")
 	if MT {
@@ -109,7 +107,7 @@ func UUIDAffs(ctx *Ctx, args ...string) (h string) {
 	}
 	var err error
 	if len(args) != 4 {
-		err = fmt.Errorf("generateIdentity requires exactly 4 asrguments, got %+v", args)
+		err = fmt.Errorf("GenerateIdentity requires exactly 4 asrguments, got %+v", args)
 	} else {
 		h, err = uuid.GenerateIdentity(&args[0], &args[1], &args[2], &args[3])
 	}

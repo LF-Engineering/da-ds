@@ -81,7 +81,7 @@ func ESCacheSet(ctx *Ctx, key string, entry *ESCacheEntry) {
 	entry.K = key
 	payloadBytes, err := jsoniter.Marshal(entry)
 	if err != nil {
-		sEntry := "<nil>"
+		sEntry := Nil
 		if entry != nil {
 			sEntry = InterfaceToStringTrunc(*entry, MaxPayloadPrintfLen, true)
 		}

@@ -798,7 +798,7 @@ func (j *DSJira) ElasticRichMapping() []byte {
 }
 
 // GetItemIdentities return list of item's identities, each one is [3]string
-// (name, username, email) tripples, special value Nil "<nil>" means null
+// (name, username, email) tripples, special value Nil "none" means null
 // we use string and not *string which allows nil to allow usage as a map key
 func (j *DSJira) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3]string]struct{}, err error) {
 	fields, ok := doc.(map[string]interface{})["data"].(map[string]interface{})["fields"].(map[string]interface{})
@@ -840,7 +840,7 @@ func (j *DSJira) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3
 	for _, rawComment := range comments {
 		comment, ok := rawComment.(map[string]interface{})
 		if !ok {
-			err = fmt.Errorf("cannot parse %+v", rawComment)
+			err = fmt.Errorf("Cannot parse %+v", rawComment)
 			return
 		}
 		for _, field := range []string{Author, "updateAuthor"} {
@@ -989,7 +989,7 @@ func JiraEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[
 		}
 		doc, ok := src.(map[string]interface{})
 		if !ok {
-			e = fmt.Errorf("failed to parse document %+v", doc)
+			e = fmt.Errorf("Failed to parse document %+v", doc)
 			return
 		}
 		var (
