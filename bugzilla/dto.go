@@ -20,7 +20,7 @@ type BugResponse struct {
 	Priority         string            `json:"priority"`
 	BugStatus        string            `json:"bug_status"`
 	ChangedAt string  `json:"changed_at"`
-	//Activity           []*BugActivityResponse `json:"activity"`
+	Activity           []*BugActivityResponse `json:"activity"`
 }
 
 // todo: clean it if not used
@@ -45,6 +45,7 @@ type BugDetailXML struct {
 	Priority   string `xml:"priority"`
 	Severity   string `xml:"bug_severity"`
 	OpSys      string `xml:"op_sys"`
+	Activity []BugActivityResponse `xml:"activity"`
 }
 
 // SearchFields ...
@@ -79,5 +80,6 @@ type BugRaw struct {
 	Severity          string    `json:"severity"`
 	OpSys             string    `json:"op_sys"`
 	ChangedAt string `json:"changed_at"`
+	Activity []BugActivityResponse `json:"activity"`
 	//SearchFields             *SearchFields `json:"search_fields"`
 }

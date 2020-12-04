@@ -28,8 +28,8 @@ func TestFetchItem(t *testing.T) {
 	if er!=nil{
 	}
 	now := time.Now()
-	limit := 25
-	result := 25
+	limit := 3
+	result := 3
 	data := make([]*BugRaw, 0)
 	for result == limit {
 		bugs, err := srv.FetchItem(from, limit, now)

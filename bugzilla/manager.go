@@ -104,7 +104,7 @@ func (m *Manager) Sync() error {
 
 		if err != nil {
 			// Todo : update date to 1970
-			from, er = time.Parse("2006-01-02 15:04:05", "2020-12-01 16:54:21")
+			from, er = time.Parse("2006-01-02 15:04:05", "2020-11-30 10:54:21")
 			if er!=nil{
 			}
 		}

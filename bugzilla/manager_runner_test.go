@@ -9,7 +9,7 @@ func TestManager(t *testing.T) {
 
  m := NewManager("https://bugzilla.yoctoproject.org",
 	 "0.0.1","0.0.1",
- 	false, false,
+ 	true, false,
 	 "http://localhost:9200", "elastic","changeme", "sds-test-yocto-bugzilla" )
  err := m.Sync()
 	// Assert

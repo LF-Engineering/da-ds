@@ -106,6 +106,7 @@ func (f *Fetcher) FetchItem(fromDate time.Time, limit int, now time.Time) ([]*Bu
 		raw.BugStatus = bug.BugStatus
 		raw.Severity = detail.Bug.Severity
 		raw.OpSys = detail.Bug.OpSys
+		raw.Activity = detail.Bug.Activity
 
 		now = now.UTC()
 		raw.MetadataUpdatedOn = now
@@ -169,6 +170,7 @@ func (f *Fetcher) fetchDetails(bugID int) (*BugDetailResponse, error) {
 	if err := xml.Unmarshal(res, result); err != nil {
 		return nil, err
 	}
+
 
 	return result, nil
 }
