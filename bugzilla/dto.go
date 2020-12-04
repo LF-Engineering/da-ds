@@ -19,6 +19,7 @@ type BugResponse struct {
 	CreationTS       time.Time         `json:"creation_ts"`
 	Priority         string            `json:"priority"`
 	BugStatus        string            `json:"bug_status"`
+	ChangedAt string  `json:"changed_at"`
 	//Activity           []*BugActivityResponse `json:"activity"`
 }
 
@@ -77,5 +78,6 @@ type BugRaw struct {
 	Priority          string    `json:"priority"`
 	Severity          string    `json:"severity"`
 	OpSys             string    `json:"op_sys"`
+	ChangedAt string `json:"changed_at"`
 	//SearchFields             *SearchFields `json:"search_fields"`
 }

@@ -17,4 +17,3 @@ func TestManager(t *testing.T) {
 
 }
 
-// 	url := fmt.Sprintf("%s/buglist.cgi?chfieldfrom=%s&ctype=csv&limit=%v&order=changeddate", f.Endpoint, "2020-01-01%12:00:00", limit)

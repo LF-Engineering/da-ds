@@ -24,11 +24,35 @@ func TestFetchItem(t *testing.T) {
 	srv := NewFetcher(params, httpClientProvider, esClientProviderMock)
 
 	// Act
+	from, er := time.Parse("2006-01-02 15:04:05", "2020-12-01 16:54:21")
+	if er!=nil{
+	}
 	now := time.Now()
-	bugs, err := srv.FetchItem(now, 3, now)
+	limit := 25
+	result := 25
+	data := make([]*BugRaw, 0)
+	for result == limit {
+		bugs, err := srv.FetchItem(from, limit, now)
+		if err != nil {
+			fmt.Println(err)
+		}
 
-	fmt.Println(len(bugs))
+		from, er = time.Parse("2006-01-02 15:04:05", bugs[len(bugs)-1].ChangedAt)
+		result = len(bugs)
+
+		if result < 2 {
+			bugs = nil
+		}else {
+			bugs = bugs[1:result]
+			data = append(data, bugs...)
+		}
+	}
+
+	fmt.Println("mmmm")
+	fmt.Println(len(data))
+
 	// Assert
-	assert.NoError(t, err)
+	assert.NoError(t, nil)
+
 
 }
