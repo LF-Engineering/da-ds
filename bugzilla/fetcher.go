@@ -106,7 +106,14 @@ func (f *Fetcher) FetchItem(fromDate time.Time, limit int, now time.Time) ([]*Bu
 		raw.BugStatus = bug.BugStatus
 		raw.Severity = detail.Bug.Severity
 		raw.OpSys = detail.Bug.OpSys
-		raw.Activity = detail.Bug.Activity
+
+		count, err := f.fetchActivitiesCount(bug.ID)
+		if err != nil {
+			return nil, err
+		}
+		raw.ActivityCount = count
+
+		fmt.Printf("couunt for %v is %v\n", bug.ID, count)
 
 		now = now.UTC()
 		raw.MetadataUpdatedOn = now
@@ -148,7 +155,7 @@ func (f *Fetcher) fetchBugList(fromDate time.Time, limit int) ([]*BugResponse, e
 			AssignedTo:       &AssigneeResponse{Name: b[3]},
 			ShortDescription: b[6],
 			BugStatus:        b[4],
-			ChangedAt: b[7],
+			ChangedAt:        b[7],
 		})
 	}
 
@@ -171,6 +178,19 @@ func (f *Fetcher) fetchDetails(bugID int) (*BugDetailResponse, error) {
 		return nil, err
 	}
 
-
 	return result, nil
+}
+
+func (f *Fetcher) fetchActivitiesCount(bugID int) (int, error) {
+	url := fmt.Sprintf("%s/show_activity.cgi?id=%v", f.Endpoint, bugID)
+	status, res, err := f.HttpClientProvider.Request(url, "GET", nil, nil, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	if status != http.StatusOK {
+		return 0, fmt.Errorf("status error: %v", status)
+	}
+
+	return GetActivityLen("#bugzilla-body tr", res)
 }

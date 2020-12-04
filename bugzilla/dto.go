@@ -11,16 +11,16 @@ type AssigneeResponse struct {
 
 // BugResponse data model represents Bugzilla get bugsList results
 type BugResponse struct {
-	ID               int               `json:"id"`
-	Product          string            `json:"product"`
-	Component        string            `json:"component"`
-	AssignedTo       *AssigneeResponse `json:"assigned_to"`
-	ShortDescription string            `json:"short_description"`
-	CreationTS       time.Time         `json:"creation_ts"`
-	Priority         string            `json:"priority"`
-	BugStatus        string            `json:"bug_status"`
-	ChangedAt string  `json:"changed_at"`
-	Activity           []*BugActivityResponse `json:"activity"`
+	ID               int                    `json:"id"`
+	Product          string                 `json:"product"`
+	Component        string                 `json:"component"`
+	AssignedTo       *AssigneeResponse      `json:"assigned_to"`
+	ShortDescription string                 `json:"short_description"`
+	CreationTS       time.Time              `json:"creation_ts"`
+	Priority         string                 `json:"priority"`
+	BugStatus        string                 `json:"bug_status"`
+	ChangedAt        string                 `json:"changed_at"`
+	Activity         []*BugActivityResponse `json:"activity"`
 }
 
 // todo: clean it if not used
@@ -40,12 +40,12 @@ type BugDetailResponse struct {
 
 // BugDetailXML ...
 type BugDetailXML struct {
-	ID         int    `xml:"bug_id"`
-	CreationTS string `xml:"creation_ts"`
-	Priority   string `xml:"priority"`
-	Severity   string `xml:"bug_severity"`
-	OpSys      string `xml:"op_sys"`
-	Activity []BugActivityResponse `xml:"activity"`
+	ID         int                   `xml:"bug_id"`
+	CreationTS string                `xml:"creation_ts"`
+	Priority   string                `xml:"priority"`
+	Severity   string                `xml:"bug_severity"`
+	OpSys      string                `xml:"op_sys"`
+	Activity   []BugActivityResponse `xml:"activity"`
 }
 
 // SearchFields ...
@@ -79,7 +79,7 @@ type BugRaw struct {
 	Priority          string    `json:"priority"`
 	Severity          string    `json:"severity"`
 	OpSys             string    `json:"op_sys"`
-	ChangedAt string `json:"changed_at"`
-	Activity []BugActivityResponse `json:"activity"`
+	ChangedAt         string    `json:"changed_at"`
+	ActivityCount     int       `json:"activity_count"`
 	//SearchFields             *SearchFields `json:"search_fields"`
 }
