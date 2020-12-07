@@ -56,13 +56,14 @@ func EnrichItem(rawItem BugRaw, now time.Time) ( *EnItem, error)  {
 	enriched.Product = rawItem.Product
 	enriched.Component = rawItem.Component
 	enriched.Platform = rawItem.RepPlatform
-	now = now.UTC()
+	tnow := time.Now()
+	tnow = now.UTC()
 
 	enriched.Tag = rawItem.Tag
 	enriched.UUID = rawItem.UUID
 	enriched.MetadataUpdatedOn = rawItem.MetadataUpdatedOn
 	enriched.MetadataTimestamp = rawItem.MetadataTimestamp
-	enriched.MetadataEnrichedOn = now
+	enriched.MetadataEnrichedOn = tnow
 	enriched.IsBugzillaBug = 1
 	enriched.Url = rawItem.Origin + "/show_bug.cgi?id=" + fmt.Sprint(rawItem.BugID)
 	//
