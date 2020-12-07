@@ -2,25 +2,24 @@ package bugzilla
 
 import (
 	"fmt"
-	"github.com/LF-Engineering/da-ds/utils"
 	"time"
+
+	"github.com/LF-Engineering/da-ds/utils"
 )
 
 // Manager describes bugzilla manager
 type Manager struct {
-	Endpoint string
+	Endpoint               string
 	FetcherBackendVersion  string
 	EnricherBackendVersion string
-	Fetch             bool
+	Fetch                  bool
 	Enrich                 bool
 	ESUrl                  string
-	ESUsername string
-	ESPassword string
-	ESIndex string
+	ESUsername             string
+	ESPassword             string
+	ESIndex                string
 	HTTPTimeout            time.Duration
-
 }
-
 
 // NewManager initiates bugzilla manager instance
 func NewManager(
@@ -35,16 +34,16 @@ func NewManager(
 	esIndex string,
 ) *Manager {
 	mng := &Manager{
-		Endpoint: endPoint,
+		Endpoint:               endPoint,
 		FetcherBackendVersion:  fetcherBackendVersion,
 		EnricherBackendVersion: enricherBackendVersion,
-		Fetch:             fetch,
+		Fetch:                  fetch,
 		Enrich:                 enrich,
 		ESUrl:                  eSUrl,
-		ESUsername: esUser,
-		ESPassword: esPassword,
-		ESIndex: esIndex,
-		HTTPTimeout: 50* time.Second,
+		ESUsername:             esUser,
+		ESPassword:             esPassword,
+		ESIndex:                esIndex,
+		HTTPTimeout:            50 * time.Second,
 	}
 
 	return mng
@@ -52,24 +51,24 @@ func NewManager(
 
 // TopHits result
 type TopHits struct {
-	Hits         Hits         `json:"hits"`
+	Hits Hits `json:"hits"`
 }
 
 // Hits result
 type Hits struct {
-	Hits     []NestedHits `json:"hits"`
+	Hits []NestedHits `json:"hits"`
 }
 
 // Nestedhits is the actual hit data
 type NestedHits struct {
-	Id string `json:"_id"`
+	Id     string    `json:"_id"`
 	Source HitSource `json:"_source"`
 }
 
 // HitSource is the document _source data
 type HitSource struct {
-	Id string `json:"id"`
-	ChangedAt string `json:"changed_at"`
+	Id        string    `json:"id"`
+	ChangedAt time.Time `json:"changed_at"`
 }
 
 func (m *Manager) Sync() error {
@@ -82,10 +81,10 @@ func (m *Manager) Sync() error {
 	if m.Fetch {
 
 		query := map[string]interface{}{
-			"query":map[string]interface{}{
+			"query": map[string]interface{}{
 				"term": map[string]interface{}{
-					"id" :map[string]string{
-						"value":"1",},
+					"id": map[string]string{
+						"value": "1"},
 				},
 			},
 		}
@@ -95,45 +94,42 @@ func (m *Manager) Sync() error {
 		cachePostfix := "-lastfetchingdate-cache"
 
 		val := &TopHits{}
-		err = esClientProvider.Get(m.ESIndex + cachePostfix, query, val)
+		err = esClientProvider.Get(m.ESIndex+cachePostfix, query, val)
 
-		round := false
 		now := time.Now()
 		var from time.Time
-		var er error
 
 		if err != nil {
 			// Todo : update date to 1970
-			from, er = time.Parse("2006-01-02 15:04:05", "2020-11-30 10:54:21")
-			if er!=nil{
+			from, err = time.Parse("2006-01-02 15:04:05", "2020-12-04 10:54:21")
+			if err != nil {
+				return err
 			}
-		}
-		if err == nil {
-			from, er = time.Parse("2006-01-02 15:04:05", val.Hits.Hits[0].Source.ChangedAt)
-			if er!=nil{
-			}
+		} else {
+			from = val.Hits.Hits[0].Source.ChangedAt
 		}
 
 		data := make([]*utils.BulkData, 0)
+		round := false
 		for result == limit {
 			bugs, err := fetcher.FetchItem(from, limit, now)
 			if err != nil {
 				return err
 			}
 
-			from, er = time.Parse("2006-01-02 15:04:05", bugs[len(bugs)-1].ChangedAt)
+			from = bugs[len(bugs)-1].ChangedAt
 			result = len(bugs)
 
 			if result < 2 {
 				bugs = nil
-			}else if round  {
-				for _, bug := range bugs{
+			} else if round {
+				for _, bug := range bugs {
 					data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s-raw", m.ESIndex), ID: bug.UUID, Data: bug})
 				}
 				round = true
-			}else {
+			} else {
 				bugs = bugs[1:result]
-				for _, bug := range bugs{
+				for _, bug := range bugs {
 					data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s-raw", m.ESIndex), ID: bug.UUID, Data: bug})
 				}
 			}
@@ -147,7 +143,7 @@ func (m *Manager) Sync() error {
 			// Update changed at in elastic cache index
 			cacheDoc, _ := data[len(data)-1].Data.(*BugRaw)
 			cacheId := "1"
-			updateChan := HitSource{Id: cacheId, ChangedAt:cacheDoc.ChangedAt }
+			updateChan := HitSource{Id: cacheId, ChangedAt: cacheDoc.ChangedAt}
 			data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, cachePostfix), ID: cacheId, Data: updateChan})
 
 			// Insert raw data to elasticsearch
@@ -159,12 +155,11 @@ func (m *Manager) Sync() error {
 
 	}
 
-	if m.Enrich{
+	if m.Enrich {
 
 	}
 	return nil
 }
-
 
 func buildServices(m *Manager) (*Fetcher, ESClientProvider, error) {
 	httpClientProvider := utils.NewHTTPClientProvider(m.HTTPTimeout)

@@ -25,7 +25,7 @@ func TestFetchItem(t *testing.T) {
 
 	// Act
 	from, er := time.Parse("2006-01-02 15:04:05", "2020-12-03 16:54:21")
-	if er!=nil{
+	if er != nil {
 	}
 	now := time.Now()
 	limit := 3
@@ -37,12 +37,12 @@ func TestFetchItem(t *testing.T) {
 			fmt.Println(err)
 		}
 
-		from, er = time.Parse("2006-01-02 15:04:05", bugs[len(bugs)-1].ChangedAt)
+		from = bugs[len(bugs)-1].ChangedAt
 		result = len(bugs)
 
 		if result < 2 {
 			bugs = nil
-		}else {
+		} else {
 			bugs = bugs[1:result]
 			data = append(data, bugs...)
 		}
@@ -53,6 +53,5 @@ func TestFetchItem(t *testing.T) {
 
 	// Assert
 	assert.NoError(t, nil)
-
 
 }

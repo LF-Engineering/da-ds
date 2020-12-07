@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"math"
 	"time"
 )
@@ -12,11 +13,10 @@ func ConvertTimeToFloat(t time.Time) float64 {
 
 // GetDaysbetweenDates calculate days between two dates
 func GetDaysbetweenDates(t1 time.Time, t2 time.Time) float64 {
-	var res float64
-	if t1.IsZero() || t2.IsZero() {
-		res = 0.0
-	}else{
-		res = t1.Sub(t2).Hours()
-	}
+	res := t1.Sub(t2).Hours() / 24
+	fmt.Println("jjjjjjj")
+	fmt.Println(t1)
+	fmt.Println(t2)
+	fmt.Println(res)
 	return res
 }

@@ -96,7 +96,13 @@ func (f *Fetcher) FetchItem(fromDate time.Time, limit int, now time.Time) ([]*Bu
 		raw.Assignee.Email = bug.AssignedTo.Email
 		raw.ShortDescription = bug.ShortDescription
 
-		t, err := time.Parse("2006-01-02 15:04:05", strings.TrimSuffix(detail.Bug.CreationTS, " +0000")) // todo: fix format layout
+		deltaTS, err := time.Parse("2006-01-02 15:04:05", strings.TrimSuffix(detail.Bug.DeltaTS, " +0000"))
+		if err != nil {
+			return nil, err
+		}
+		raw.DeltaTs = deltaTS
+
+		t, err := time.Parse("2006-01-02 15:04:05", strings.TrimSuffix(detail.Bug.CreationTS, " +0000"))
 		if err != nil {
 			return nil, err
 		}
@@ -121,12 +127,17 @@ func (f *Fetcher) FetchItem(fromDate time.Time, limit int, now time.Time) ([]*Bu
 
 		fmt.Printf("couunt for %v is %v\n", bug.ID, count)
 
-		now = now.UTC()
+		now = now
 		raw.MetadataUpdatedOn = now
 		raw.MetadataTimestamp = now
 		raw.Timestamp = utils.ConvertTimeToFloat(now)
 		raw.Category = Category
-		raw.ChangedAt = bug.ChangedAt
+
+		t, err = time.Parse("2006-01-02 15:04:05", strings.TrimSuffix(bug.ChangedAt, " +0000"))
+		if err != nil {
+			return nil, err
+		}
+		raw.ChangedAt = t
 
 		bugs = append(bugs, raw)
 	}

@@ -2,9 +2,11 @@ package bugzilla
 
 import (
 	"fmt"
+	"testing"
+	"time"
+
 	jsoniter "github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestEnrichItem(t *testing.T) {
@@ -18,7 +20,7 @@ func TestEnrichItem(t *testing.T) {
 	testYocto := test{
 		"YoctoTest",
 		`{
-          "backend_version" : "0.0.1",
+"backend_version" : "0.0.1",
           "backend_name" : "Bugzilla",
           "uuid" : "5d61b34bcdf735a83d8b1c6762890b79f053c491",
           "bug_id" : 14136,
@@ -36,13 +38,13 @@ func TestEnrichItem(t *testing.T) {
           "metadata__timestamp" : "2020-12-07T14:38:23.895437Z",
           "timestamp" : 1.607351903895437E9,
           "category" : "bug",
-          "creation_ts" : "2020-11-27T02:48:00Z",
+          "creation_ts" : "2020-11-03T05:31:00Z",
           "priority" : "Medium+",
           "severity" : "normal",
           "op_sys" : "Multiple",
-          "changed_at" : "2020-12-07 08:18:54",
-          "activity_count" : 5,
-          "delta_ts" : "0001-01-01T00:00:00Z",
+          "changed_at" : "2020-12-07T09:24:51Z",
+          "activity_count" : 13,
+          "delta_ts" : "2020-11-13T05:31:00Z",
           "keywords" : null,
           "rep_platform" : "PC",
           "status_whiteboard" : "",
@@ -52,7 +54,7 @@ func TestEnrichItem(t *testing.T) {
           "summary" : ""
         }`,
 		`{
-          "bug_id" : 14136,
+"bug_id" : 14136,
           "priority" : "Medium+",
           "changes" : 13,
           "metadata__timestamp" : "2020-12-06T17:16:36.178198Z",
@@ -60,14 +62,14 @@ func TestEnrichItem(t *testing.T) {
           "tag" : "https://bugzilla.yoctoproject.org",
           "product" : "OE-Core",
           "main_description_analyzed" : "If u-boot defconfig is incomplete, 'bitbake u-boot -c configure' hangs and eats all memory",
-          "resolution_days" : 6.78,
+          "resolution_days" : 10.00,
           "project_ts" : 1607275057,
-          "creation_date" : "2020-11-27T02:48:00Z",
+          "creation_date" : "2020-11-03T05:31:00Z",
           "metadata__updated_on" : "2020-12-03T21:26:39Z",
           "metadata__version" : "0.80.0",
           "metadata__backend_name" : "BugzillaEnrich",
           "severity" : "normal",
-          "metadata__enriched_on" : "2020-12-06T17:16:39.517209",
+          "metadata__enriched_on" : "2020-12-03T21:26:39Z",
           "project" : "yocto",
           "changeddate_date" : "2020-12-03T21:26:39+00:00",
           "metadata__filter_raw" : null,
@@ -80,10 +82,11 @@ func TestEnrichItem(t *testing.T) {
           "is_bugzilla_bug" : 1,
           "component" : "oe-core other",
           "url" : "https://bugzilla.yoctoproject.org/show_bug.cgi?id=14136",
-          "creation_date" : "2020-11-27T02:48:00",
-          "delta_ts" : "2020-12-03T21:26:39",
-          "status" : "ACCEPTED",
-        }`,
+          "creation_date" : "2020-12-07T09:24:51Z",
+          "delta_ts" : "2020-11-13T05:31:00Z",
+          "status" : "ACCEPTED"
+        }
+`,
 	}
 
 	t.Run(testYocto.name, func(tt *testing.T) {
@@ -97,13 +100,17 @@ func TestEnrichItem(t *testing.T) {
 			t.Error(err)
 		}
 
-
 		// Act
+		fmt.Println("xxxxxx")
+
 		enrich, er := EnrichItem(expectedRaw, expectedEnrich.MetadataUpdatedOn)
 		if er != nil {
 			tt.Error(er)
 		}
 		fmt.Println("enriched:==== ")
+		fmt.Println(enrich.DeltaTs.Format(time.RFC3339Nano))
+		fmt.Println(expectedEnrich.DeltaTs)
+
 		fmt.Println(enrich)
 
 		assert.Equal(tt, expectedEnrich, *enrich)
@@ -112,9 +119,17 @@ func TestEnrichItem(t *testing.T) {
 
 }
 
-func toBugEnrich(b string) (EnItem, error) {
-	expectedEnrich := EnItem{}
-	err := jsoniter.Unmarshal([]byte(b), &expectedEnrich)
+func toBugEnrich(b string) (*EnrichedItem, error) {
+	expectedEnrich := &EnrichedItem{}
+	err := jsoniter.Unmarshal([]byte(b), expectedEnrich)
+	if err != nil {
+		fmt.Println("errrrrrr")
+		fmt.Println(err.Error())
+		return nil, err
+	}
+
+	fmt.Println("222222")
+	fmt.Println(expectedEnrich.DeltaTs)
 	return expectedEnrich, err
 }
 

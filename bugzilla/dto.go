@@ -40,18 +40,19 @@ type BugDetailResponse struct {
 
 // BugDetailXML ...
 type BugDetailXML struct {
-	ID         int                   `xml:"bug_id"`
-	CreationTS string                `xml:"creation_ts"`
-	Priority   string                `xml:"priority"`
-	Severity   string                `xml:"bug_severity"`
-	OpSys      string                `xml:"op_sys"`
-	RepPlatform string `xml:"rep_platform"`
-	Keywords []string `xml:"keywords"`
-	StatusWhiteboard string `xml:"status_whiteboard"`
-	Resolution string `xml:"resolution"`
-	Reporter string `xml:"reporter"`
-	AssignedTo string `xml:"assigned_to"`
-	Summary string `xml:"summary"`
+	ID               int      `xml:"bug_id"`
+	CreationTS       string   `xml:"creation_ts"`
+	DeltaTS          string   `xml:"delta_ts"`
+	Priority         string   `xml:"priority"`
+	Severity         string   `xml:"bug_severity"`
+	OpSys            string   `xml:"op_sys"`
+	RepPlatform      string   `xml:"rep_platform"`
+	Keywords         []string `xml:"keywords"`
+	StatusWhiteboard string   `xml:"status_whiteboard"`
+	Resolution       string   `xml:"resolution"`
+	Reporter         string   `xml:"reporter"`
+	AssignedTo       string   `xml:"assigned_to"`
+	Summary          string   `xml:"summary"`
 }
 
 // SearchFields ...
@@ -85,15 +86,15 @@ type BugRaw struct {
 	Priority          string    `json:"priority"`
 	Severity          string    `json:"severity"`
 	OpSys             string    `json:"op_sys"`
-	ChangedAt         string    `json:"changed_at"`
+	ChangedAt         time.Time `json:"changed_at"`
 	ActivityCount     int       `json:"activity_count"`
 	//SearchFields             *SearchFields `json:"search_fields"`
-	DeltaTs time.Time `json:"delta_ts"`
-	Keywords []string `json:"keywords"`
-	RepPlatform string `json:"rep_platform"`
-	StatusWhiteboard string `json:"status_whiteboard"`
-	Resolution string `json:"resolution"`
-	Reporter string `json:"reporter"`
-	AssignedTo string `json:"assigned_to"`
-	Summary string `json:"summary"`
+	DeltaTs          time.Time `json:"delta_ts"`
+	Keywords         []string  `json:"keywords"`
+	RepPlatform      string    `json:"rep_platform"`
+	StatusWhiteboard string    `json:"status_whiteboard"`
+	Resolution       string    `json:"resolution"`
+	Reporter         string    `json:"reporter"`
+	AssignedTo       string    `json:"assigned_to"`
+	Summary          string    `json:"summary"`
 }
