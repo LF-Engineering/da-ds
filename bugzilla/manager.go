@@ -139,6 +139,10 @@ func (m *Manager) Sync() error {
 			}
 		}
 
+		// set mapping and create index if not exists
+		//ind := m.ESIndex + cachePostfix
+		//_ = fetcher.HandleMapping(fmt.Sprintf(ind))
+
 		if len(data) > 0 {
 			// Update changed at in elastic cache index
 			cacheDoc, _ := data[len(data)-1].Data.(*BugRaw)

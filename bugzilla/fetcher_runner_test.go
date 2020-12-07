@@ -24,7 +24,7 @@ func TestFetchItem(t *testing.T) {
 	srv := NewFetcher(params, httpClientProvider, esClientProviderMock)
 
 	// Act
-	from, er := time.Parse("2006-01-02 15:04:05", "2020-12-01 16:54:21")
+	from, er := time.Parse("2006-01-02 15:04:05", "2020-12-03 16:54:21")
 	if er!=nil{
 	}
 	now := time.Now()

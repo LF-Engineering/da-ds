@@ -106,6 +106,12 @@ func (f *Fetcher) FetchItem(fromDate time.Time, limit int, now time.Time) ([]*Bu
 		raw.BugStatus = bug.BugStatus
 		raw.Severity = detail.Bug.Severity
 		raw.OpSys = detail.Bug.OpSys
+		raw.RepPlatform = detail.Bug.RepPlatform
+		raw.StatusWhiteboard = detail.Bug.StatusWhiteboard
+		raw.Resolution = detail.Bug.Resolution
+		raw.Reporter = detail.Bug.Reporter
+		raw.AssignedTo = detail.Bug.AssignedTo
+		raw.Summary = detail.Bug.Summary
 
 		count, err := f.fetchActivitiesCount(bug.ID)
 		if err != nil {
@@ -193,4 +199,10 @@ func (f *Fetcher) fetchActivitiesCount(bugID int) (int, error) {
 	}
 
 	return GetActivityLen("#bugzilla-body tr", res)
+}
+
+// HandleMapping updates bugzilla raw mapping
+func (f *Fetcher) HandleMapping(index string) error {
+	_, err := f.ElasticSearchProvider.CreateIndex(index, BugzillaRawMapping)
+	return err
 }

@@ -45,7 +45,13 @@ type BugDetailXML struct {
 	Priority   string                `xml:"priority"`
 	Severity   string                `xml:"bug_severity"`
 	OpSys      string                `xml:"op_sys"`
-	Activity   []BugActivityResponse `xml:"activity"`
+	RepPlatform string `xml:"rep_platform"`
+	Keywords []string `xml:"keywords"`
+	StatusWhiteboard string `xml:"status_whiteboard"`
+	Resolution string `xml:"resolution"`
+	Reporter string `xml:"reporter"`
+	AssignedTo string `xml:"assigned_to"`
+	Summary string `xml:"summary"`
 }
 
 // SearchFields ...
@@ -82,4 +88,12 @@ type BugRaw struct {
 	ChangedAt         string    `json:"changed_at"`
 	ActivityCount     int       `json:"activity_count"`
 	//SearchFields             *SearchFields `json:"search_fields"`
+	DeltaTs time.Time `json:"delta_ts"`
+	Keywords []string `json:"keywords"`
+	RepPlatform string `json:"rep_platform"`
+	StatusWhiteboard string `json:"status_whiteboard"`
+	Resolution string `json:"resolution"`
+	Reporter string `json:"reporter"`
+	AssignedTo string `json:"assigned_to"`
+	Summary string `json:"summary"`
 }
