@@ -53,6 +53,14 @@ type BugDetailXML struct {
 	Reporter         string   `xml:"reporter"`
 	AssignedTo       string   `xml:"assigned_to"`
 	Summary          string   `xml:"summary"`
+	LongDesc []Comments `xml:"long_desc"`
+}
+
+type Comments struct {
+	Commentid int `xml:"commentid"`
+	Who string `xml:"who"`
+	BugWhen string  `xml:"bug_when"`
+	Thetext string `xml:"thetext"`
 }
 
 // SearchFields ...
@@ -77,6 +85,7 @@ type BugRaw struct {
 		Email string `json:"email"`
 	}
 	ShortDescription  string    `json:"short_description"`
+	LongDesc []Comments `json:"long_desc"`
 	BugStatus         string    `json:"bug_status"`
 	MetadataUpdatedOn time.Time `json:"metadata__updated_on"`
 	MetadataTimestamp time.Time `json:"metadata__timestamp"`

@@ -40,6 +40,7 @@ type EnrichedItem struct {
 	Summary                 string    `json:"summary"`
 	SummaryAnalyzed         string    `json:"summary_analyzed"`
 	Comments int `json:"comments"`
+	LongDesc int `json:"long_desc"`
 
 	MetadataUpdatedOn  time.Time `json:"metadata__updated_on"`
 	MetadataTimestamp  time.Time `json:"metadata__timestamp"`
@@ -51,8 +52,6 @@ func EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, error) {
 
 	enriched.Category = "bug"
 	enriched.ChangedDate = rawItem.ChangedAt
-	fmt.Println("111111")
-	fmt.Println(rawItem.DeltaTs)
 	enriched.DeltaTs = rawItem.DeltaTs
 	enriched.Changes = rawItem.ActivityCount
 	enriched.Labels = rawItem.Keywords
@@ -99,6 +98,10 @@ func EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, error) {
 	enriched.Status = rawItem.BugStatus
 	enriched.BugId = rawItem.BugID
 	enriched.Comments = 0
+	if len(rawItem.LongDesc) > 0  {
+		enriched.Comments = len(rawItem.LongDesc)
+	}
+	enriched.LongDesc = len(rawItem.LongDesc)
 
 	return enriched, nil
 }

@@ -118,6 +118,7 @@ func (f *Fetcher) FetchItem(fromDate time.Time, limit int, now time.Time) ([]*Bu
 		raw.Reporter = detail.Bug.Reporter
 		raw.AssignedTo = detail.Bug.AssignedTo
 		raw.Summary = detail.Bug.Summary
+		raw.LongDesc = detail.Bug.LongDesc
 
 		count, err := f.fetchActivitiesCount(bug.ID)
 		if err != nil {
