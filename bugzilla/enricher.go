@@ -17,8 +17,7 @@ type Enricher struct {
 }
 
 type IdentityProvider interface {
-	GetIdentityByUsername(username string) (*affiliation.Identity, error)
-	GetIdentityByEmail(email string) (*affiliation.Identity, error)
+	GetIdentity(key string, val string) (*affiliation.Identity, error)
 }
 
 // NewEnricher
@@ -62,9 +61,38 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, err
 	if rawItem.AssignedTo != "" {
 		enriched.Assigned = rawItem.AssignedTo
 	}
+
 	if rawItem.Reporter != "" {
-		enriched.ReporterName = rawItem.Reporter
+		enriched.ReporterUserName = rawItem.Reporter
 		enriched.AuthorName = rawItem.Reporter
+
+		// Enrich reporter
+		reporterFieldName := "username"
+		if strings.Contains(enriched.ReporterUserName, "@") {
+			reporterFieldName = "email"
+		}
+
+		reporter, err := e.identityProvider.GetIdentity(reporterFieldName, enriched.ReporterUserName)
+		if err == nil {
+			enriched.ReporterID = reporter.ID
+			enriched.UUID = reporter.UUID
+			enriched.ReporterID = reporter.ID
+			enriched.ReporterName = reporter.Name
+			enriched.ReporterUserName = reporter.Username
+			enriched.ReporterDomain = reporter.Domain
+			if reporter.Gender != nil {
+				enriched.ReporterGender = *reporter.Gender
+			}
+			if reporter.GenderACC != nil {
+				enriched.ReporterGenderACC = *reporter.GenderACC
+			}
+			enriched.ReporterDomain = reporter.Domain
+			if reporter.OrgName != nil {
+				enriched.ReporterOrgName = *reporter.OrgName
+			}
+			enriched.ReporterMultiOrgName = reporter.MultiOrgNames
+			enriched.ReporterBot = reporter.IsBot
+		}
 	}
 	if rawItem.Resolution != "" {
 		enriched.Resolution = rawItem.Resolution
@@ -89,18 +117,7 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, err
 	return enriched, nil
 }
 
-// EnrichAffiliation Adds sorting hat enrichment fields for different roles
-// If there are no roles, just add the author fields.
-func (e *Enricher) EnrichAffiliation(raw *BugRaw) error {
-	// Enrich Reporter
-	var reporterIdentity *affiliation.Identity
-	reporterKey := raw.Reporter
-	if strings.Contains(reporterKey, "@") {
-		reporterIdentity, err := e.identityProvider.GetIdentityByEmail(reporterKey)
-		if err != nil {
-			return err
-		}
-
-	}
-
+// EnrichAffiliation gets author SH identity data
+func (e *Enricher) EnrichAffiliation(key string, val string) (*affiliation.Identity, error) {
+	return e.identityProvider.GetIdentity(key, val)
 }

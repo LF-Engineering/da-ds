@@ -16,7 +16,7 @@ func NewIdentityProvider(db *sqlx.DB) *IdentityProvider {
 }
 
 // GetIdentityByUsername ...
-func (i *IdentityProvider) GetIdentityByUsername(username string) (*Identity, error) {
+func (i *IdentityProvider) GetIdentityByUsername(key string, val string) (*Identity, error) {
 	query := fmt.Sprintf(`SELECT 
        identities.id,
        identities.uuid,
@@ -24,37 +24,13 @@ func (i *IdentityProvider) GetIdentityByUsername(username string) (*Identity, er
        identities.username,
        profiles.email,
        profiles.gender,
-       profiles.gender_acc 
+       profiles.gender_acc,
+       profiles.is_bot
 FROM 
      identities LEFT JOIN (profiles)
                  ON (identities.uuid = profiles.uuid)
 where 
-      identities.username='%s';`, username)
-
-	var identity Identity
-	err := i.db.Get(&identity, query)
-	if err != nil {
-		return nil, err
-	}
-
-	return &identity, nil
-}
-
-// GetIdentityByEmail ...
-func (i *IdentityProvider) GetIdentityByEmail(email string) (*Identity, error) {
-	query := fmt.Sprintf(`SELECT 
-       identities.id,
-       identities.uuid,
-       profiles.name,
-       identities.username,
-       profiles.email,
-       profiles.gender,
-       profiles.gender_acc 
-FROM 
-     identities LEFT JOIN (profiles)
-                 ON (identities.uuid = profiles.uuid)
-where 
-      identities.email='%s';`, email)
+      identities.%s='%s';`, key, val)
 
 	var identity Identity
 	err := i.db.Get(&identity, query)
