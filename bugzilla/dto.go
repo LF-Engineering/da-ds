@@ -98,3 +98,42 @@ type BugRaw struct {
 	AssignedTo       string    `json:"assigned_to"`
 	Summary          string    `json:"summary"`
 }
+
+// EnrichedItem ...
+type EnrichedItem struct {
+	UUID                    string    `json:"uuid"`
+	Labels                  []string  `json:"labels"`
+	Changes                 int       `json:"changes"`
+	Priority                string    `json:"priority"`
+	Severity                string    `json:"severity"`
+	OpSys                   string    `json:"op_sys"`
+	ChangedAt               string    `json:"changed_at"`
+	Product                 string    `json:"product"`
+	Component               string    `json:"component"`
+	Platform                string    `json:"platform"`
+	BugId                   int       `json:"bug_id"`
+	Status                  string    `json:"status"`
+	TimeOpenDays            float64   `json:"timeopen_days"`
+	Category                string    `json:"category"`
+	ChangedDate             time.Time `json:"changed_date"`
+	Tag                     string    `json:"tag"`
+	IsBugzillaBug           int       `json:"is_bugzilla_bug"`
+	Url                     string    `json:"url"`
+	ResolutionDays          float64   `json:"resolution_days"`
+	CreationDate            time.Time `json:"creation_date"`
+	DeltaTs                 time.Time `json:"delta_ts"`
+	Whiteboard              string    `json:"whiteboard"`
+	Resolution              string    `json:"resolution"`
+	Assigned                string    `json:"assigned"`
+	ReporterName            string    `json:"reporter_name"`
+	AuthorName              string    `json:"author_name"`
+	MainDescription         string    `json:"main_description"`
+	MainDescriptionAnalyzed string    `json:"main_description_analyzed"`
+	Summary                 string    `json:"summary"`
+	SummaryAnalyzed         string    `json:"summary_analyzed"`
+	Comments                int       `json:"comments"`
+
+	MetadataUpdatedOn  time.Time `json:"metadata__updated_on"`
+	MetadataTimestamp  time.Time `json:"metadata__timestamp"`
+	MetadataEnrichedOn time.Time `json:"metadata__enriched_on"`
+}
