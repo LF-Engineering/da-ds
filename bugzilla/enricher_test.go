@@ -69,7 +69,6 @@ func TestEnrichItem(t *testing.T) {
           "creation_date" : "2020-11-03T05:31:00Z",
           "metadata__updated_on" : "2020-12-07T14:38:23.895437Z",
           "metadata__version" : "0.80.0",
-          "metadata__backend_name" : "BugzillaEnrich",
           "severity" : "normal",
           "metadata__enriched_on" : "2020-12-06T17:16:36.178198Z",
           "project" : "yocto",
