@@ -54,11 +54,14 @@ func TestEnrichItem(t *testing.T) {
           "summary" : ""
         }`,
 		`{
-"bug_id" : 14136,
+	      "bug_id" : 14136,
           "priority" : "Medium+",
+		  "category":"bug",
           "changes" : 13,
           "metadata__timestamp" : "2020-12-06T17:16:36.178198Z",
-          "assigned" : "akuster",
+          "assigned" : "akuster808",
+		  "reporter_name":"vvavrychuk",
+		  "author_name":"vvavrychuk",
           "tag" : "https://bugzilla.yoctoproject.org",
           "product" : "OE-Core",
           "main_description_analyzed" : "If u-boot defconfig is incomplete, 'bitbake u-boot -c configure' hangs and eats all memory",
@@ -71,20 +74,21 @@ func TestEnrichItem(t *testing.T) {
           "severity" : "normal",
           "metadata__enriched_on" : "2020-12-03T21:26:39Z",
           "project" : "yocto",
-          "changeddate_date" : "2020-12-03T21:26:39+00:00",
+          "changed_date" : "2020-12-07T09:24:51Z",
           "metadata__filter_raw" : null,
           "origin" : "https://bugzilla.yoctoproject.org",
           "op_sys" : "Multiple",
           "platform" : "PC",
           "uuid" : "5d61b34bcdf735a83d8b1c6762890b79f053c491",
-          "timeopen_days" : 9.6,
+          "timeopen_days" : 0,
           "main_description" : "If u-boot defconfig is incomplete, 'bitbake u-boot -c configure' hangs and eats all memory",
           "is_bugzilla_bug" : 1,
           "component" : "oe-core other",
           "url" : "https://bugzilla.yoctoproject.org/show_bug.cgi?id=14136",
-          "creation_date" : "2020-12-07T09:24:51Z",
+          "creation_date" : "2020-11-03T05:31:00Z",
           "delta_ts" : "2020-11-13T05:31:00Z",
-          "status" : "ACCEPTED"
+          "status" : "ACCEPTED",
+"comments" : 0
         }
 `,
 	}

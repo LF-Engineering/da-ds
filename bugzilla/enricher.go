@@ -22,7 +22,7 @@ type EnrichedItem struct {
 	BugId                   int       `json:"bug_id"`
 	Status                  string    `json:"status"`
 	TimeOpenDays            float64   `json:"timeopen_days"`
-	Category                string    `json:"'category'"`
+	Category                string    `json:"category"`
 	ChangedDate             time.Time `json:"changed_date"`
 	Tag                     string    `json:"tag"`
 	IsBugzillaBug           int       `json:"is_bugzilla_bug"`
@@ -39,6 +39,7 @@ type EnrichedItem struct {
 	MainDescriptionAnalyzed string    `json:"main_description_analyzed"`
 	Summary                 string    `json:"summary"`
 	SummaryAnalyzed         string    `json:"summary_analyzed"`
+	Comments int `json:"comments"`
 
 	MetadataUpdatedOn  time.Time `json:"metadata__updated_on"`
 	MetadataTimestamp  time.Time `json:"metadata__timestamp"`
@@ -92,11 +93,12 @@ func EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, error) {
 	}
 	if rawItem.Summary != "" {
 		enriched.Summary = rawItem.Summary
-		enriched.SummaryAnalyzed = rawItem.Summary
+		enriched.SummaryAnalyzed = rawItem.Summary[:1000]
 	}
 
 	enriched.Status = rawItem.BugStatus
 	enriched.BugId = rawItem.BugID
+	enriched.Comments = 0
 
 	return enriched, nil
 }
