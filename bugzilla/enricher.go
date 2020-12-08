@@ -48,7 +48,8 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, err
 	enriched.UUID = rawItem.UUID
 	enriched.MetadataUpdatedOn = rawItem.MetadataUpdatedOn
 	enriched.MetadataTimestamp = rawItem.MetadataTimestamp
-	enriched.MetadataEnrichedOn = now
+	enriched.MetadataEnrichedOn = rawItem.MetadataTimestamp
+	enriched.MetadataFilterRaw = nil
 	enriched.IsBugzillaBug = 1
 	enriched.Url = rawItem.Origin + "/show_bug.cgi?id=" + fmt.Sprint(rawItem.BugID)
 	enriched.CreationDate = rawItem.CreationTS
@@ -80,6 +81,10 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, err
 	enriched.Status = rawItem.BugStatus
 	enriched.BugId = rawItem.BugID
 	enriched.Comments = 0
+	if len(rawItem.LongDesc) > 0 {
+		enriched.Comments = len(rawItem.LongDesc)
+	}
+	enriched.LongDesc = len(rawItem.LongDesc)
 
 	return enriched, nil
 }
