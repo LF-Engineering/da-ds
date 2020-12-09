@@ -13,17 +13,23 @@ import (
 // Enricher ...
 type Enricher struct {
 	identityProvider IdentityProvider
+	DSName           string
+	BackendVersion   string
+	Project          string
 }
 
 type IdentityProvider interface {
 	GetIdentity(key string, val string) (*affiliation.Identity, error)
-    GetOrganizations(uuid string, date time.Time) ([]string , error)
+	GetOrganizations(uuid string, date time.Time) ([]string, error)
 }
 
 // NewEnricher
-func NewEnricher(identProvider IdentityProvider) *Enricher {
+func NewEnricher(identProvider IdentityProvider, backendVersion string, project string) *Enricher {
 	return &Enricher{
 		identityProvider: identProvider,
+		DSName:           Bugzilla,
+		BackendVersion:   backendVersion,
+		Project:          project,
 	}
 }
 
@@ -31,6 +37,7 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, err
 	enriched := &EnrichedItem{}
 
 	enriched.Category = "bug"
+	enriched.Project = e.Project
 	enriched.ChangedDate = rawItem.ChangedAt
 	enriched.DeltaTs = rawItem.DeltaTs
 	enriched.Changes = rawItem.ActivityCount
@@ -48,6 +55,8 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, err
 	enriched.MetadataTimestamp = rawItem.MetadataTimestamp
 	enriched.MetadataEnrichedOn = now
 	enriched.MetadataFilterRaw = nil
+	enriched.MetadataBackendName = fmt.Sprintf("%sEnrich", strings.Title(e.DSName))
+	enriched.MetadataBackendVersion = e.BackendVersion
 	enriched.IsBugzillaBug = 1
 	enriched.Url = rawItem.Origin + "/show_bug.cgi?id=" + fmt.Sprint(rawItem.BugID)
 	enriched.CreationDate = rawItem.CreationTS
@@ -58,7 +67,7 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, err
 		enriched.Whiteboard = rawItem.StatusWhiteboard
 	}
 	unknown := "Unknown"
-	multiOrgs := []string{ unknown }
+	multiOrgs := []string{unknown}
 	if rawItem.AssignedTo != "" {
 		enriched.Assigned = rawItem.AssignedTo
 
@@ -79,7 +88,7 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, err
 
 			if assignedTo.Gender != nil {
 				enriched.AssignedToGender = *assignedTo.Gender
-			} else if assignedTo.Gender == nil{
+			} else if assignedTo.Gender == nil {
 				enriched.AssignedToGender = unknown
 			}
 
@@ -91,7 +100,7 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, err
 
 			if assignedTo.OrgName != nil {
 				enriched.AssignedToOrgName = *assignedTo.OrgName
-			}else if assignedTo.OrgName == nil {
+			} else if assignedTo.OrgName == nil {
 				enriched.AssignedToOrgName = unknown
 			}
 
@@ -142,14 +151,14 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, err
 			if reporter.GenderACC != nil {
 				enriched.ReporterGenderACC = *reporter.GenderACC
 				enriched.AuthorGenderAcc = *reporter.GenderACC
-			}else if reporter.GenderACC == nil {
+			} else if reporter.GenderACC == nil {
 				enriched.ReporterGenderACC = 0
 				enriched.AuthorGenderAcc = 0
 			}
 			if reporter.OrgName != nil {
 				enriched.ReporterOrgName = *reporter.OrgName
 				enriched.AuthorOrgName = *reporter.OrgName
-			}else if reporter.OrgName == nil {
+			} else if reporter.OrgName == nil {
 				enriched.ReporterOrgName = unknown
 				enriched.AuthorOrgName = unknown
 			}

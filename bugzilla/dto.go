@@ -111,6 +111,7 @@ type BugRaw struct {
 // EnrichedItem ...
 type EnrichedItem struct {
 	UUID           string    `json:"uuid"`
+	Project        string    `json:"project"`
 	Labels         []string  `json:"labels"`
 	Changes        int       `json:"changes"`
 	Priority       string    `json:"priority"`
@@ -141,32 +142,32 @@ type EnrichedItem struct {
 	ReporterUserName     string   `json:"reporter_user_name"`
 	ReporterDomain       string   `json:"reporter_domain"`
 	ReporterGender       string   `json:"reporter_gender"`
-	ReporterGenderACC    int   `json:"reporter_gender_acc"`
+	ReporterGenderACC    int      `json:"reporter_gender_acc"`
 	ReporterOrgName      string   `json:"reporter_org_name"`
 	ReporterMultiOrgName []string `json:"reporter_multi_org_names"`
 	ReporterBot          bool     `json:"reporter_bot"`
 
-	AuthorID string `json:"author_id"`
-	AuthorUUID string `json:"author_uuid"`
-	AuthorName     string `json:"author_name"`
-	AuthorUserName string `json:"author_user_name"`
-	AuthorDomain string `json:"author_domain"`
-	AuthorGender string `json:"author_gender"`
-	AuthorGenderAcc int `json:"author_gender_acc"`
-	AuthorOrgName string `json:"author_org_name"`
+	AuthorID           string   `json:"author_id"`
+	AuthorUUID         string   `json:"author_uuid"`
+	AuthorName         string   `json:"author_name"`
+	AuthorUserName     string   `json:"author_user_name"`
+	AuthorDomain       string   `json:"author_domain"`
+	AuthorGender       string   `json:"author_gender"`
+	AuthorGenderAcc    int      `json:"author_gender_acc"`
+	AuthorOrgName      string   `json:"author_org_name"`
 	AuthorMultiOrgName []string `json:"author_multi_org_names"`
-	AuthorBot bool `json:"author_bot"`
+	AuthorBot          bool     `json:"author_bot"`
 
-	AssignedToID string `json:"assigned_to_id"`
-	AssignedToUUID string `json:"assigned_to_uuid"`
-	AssignedToName string `json:"assigned_to_name"`
-	AssignedToUserName string `json:"assigned_to_user_name"`
-	AssignedToDomain string `json:"assigned_to_domain"`
-	AssignedToGender string `json:"assigned_to_gender"`
-	AssignedToGenderAcc int `json:"assigned_to_gender_acc"`
-	AssignedToOrgName string `json:"assigned_to_org_name"`
+	AssignedToID           string   `json:"assigned_to_id"`
+	AssignedToUUID         string   `json:"assigned_to_uuid"`
+	AssignedToName         string   `json:"assigned_to_name"`
+	AssignedToUserName     string   `json:"assigned_to_user_name"`
+	AssignedToDomain       string   `json:"assigned_to_domain"`
+	AssignedToGender       string   `json:"assigned_to_gender"`
+	AssignedToGenderAcc    int      `json:"assigned_to_gender_acc"`
+	AssignedToOrgName      string   `json:"assigned_to_org_name"`
 	AssignedToMultiOrgName []string `json:"assigned_to_multi_org_names"`
-	AssignedToBot bool `json:"assigned_to_bot"`
+	AssignedToBot          bool     `json:"assigned_to_bot"`
 
 	MainDescription         string `json:"main_description"`
 	MainDescriptionAnalyzed string `json:"main_description_analyzed"`
@@ -175,9 +176,10 @@ type EnrichedItem struct {
 	Comments                int    `json:"comments"`
 	LongDesc                int    `json:"long_desc"`
 
-	MetadataUpdatedOn  time.Time `json:"metadata__updated_on"`
-	MetadataTimestamp  time.Time `json:"metadata__timestamp"`
-	MetadataEnrichedOn time.Time `json:"metadata__enriched_on"`
-	MetadataFilterRaw  *string   `json:"metadata__filter_raw"`
-	BackendName        string    `json:"metadata__backend_name"`
+	MetadataUpdatedOn      time.Time `json:"metadata__updated_on"`
+	MetadataTimestamp      time.Time `json:"metadata__timestamp"`
+	MetadataEnrichedOn     time.Time `json:"metadata__enriched_on"`
+	MetadataFilterRaw      *string   `json:"metadata__filter_raw"`
+	MetadataBackendName    string    `json:"metadata__backend_name"`
+	MetadataBackendVersion string    `json:"metadata__backend_version"`
 }

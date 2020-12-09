@@ -92,7 +92,7 @@ func (e *Enricher) EnrichItem(rawItem RepositoryRaw, project string, now time.Ti
 	enriched.LastUpdated = rawItem.Data.LastUpdated
 	enriched.Project = project
 
-	enriched.BackendName = fmt.Sprintf("%sEnrich", strings.Title(e.DSName))
+	enriched.MetadataBackendName = fmt.Sprintf("%sEnrich", strings.Title(e.DSName))
 	enriched.BackendVersion = e.BackendVersion
 	now = now.UTC()
 	enriched.MetadataEnrichedOn = now
