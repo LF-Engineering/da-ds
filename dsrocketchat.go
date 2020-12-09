@@ -492,7 +492,7 @@ func (j *DSRocketchat) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string
 	timestamp := time.Now()
 	mItem["backend_name"] = j.DS
 	mItem["backend_version"] = RocketchatBackendVersion
-	mItem["timestamp"] = fmt.Sprintf("%.06f", float64(timestamp.UnixNano())/1.0e3)
+	mItem["timestamp"] = fmt.Sprintf("%.06f", float64(timestamp.UnixNano())/1.0e9)
 	mItem[UUID] = uuid
 	mItem[DefaultOriginField] = origin
 	mItem[DefaultTagField] = tag
