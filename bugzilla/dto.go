@@ -141,9 +141,9 @@ type EnrichedItem struct {
 	ReporterUserName     string   `json:"reporter_user_name"`
 	ReporterDomain       string   `json:"reporter_domain"`
 	ReporterGender       string   `json:"reporter_gender"`
-	ReporterGenderACC    string   `json:"reporter_gender_acc"`
+	ReporterGenderACC    int   `json:"reporter_gender_acc"`
 	ReporterOrgName      string   `json:"reporter_org_name"`
-	ReporterMultiOrgName []string `json:"reporter_multi_org_name"`
+	ReporterMultiOrgName []string `json:"reporter_multi_org_names"`
 	ReporterBot          bool     `json:"reporter_bot"`
 
 	AuthorID string `json:"author_id"`
@@ -152,9 +152,9 @@ type EnrichedItem struct {
 	AuthorUserName string `json:"author_user_name"`
 	AuthorDomain string `json:"author_domain"`
 	AuthorGender string `json:"author_gender"`
-	AuthorGenderAcc string `json:"autho_gender_acc"`
+	AuthorGenderAcc int `json:"author_gender_acc"`
 	AuthorOrgName string `json:"author_org_name"`
-	AuthorMultiOrgName []string `json:"author_multi_org_name"`
+	AuthorMultiOrgName []string `json:"author_multi_org_names"`
 	AuthorBot bool `json:"author_bot"`
 
 	AssignedToID string `json:"assigned_to_id"`
@@ -163,9 +163,9 @@ type EnrichedItem struct {
 	AssignedToUserName string `json:"assigned_to_user_name"`
 	AssignedToDomain string `json:"assigned_to_domain"`
 	AssignedToGender string `json:"assigned_to_gender"`
-	AssignedToGenderAcc string `json:"assigned_to_gender_acc"`
+	AssignedToGenderAcc int `json:"assigned_to_gender_acc"`
 	AssignedToOrgName string `json:"assigned_to_org_name"`
-	AssignedToMultiOrgName []string `json:"assigned_to_multi_org_name"`
+	AssignedToMultiOrgName []string `json:"assigned_to_multi_org_names"`
 	AssignedToBot bool `json:"assigned_to_bot"`
 
 	MainDescription         string `json:"main_description"`

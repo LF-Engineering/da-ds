@@ -2,10 +2,9 @@ package bugzilla
 
 import (
 	"fmt"
+	"github.com/LF-Engineering/da-ds/affiliation"
 	"testing"
 	"time"
-
-	"github.com/LF-Engineering/da-ds/affiliation"
 
 	"github.com/LF-Engineering/da-ds/bugzilla/mocks"
 
@@ -91,7 +90,44 @@ func TestEnrichItem(t *testing.T) {
           "creation_date" : "2020-11-03T05:31:00Z",
           "delta_ts" : "2020-11-13T05:31:00Z",
           "status" : "ACCEPTED",
-"comments" : 0
+          "comments" : 0,
+         "assigned_to_uuid" : "5d408e590365763c3927084d746071fa84dc8e52",
+          "reporter_multi_org_names" : [
+            "Unknown"
+          ],
+          "assigned_to_name" : "akuster",
+          "author_domain" : "gmail.com",
+          "author_org_name" : "Unknown",
+          "reporter_domain" : "gmail.com",
+          "reporter_uuid" : "50ffba4dfbedc6dc4390fc8bde7aeec0a7191056",
+          "assigned_to_bot" : false,
+          "reporter_name" : "Vasyl",
+          "author_id" : "50ffba4dfbedc6dc4390fc8bde7aeec0a7191056",
+          "assigned_to_user_name" : "",
+          "reporter_org_name" : "Unknown",
+          "author_uuid" : "50ffba4dfbedc6dc4390fc8bde7aeec0a7191056",
+          "assigned_to_gender" : "Unknown",
+          "reporter_gender_acc" : 0,
+          "assigned_to_gender_acc" : 0,
+          "author_user_name" : "",
+          "assigned_to_multi_org_names" : [
+            "MontaVista Software, LLC"
+          ],
+          "assigned_to_id" : "a89364af9818412b8c59193ca83b30dd67b20e35",
+          "author_name" : "Vasyl",
+          "assigned_to_domain" : "gmail.com",
+          "author_gender_acc" : 0,
+          "author_bot" : false,
+          "reporter_bot" : false,
+          "reporter_id" : "50ffba4dfbedc6dc4390fc8bde7aeec0a7191056",
+          "reporter_gender" : "Unknown",
+          "author_multi_org_names" : [
+            "Unknown"
+          ],
+          "assigned_to_org_name" : "MontaVista Software, LLC",
+          "author_gender" : "Unknown",
+          "reporter_user_name" : ""
+
         }
 `,
 	}
@@ -108,23 +144,42 @@ func TestEnrichItem(t *testing.T) {
 		}
 
 		identityProviderMock := &mocks.IdentityProvider{}
-		fakeAff := &affiliation.Identity{ID: "1", UUID: "", Name: "Ayman"}
-		identityProviderMock.On("GetIdentity", "email", "ayman@mail.com").Return(fakeAff, nil)
+		unknown := "Unknown"
+		zero := 0
+		fakeAff1 := &affiliation.Identity{ID: "50ffba4dfbedc6dc4390fc8bde7aeec0a7191056",
+			UUID: "50ffba4dfbedc6dc4390fc8bde7aeec0a7191056", Name: "Vasyl", IsBot: false ,
+			Domain : "gmail.com", OrgName: nil, Username: "", GenderACC: &zero,
+			MultiOrgNames: []string{}, Gender: &unknown,
+		}
+
+		dd := "MontaVista Software, LLC"
+		fakeAff2 := &affiliation.Identity{ID: "a89364af9818412b8c59193ca83b30dd67b20e35",
+			UUID: "5d408e590365763c3927084d746071fa84dc8e52", Name: "akuster", IsBot: false ,
+			Domain : "gmail.com", OrgName: &dd , Username: "", GenderACC: &zero,
+			MultiOrgNames: []string{"MontaVista Software, LLC"}, Gender: &unknown,
+		}
+		rmultiorg1 := []string{ "MontaVista Software, LLC"}
+		rmultiorg2 := []string{ unknown }
+		identityProviderMock.On("GetIdentity", "username", "vvavrychuk").Return(fakeAff1, nil)
+		identityProviderMock.On("GetIdentity", "username", "akuster808").Return(fakeAff2, nil)
+
+		d, err := time.Parse(time.RFC3339, "2020-12-07T14:38:23.895437Z")
+		identityProviderMock.On("GetOrganizations", "5d408e590365763c3927084d746071fa84dc8e52", d).Return(rmultiorg1, nil)
+		identityProviderMock.On("GetOrganizations", "50ffba4dfbedc6dc4390fc8bde7aeec0a7191056", d ).Return(rmultiorg2, nil)
+
 		// Act
 
 		srv := NewEnricher(identityProviderMock)
 
-		enrich, er := srv.EnrichItem(expectedRaw, expectedEnrich.MetadataUpdatedOn)
+		enrich, er := srv.EnrichItem(expectedRaw, expectedEnrich.MetadataEnrichedOn)
 		if er != nil {
 			tt.Error(er)
 		}
 		fmt.Println("enriched:==== ")
-		fmt.Println(enrich.DeltaTs.Format(time.RFC3339Nano))
-		fmt.Println(expectedEnrich.DeltaTs)
-
-		fmt.Println(enrich)
-
-		assert.Equal(tt, expectedEnrich, *enrich)
+		assert.Equal(tt, *expectedEnrich, *enrich)
+		assert.Equal(tt, expectedEnrich.UUID, enrich.UUID)
+		assert.Equal(tt, expectedEnrich.BackendName, enrich.BackendName)
+		assert.Equal(tt, expectedEnrich.AssignedToMultiOrgName, enrich.AssignedToMultiOrgName)
 
 	})
 
@@ -134,13 +189,10 @@ func toBugEnrich(b string) (*EnrichedItem, error) {
 	expectedEnrich := &EnrichedItem{}
 	err := jsoniter.Unmarshal([]byte(b), expectedEnrich)
 	if err != nil {
-		fmt.Println("errrrrrr")
-		fmt.Println(err.Error())
 		return nil, err
 	}
 
-	fmt.Println("222222")
-	fmt.Println(expectedEnrich.DeltaTs)
+
 	return expectedEnrich, err
 }
 

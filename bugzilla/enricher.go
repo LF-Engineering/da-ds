@@ -17,6 +17,7 @@ type Enricher struct {
 
 type IdentityProvider interface {
 	GetIdentity(key string, val string) (*affiliation.Identity, error)
+    GetOrganizations(uuid string, date time.Time) ([]string , error)
 }
 
 // NewEnricher
@@ -45,7 +46,7 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, err
 	enriched.UUID = rawItem.UUID
 	enriched.MetadataUpdatedOn = rawItem.MetadataUpdatedOn
 	enriched.MetadataTimestamp = rawItem.MetadataTimestamp
-	enriched.MetadataEnrichedOn = rawItem.MetadataUpdatedOn
+	enriched.MetadataEnrichedOn = now
 	enriched.MetadataFilterRaw = nil
 	enriched.IsBugzillaBug = 1
 	enriched.Url = rawItem.Origin + "/show_bug.cgi?id=" + fmt.Sprint(rawItem.BugID)
@@ -56,10 +57,12 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, err
 	if rawItem.StatusWhiteboard != "" {
 		enriched.Whiteboard = rawItem.StatusWhiteboard
 	}
+	unknown := "Unknown"
+	multiOrgs := []string{ unknown }
 	if rawItem.AssignedTo != "" {
 		enriched.Assigned = rawItem.AssignedTo
 
-		// Enrich reporter
+		// Enrich assigned to
 		assignedToFieldName := "username"
 		if strings.Contains(rawItem.AssignedTo, "@") {
 			assignedToFieldName = "email"
@@ -72,17 +75,33 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, err
 			enriched.AssignedToName = assignedTo.Name
 			enriched.AssignedToUserName = assignedTo.Username
 			enriched.AssignedToDomain = assignedTo.Domain
-			enriched.AssignedToMultiOrgName = assignedTo.MultiOrgNames
 			enriched.AssignedToBot = assignedTo.IsBot
 
 			if assignedTo.Gender != nil {
 				enriched.AssignedToGender = *assignedTo.Gender
+			} else if assignedTo.Gender == nil{
+				enriched.AssignedToGender = unknown
 			}
+
 			if assignedTo.GenderACC != nil {
 				enriched.AssignedToGenderAcc = *assignedTo.GenderACC
+			} else if assignedTo.GenderACC == nil {
+				enriched.AssignedToGenderAcc = 0
 			}
+
 			if assignedTo.OrgName != nil {
 				enriched.AssignedToOrgName = *assignedTo.OrgName
+			}else if assignedTo.OrgName == nil {
+				enriched.AssignedToOrgName = unknown
+			}
+
+			assignedToMultiOrg, err := e.identityProvider.GetOrganizations(assignedTo.UUID, enriched.MetadataUpdatedOn)
+			if err == nil {
+				enriched.AssignedToMultiOrgName = multiOrgs
+
+				if len(assignedToMultiOrg) != 0 {
+					enriched.AssignedToMultiOrgName = assignedToMultiOrg
+				}
 			}
 		}
 
@@ -99,6 +118,7 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, err
 		}
 
 		reporter, err := e.identityProvider.GetIdentity(reporterFieldName, enriched.ReporterUserName)
+
 		if err == nil {
 			enriched.ReporterID = reporter.ID
 			enriched.ReporterUUID = reporter.UUID
@@ -115,22 +135,40 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, err
 			if reporter.Gender != nil {
 				enriched.ReporterGender = *reporter.Gender
 				enriched.AuthorGender = *reporter.Gender
+			} else if reporter.Gender == nil {
+				enriched.ReporterGender = unknown
+				enriched.AuthorGender = unknown
 			}
 			if reporter.GenderACC != nil {
 				enriched.ReporterGenderACC = *reporter.GenderACC
 				enriched.AuthorGenderAcc = *reporter.GenderACC
+			}else if reporter.GenderACC == nil {
+				enriched.ReporterGenderACC = 0
+				enriched.AuthorGenderAcc = 0
 			}
 			if reporter.OrgName != nil {
 				enriched.ReporterOrgName = *reporter.OrgName
 				enriched.AuthorOrgName = *reporter.OrgName
+			}else if reporter.OrgName == nil {
+				enriched.ReporterOrgName = unknown
+				enriched.AuthorOrgName = unknown
 			}
 
-			enriched.ReporterMultiOrgName = reporter.MultiOrgNames
 			enriched.ReporterBot = reporter.IsBot
-
-			enriched.AuthorMultiOrgName = reporter.MultiOrgNames
 			enriched.AuthorBot = reporter.IsBot
+
+			reporterMultiOrg, err := e.identityProvider.GetOrganizations(reporter.UUID, enriched.MetadataUpdatedOn)
+			if err == nil {
+				enriched.ReporterMultiOrgName = multiOrgs
+				enriched.AuthorMultiOrgName = multiOrgs
+
+				if len(reporterMultiOrg) != 0 {
+					enriched.ReporterMultiOrgName = reporterMultiOrg
+					enriched.AuthorMultiOrgName = reporterMultiOrg
+				}
+			}
 		}
+
 	}
 	if rawItem.Resolution != "" {
 		enriched.Resolution = rawItem.Resolution
