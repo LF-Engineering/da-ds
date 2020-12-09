@@ -1,6 +1,6 @@
 package affiliation
 
-// Identity sortingHat Identity
+// Identity contains sortingHat user Identity
 type Identity struct {
 	ID            string
 	UUID          string

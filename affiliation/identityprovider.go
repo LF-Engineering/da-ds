@@ -3,16 +3,21 @@ package affiliation
 import (
 	"fmt"
 	"time"
-
-	"github.com/jmoiron/sqlx"
 )
 
 // IdentityProvider manages user identities
 type IdentityProvider struct {
-	db *sqlx.DB
+	db DBConnector
 }
 
-func NewIdentityProvider(db *sqlx.DB) *IdentityProvider {
+// DBConnector contains dataAccess functionalities
+type DBConnector interface {
+	Get(dest interface{}, query string, args ...interface{}) error
+	Select(dest interface{}, query string, args ...interface{}) error
+}
+
+// NewIdentityProvider initiates a new IdentityProvider instance
+func NewIdentityProvider(db DBConnector) *IdentityProvider {
 	return &IdentityProvider{db: db}
 }
 
@@ -42,10 +47,8 @@ where
 	return &identity, nil
 }
 
-
-
-// GetEnrollments ...
-func (i *IdentityProvider) GetOrganizations(uuid string, date time.Time) ([]string , error) {
+// GetOrganizations gets user's enrolled organizations until given time
+func (i *IdentityProvider) GetOrganizations(uuid string, date time.Time) ([]string, error) {
 	query := fmt.Sprintf(`select distinct o.name 
 		from enrollments e, organizations o
 		where e.organization_id = o.id and
@@ -58,6 +61,9 @@ func (i *IdentityProvider) GetOrganizations(uuid string, date time.Time) ([]stri
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println("jjjjjj")
+	fmt.Println(multiOrg)
 
 	return multiOrg, nil
 }
