@@ -13,16 +13,15 @@ GO_INSTALL=go install -ldflags '-s'
 GO_FMT=gofmt -s -w
 GO_LINT=golint -set_exit_status
 GO_VET=go vet
-GO_CONST=goconst
 GO_IMPORTS=goimports -w
 GO_USEDEXPORTS=usedexports
-GO_ERRCHECK=errcheck -asserts -ignore '[FS]?[Pp]rint*' -ignoretests
+GO_ERRCHECK=errcheck -asserts -ignoretests -ignoregenerated
 GO_TEST=go test
 BINARIES=dads
 STRIP=strip
-PKG_LIST := $(shell go list ./... | grep -v /vendor/)
+PKG_LIST := $(shell go list ./... | grep -v mock)
 
-all: check ${BINARIES}
+all: check build
 
 build: cmd/dads/dads.go ${GO_LIB_FILES}
 	 ${GO_ENV} ${GO_BUILD} -o dads cmd/dads/dads.go
@@ -34,13 +33,10 @@ lint: ## Lint the files
 	golint -set_exit_status $(PKG_LIST)
 
 vet: ${GO_BIN_FILES} ${GO_LIB_FILES} ${GO_TEST_FILES} ${GO_LIBTEST_FILES}
-	./scripts/vet_files.sh "${GO_VET}"
+	go vet $(PKG_LIST)
 
 imports: ${GO_BIN_FILES} ${GO_LIB_FILES} ${GO_TEST_FILES} ${GO_LIBTEST_FILES}
 	./scripts/for_each_go_file.sh "${GO_IMPORTS}"
-
-const: ${GO_BIN_FILES} ${GO_LIB_FILES} ${GO_TEST_FILES} ${GO_LIBTEST_FILES}
-	${GO_CONST} ./...
 
 usedexports: ${GO_BIN_FILES} ${GO_LIB_FILES} ${GO_TEST_FILES} ${GO_LIBTEST_FILES}
 	${GO_USEDEXPORTS} ./...
@@ -51,7 +47,7 @@ errcheck: ${GO_BIN_FILES} ${GO_LIB_FILES} ${GO_TEST_FILES} ${GO_LIBTEST_FILES}
 test:
 	go test -v $(PKG_LIST)
 
-check: fmt lint imports vet const usedexports errcheck
+check: fmt lint imports vet usedexports errcheck
 
 install: check ${BINARIES}
 	${GO_ENV} ${GO_INSTALL} ${GO_BIN_CMDS}
@@ -62,4 +58,4 @@ strip: ${BINARIES}
 clean:
 	rm -f ${BINARIES}
 
-.PHONY: test
+.PHONY: test build

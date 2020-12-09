@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"regexp"
 	"strings"
 	"time"
@@ -78,7 +79,11 @@ func (p *ESClientProvider) CreateIndex(index string, body []byte) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			log.Printf("Err: %s", err.Error())
+		}
+	}()
 
 	resBytes, err := toBytes(res)
 	if err != nil {
@@ -97,7 +102,11 @@ func (p *ESClientProvider) DeleteIndex(index string, ignoreUnavailable bool) ([]
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			log.Printf("Err: %s", err.Error())
+		}
+	}()
 
 	body, err := toBytes(res)
 	if err != nil {
@@ -146,7 +155,11 @@ func (p *ESClientProvider) Add(index string, documentID string, body []byte) ([]
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			log.Printf("Err: %s", err.Error())
+		}
+	}()
 
 	resBytes, err := toBytes(res)
 	if err != nil {
@@ -183,7 +196,11 @@ func (p *ESClientProvider) Bulk(body []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			log.Printf("Err: %s", err.Error())
+		}
+	}()
 
 	resBytes, err := toBytes(res)
 	if err != nil {
@@ -257,7 +274,12 @@ func (p *ESClientProvider) Get(index string, query map[string]interface{}, resul
 	if err != nil {
 		return err
 	}
-	defer res.Body.Close()
+
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			log.Printf("Err: %s", err.Error())
+		}
+	}()
 
 	if res.StatusCode == 200 {
 		// index exists so return true

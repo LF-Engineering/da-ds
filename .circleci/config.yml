@@ -9,6 +9,9 @@ jobs:
       - checkout
 
       - run: go get -u golang.org/x/lint/golint
-      - run: make lint
+      - run: go get golang.org/x/tools/cmd/goimports
+      - run: go get github.com/jgautheron/usedexports
+      - run: go get -u github.com/kisielk/errcheck
+      - run: make check
       - run: make test
       - run: make build

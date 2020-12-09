@@ -3,6 +3,7 @@ package utils
 import (
 	"bytes"
 	"encoding/csv"
+	"log"
 	"net/http"
 	"time"
 )
@@ -68,7 +69,11 @@ func (h *HTTPClientProvider) RequestCSV(url string) ([][]string, error) {
 		return nil, err
 	}
 
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Err: %s", err.Error())
+		}
+	}()
 	reader := csv.NewReader(resp.Body)
 	reader.Comma = ','
 	data, err := reader.ReadAll()

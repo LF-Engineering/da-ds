@@ -205,7 +205,7 @@ func (j *DSJira) AddMetadata(ctx *Ctx, issue interface{}) (mItem map[string]inte
 	timestamp := time.Now()
 	mItem["backend_name"] = j.DS
 	mItem["backend_version"] = JiraBackendVersion
-	mItem["timestamp"] = fmt.Sprintf("%.06f", float64(timestamp.UnixNano())/1.0e3)
+	mItem["timestamp"] = fmt.Sprintf("%.06f", float64(timestamp.UnixNano())/1.0e9)
 	mItem[UUID] = uuid
 	mItem[DefaultOriginField] = origin
 	mItem[DefaultTagField] = tag
@@ -840,7 +840,7 @@ func (j *DSJira) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3
 	for _, rawComment := range comments {
 		comment, ok := rawComment.(map[string]interface{})
 		if !ok {
-			err = fmt.Errorf("cannot parse %+v", rawComment)
+			err = fmt.Errorf("Cannot parse %+v", rawComment)
 			return
 		}
 		for _, field := range []string{Author, "updateAuthor"} {
@@ -989,7 +989,7 @@ func JiraEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[
 		}
 		doc, ok := src.(map[string]interface{})
 		if !ok {
-			e = fmt.Errorf("failed to parse document %+v", doc)
+			e = fmt.Errorf("Failed to parse document %+v", doc)
 			return
 		}
 		var (
