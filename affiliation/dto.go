@@ -9,7 +9,7 @@ type Identity struct {
 	Email         string
 	Domain        string
 	Gender        *string
-	GenderACC     *string `db:"gender_acc"`
+	GenderACC     *int `db:"gender_acc"`
 	OrgName       *string
 	IsBot         bool `db:"is_bot"`
 	MultiOrgNames []string

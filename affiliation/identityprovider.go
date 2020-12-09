@@ -2,6 +2,7 @@ package affiliation
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -39,4 +40,24 @@ where
 	}
 
 	return &identity, nil
+}
+
+
+
+// GetEnrollments ...
+func (i *IdentityProvider) GetOrganizations(uuid string, date time.Time) ([]string , error) {
+	query := fmt.Sprintf(`select distinct o.name 
+		from enrollments e, organizations o
+		where e.organization_id = o.id and
+		e.uuid = '%s' and
+       '%s' between e.start and e.end order by e.id desc`,
+		uuid, date.Format(time.RFC3339))
+
+	var multiOrg []string
+	err := i.db.Select(&multiOrg, query)
+	if err != nil {
+		return nil, err
+	}
+
+	return multiOrg, nil
 }
