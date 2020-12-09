@@ -47,7 +47,7 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, err
 	enriched.UUID = rawItem.UUID
 	enriched.MetadataUpdatedOn = rawItem.MetadataUpdatedOn
 	enriched.MetadataTimestamp = rawItem.MetadataTimestamp
-	enriched.MetadataEnrichedOn = rawItem.MetadataTimestamp
+	enriched.MetadataEnrichedOn = rawItem.MetadataUpdatedOn
 	enriched.MetadataFilterRaw = nil
 	enriched.IsBugzillaBug = 1
 	enriched.Url = rawItem.Origin + "/show_bug.cgi?id=" + fmt.Sprint(rawItem.BugID)
@@ -60,6 +60,34 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, err
 	}
 	if rawItem.AssignedTo != "" {
 		enriched.Assigned = rawItem.AssignedTo
+
+		// Enrich reporter
+		assignedToFieldName := "username"
+		if strings.Contains(rawItem.AssignedTo, "@") {
+			assignedToFieldName = "email"
+		}
+
+		assignedTo, err := e.identityProvider.GetIdentity(assignedToFieldName, enriched.Assigned)
+		if err == nil {
+			enriched.AssignedToID = assignedTo.ID
+			enriched.AssignedToUUID = assignedTo.UUID
+			enriched.AssignedToName = assignedTo.Name
+			enriched.AssignedToUserName = assignedTo.Username
+			enriched.AssignedToDomain = assignedTo.Domain
+			enriched.AssignedToMultiOrgName = assignedTo.MultiOrgNames
+			enriched.AssignedToBot = assignedTo.IsBot
+
+			if assignedTo.Gender != nil {
+				enriched.AssignedToGender = *assignedTo.Gender
+			}
+			if assignedTo.GenderACC != nil {
+				enriched.AssignedToGenderAcc = *assignedTo.GenderACC
+			}
+			if assignedTo.OrgName != nil {
+				enriched.AssignedToOrgName = *assignedTo.OrgName
+			}
+		}
+
 	}
 
 	if rawItem.Reporter != "" {
@@ -75,23 +103,36 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, err
 		reporter, err := e.identityProvider.GetIdentity(reporterFieldName, enriched.ReporterUserName)
 		if err == nil {
 			enriched.ReporterID = reporter.ID
-			enriched.UUID = reporter.UUID
-			enriched.ReporterID = reporter.ID
+			enriched.ReporterUUID = reporter.UUID
 			enriched.ReporterName = reporter.Name
 			enriched.ReporterUserName = reporter.Username
 			enriched.ReporterDomain = reporter.Domain
+
+			enriched.AuthorID = reporter.ID
+			enriched.AuthorUUID = reporter.UUID
+			enriched.AuthorName = reporter.Name
+			enriched.AuthorUserName = reporter.Username
+			enriched.AuthorDomain = reporter.Domain
+
+
 			if reporter.Gender != nil {
 				enriched.ReporterGender = *reporter.Gender
+				enriched.AuthorGender = *reporter.Gender
 			}
 			if reporter.GenderACC != nil {
 				enriched.ReporterGenderACC = *reporter.GenderACC
+				enriched.AuthorGenderAcc = *reporter.GenderACC
 			}
-			enriched.ReporterDomain = reporter.Domain
 			if reporter.OrgName != nil {
 				enriched.ReporterOrgName = *reporter.OrgName
+				enriched.AuthorOrgName = *reporter.OrgName
 			}
+
 			enriched.ReporterMultiOrgName = reporter.MultiOrgNames
 			enriched.ReporterBot = reporter.IsBot
+
+			enriched.AuthorMultiOrgName = reporter.MultiOrgNames
+			enriched.AuthorBot = reporter.IsBot
 		}
 	}
 	if rawItem.Resolution != "" {

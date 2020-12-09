@@ -104,9 +104,10 @@ func TestEnrichItem(t *testing.T) {
 		}
 
 		// Act
-		fmt.Println("xxxxxx")
 
-		enrich, er := EnrichItem(expectedRaw, expectedEnrich.MetadataUpdatedOn)
+		srv := NewEnricher()
+
+		enrich, er := srv.EnrichItem(expectedRaw, expectedEnrich.MetadataUpdatedOn)
 		if er != nil {
 			tt.Error(er)
 		}

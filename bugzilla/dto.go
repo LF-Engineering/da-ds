@@ -146,7 +146,28 @@ type EnrichedItem struct {
 	ReporterMultiOrgName []string `json:"reporter_multi_org_name"`
 	ReporterBot          bool     `json:"reporter_bot"`
 
-	AuthorName              string `json:"author_name"`
+	AuthorID string `json:"author_id"`
+	AuthorUUID string `json:"author_uuid"`
+	AuthorName     string `json:"author_name"`
+	AuthorUserName string `json:"author_user_name"`
+	AuthorDomain string `json:"author_domain"`
+	AuthorGender string `json:"author_gender"`
+	AuthorGenderAcc string `json:"autho_gender_acc"`
+	AuthorOrgName string `json:"author_org_name"`
+	AuthorMultiOrgName []string `json:"author_multi_org_name"`
+	AuthorBot bool `json:"author_bot"`
+
+	AssignedToID string `json:"assigned_to_id"`
+	AssignedToUUID string `json:"assigned_to_uuid"`
+	AssignedToName string `json:"assigned_to_name"`
+	AssignedToUserName string `json:"assigned_to_user_name"`
+	AssignedToDomain string `json:"assigned_to_domain"`
+	AssignedToGender string `json:"assigned_to_gender"`
+	AssignedToGenderAcc string `json:"assigned_to_gender_acc"`
+	AssignedToOrgName string `json:"assigned_to_org_name"`
+	AssignedToMultiOrgName []string `json:"assigned_to_multi_org_name"`
+	AssignedToBot bool `json:"assigned_to_bot"`
+
 	MainDescription         string `json:"main_description"`
 	MainDescriptionAnalyzed string `json:"main_description_analyzed"`
 	Summary                 string `json:"summary"`
