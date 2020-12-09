@@ -5,6 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LF-Engineering/da-ds/affiliation"
+
+	"github.com/LF-Engineering/da-ds/bugzilla/mocks"
+
 	jsoniter "github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
 )
@@ -103,9 +107,12 @@ func TestEnrichItem(t *testing.T) {
 			t.Error(err)
 		}
 
+		identityProviderMock := &mocks.IdentityProvider{}
+		fakeAff := &affiliation.Identity{ID: "1", UUID: "", Name: "Ayman"}
+		identityProviderMock.On("GetIdentity", "email", "ayman@mail.com").Return(fakeAff, nil)
 		// Act
 
-		srv := NewEnricher()
+		srv := NewEnricher(identityProviderMock)
 
 		enrich, er := srv.EnrichItem(expectedRaw, expectedEnrich.MetadataUpdatedOn)
 		if er != nil {

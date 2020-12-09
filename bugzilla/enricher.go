@@ -13,7 +13,6 @@ import (
 // Enricher ...
 type Enricher struct {
 	identityProvider IdentityProvider
-	roles            []string
 }
 
 type IdentityProvider interface {
@@ -24,7 +23,6 @@ type IdentityProvider interface {
 func NewEnricher(identProvider IdentityProvider) *Enricher {
 	return &Enricher{
 		identityProvider: identProvider,
-		roles:            []string{"assigned_to", "reporter", "qa_contact"},
 	}
 }
 
@@ -113,7 +111,6 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, err
 			enriched.AuthorName = reporter.Name
 			enriched.AuthorUserName = reporter.Username
 			enriched.AuthorDomain = reporter.Domain
-
 
 			if reporter.Gender != nil {
 				enriched.ReporterGender = *reporter.Gender
