@@ -42,6 +42,8 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, err
 	enriched.DeltaTs = rawItem.DeltaTs
 	enriched.Changes = rawItem.ActivityCount
 	enriched.Labels = rawItem.Keywords
+	fmt.Println("ttt")
+	fmt.Println(rawItem.Keywords)
 	enriched.Priority = rawItem.Priority
 	enriched.Severity = rawItem.Severity
 	enriched.OpSys = rawItem.OpSys
@@ -198,6 +200,8 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, err
 		enriched.Comments = len(rawItem.LongDesc)
 	}
 	enriched.LongDesc = len(rawItem.LongDesc)
+	enriched.RepositoryLabels = nil
+
 
 	return enriched, nil
 }

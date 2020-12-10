@@ -10,25 +10,59 @@ import (
 
 	"github.com/LF-Engineering/da-ds/affiliation/mocks"
 
-	db "github.com/LF-Engineering/da-ds/db"
-
 	"github.com/stretchr/testify/assert"
 )
 
 func TestGetIdentityByUsername(t *testing.T) {
 	// Arrange
-	x := "lfinsights_test:urpialruvCadcyakhokcect2@tcp(lfinsights-db.clctyzfo4svp.us-west-2.rds.amazonaws.com)/lfinsights_test?charset=utf8"
-	dataBase, err := db.NewConnector("mysql", x)
-	if err != nil {
-		fmt.Println("jjjjjjj")
-		fmt.Println(err)
-	}
+	dataBase := &mocks.DBConnector{}
+	key := "username"
+	val := "vvavrychuk"
+	query := fmt.Sprintf(`SELECT 
+       identities.id,
+       identities.uuid,
+       profiles.name,
+       identities.username,
+       profiles.email,
+       profiles.gender,
+       profiles.gender_acc,
+       profiles.is_bot
+FROM 
+     identities LEFT JOIN (profiles)
+                 ON (identities.uuid = profiles.uuid)
+where 
+      identities.%s='%s';`, key, val)
+
+	ide := Identity{}
+	dataBase.On("Get", &ide, query).Run(func(args mock.Arguments) {
+
+		o := Identity{
+			ID : "5",
+			UUID: "5",
+			Name : "vvavrychuk",
+			Username  : "vvavrychuk",
+			Email         : "gmail.com",
+			Domain        :"inc.com",
+			Gender        :nil,
+			GenderACC     : nil,
+			OrgName       :nil,
+			IsBot         :false,
+		}
+		reflect.ValueOf(args.Get(0)).Elem().Set(reflect.ValueOf(o))
+	}).Return(nil)
+
 	// Act
 	srv := NewIdentityProvider(dataBase)
-	res, err := srv.GetIdentityByUsername("username", "vvavrychuk")
+	res, err := srv.GetIdentityByUsername(key, val)
 	fmt.Println(res)
 	// Assert
 	assert.NoError(t, err)
+	assert.Equal(t, res.UUID, "5")
+	assert.Equal(t, res.Domain, "inc.com")
+	assert.Equal(t, res.Email, "gmail.com")
+	assert.Equal(t, res.IsBot, false)
+
+
 
 }
 

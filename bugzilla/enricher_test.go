@@ -23,7 +23,7 @@ func TestEnrichItem(t *testing.T) {
 	testYocto := test{
 		"YoctoTest",
 		`{
-"backend_version" : "0.0.1",
+		  "backend_version" : "0.0.1",
           "backend_name" : "Bugzilla",
           "uuid" : "5d61b34bcdf735a83d8b1c6762890b79f053c491",
           "bug_id" : 14136,
@@ -57,7 +57,10 @@ func TestEnrichItem(t *testing.T) {
           "summary" : ""
         }`,
 		`{
-	      "bug_id" : 14136,
+          "metadata__backend_name" : "BugzillaEnrich",
+          "metadata__backend_version" : "0.18",
+          "labels" : null,
+		  "bug_id" : 14136,
           "priority" : "Medium+",
 		  "category":"bug",
           "changes" : 13,
@@ -169,7 +172,7 @@ func TestEnrichItem(t *testing.T) {
 
 		// Act
 
-		srv := NewEnricher(identityProviderMock)
+		srv := NewEnricher(identityProviderMock, "0.18", "yocto")
 
 		enrich, er := srv.EnrichItem(expectedRaw, expectedEnrich.MetadataEnrichedOn)
 		if er != nil {
@@ -178,7 +181,7 @@ func TestEnrichItem(t *testing.T) {
 		fmt.Println("enriched:==== ")
 		assert.Equal(tt, *expectedEnrich, *enrich)
 		assert.Equal(tt, expectedEnrich.UUID, enrich.UUID)
-		assert.Equal(tt, expectedEnrich.BackendName, enrich.BackendName)
+		assert.Equal(tt, expectedEnrich.MetadataBackendName, enrich.MetadataBackendName)
 		assert.Equal(tt, expectedEnrich.AssignedToMultiOrgName, enrich.AssignedToMultiOrgName)
 
 	})
