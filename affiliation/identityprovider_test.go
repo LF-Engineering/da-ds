@@ -53,7 +53,7 @@ where
 
 	// Act
 	srv := NewIdentityProvider(dataBase)
-	res, err := srv.GetIdentityByUsername(key, val)
+	res, err := srv.GetIdentity(key, val)
 	fmt.Println(res)
 	// Assert
 	assert.NoError(t, err)

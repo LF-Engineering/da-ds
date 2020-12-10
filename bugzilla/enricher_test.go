@@ -172,7 +172,7 @@ func TestEnrichItem(t *testing.T) {
 
 		// Act
 
-		srv := NewEnricher(identityProviderMock, "0.18", "yocto")
+		srv := NewEnricher(identityProviderMock,"0.18", "yocto")
 
 		enrich, er := srv.EnrichItem(expectedRaw, expectedEnrich.MetadataEnrichedOn)
 		if er != nil {

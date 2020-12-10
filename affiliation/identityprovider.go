@@ -22,7 +22,7 @@ func NewIdentityProvider(db DBConnector) *IdentityProvider {
 }
 
 // GetIdentityByUsername ...
-func (i *IdentityProvider) GetIdentityByUsername(key string, val string) (*Identity, error) {
+func (i *IdentityProvider) GetIdentity(key string, val string) (*Identity, error) {
 	query := fmt.Sprintf(`SELECT 
        identities.id,
        identities.uuid,

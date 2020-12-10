@@ -184,3 +184,21 @@ type EnrichedItem struct {
 	MetadataBackendName    string    `json:"metadata__backend_name"`
 	MetadataBackendVersion string    `json:"metadata__backend_version"`
 }
+
+
+
+// TopHits result
+type RawHits struct {
+	Hits NHits `json:"hits"`
+}
+
+// rawHits result
+type NHits struct {
+	Hits []NestedRawHits `json:"hits"`
+}
+
+// NestedRawHits is the actual hit data
+type NestedRawHits struct {
+	Id     string    `json:"_id"`
+	Source BugRaw `json:"_source"`
+}

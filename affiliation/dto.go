@@ -6,7 +6,7 @@ type Identity struct {
 	UUID          string
 	Name          string
 	Username      string
-	Email         string
+	Email         *string
 	Domain        string
 	Gender        *string
 	GenderACC     *int `db:"gender_acc"`

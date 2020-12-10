@@ -12,10 +12,10 @@ import (
 
 // Enricher ...
 type Enricher struct {
-	identityProvider IdentityProvider
-	DSName           string
-	BackendVersion   string
-	Project          string
+	identityProvider      IdentityProvider
+	DSName                string
+	BackendVersion        string
+	Project               string
 }
 
 type IdentityProvider interface {
@@ -26,13 +26,14 @@ type IdentityProvider interface {
 // NewEnricher
 func NewEnricher(identProvider IdentityProvider, backendVersion string, project string) *Enricher {
 	return &Enricher{
-		identityProvider: identProvider,
-		DSName:           Bugzilla,
-		BackendVersion:   backendVersion,
-		Project:          project,
+		identityProvider:      identProvider,
+		DSName:                Bugzilla,
+		BackendVersion:        backendVersion,
+		Project:               project,
 	}
 }
 
+// EnrichItem...
 func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, error) {
 	enriched := &EnrichedItem{}
 
@@ -80,6 +81,10 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, err
 		}
 
 		assignedTo, err := e.identityProvider.GetIdentity(assignedToFieldName, enriched.Assigned)
+		if err != nil {
+			fmt.Println("ppppp")
+			fmt.Println(err)
+		}
 		if err == nil {
 			enriched.AssignedToID = assignedTo.ID
 			enriched.AssignedToUUID = assignedTo.UUID
@@ -115,7 +120,6 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, err
 				}
 			}
 		}
-
 	}
 
 	if rawItem.Reporter != "" {
@@ -199,12 +203,11 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, err
 	if len(rawItem.LongDesc) > 0 {
 		enriched.Comments = len(rawItem.LongDesc)
 	}
-	enriched.LongDesc = len(rawItem.LongDesc)
 	enriched.RepositoryLabels = nil
-
 
 	return enriched, nil
 }
+
 
 // EnrichAffiliation gets author SH identity data
 func (e *Enricher) EnrichAffiliation(key string, val string) (*affiliation.Identity, error) {
