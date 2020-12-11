@@ -33,23 +33,7 @@ type Manager struct {
 }
 
 // NewManager initiates bugzilla manager instance
-func NewManager(
-	endPoint string,
-	shConnStr string,
-	fetcherBackendVersion string,
-	enricherBackendVersion string,
-	fetch bool,
-	enrich bool,
-	eSUrl string,
-	esUser string,
-	esPassword string,
-	esIndex string,
-	fromDate *time.Time,
-	httpTimeout time.Duration,
-	project string,
-	fetchSize int,
-	enrichSize int,
-) (*Manager, error) {
+func NewManager(endPoint string, shConnStr string, fetcherBackendVersion string, enricherBackendVersion string, fetch bool, enrich bool, eSUrl string, esUser string, esPassword string, esIndex string, fromDate *time.Time, httpTimeout time.Duration, project string, fetchSize int, enrichSize int) *Manager {
 
 	mgr := &Manager{
 		Endpoint:               endPoint,
@@ -71,14 +55,14 @@ func NewManager(
 
 	fetcher, enricher, esClientProvider, err := buildServices(mgr)
 	if err != nil {
-		return nil, err
+		return nil
 	}
 
 	mgr.fetcher = fetcher
 	mgr.enricher = enricher
 	mgr.esClientProvider = esClientProvider
 
-	return mgr, nil
+	return mgr
 }
 
 // TopHits result
