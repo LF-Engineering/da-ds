@@ -11,26 +11,15 @@ type AssigneeResponse struct {
 
 // BugResponse data model represents Bugzilla get bugsList results
 type BugResponse struct {
-	ID               int                    `json:"id"`
-	Product          string                 `json:"product"`
-	Component        string                 `json:"component"`
-	AssignedTo       *AssigneeResponse      `json:"assigned_to"`
-	ShortDescription string                 `json:"short_description"`
-	CreationTS       time.Time              `json:"creation_ts"`
-	Priority         string                 `json:"priority"`
-	BugStatus        string                 `json:"bug_status"`
-	ChangedAt        string                 `json:"changed_at"`
-	Activity         []*BugActivityResponse `json:"activity"`
-}
-
-// todo: clean it if not used
-// BugActivityResponse data model represents Bugzilla bugsActivity results
-type BugActivityResponse struct {
-	Added  string `json:"added"`
-	What   string `json:"what"`
-	Remove string `json:"remove"`
-	Who    string `json:"who"`
-	When   string `json:"when"`
+	ID               int               `json:"id"`
+	Product          string            `json:"product"`
+	Component        string            `json:"component"`
+	AssignedTo       *AssigneeResponse `json:"assigned_to"`
+	ShortDescription string            `json:"short_description"`
+	CreationTS       time.Time         `json:"creation_ts"`
+	Priority         string            `json:"priority"`
+	BugStatus        string            `json:"bug_status"`
+	ChangedAt        string            `json:"changed_at"`
 }
 
 // BugResponse data model represents Bugzilla get bugDetail results
@@ -40,23 +29,24 @@ type BugDetailResponse struct {
 
 // BugDetailXML ...
 type BugDetailXML struct {
-	ID               int        `xml:"bug_id"`
-	CreationTS       string     `xml:"creation_ts"`
-	DeltaTS          string     `xml:"delta_ts"`
-	Priority         string     `xml:"priority"`
-	Severity         string     `xml:"bug_severity"`
-	OpSys            string     `xml:"op_sys"`
-	RepPlatform      string     `xml:"rep_platform"`
-	Keywords         []string   `xml:"keywords"`
-	StatusWhiteboard string     `xml:"status_whiteboard"`
-	Resolution       string     `xml:"resolution"`
-	Reporter         string     `xml:"reporter"`
-	AssignedTo       string     `xml:"assigned_to"`
-	Summary          string     `xml:"summary"`
-	LongDesc         []Comments `xml:"long_desc"`
+	ID               int       `xml:"bug_id"`
+	CreationTS       string    `xml:"creation_ts"`
+	DeltaTS          string    `xml:"delta_ts"`
+	Priority         string    `xml:"priority"`
+	Severity         string    `xml:"bug_severity"`
+	OpSys            string    `xml:"op_sys"`
+	RepPlatform      string    `xml:"rep_platform"`
+	Keywords         []string  `xml:"keywords"`
+	StatusWhiteboard string    `xml:"status_whiteboard"`
+	Resolution       string    `xml:"resolution"`
+	Reporter         string    `xml:"reporter"`
+	AssignedTo       string    `xml:"assigned_to"`
+	Summary          string    `xml:"summary"`
+	LongDesc         []Comment `xml:"long_desc"`
 }
 
-type Comments struct {
+// Comment of a bug
+type Comment struct {
 	Commentid int    `xml:"commentid"`
 	Who       string `xml:"who"`
 	BugWhen   string `xml:"bug_when"`
@@ -84,32 +74,32 @@ type BugRaw struct {
 		Name  string `json:"name"`
 		Email string `json:"email"`
 	}
-	ShortDescription  string     `json:"short_description"`
-	LongDesc          []Comments `json:"long_desc"`
-	BugStatus         string     `json:"bug_status"`
-	MetadataUpdatedOn time.Time  `json:"metadata__updated_on"`
-	MetadataTimestamp time.Time  `json:"metadata__timestamp"`
-	Timestamp         float64    `json:"timestamp"`
-	Category          string     `json:"category"`
-	CreationTS        time.Time  `json:"creation_ts"`
-	Priority          string     `json:"priority"`
-	Severity          string     `json:"severity"`
-	OpSys             string     `json:"op_sys"`
-	ChangedAt         time.Time  `json:"changed_at"`
-	ActivityCount     int        `json:"activity_count"`
-	//SearchFields             *SearchFields `json:"search_fields"`
-	DeltaTs          time.Time `json:"delta_ts"`
-	Keywords         []string  `json:"keywords"`
-	RepPlatform      string    `json:"rep_platform"`
-	StatusWhiteboard string    `json:"status_whiteboard"`
-	Resolution       string    `json:"resolution"`
-	Reporter         string    `json:"reporter"`
-	AssignedTo       string    `json:"assigned_to"`
-	Summary          string    `json:"summary"`
+	ShortDescription  string        `json:"short_description"`
+	LongDesc          []Comment     `json:"long_desc"`
+	BugStatus         string        `json:"bug_status"`
+	MetadataUpdatedOn time.Time     `json:"metadata__updated_on"`
+	MetadataTimestamp time.Time     `json:"metadata__timestamp"`
+	Timestamp         float64       `json:"timestamp"`
+	Category          string        `json:"category"`
+	CreationTS        time.Time     `json:"creation_ts"`
+	Priority          string        `json:"priority"`
+	Severity          string        `json:"severity"`
+	OpSys             string        `json:"op_sys"`
+	ChangedAt         time.Time     `json:"changed_at"`
+	ActivityCount     int           `json:"activity_count"`
+	SearchFields      *SearchFields `json:"search_fields"`
+	DeltaTs           time.Time     `json:"delta_ts"`
+	Keywords          []string      `json:"keywords"`
+	RepPlatform       string        `json:"rep_platform"`
+	StatusWhiteboard  string        `json:"status_whiteboard"`
+	Resolution        string        `json:"resolution"`
+	Reporter          string        `json:"reporter"`
+	AssignedTo        string        `json:"assigned_to"`
+	Summary           string        `json:"summary"`
 }
 
-// EnrichedItem ...
-type EnrichedItem struct {
+// BugEnrich ...
+type BugEnrich struct {
 	UUID           string    `json:"uuid"`
 	Project        string    `json:"project"`
 	Labels         []string  `json:"labels"`
@@ -169,13 +159,13 @@ type EnrichedItem struct {
 	AssignedToMultiOrgName []string `json:"assigned_to_multi_org_names"`
 	AssignedToBot          bool     `json:"assigned_to_bot"`
 
-	MainDescription         string `json:"main_description"`
-	MainDescriptionAnalyzed string `json:"main_description_analyzed"`
-	Summary                 string `json:"summary"`
-	SummaryAnalyzed         string `json:"summary_analyzed"`
-	Comments                int    `json:"comments"`
-	LongDesc                int    `json:"long_desc"`
-	RepositoryLabels    *[]string `json:"repository_labels"`
+	MainDescription         string    `json:"main_description"`
+	MainDescriptionAnalyzed string    `json:"main_description_analyzed"`
+	Summary                 string    `json:"summary"`
+	SummaryAnalyzed         string    `json:"summary_analyzed"`
+	Comments                int       `json:"comments"`
+	LongDesc                int       `json:"long_desc"`
+	RepositoryLabels        *[]string `json:"repository_labels"`
 
 	MetadataUpdatedOn      time.Time `json:"metadata__updated_on"`
 	MetadataTimestamp      time.Time `json:"metadata__timestamp"`
@@ -184,8 +174,6 @@ type EnrichedItem struct {
 	MetadataBackendName    string    `json:"metadata__backend_name"`
 	MetadataBackendVersion string    `json:"metadata__backend_version"`
 }
-
-
 
 // TopHits result
 type RawHits struct {
@@ -199,6 +187,6 @@ type NHits struct {
 
 // NestedRawHits is the actual hit data
 type NestedRawHits struct {
-	Id     string    `json:"_id"`
+	Id     string `json:"_id"`
 	Source BugRaw `json:"_source"`
 }

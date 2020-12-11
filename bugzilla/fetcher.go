@@ -12,7 +12,7 @@ import (
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 )
 
-// Fetcher contains datasource fetch logic
+// Fetcher contains Bugzilla fetch logic
 type Fetcher struct {
 	DSName                string // Datasource will be used as key for ES
 	HttpClientProvider    HttpClientProvider
@@ -27,7 +27,7 @@ type HttpClientProvider interface {
 	RequestCSV(url string) ([][]string, error)
 }
 
-// ESClientProvider used in connecting to ES Client server
+// ESClientProvider used in connecting to ES server
 type ESClientProvider interface {
 	Add(index string, documentID string, body []byte) ([]byte, error)
 	CreateIndex(index string, body []byte) ([]byte, error)
@@ -42,7 +42,6 @@ type ESClientProvider interface {
 type Params struct {
 	Name           string
 	Endpoint       string
-	MaxBugs        int
 	FromDate       time.Time
 	Order          string
 	Project        string
@@ -79,16 +78,17 @@ func (f *Fetcher) FetchItem(fromDate time.Time, limit int, now time.Time) ([]*Bu
 		if err != nil {
 			return nil, err
 		}
+
 		// generate UUID
 		uid, err := uuid.Generate(f.Endpoint, strconv.Itoa(bug.ID))
 		if err != nil {
 			return nil, err
 		}
 		raw.UUID = uid
+
 		raw.Origin = f.Endpoint
 		raw.Tag = f.Endpoint
 		raw.Product = bug.Product
-
 		raw.BugID = bug.ID
 		raw.Product = bug.Product
 		raw.Component = bug.Component
@@ -126,9 +126,6 @@ func (f *Fetcher) FetchItem(fromDate time.Time, limit int, now time.Time) ([]*Bu
 		}
 		raw.ActivityCount = count
 
-		fmt.Printf("couunt for %v is %v\n", bug.ID, count)
-
-		now = now
 		raw.MetadataUpdatedOn = now
 		raw.MetadataTimestamp = now
 		raw.Timestamp = utils.ConvertTimeToFloat(now)

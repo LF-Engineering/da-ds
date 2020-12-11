@@ -10,32 +10,33 @@ import (
 	"github.com/LF-Engineering/da-ds/utils"
 )
 
-// Enricher ...
+// Enricher enrich Bugzilla raw
 type Enricher struct {
-	identityProvider      IdentityProvider
-	DSName                string
-	BackendVersion        string
-	Project               string
+	identityProvider IdentityProvider
+	DSName           string
+	BackendVersion   string
+	Project          string
 }
 
+// IdentityProvider manages user identity
 type IdentityProvider interface {
 	GetIdentity(key string, val string) (*affiliation.Identity, error)
 	GetOrganizations(uuid string, date time.Time) ([]string, error)
 }
 
-// NewEnricher
+// NewEnricher intiate a new enricher instance
 func NewEnricher(identProvider IdentityProvider, backendVersion string, project string) *Enricher {
 	return &Enricher{
-		identityProvider:      identProvider,
-		DSName:                Bugzilla,
-		BackendVersion:        backendVersion,
-		Project:               project,
+		identityProvider: identProvider,
+		DSName:           Bugzilla,
+		BackendVersion:   backendVersion,
+		Project:          project,
 	}
 }
 
-// EnrichItem...
-func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, error) {
-	enriched := &EnrichedItem{}
+// EnrichItem enrich Bugzilla raw item
+func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error) {
+	enriched := &BugEnrich{}
 
 	enriched.Category = "bug"
 	enriched.Project = e.Project
@@ -43,8 +44,6 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, err
 	enriched.DeltaTs = rawItem.DeltaTs
 	enriched.Changes = rawItem.ActivityCount
 	enriched.Labels = rawItem.Keywords
-	fmt.Println("ttt")
-	fmt.Println(rawItem.Keywords)
 	enriched.Priority = rawItem.Priority
 	enriched.Severity = rawItem.Severity
 	enriched.OpSys = rawItem.OpSys
@@ -65,7 +64,6 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, err
 	enriched.CreationDate = rawItem.CreationTS
 
 	enriched.ResolutionDays = utils.GetDaysbetweenDates(enriched.DeltaTs, enriched.CreationDate)
-	//enriched.TimeOpenDays = utils.GetDaysbetweenDates(enriched.CreationDate, enriched.MetadataUpdatedOn)
 	if rawItem.StatusWhiteboard != "" {
 		enriched.Whiteboard = rawItem.StatusWhiteboard
 	}
@@ -207,7 +205,6 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*EnrichedItem, err
 
 	return enriched, nil
 }
-
 
 // EnrichAffiliation gets author SH identity data
 func (e *Enricher) EnrichAffiliation(key string, val string) (*affiliation.Identity, error) {

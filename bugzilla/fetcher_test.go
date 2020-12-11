@@ -48,9 +48,6 @@ func TestFetchItem(t *testing.T) {
 		}
 	}
 
-	fmt.Println("mmmm")
-	fmt.Println(len(data))
-
 	// Assert
 	assert.NoError(t, nil)
 

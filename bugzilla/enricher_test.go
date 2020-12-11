@@ -2,9 +2,10 @@ package bugzilla
 
 import (
 	"fmt"
-	"github.com/LF-Engineering/da-ds/affiliation"
 	"testing"
 	"time"
+
+	"github.com/LF-Engineering/da-ds/affiliation"
 
 	"github.com/LF-Engineering/da-ds/bugzilla/mocks"
 
@@ -150,29 +151,29 @@ func TestEnrichItem(t *testing.T) {
 		unknown := "Unknown"
 		zero := 0
 		fakeAff1 := &affiliation.Identity{ID: "50ffba4dfbedc6dc4390fc8bde7aeec0a7191056",
-			UUID: "50ffba4dfbedc6dc4390fc8bde7aeec0a7191056", Name: "Vasyl", IsBot: false ,
-			Domain : "gmail.com", OrgName: nil, Username: "", GenderACC: &zero,
+			UUID: "50ffba4dfbedc6dc4390fc8bde7aeec0a7191056", Name: "Vasyl", IsBot: false,
+			Domain: "gmail.com", OrgName: nil, Username: "", GenderACC: &zero,
 			MultiOrgNames: []string{}, Gender: &unknown,
 		}
 
 		dd := "MontaVista Software, LLC"
 		fakeAff2 := &affiliation.Identity{ID: "a89364af9818412b8c59193ca83b30dd67b20e35",
-			UUID: "5d408e590365763c3927084d746071fa84dc8e52", Name: "akuster", IsBot: false ,
-			Domain : "gmail.com", OrgName: &dd , Username: "", GenderACC: &zero,
+			UUID: "5d408e590365763c3927084d746071fa84dc8e52", Name: "akuster", IsBot: false,
+			Domain: "gmail.com", OrgName: &dd, Username: "", GenderACC: &zero,
 			MultiOrgNames: []string{"MontaVista Software, LLC"}, Gender: &unknown,
 		}
-		rmultiorg1 := []string{ "MontaVista Software, LLC"}
-		rmultiorg2 := []string{ unknown }
+		rmultiorg1 := []string{"MontaVista Software, LLC"}
+		rmultiorg2 := []string{unknown}
 		identityProviderMock.On("GetIdentity", "username", "vvavrychuk").Return(fakeAff1, nil)
 		identityProviderMock.On("GetIdentity", "username", "akuster808").Return(fakeAff2, nil)
 
 		d, err := time.Parse(time.RFC3339, "2020-12-07T14:38:23.895437Z")
 		identityProviderMock.On("GetOrganizations", "5d408e590365763c3927084d746071fa84dc8e52", d).Return(rmultiorg1, nil)
-		identityProviderMock.On("GetOrganizations", "50ffba4dfbedc6dc4390fc8bde7aeec0a7191056", d ).Return(rmultiorg2, nil)
+		identityProviderMock.On("GetOrganizations", "50ffba4dfbedc6dc4390fc8bde7aeec0a7191056", d).Return(rmultiorg2, nil)
 
 		// Act
 
-		srv := NewEnricher(identityProviderMock,"0.18", "yocto")
+		srv := NewEnricher(identityProviderMock, "0.18", "yocto")
 
 		enrich, er := srv.EnrichItem(expectedRaw, expectedEnrich.MetadataEnrichedOn)
 		if er != nil {
@@ -188,13 +189,12 @@ func TestEnrichItem(t *testing.T) {
 
 }
 
-func toBugEnrich(b string) (*EnrichedItem, error) {
-	expectedEnrich := &EnrichedItem{}
+func toBugEnrich(b string) (*BugEnrich, error) {
+	expectedEnrich := &BugEnrich{}
 	err := jsoniter.Unmarshal([]byte(b), expectedEnrich)
 	if err != nil {
 		return nil, err
 	}
-
 
 	return expectedEnrich, err
 }

@@ -2,10 +2,11 @@ package bugzilla
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/LF-Engineering/da-ds/affiliation"
 	db "github.com/LF-Engineering/da-ds/db"
 	"github.com/LF-Engineering/da-ds/utils"
-	"time"
 )
 
 // Manager describes bugzilla manager
@@ -24,6 +25,10 @@ type Manager struct {
 	Project                string
 	FetchSize              int
 	EnrichSize             int
+
+	esClientProvider ESClientProvider
+	fetcher          *Fetcher
+	enricher         *Enricher
 }
 
 // NewManager initiates bugzilla manager instance
@@ -42,8 +47,9 @@ func NewManager(
 	project string,
 	fetchSize int,
 	enrichSize int,
-) *Manager {
-	mng := &Manager{
+) (*Manager, error) {
+
+	mgr := &Manager{
 		Endpoint:               endPoint,
 		FetcherBackendVersion:  fetcherBackendVersion,
 		EnricherBackendVersion: enricherBackendVersion,
@@ -60,7 +66,16 @@ func NewManager(
 		EnrichSize:             enrichSize,
 	}
 
-	return mng
+	fetcher, enricher, esClientProvider, err := buildServices(mgr)
+	if err != nil {
+		return nil, err
+	}
+
+	mgr.fetcher = fetcher
+	mgr.enricher = enricher
+	mgr.esClientProvider = esClientProvider
+
+	return mgr, nil
 }
 
 // TopHits result
@@ -85,218 +100,24 @@ type HitSource struct {
 	ChangedAt time.Time `json:"changed_at"`
 }
 
+// Sync starts fetch and enrich processes
 func (m *Manager) Sync() error {
-
-	fetcher, enricher, esClientProvider, err := buildServices(m)
-	if err != nil {
-		return err
-	}
-
 	cachePostfix := "-last-action-date-cache"
 
 	if m.Fetch {
-		fetchId := "fetch"
-
-		query := map[string]interface{}{
-			"query": map[string]interface{}{
-				"term": map[string]interface{}{
-					"id": map[string]string{
-						"value": fetchId},
-				},
-			},
+		err := m.fetch(m.fetcher, cachePostfix)
+		if err != nil {
+			return err
 		}
-		result := m.FetchSize
-
-		val := &TopHits{}
-		err = esClientProvider.Get(m.ESIndex+cachePostfix, query, val)
-
-		now := time.Now()
-		var from time.Time
-
-		if err != nil || len(val.Hits.Hits) < 1 {
-			// Todo : update date to 1970
-			from, err = time.Parse("2006-01-02 15:04:05", "2020-12-04 10:54:21")
-			if err != nil {
-				return err
-			}
-
-		} else {
-			from = val.Hits.Hits[0].Source.ChangedAt
-
-			if m.FromDate != nil && m.FromDate.Before(from) {
-				from = *m.FromDate
-			}
-		}
-
-		data := make([]*utils.BulkData, 0)
-		round := false
-		for result == m.FetchSize {
-			bugs, err := fetcher.FetchItem(from, m.FetchSize, now)
-			if err != nil {
-				return err
-			}
-
-			from = bugs[len(bugs)-1].ChangedAt
-			result = len(bugs)
-
-			if result < 2 {
-				bugs = nil
-			} else if round {
-				for _, bug := range bugs {
-					data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s-raw", m.ESIndex), ID: bug.UUID, Data: bug})
-				}
-				round = true
-			} else {
-				bugs = bugs[1:result]
-				for _, bug := range bugs {
-					data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s-raw", m.ESIndex), ID: bug.UUID, Data: bug})
-				}
-			}
-		}
-
-		// set mapping and create index if not exists
-		ind := m.ESIndex + cachePostfix
-		_ = fetcher.HandleMapping(fmt.Sprintf(ind))
-
-		if len(data) > 0 {
-			// Update changed at in elastic cache index
-			cacheDoc, _ := data[len(data)-1].Data.(*BugRaw)
-			updateChan := HitSource{Id: fetchId, ChangedAt: cacheDoc.ChangedAt}
-			data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, cachePostfix), ID: fetchId, Data: updateChan})
-
-			// Insert raw data to elasticsearch
-			_, err = esClientProvider.BulkInsert(data)
-			if err != nil {
-				return err
-			}
-		}
-
 	}
 
 	if m.Enrich {
-
-		enrichId := "enrich"
-
-		query := map[string]interface{}{
-			"query": map[string]interface{}{
-				"term": map[string]interface{}{
-					"id": map[string]string{
-						"value": enrichId},
-				},
-			},
+		err := m.enrich(m.enricher, cachePostfix)
+		if err != nil {
+			return err
 		}
-
-		val := &TopHits{}
-		err = esClientProvider.Get(m.ESIndex+cachePostfix, query, val)
-
-		query = map[string]interface{}{
-			"size": 10000,
-			"query": map[string]interface{}{
-				"bool": map[string]interface{}{
-					"must": []map[string]interface{}{},
-				},
-			},
-			"sort": []map[string]interface{}{
-				{
-					"metadata__updated_on": map[string]string{
-						"order": "desc",
-					},
-				},
-			},
-		}
-
-		var tophits *RawHits
-		{
-		}
-		var from time.Time
-		if err == nil && len(val.Hits.Hits) > 0 {
-			from = val.Hits.Hits[0].Source.ChangedAt
-		}
-
-		isBothDatesNull := (err != nil || len(val.Hits.Hits) < 1) && (m.FromDate == nil || (*m.FromDate).IsZero())
-
-		if m.FromDate != nil && isBothDatesNull {
-			searchVal := m.FromDate
-			if !from.IsZero() {
-				if from.Before(*searchVal) {
-					searchVal = &from
-				}
-			}
-			conditions := map[string]interface{}{
-				"range": map[string]interface{}{
-					"metadata__updated_on": map[string]interface{}{
-						"gte": (m.FromDate).Format(time.RFC3339),
-					},
-				},
-			}
-			query["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"] = conditions
-
-		} else {
-			var searchVal time.Time
-
-			if m.FromDate == nil {
-				searchVal = from
-			} else {
-				searchVal = *m.FromDate
-			}
-			conditions := map[string]interface{}{
-				"range": map[string]interface{}{
-					"metadata__updated_on": map[string]interface{}{
-						"gte": (searchVal).Format(time.RFC3339),
-					},
-				},
-			}
-			query["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"] = conditions
-
-		}
-
-		results := m.EnrichSize
-		offset := 0
-		query["size"] = m.EnrichSize
-
-		for results == m.EnrichSize {
-
-			// make pagination to get the specified size of documents with offset
-			query["from"] = offset
-			tophits, err = m.GetFetchedData(m.ESIndex+"-raw", query)
-			if err != nil {
-				return err
-			}
-
-			data := make([]*utils.BulkData, 0)
-			for _, hit := range tophits.Hits.Hits {
-				enrichedItem, err := enricher.EnrichItem(hit.Source, time.Now())
-				if err != nil {
-					return err
-				}
-				data = append(data, &utils.BulkData{IndexName: m.ESIndex, ID: enrichedItem.UUID, Data: enrichedItem})
-			}
-
-			results = len(data)
-			offset += results
-
-			// set mapping and create index if not exists
-			if offset == 0 {
-				ind := m.ESIndex + cachePostfix
-				_ = fetcher.HandleMapping(fmt.Sprintf(ind))
-			}
-
-			if len(data) > 0 {
-				// Update changed at in elastic cache index
-				cacheDoc, _ := data[len(data)-1].Data.(*EnrichedItem)
-				updateChan := HitSource{Id: enrichId, ChangedAt: cacheDoc.MetadataEnrichedOn}
-				data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, cachePostfix), ID: enrichId, Data: updateChan})
-
-				// Insert enriched data to elasticsearch
-				_, err = esClientProvider.BulkInsert(data)
-				if err != nil {
-					return err
-				}
-			}
-
-		}
-
 	}
+
 	return nil
 }
 
@@ -329,6 +150,208 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 	enricher := NewEnricher(identityProvider, m.EnricherBackendVersion, m.Project)
 
 	return fetcher, enricher, esClientProvider, err
+}
+
+func (m *Manager) fetch(fetcher *Fetcher, cachePostfix string) error {
+	fetchId := "fetch"
+
+	query := map[string]interface{}{
+		"query": map[string]interface{}{
+			"term": map[string]interface{}{
+				"id": map[string]string{
+					"value": fetchId},
+			},
+		},
+	}
+	result := m.FetchSize
+
+	val := &TopHits{}
+	err := m.esClientProvider.Get(m.ESIndex+cachePostfix, query, val)
+
+	now := time.Now()
+	var from time.Time
+
+	if err != nil || len(val.Hits.Hits) < 1 {
+		from, err = time.Parse("2006-01-02 15:04:05", "1970-01-01 00:00:00")
+		if err != nil {
+			return err
+		}
+
+	} else {
+		from = val.Hits.Hits[0].Source.ChangedAt
+
+		if m.FromDate != nil && m.FromDate.Before(from) {
+			from = *m.FromDate
+		}
+	}
+
+	data := make([]*utils.BulkData, 0)
+	round := false
+	for result == m.FetchSize {
+		bugs, err := fetcher.FetchItem(from, m.FetchSize, now)
+		if err != nil {
+			return err
+		}
+
+		from = bugs[len(bugs)-1].ChangedAt
+		result = len(bugs)
+
+		if result < 2 {
+			bugs = nil
+		} else if round {
+			for _, bug := range bugs {
+				data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s-raw", m.ESIndex), ID: bug.UUID, Data: bug})
+			}
+			round = true
+		} else {
+			bugs = bugs[1:result]
+			for _, bug := range bugs {
+				data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s-raw", m.ESIndex), ID: bug.UUID, Data: bug})
+			}
+		}
+	}
+
+	// set mapping and create index if not exists
+	ind := m.ESIndex + cachePostfix
+	_ = fetcher.HandleMapping(fmt.Sprintf(ind))
+
+	if len(data) > 0 {
+		// Update changed at in elastic cache index
+		cacheDoc, _ := data[len(data)-1].Data.(*BugRaw)
+		updateChan := HitSource{Id: fetchId, ChangedAt: cacheDoc.ChangedAt}
+		data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, cachePostfix), ID: fetchId, Data: updateChan})
+
+		// Insert raw data to elasticsearch
+		_, err = m.esClientProvider.BulkInsert(data)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *Manager) enrich(enricher *Enricher, cachePostfix string) error {
+	enrichId := "enrich"
+
+	query := map[string]interface{}{
+		"query": map[string]interface{}{
+			"term": map[string]interface{}{
+				"id": map[string]string{
+					"value": enrichId},
+			},
+		},
+	}
+
+	val := &TopHits{}
+	err := m.esClientProvider.Get(m.ESIndex+cachePostfix, query, val)
+
+	query = map[string]interface{}{
+		"size": 10000,
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{},
+			},
+		},
+		"sort": []map[string]interface{}{
+			{
+				"metadata__updated_on": map[string]string{
+					"order": "desc",
+				},
+			},
+		},
+	}
+
+	var topHits *RawHits
+	var from time.Time
+	if err == nil && len(val.Hits.Hits) > 0 {
+		from = val.Hits.Hits[0].Source.ChangedAt
+	}
+
+	isBothDatesNull := (err != nil || len(val.Hits.Hits) < 1) && (m.FromDate == nil || (*m.FromDate).IsZero())
+
+	if m.FromDate != nil && isBothDatesNull {
+		searchVal := m.FromDate
+		if !from.IsZero() {
+			if from.Before(*searchVal) {
+				searchVal = &from
+			}
+		}
+		conditions := map[string]interface{}{
+			"range": map[string]interface{}{
+				"metadata__updated_on": map[string]interface{}{
+					"gte": (m.FromDate).Format(time.RFC3339),
+				},
+			},
+		}
+		query["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"] = conditions
+
+	} else {
+		var searchVal time.Time
+
+		if m.FromDate == nil {
+			searchVal = from
+		} else {
+			searchVal = *m.FromDate
+		}
+		conditions := map[string]interface{}{
+			"range": map[string]interface{}{
+				"metadata__updated_on": map[string]interface{}{
+					"gte": (searchVal).Format(time.RFC3339),
+				},
+			},
+		}
+		query["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"] = conditions
+
+	}
+
+	results := m.EnrichSize
+	offset := 0
+	query["size"] = m.EnrichSize
+
+	for results == m.EnrichSize {
+
+		// make pagination to get the specified size of documents with offset
+		query["from"] = offset
+		topHits, err = m.GetFetchedData(m.ESIndex+"-raw", query)
+		if err != nil {
+			return err
+		}
+
+		data := make([]*utils.BulkData, 0)
+		for _, hit := range topHits.Hits.Hits {
+			enrichedItem, err := enricher.EnrichItem(hit.Source, time.Now())
+			if err != nil {
+				return err
+			}
+			data = append(data, &utils.BulkData{IndexName: m.ESIndex, ID: enrichedItem.UUID, Data: enrichedItem})
+		}
+
+		results = len(data)
+		offset += results
+
+		// set mapping and create index if not exists
+		if offset == 0 {
+			ind := m.ESIndex + cachePostfix
+			_ = m.fetcher.HandleMapping(fmt.Sprintf(ind))
+		}
+
+		if len(data) > 0 {
+			// Update changed at in elastic cache index
+			cacheDoc, _ := data[len(data)-1].Data.(*BugEnrich)
+			updateChan := HitSource{Id: enrichId, ChangedAt: cacheDoc.MetadataEnrichedOn}
+			data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, cachePostfix), ID: enrichId, Data: updateChan})
+
+			// Insert enriched data to elasticsearch
+			_, err = m.esClientProvider.BulkInsert(data)
+			if err != nil {
+				return err
+			}
+		}
+
+	}
+
+	return nil
 }
 
 func (m *Manager) GetFetchedData(index string, query map[string]interface{}) (*RawHits, error) {

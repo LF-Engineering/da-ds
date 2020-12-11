@@ -62,8 +62,5 @@ func (i *IdentityProvider) GetOrganizations(uuid string, date time.Time) ([]stri
 		return nil, err
 	}
 
-	fmt.Println("jjjjjj")
-	fmt.Println(multiOrg)
-
 	return multiOrg, nil
 }
