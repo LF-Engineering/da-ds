@@ -214,8 +214,8 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) error {
 	}
 
 	// set mapping and create index if not exists
+	_, err = m.esClientProvider.CreateIndex(fmt.Sprintf("%s-raw", m.ESIndex), BugzillaRawMapping)
 
-	err = fetcher.HandleMapping(fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix))
 	if err != nil {
 		return err
 	}
@@ -335,9 +335,10 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) erro
 		results = len(data)
 		offset += results
 
-		// set mapping and create index if not exists
+		// setting mapping and create index if not exists
 		if offset == 0 {
-			err = m.fetcher.HandleMapping(fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix))
+			_, err := m.esClientProvider.CreateIndex(m.ESIndex, BugzillaEnrichMapping)
+
 			if err != nil {
 				return err
 			}

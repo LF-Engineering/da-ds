@@ -164,7 +164,6 @@ type BugEnrich struct {
 	Summary                 string    `json:"summary"`
 	SummaryAnalyzed         string    `json:"summary_analyzed"`
 	Comments                int       `json:"comments"`
-	LongDesc                int       `json:"long_desc"`
 	RepositoryLabels        *[]string `json:"repository_labels"`
 
 	MetadataUpdatedOn      time.Time `json:"metadata__updated_on"`
