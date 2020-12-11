@@ -1,7 +1,7 @@
 package db
 
 import (
-	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/go-sql-driver/mysql" // blank import for mysql driver
 	"github.com/jmoiron/sqlx"
 )
 

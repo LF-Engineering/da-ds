@@ -60,7 +60,7 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 	enriched.MetadataBackendName = fmt.Sprintf("%sEnrich", strings.Title(e.DSName))
 	enriched.MetadataBackendVersion = e.BackendVersion
 	enriched.IsBugzillaBug = 1
-	enriched.Url = rawItem.Origin + "/show_bug.cgi?id=" + fmt.Sprint(rawItem.BugID)
+	enriched.URL = rawItem.Origin + "/show_bug.cgi?id=" + fmt.Sprint(rawItem.BugID)
 	enriched.CreationDate = rawItem.CreationTS
 
 	enriched.ResolutionDays = utils.GetDaysbetweenDates(enriched.DeltaTs, enriched.CreationDate)
@@ -196,7 +196,7 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 	}
 
 	enriched.Status = rawItem.BugStatus
-	enriched.BugId = rawItem.BugID
+	enriched.BugID = rawItem.BugID
 	enriched.Comments = 0
 	if len(rawItem.LongDesc) > 0 {
 		enriched.Comments = len(rawItem.LongDesc)

@@ -33,23 +33,7 @@ type Manager struct {
 }
 
 // NewManager initiates bugzilla manager instance
-func NewManager(
-	endPoint string,
-	shConnStr string,
-	fetcherBackendVersion string,
-	enricherBackendVersion string,
-	fetch bool,
-	enrich bool,
-	eSUrl string,
-	esUser string,
-	esPassword string,
-	esIndex string,
-	fromDate *time.Time,
-	httpTimeout time.Duration,
-	project string,
-	fetchSize int,
-	enrichSize int,
-) (*Manager, error) {
+func NewManager(endPoint string, shConnStr string, fetcherBackendVersion string, enricherBackendVersion string, fetch bool, enrich bool, eSUrl string, esUser string, esPassword string, esIndex string, fromDate *time.Time, httpTimeout time.Duration, project string, fetchSize int, enrichSize int) *Manager {
 
 	mgr := &Manager{
 		Endpoint:               endPoint,
@@ -71,14 +55,14 @@ func NewManager(
 
 	fetcher, enricher, esClientProvider, err := buildServices(mgr)
 	if err != nil {
-		return nil, err
+		return nil
 	}
 
 	mgr.fetcher = fetcher
 	mgr.enricher = enricher
 	mgr.esClientProvider = esClientProvider
 
-	return mgr, nil
+	return mgr
 }
 
 // TopHits result
@@ -91,15 +75,15 @@ type Hits struct {
 	Hits []NestedHits `json:"hits"`
 }
 
-// Nestedhits is the actual hit data
+// NestedHits is the actual hit data
 type NestedHits struct {
-	Id     string    `json:"_id"`
+	ID     string    `json:"_id"`
 	Source HitSource `json:"_source"`
 }
 
 // HitSource is the document _source data
 type HitSource struct {
-	Id        string    `json:"id"`
+	ID        string    `json:"id"`
 	ChangedAt time.Time `json:"changed_at"`
 }
 
@@ -155,13 +139,13 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 }
 
 func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) error {
-	fetchId := "fetch"
+	fetchID := "fetch"
 
 	query := map[string]interface{}{
 		"query": map[string]interface{}{
 			"term": map[string]interface{}{
 				"id": map[string]string{
-					"value": fetchId},
+					"value": fetchID},
 			},
 		},
 	}
@@ -223,8 +207,8 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) error {
 	if len(data) > 0 {
 		// Update changed at in elastic cache index
 		cacheDoc, _ := data[len(data)-1].Data.(*BugRaw)
-		updateChan := HitSource{Id: fetchId, ChangedAt: cacheDoc.ChangedAt}
-		data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: fetchId, Data: updateChan})
+		updateChan := HitSource{ID: fetchID, ChangedAt: cacheDoc.ChangedAt}
+		data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: fetchID, Data: updateChan})
 
 		// Insert raw data to elasticsearch
 		_, err = m.esClientProvider.BulkInsert(data)
@@ -237,13 +221,13 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) error {
 }
 
 func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) error {
-	enrichId := "enrich"
+	enrichID := "enrich"
 
 	query := map[string]interface{}{
 		"query": map[string]interface{}{
 			"term": map[string]interface{}{
 				"id": map[string]string{
-					"value": enrichId},
+					"value": enrichID},
 			},
 		},
 	}
@@ -347,8 +331,8 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) erro
 		if len(data) > 0 {
 			// Update changed at in elastic cache index
 			cacheDoc, _ := data[len(data)-1].Data.(*BugEnrich)
-			updateChan := HitSource{Id: enrichId, ChangedAt: cacheDoc.MetadataEnrichedOn}
-			data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: enrichId, Data: updateChan})
+			updateChan := HitSource{ID: enrichID, ChangedAt: cacheDoc.MetadataEnrichedOn}
+			data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: enrichID, Data: updateChan})
 
 			// Insert enriched data to elasticsearch
 			_, err = m.esClientProvider.BulkInsert(data)

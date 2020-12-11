@@ -47,6 +47,9 @@ errcheck: ${GO_BIN_FILES} ${GO_LIB_FILES} ${GO_TEST_FILES} ${GO_LIBTEST_FILES}
 test:
 	go test -v $(PKG_LIST)
 
+test-coverage:
+	./scripts/coverage.sh
+
 check: fmt lint imports vet usedexports errcheck
 
 install: check ${BINARIES}

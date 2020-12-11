@@ -15,14 +15,14 @@ import (
 // Fetcher contains Bugzilla fetch logic
 type Fetcher struct {
 	DSName                string // Datasource will be used as key for ES
-	HttpClientProvider    HttpClientProvider
+	HTTPClientProvider    HTTPClientProvider
 	ElasticSearchProvider ESClientProvider
 	BackendVersion        string
 	Endpoint              string
 }
 
-// HttpClientProvider used in connecting to remote http server
-type HttpClientProvider interface {
+// HTTPClientProvider used in connecting to remote http server
+type HTTPClientProvider interface {
 	Request(url string, method string, header map[string]string, body []byte, params map[string]string) (statusCode int, resBody []byte, err error)
 	RequestCSV(url string) ([][]string, error)
 }
@@ -51,17 +51,17 @@ type Params struct {
 }
 
 // NewFetcher initiates a new bugZilla fetcher
-func NewFetcher(params *Params, httpClientProvider HttpClientProvider, esClientProvider ESClientProvider) *Fetcher {
+func NewFetcher(params *Params, httpClientProvider HTTPClientProvider, esClientProvider ESClientProvider) *Fetcher {
 	return &Fetcher{
 		DSName:                Bugzilla,
-		HttpClientProvider:    httpClientProvider,
+		HTTPClientProvider:    httpClientProvider,
 		ElasticSearchProvider: esClientProvider,
 		BackendVersion:        params.BackendVersion,
 		Endpoint:              params.Endpoint,
 	}
 }
 
-// FetchItems ...
+// FetchItem fetches bugs and save it into ES
 func (f *Fetcher) FetchItem(fromDate time.Time, limit int, now time.Time) ([]*BugRaw, error) {
 	bugList, err := f.fetchBugList(fromDate, limit)
 	if err != nil {
@@ -143,7 +143,7 @@ func (f *Fetcher) FetchItem(fromDate time.Time, limit int, now time.Time) ([]*Bu
 	return bugs, nil
 }
 
-// GetFetchedData query saved raw data from ES
+// Query query saved raw data from ES
 func (f *Fetcher) Query(index string, query map[string]interface{}) (*RawHits, error) {
 
 	var hits RawHits
@@ -159,7 +159,7 @@ func (f *Fetcher) Query(index string, query map[string]interface{}) (*RawHits, e
 func (f *Fetcher) fetchBugList(fromDate time.Time, limit int) ([]*BugResponse, error) {
 	url := fmt.Sprintf("%s/buglist.cgi?chfieldfrom=%s&ctype=csv&limit=%v&order=changeddate", f.Endpoint, fromDate.Format("2006-01-02+15:04:05"), limit)
 
-	bugs, err := f.HttpClientProvider.RequestCSV(url)
+	bugs, err := f.HTTPClientProvider.RequestCSV(url)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +192,7 @@ func (f *Fetcher) fetchBugList(fromDate time.Time, limit int) ([]*BugResponse, e
 
 func (f *Fetcher) fetchDetails(bugID int) (*BugDetailResponse, error) {
 	url := fmt.Sprintf("%s/show_bug.cgi?id=%v&ctype=xml&excludefield=attachmentdata", f.Endpoint, bugID)
-	status, res, err := f.HttpClientProvider.Request(url, "GET", nil, nil, nil)
+	status, res, err := f.HTTPClientProvider.Request(url, "GET", nil, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +211,7 @@ func (f *Fetcher) fetchDetails(bugID int) (*BugDetailResponse, error) {
 
 func (f *Fetcher) fetchActivitiesCount(bugID int) (int, error) {
 	url := fmt.Sprintf("%s/show_activity.cgi?id=%v", f.Endpoint, bugID)
-	status, res, err := f.HttpClientProvider.Request(url, "GET", nil, nil, nil)
+	status, res, err := f.HTTPClientProvider.Request(url, "GET", nil, nil, nil)
 	if err != nil {
 		return 0, err
 	}

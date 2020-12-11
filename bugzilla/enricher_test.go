@@ -1,12 +1,10 @@
 package bugzilla
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
 	"github.com/LF-Engineering/da-ds/affiliation"
-
 	"github.com/LF-Engineering/da-ds/bugzilla/mocks"
 
 	jsoniter "github.com/json-iterator/go"
@@ -136,8 +134,8 @@ func TestEnrichItem(t *testing.T) {
 `,
 	}
 
-	t.Run(testYocto.name, func(tt *testing.T) {
-		expectedRaw, err := toBugRaw(testYocto.fetchData)
+	t.Run(testYocto.name, func(t *testing.T) {
+		raw, err := toBugRaw(testYocto.fetchData)
 		if err != nil {
 			t.Error(err)
 		}
@@ -172,18 +170,18 @@ func TestEnrichItem(t *testing.T) {
 		identityProviderMock.On("GetOrganizations", "50ffba4dfbedc6dc4390fc8bde7aeec0a7191056", d).Return(rmultiorg2, nil)
 
 		// Act
-
 		srv := NewEnricher(identityProviderMock, "0.18", "yocto")
 
-		enrich, er := srv.EnrichItem(expectedRaw, expectedEnrich.MetadataEnrichedOn)
-		if er != nil {
-			tt.Error(er)
+		enrich, err := srv.EnrichItem(raw, expectedEnrich.MetadataEnrichedOn)
+		if err != nil {
+			t.Error(err)
 		}
-		fmt.Println("enriched:==== ")
-		assert.Equal(tt, *expectedEnrich, *enrich)
-		assert.Equal(tt, expectedEnrich.UUID, enrich.UUID)
-		assert.Equal(tt, expectedEnrich.MetadataBackendName, enrich.MetadataBackendName)
-		assert.Equal(tt, expectedEnrich.AssignedToMultiOrgName, enrich.AssignedToMultiOrgName)
+
+		// Assert
+		assert.Equal(t, *expectedEnrich, *enrich)
+		assert.Equal(t, expectedEnrich.UUID, enrich.UUID)
+		assert.Equal(t, expectedEnrich.MetadataBackendName, enrich.MetadataBackendName)
+		assert.Equal(t, expectedEnrich.AssignedToMultiOrgName, enrich.AssignedToMultiOrgName)
 
 	})
 

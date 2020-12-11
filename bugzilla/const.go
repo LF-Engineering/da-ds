@@ -1,13 +1,8 @@
 package bugzilla
 
 const (
-	Category       = "bug"
-	MaxBugs        = 10000
-	CGILogin       = "index.cgi"
-	CGIBugList     = "buglist.cgi"
-	CGIBug         = "show_bug.cgi"
-	CGIBugActivity = "show_activity.cgi"
-
-	// Dockerhub - DS name
+	// Category type
+	Category = "bug"
+	// Bugzilla - DS name
 	Bugzilla string = "bugzilla"
 )

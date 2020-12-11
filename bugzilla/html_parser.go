@@ -6,7 +6,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-// GetLen gets count of searched items
+// GetActivityLen gets count of searched items
 func GetActivityLen(query string, body []byte) (int, error) {
 	r := bytes.NewReader(body)
 	doc, err := goquery.NewDocumentFromReader(r)

@@ -35,13 +35,13 @@ where
 
 	ide := Identity{}
 	dataBase.On("Get", &ide, query).Run(func(args mock.Arguments) {
-
+		email := "ayman@gmail.com"
 		o := Identity{
 			ID:        "5",
 			UUID:      "5",
 			Name:      "vvavrychuk",
 			Username:  "vvavrychuk",
-			Email:     nil,
+			Email:     &email,
 			Domain:    "inc.com",
 			Gender:    nil,
 			GenderACC: nil,
@@ -59,6 +59,7 @@ where
 	assert.NoError(t, err)
 	assert.Equal(t, res.UUID, "5")
 	assert.Equal(t, res.Domain, "inc.com")
+	assert.Equal(t, *res.Email, "ayman@gmail.com")
 	assert.Equal(t, res.IsBot, false)
 
 }

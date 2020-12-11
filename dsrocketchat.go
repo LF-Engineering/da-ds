@@ -156,7 +156,7 @@ func (j *DSRocketchat) GetRocketchatMessages(ctx *Ctx, fromDate string, offset, 
 	// Let's cache messages for 1 hour (so there are no rate limit hits during the development)
 	cacheDur := time.Duration(1) * time.Hour
 	method := Get
-	headers := map[string]string{"X-User-Id": j.User, "X-Auth-Token": j.Token}
+	headers := map[string]string{"X-User-ID": j.User, "X-Auth-Token": j.Token}
 	//Printf("%s %+v\n", method, headers)
 	//Printf("URL: %s\n", url)
 	var (
@@ -220,7 +220,7 @@ func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
 	cacheDur := time.Duration(48) * time.Hour
 	url := j.URL + "/api/v1/channels.info?roomName=" + neturl.QueryEscape(j.Channel)
 	method := Get
-	headers := map[string]string{"X-User-Id": j.User, "X-Auth-Token": j.Token}
+	headers := map[string]string{"X-User-ID": j.User, "X-Auth-Token": j.Token}
 	var (
 		res        interface{}
 		status     int
@@ -231,7 +231,7 @@ func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
 		if err != nil {
 			return
 		}
-		// curl -s -H 'X-Auth-Token: token' -H 'X-User-Id: user' URL/api/v1/channels.info?roomName=channel | jq '.'
+		// curl -s -H 'X-Auth-Token: token' -H 'X-User-ID: user' URL/api/v1/channels.info?roomName=channel | jq '.'
 		// 48 hours for caching channel info
 		res, status, _, outHeaders, err = Request(
 			ctx,
