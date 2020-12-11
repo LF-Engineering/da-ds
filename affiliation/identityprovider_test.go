@@ -37,16 +37,16 @@ where
 	dataBase.On("Get", &ide, query).Run(func(args mock.Arguments) {
 
 		o := Identity{
-			ID : "5",
-			UUID: "5",
-			Name : "vvavrychuk",
-			Username  : "vvavrychuk",
-			Email         : "gmail.com",
-			Domain        :"inc.com",
-			Gender        :nil,
-			GenderACC     : nil,
-			OrgName       :nil,
-			IsBot         :false,
+			ID:        "5",
+			UUID:      "5",
+			Name:      "vvavrychuk",
+			Username:  "vvavrychuk",
+			Email:     nil,
+			Domain:    "inc.com",
+			Gender:    nil,
+			GenderACC: nil,
+			OrgName:   nil,
+			IsBot:     false,
 		}
 		reflect.ValueOf(args.Get(0)).Elem().Set(reflect.ValueOf(o))
 	}).Return(nil)
@@ -59,10 +59,7 @@ where
 	assert.NoError(t, err)
 	assert.Equal(t, res.UUID, "5")
 	assert.Equal(t, res.Domain, "inc.com")
-	assert.Equal(t, res.Email, "gmail.com")
 	assert.Equal(t, res.IsBot, false)
-
-
 
 }
 
