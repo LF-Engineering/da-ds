@@ -21,7 +21,7 @@ func NewIdentityProvider(db DBConnector) *IdentityProvider {
 	return &IdentityProvider{db: db}
 }
 
-// GetIdentityByUsername ...
+// GetIdentity ...
 func (i *IdentityProvider) GetIdentity(key string, val string) (*Identity, error) {
 	query := fmt.Sprintf(`SELECT 
        identities.id,

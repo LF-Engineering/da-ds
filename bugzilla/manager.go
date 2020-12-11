@@ -75,9 +75,9 @@ type Hits struct {
 	Hits []NestedHits `json:"hits"`
 }
 
-// Nestedhits is the actual hit data
+// NestedHits is the actual hit data
 type NestedHits struct {
-	Id     string    `json:"_id"`
+	ID     string    `json:"_id"`
 	Source HitSource `json:"_source"`
 }
 

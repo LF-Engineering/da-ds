@@ -4,6 +4,7 @@ import (
 	"time"
 )
 
+// AssigneeResponse represents Assignee response model
 type AssigneeResponse struct {
 	Name  string `json:"name"`
 	Email string `json:"email"`
@@ -22,7 +23,7 @@ type BugResponse struct {
 	ChangedAt        string            `json:"changed_at"`
 }
 
-// BugResponse data model represents Bugzilla get bugDetail results
+// BugDetailResponse data model represents Bugzilla get bugDetail results
 type BugDetailResponse struct {
 	Bug BugDetailXML `xml:"bug"`
 }
@@ -111,14 +112,14 @@ type BugEnrich struct {
 	Product        string    `json:"product"`
 	Component      string    `json:"component"`
 	Platform       string    `json:"platform"`
-	BugId          int       `json:"bug_id"`
+	BugID          int       `json:"bug_id"`
 	Status         string    `json:"status"`
 	TimeOpenDays   float64   `json:"timeopen_days"`
 	Category       string    `json:"category"`
 	ChangedDate    time.Time `json:"changed_date"`
 	Tag            string    `json:"tag"`
 	IsBugzillaBug  int       `json:"is_bugzilla_bug"`
-	Url            string    `json:"url"`
+	URL            string    `json:"url"`
 	ResolutionDays float64   `json:"resolution_days"`
 	CreationDate   time.Time `json:"creation_date"`
 	DeltaTs        time.Time `json:"delta_ts"`
@@ -175,18 +176,18 @@ type BugEnrich struct {
 	MetadataBackendVersion string    `json:"metadata__backend_version"`
 }
 
-// TopHits result
+// RawHits result
 type RawHits struct {
 	Hits NHits `json:"hits"`
 }
 
-// rawHits result
+// NHits result
 type NHits struct {
 	Hits []NestedRawHits `json:"hits"`
 }
 
 // NestedRawHits is the actual hit data
 type NestedRawHits struct {
-	Id     string `json:"_id"`
+	ID     string `json:"_id"`
 	Source BugRaw `json:"_source"`
 }
