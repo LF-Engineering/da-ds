@@ -86,20 +86,19 @@ func (m *Manager) Sync() error {
 		return err
 	}
 
-	queryId := ""
-	query := map[string]interface{}{
-		"query": map[string]interface{}{
-			"term": map[string]interface{}{
-				"id": map[string]string{
-					"value": queryId},
-			},
-		},
-	}
 	cachePostfix := "-last-action-date-cache"
 
 	if m.Fetch {
 		fetchId := "fetch"
-		queryId = fetchId
+
+		query := map[string]interface{}{
+			"query": map[string]interface{}{
+				"term": map[string]interface{}{
+					"id": map[string]string{
+						"value": fetchId},
+				},
+			},
+		}
 		limit := 25
 		result := 25
 
@@ -119,7 +118,7 @@ func (m *Manager) Sync() error {
 		} else {
 			from = val.Hits.Hits[0].Source.ChangedAt
 
-			if m.FromDate.Before(from) {
+			if m.FromDate != nil && m.FromDate.Before(from) {
 				from = *m.FromDate
 			}
 		}
@@ -172,12 +171,20 @@ func (m *Manager) Sync() error {
 	if m.Enrich {
 
 		enrichId := "enrich"
-		queryId = enrichId
+
+		query := map[string]interface{}{
+			"query": map[string]interface{}{
+				"term": map[string]interface{}{
+					"id": map[string]string{
+						"value": enrichId},
+				},
+			},
+		}
 
 		val := &TopHits{}
 		err = esClientProvider.Get(m.ESIndex+cachePostfix, query, val)
 
-		query := map[string]interface{}{
+		query = map[string]interface{}{
 			"size": 10000,
 			"query": map[string]interface{}{
 				"bool": map[string]interface{}{
@@ -201,29 +208,18 @@ func (m *Manager) Sync() error {
 			from = val.Hits.Hits[0].Source.ChangedAt
 		}
 
-		if err != nil || len(val.Hits.Hits) < 1 {
+		if (err != nil || len(val.Hits.Hits) < 1) && (m.FromDate == nil || (*m.FromDate).IsZero()) {
 			tophits, err = m.GetFetchedData(m.ESIndex+"-raw", query)
 			if err != nil {
 				return err
 			}
-		} else if (m.FromDate == nil || (*m.FromDate).IsZero()) && from.IsZero() &&
-			from.Before(*m.FromDate) {
-
-			conditions := map[string]interface{}{
-				"range": map[string]interface{}{
-					"metadata__updated_on": map[string]interface{}{
-						"gte": (from).Format(time.RFC3339),
-					},
-				},
+		} else if m.FromDate != nil {
+			searchVal := m.FromDate
+			if !from.IsZero() {
+				if from.Before(*searchVal) {
+					searchVal = &from
+				}
 			}
-			query["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"] = conditions
-
-			tophits, err = m.GetFetchedData(m.ESIndex+"-raw", query)
-			if err != nil {
-				return err
-			}
-
-		} else {
 			conditions := map[string]interface{}{
 				"range": map[string]interface{}{
 					"metadata__updated_on": map[string]interface{}{
@@ -238,7 +234,30 @@ func (m *Manager) Sync() error {
 				return err
 			}
 
+		} else {
+			var searchVal time.Time
+
+			if m.FromDate == nil {
+				searchVal = from
+			}else {
+				searchVal = *m.FromDate
+			}
+			conditions := map[string]interface{}{
+				"range": map[string]interface{}{
+					"metadata__updated_on": map[string]interface{}{
+						"gte": (searchVal).Format(time.RFC3339),
+					},
+				},
+			}
+			query["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"] = conditions
+
+			tophits, err = m.GetFetchedData(m.ESIndex+"-raw", query)
+			if err != nil {
+				return err
+			}
+
 		}
+
 		data := make([]*utils.BulkData, 0)
 		for _, hit := range tophits.Hits.Hits{
 			enrichedItem, err := enricher.EnrichItem(hit.Source, time.Now())
