@@ -35,18 +35,18 @@ where
 
 	ide := Identity{}
 	dataBase.On("Get", &ide, query).Run(func(args mock.Arguments) {
-
+		email := "ayman@gmail.com"
 		o := Identity{
-			ID : "5",
-			UUID: "5",
-			Name : "vvavrychuk",
-			Username  : "vvavrychuk",
-			Email         : "gmail.com",
-			Domain        :"inc.com",
-			Gender        :nil,
-			GenderACC     : nil,
-			OrgName       :nil,
-			IsBot         :false,
+			ID:        "5",
+			UUID:      "5",
+			Name:      "vvavrychuk",
+			Username:  "vvavrychuk",
+			Email:     &email,
+			Domain:    "inc.com",
+			Gender:    nil,
+			GenderACC: nil,
+			OrgName:   nil,
+			IsBot:     false,
 		}
 		reflect.ValueOf(args.Get(0)).Elem().Set(reflect.ValueOf(o))
 	}).Return(nil)
@@ -61,8 +61,6 @@ where
 	assert.Equal(t, res.Domain, "inc.com")
 	assert.Equal(t, res.Email, "gmail.com")
 	assert.Equal(t, res.IsBot, false)
-
-
 
 }
 

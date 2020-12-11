@@ -207,8 +207,8 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) error {
 	if len(data) > 0 {
 		// Update changed at in elastic cache index
 		cacheDoc, _ := data[len(data)-1].Data.(*BugRaw)
-		updateChan := HitSource{ID: fetchId, ChangedAt: cacheDoc.ChangedAt}
-		data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: fetchId, Data: updateChan})
+		updateChan := HitSource{ID: fetchID, ChangedAt: cacheDoc.ChangedAt}
+		data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: fetchID, Data: updateChan})
 
 		// Insert raw data to elasticsearch
 		_, err = m.esClientProvider.BulkInsert(data)

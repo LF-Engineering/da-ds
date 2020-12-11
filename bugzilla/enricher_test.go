@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/LF-Engineering/da-ds/affiliation"
-
 	"github.com/LF-Engineering/da-ds/bugzilla/mocks"
 
 	jsoniter "github.com/json-iterator/go"
