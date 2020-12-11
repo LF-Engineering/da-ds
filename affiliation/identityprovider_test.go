@@ -59,7 +59,7 @@ where
 	assert.NoError(t, err)
 	assert.Equal(t, res.UUID, "5")
 	assert.Equal(t, res.Domain, "inc.com")
-	assert.Equal(t, res.Email, "gmail.com")
+	assert.Equal(t, *res.Email, "ayman@gmail.com")
 	assert.Equal(t, res.IsBot, false)
 
 }
