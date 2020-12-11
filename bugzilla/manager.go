@@ -105,17 +105,17 @@ type HitSource struct {
 
 // Sync starts fetch and enrich processes
 func (m *Manager) Sync() error {
-	cachePostfix := "-last-action-date-cache"
+	lastActionCachePostfix := "-last-action-date-cache"
 
 	if m.Fetch {
-		err := m.fetch(m.fetcher, cachePostfix)
+		err := m.fetch(m.fetcher, lastActionCachePostfix)
 		if err != nil {
 			return err
 		}
 	}
 
 	if m.Enrich {
-		err := m.enrich(m.enricher, cachePostfix)
+		err := m.enrich(m.enricher, lastActionCachePostfix)
 		if err != nil {
 			return err
 		}
@@ -154,7 +154,7 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 	return fetcher, enricher, esClientProvider, err
 }
 
-func (m *Manager) fetch(fetcher *Fetcher, cachePostfix string) error {
+func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) error {
 	fetchId := "fetch"
 
 	query := map[string]interface{}{
@@ -168,7 +168,7 @@ func (m *Manager) fetch(fetcher *Fetcher, cachePostfix string) error {
 	result := m.FetchSize
 
 	val := &TopHits{}
-	err := m.esClientProvider.Get(m.ESIndex+cachePostfix, query, val)
+	err := m.esClientProvider.Get(fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), query, val)
 
 	now := time.Now()
 	var from time.Time
@@ -214,14 +214,17 @@ func (m *Manager) fetch(fetcher *Fetcher, cachePostfix string) error {
 	}
 
 	// set mapping and create index if not exists
-	ind := m.ESIndex + cachePostfix
-	_ = fetcher.HandleMapping(fmt.Sprintf(ind))
+
+	err = fetcher.HandleMapping(fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix))
+	if err != nil {
+		return err
+	}
 
 	if len(data) > 0 {
 		// Update changed at in elastic cache index
 		cacheDoc, _ := data[len(data)-1].Data.(*BugRaw)
 		updateChan := HitSource{Id: fetchId, ChangedAt: cacheDoc.ChangedAt}
-		data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, cachePostfix), ID: fetchId, Data: updateChan})
+		data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: fetchId, Data: updateChan})
 
 		// Insert raw data to elasticsearch
 		_, err = m.esClientProvider.BulkInsert(data)
@@ -233,7 +236,7 @@ func (m *Manager) fetch(fetcher *Fetcher, cachePostfix string) error {
 	return nil
 }
 
-func (m *Manager) enrich(enricher *Enricher, cachePostfix string) error {
+func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) error {
 	enrichId := "enrich"
 
 	query := map[string]interface{}{
@@ -246,7 +249,7 @@ func (m *Manager) enrich(enricher *Enricher, cachePostfix string) error {
 	}
 
 	val := &TopHits{}
-	err := m.esClientProvider.Get(m.ESIndex+cachePostfix, query, val)
+	err := m.esClientProvider.Get(fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), query, val)
 
 	query = map[string]interface{}{
 		"size": 10000,
@@ -315,7 +318,7 @@ func (m *Manager) enrich(enricher *Enricher, cachePostfix string) error {
 
 		// make pagination to get the specified size of documents with offset
 		query["from"] = offset
-		topHits, err = m.fetcher.Query(m.ESIndex+"-raw", query)
+		topHits, err = m.fetcher.Query(fmt.Sprintf("%s-raw", m.ESIndex), query)
 		if err != nil {
 			return err
 		}
@@ -334,15 +337,17 @@ func (m *Manager) enrich(enricher *Enricher, cachePostfix string) error {
 
 		// set mapping and create index if not exists
 		if offset == 0 {
-			ind := m.ESIndex + cachePostfix
-			_ = m.fetcher.HandleMapping(fmt.Sprintf(ind))
+			err = m.fetcher.HandleMapping(fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix))
+			if err != nil {
+				return err
+			}
 		}
 
 		if len(data) > 0 {
 			// Update changed at in elastic cache index
 			cacheDoc, _ := data[len(data)-1].Data.(*BugEnrich)
 			updateChan := HitSource{Id: enrichId, ChangedAt: cacheDoc.MetadataEnrichedOn}
-			data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, cachePostfix), ID: enrichId, Data: updateChan})
+			data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: enrichId, Data: updateChan})
 
 			// Insert enriched data to elasticsearch
 			_, err = m.esClientProvider.BulkInsert(data)
