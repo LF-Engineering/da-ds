@@ -22,6 +22,8 @@ type Manager struct {
 	FromDate               *time.Time
 	HTTPTimeout            time.Duration
 	Project                string
+	FetchSize              int
+	EnrichSize             int
 }
 
 // NewManager initiates bugzilla manager instance
@@ -38,6 +40,8 @@ func NewManager(
 	fromDate *time.Time,
 	httpTimeout time.Duration,
 	project string,
+	fetchSize int,
+	enrichSize int,
 ) *Manager {
 	mng := &Manager{
 		Endpoint:               endPoint,
@@ -52,6 +56,8 @@ func NewManager(
 		FromDate:               fromDate,
 		HTTPTimeout:            httpTimeout,
 		Project:                project,
+		FetchSize:              fetchSize,
+		EnrichSize:             enrichSize,
 	}
 
 	return mng
@@ -99,8 +105,7 @@ func (m *Manager) Sync() error {
 				},
 			},
 		}
-		limit := 25
-		result := 25
+		result := m.FetchSize
 
 		val := &TopHits{}
 		err = esClientProvider.Get(m.ESIndex+cachePostfix, query, val)
@@ -125,8 +130,8 @@ func (m *Manager) Sync() error {
 
 		data := make([]*utils.BulkData, 0)
 		round := false
-		for result == limit {
-			bugs, err := fetcher.FetchItem(from, limit, now)
+		for result == m.FetchSize {
+			bugs, err := fetcher.FetchItem(from, m.FetchSize, now)
 			if err != nil {
 				return err
 			}
@@ -208,12 +213,9 @@ func (m *Manager) Sync() error {
 			from = val.Hits.Hits[0].Source.ChangedAt
 		}
 
-		if (err != nil || len(val.Hits.Hits) < 1) && (m.FromDate == nil || (*m.FromDate).IsZero()) {
-			tophits, err = m.GetFetchedData(m.ESIndex+"-raw", query)
-			if err != nil {
-				return err
-			}
-		} else if m.FromDate != nil {
+		isBothDatesNull := (err != nil || len(val.Hits.Hits) < 1) && (m.FromDate == nil || (*m.FromDate).IsZero())
+
+		if m.FromDate != nil && isBothDatesNull {
 			searchVal := m.FromDate
 			if !from.IsZero() {
 				if from.Before(*searchVal) {
@@ -229,17 +231,12 @@ func (m *Manager) Sync() error {
 			}
 			query["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"] = conditions
 
-			tophits, err = m.GetFetchedData(m.ESIndex+"-raw", query)
-			if err != nil {
-				return err
-			}
-
 		} else {
 			var searchVal time.Time
 
 			if m.FromDate == nil {
 				searchVal = from
-			}else {
+			} else {
 				searchVal = *m.FromDate
 			}
 			conditions := map[string]interface{}{
@@ -251,41 +248,52 @@ func (m *Manager) Sync() error {
 			}
 			query["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"] = conditions
 
+		}
+
+		results := m.EnrichSize
+		offset := 0
+		query["size"] = m.EnrichSize
+
+		for results == m.EnrichSize {
+
+			// make pagination to get the specified size of documents with offset
+			query["from"] = offset
 			tophits, err = m.GetFetchedData(m.ESIndex+"-raw", query)
 			if err != nil {
 				return err
 			}
 
-		}
-
-		data := make([]*utils.BulkData, 0)
-		for _, hit := range tophits.Hits.Hits{
-			enrichedItem, err := enricher.EnrichItem(hit.Source, time.Now())
-			if err != nil {
-				return err
+			data := make([]*utils.BulkData, 0)
+			for _, hit := range tophits.Hits.Hits {
+				enrichedItem, err := enricher.EnrichItem(hit.Source, time.Now())
+				if err != nil {
+					return err
+				}
+				data = append(data, &utils.BulkData{IndexName: m.ESIndex, ID: enrichedItem.UUID, Data: enrichedItem})
 			}
-			data = append(data, &utils.BulkData{IndexName:  m.ESIndex, ID: enrichedItem.UUID, Data: enrichedItem })
-		}
 
-		// set mapping and create index if not exists
-		ind := m.ESIndex + cachePostfix
-		_ = fetcher.HandleMapping(fmt.Sprintf(ind))
+			results = len(data)
+			offset += results
 
-		if len(data) > 0 {
-			// Update changed at in elastic cache index
-			cacheDoc, _ := data[len(data)-1].Data.(*EnrichedItem)
-			fmt.Println("===")
-			fmt.Println(cacheDoc.ChangedAt)
-
-			fmt.Println(enrichId)
-			updateChan := HitSource{Id: enrichId, ChangedAt: cacheDoc.MetadataEnrichedOn}
-			data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, cachePostfix), ID: enrichId, Data: updateChan})
-
-			// Insert enriched data to elasticsearch
-			_, err = esClientProvider.BulkInsert(data)
-			if err != nil {
-				return err
+			// set mapping and create index if not exists
+			if offset == 0 {
+				ind := m.ESIndex + cachePostfix
+				_ = fetcher.HandleMapping(fmt.Sprintf(ind))
 			}
+
+			if len(data) > 0 {
+				// Update changed at in elastic cache index
+				cacheDoc, _ := data[len(data)-1].Data.(*EnrichedItem)
+				updateChan := HitSource{Id: enrichId, ChangedAt: cacheDoc.MetadataEnrichedOn}
+				data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, cachePostfix), ID: enrichId, Data: updateChan})
+
+				// Insert enriched data to elasticsearch
+				_, err = esClientProvider.BulkInsert(data)
+				if err != nil {
+					return err
+				}
+			}
+
 		}
 
 	}
@@ -323,9 +331,7 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 	return fetcher, enricher, esClientProvider, err
 }
 
-
-
-func (m *Manager) GetFetchedData(index string, query map[string]interface{} ) (*RawHits, error) {
+func (m *Manager) GetFetchedData(index string, query map[string]interface{}) (*RawHits, error) {
 
 	_, _, esClientProvider, err := buildServices(m)
 	if err != nil {
@@ -333,7 +339,7 @@ func (m *Manager) GetFetchedData(index string, query map[string]interface{} ) (*
 	}
 	var hits RawHits
 
-	err = esClientProvider.Get(index, query, &hits )
+	err = esClientProvider.Get(index, query, &hits)
 	if err != nil {
 		return nil, err
 	}
