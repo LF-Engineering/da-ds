@@ -136,7 +136,7 @@ func TestEnrichItem(t *testing.T) {
 	}
 
 	t.Run(testYocto.name, func(tt *testing.T) {
-		expectedRaw, err := toBugRaw(testYocto.fetchData)
+		raw, err := toBugRaw(testYocto.fetchData)
 		if err != nil {
 			t.Error(err)
 		}
@@ -174,7 +174,7 @@ func TestEnrichItem(t *testing.T) {
 
 		srv := NewEnricher(identityProviderMock, "0.18", "yocto")
 
-		enrich, er := srv.EnrichItem(expectedRaw, expectedEnrich.MetadataEnrichedOn)
+		enrich, er := srv.EnrichItem(raw, expectedEnrich.MetadataEnrichedOn)
 		if er != nil {
 			tt.Error(er)
 		}
