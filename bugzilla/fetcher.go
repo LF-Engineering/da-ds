@@ -15,7 +15,7 @@ import (
 // Fetcher contains Bugzilla fetch logic
 type Fetcher struct {
 	DSName                string // Datasource will be used as key for ES
-	HttpClientProvider    HTTPClientProvider
+	HTTPClientProvider    HTTPClientProvider
 	ElasticSearchProvider ESClientProvider
 	BackendVersion        string
 	Endpoint              string
@@ -54,7 +54,7 @@ type Params struct {
 func NewFetcher(params *Params, httpClientProvider HTTPClientProvider, esClientProvider ESClientProvider) *Fetcher {
 	return &Fetcher{
 		DSName:                Bugzilla,
-		HttpClientProvider:    httpClientProvider,
+		HTTPClientProvider:    httpClientProvider,
 		ElasticSearchProvider: esClientProvider,
 		BackendVersion:        params.BackendVersion,
 		Endpoint:              params.Endpoint,
@@ -159,7 +159,7 @@ func (f *Fetcher) Query(index string, query map[string]interface{}) (*RawHits, e
 func (f *Fetcher) fetchBugList(fromDate time.Time, limit int) ([]*BugResponse, error) {
 	url := fmt.Sprintf("%s/buglist.cgi?chfieldfrom=%s&ctype=csv&limit=%v&order=changeddate", f.Endpoint, fromDate.Format("2006-01-02+15:04:05"), limit)
 
-	bugs, err := f.HttpClientProvider.RequestCSV(url)
+	bugs, err := f.HTTPClientProvider.RequestCSV(url)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +192,7 @@ func (f *Fetcher) fetchBugList(fromDate time.Time, limit int) ([]*BugResponse, e
 
 func (f *Fetcher) fetchDetails(bugID int) (*BugDetailResponse, error) {
 	url := fmt.Sprintf("%s/show_bug.cgi?id=%v&ctype=xml&excludefield=attachmentdata", f.Endpoint, bugID)
-	status, res, err := f.HttpClientProvider.Request(url, "GET", nil, nil, nil)
+	status, res, err := f.HTTPClientProvider.Request(url, "GET", nil, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +211,7 @@ func (f *Fetcher) fetchDetails(bugID int) (*BugDetailResponse, error) {
 
 func (f *Fetcher) fetchActivitiesCount(bugID int) (int, error) {
 	url := fmt.Sprintf("%s/show_activity.cgi?id=%v", f.Endpoint, bugID)
-	status, res, err := f.HttpClientProvider.Request(url, "GET", nil, nil, nil)
+	status, res, err := f.HTTPClientProvider.Request(url, "GET", nil, nil, nil)
 	if err != nil {
 		return 0, err
 	}
