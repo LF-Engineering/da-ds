@@ -315,7 +315,7 @@ func (m *Manager) enrich(enricher *Enricher, cachePostfix string) error {
 
 		// make pagination to get the specified size of documents with offset
 		query["from"] = offset
-		topHits, err = m.GetFetchedData(m.ESIndex+"-raw", query)
+		topHits, err = m.fetcher.Query(m.ESIndex+"-raw", query)
 		if err != nil {
 			return err
 		}
@@ -354,19 +354,4 @@ func (m *Manager) enrich(enricher *Enricher, cachePostfix string) error {
 	}
 
 	return nil
-}
-
-func (m *Manager) GetFetchedData(index string, query map[string]interface{}) (*RawHits, error) {
-
-	_, _, esClientProvider, err := buildServices(m)
-	if err != nil {
-		return nil, err
-	}
-	var hits RawHits
-
-	err = esClientProvider.Get(index, query, &hits)
-	if err != nil {
-		return nil, err
-	}
-	return &hits, err
 }

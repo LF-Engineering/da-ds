@@ -143,6 +143,19 @@ func (f *Fetcher) FetchItem(fromDate time.Time, limit int, now time.Time) ([]*Bu
 	return bugs, nil
 }
 
+// GetFetchedData query saved raw data from ES
+func (f *Fetcher) Query(index string, query map[string]interface{}) (*RawHits, error) {
+
+	var hits RawHits
+
+	err := f.ElasticSearchProvider.Get(index, query, &hits)
+	if err != nil {
+		return nil, err
+	}
+
+	return &hits, err
+}
+
 func (f *Fetcher) fetchBugList(fromDate time.Time, limit int) ([]*BugResponse, error) {
 	url := fmt.Sprintf("%s/buglist.cgi?chfieldfrom=%s&ctype=csv&limit=%v&order=changeddate", f.Endpoint, fromDate.Format("2006-01-02+15:04:05"), limit)
 
