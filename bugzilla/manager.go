@@ -12,6 +12,7 @@ import (
 // Manager describes bugzilla manager
 type Manager struct {
 	Endpoint               string
+	SHConnString           string
 	FetcherBackendVersion  string
 	EnricherBackendVersion string
 	Fetch                  bool
@@ -34,6 +35,7 @@ type Manager struct {
 // NewManager initiates bugzilla manager instance
 func NewManager(
 	endPoint string,
+	shConnStr string,
 	fetcherBackendVersion string,
 	enricherBackendVersion string,
 	fetch bool,
@@ -51,6 +53,7 @@ func NewManager(
 
 	mgr := &Manager{
 		Endpoint:               endPoint,
+		SHConnString:           shConnStr,
 		FetcherBackendVersion:  fetcherBackendVersion,
 		EnricherBackendVersion: enricherBackendVersion,
 		Fetch:                  fetch,
@@ -139,13 +142,12 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 	// Initialize fetcher object to get data from dockerhub api
 	fetcher := NewFetcher(params, httpClientProvider, esClientProvider)
 
-	x := "lfinsights_test:urpialruvCadcyakhokcect2@tcp(lfinsights-db.clctyzfo4svp.us-west-2.rds.amazonaws.com)/lfinsights_test?charset=utf8"
-	dataBase, err := db.NewConnector("mysql", x)
+	dataBase, err := db.NewConnector("mysql", m.SHConnString)
 	if err != nil {
-		fmt.Println("jjjjjjj")
-		fmt.Println(err)
+		return nil, nil, nil, err
 	}
 	identityProvider := affiliation.NewIdentityProvider(dataBase)
+
 	// Initialize enrich object to enrich raw data
 	enricher := NewEnricher(identityProvider, m.EnricherBackendVersion, m.Project)
 
