@@ -33,7 +33,7 @@ type Manager struct {
 }
 
 // NewManager initiates bugzilla manager instance
-func NewManager(endPoint string, shConnStr string, fetcherBackendVersion string, enricherBackendVersion string, fetch bool, enrich bool, eSUrl string, esUser string, esPassword string, esIndex string, fromDate *time.Time, httpTimeout time.Duration, project string, fetchSize int, enrichSize int) *Manager {
+func NewManager(endPoint string, shConnStr string, fetcherBackendVersion string, enricherBackendVersion string, fetch bool, enrich bool, eSUrl string, esUser string, esPassword string, esIndex string, fromDate *time.Time, project string, fetchSize int, enrichSize int) *Manager {
 
 	mgr := &Manager{
 		Endpoint:               endPoint,
@@ -47,7 +47,7 @@ func NewManager(endPoint string, shConnStr string, fetcherBackendVersion string,
 		ESPassword:             esPassword,
 		ESIndex:                esIndex,
 		FromDate:               fromDate,
-		HTTPTimeout:            httpTimeout,
+		HTTPTimeout:            60*time.Second,
 		Project:                project,
 		FetchSize:              fetchSize,
 		EnrichSize:             enrichSize,
@@ -154,33 +154,29 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) error {
 	val := &TopHits{}
 	err := m.esClientProvider.Get(fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), query, val)
 
-	now := time.Now()
-	var from time.Time
+	now := time.Now().UTC()
+	var lastFetch *time.Time
 
-	if err != nil || len(val.Hits.Hits) < 1 {
-		from, err = time.Parse("2006-01-02 15:04:05", "1970-01-01 00:00:00")
-		if err != nil {
-			return err
-		}
-
-	} else {
-		from = val.Hits.Hits[0].Source.ChangedAt
-
-		if m.FromDate != nil && m.FromDate.Before(from) {
-			from = *m.FromDate
-		}
+	if err == nil && len(val.Hits.Hits) > 0 {
+		lastFetch = &val.Hits.Hits[0].Source.ChangedAt
 	}
 
-	data := make([]*utils.BulkData, 0)
+	from := utils.GetOldestDate(m.FromDate, lastFetch)
+
 	round := false
 	for result == m.FetchSize {
-		bugs, err := fetcher.FetchItem(from, m.FetchSize, now)
+		data := make([]*utils.BulkData, 0)
+		bugs, err := fetcher.FetchItem(*from, m.FetchSize, now)
 		if err != nil {
 			return err
 		}
 
-		from = bugs[len(bugs)-1].ChangedAt
+
 		result = len(bugs)
+		if result != 0 {
+			from = &bugs[len(bugs)-1].ChangedAt
+		}
+
 
 		if result < 2 {
 			bugs = nil
@@ -195,26 +191,29 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) error {
 				data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s-raw", m.ESIndex), ID: bug.UUID, Data: bug})
 			}
 		}
-	}
 
-	// set mapping and create index if not exists
-	_, err = m.esClientProvider.CreateIndex(fmt.Sprintf("%s-raw", m.ESIndex), BugzillaRawMapping)
 
-	if err != nil {
-		return err
-	}
+		// set mapping and create index if not exists
+		_, err = m.esClientProvider.CreateIndex(fmt.Sprintf("%s-raw", m.ESIndex), BugzillaRawMapping)
 
-	if len(data) > 0 {
-		// Update changed at in elastic cache index
-		cacheDoc, _ := data[len(data)-1].Data.(*BugRaw)
-		updateChan := HitSource{ID: fetchID, ChangedAt: cacheDoc.ChangedAt}
-		data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: fetchID, Data: updateChan})
-
-		// Insert raw data to elasticsearch
-		_, err = m.esClientProvider.BulkInsert(data)
 		if err != nil {
 			return err
 		}
+
+		if len(data) > 0 {
+			// Update changed at in elastic cache index
+			cacheDoc, _ := data[len(data)-1].Data.(*BugRaw)
+			updateChan := HitSource{ID: fetchID, ChangedAt: cacheDoc.MetadataUpdatedOn}
+			data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: fetchID, Data: updateChan})
+
+			// Insert raw data to elasticsearch
+			_, err = m.esClientProvider.BulkInsert(data)
+			if err != nil {
+				return err
+			}
+		}
+
+
 	}
 
 	return nil
@@ -252,47 +251,25 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) erro
 	}
 
 	var topHits *RawHits
-	var from time.Time
+	var lastEnrich time.Time
 	if err == nil && len(val.Hits.Hits) > 0 {
-		from = val.Hits.Hits[0].Source.ChangedAt
+		lastEnrich = val.Hits.Hits[0].Source.ChangedAt
 	}
 
-	isBothDatesNull := (err != nil || len(val.Hits.Hits) < 1) && (m.FromDate == nil || (*m.FromDate).IsZero())
+	from := utils.GetOldestDate(m.FromDate, &lastEnrich)
 
-	if m.FromDate != nil && isBothDatesNull {
-		searchVal := m.FromDate
-		if !from.IsZero() {
-			if from.Before(*searchVal) {
-				searchVal = &from
-			}
-		}
-		conditions := map[string]interface{}{
-			"range": map[string]interface{}{
-				"metadata__updated_on": map[string]interface{}{
-					"gte": (m.FromDate).Format(time.RFC3339),
-				},
+
+
+	conditions := map[string]interface{}{
+		"range": map[string]interface{}{
+			"metadata__updated_on": map[string]interface{}{
+				"gte": (from).Format(time.RFC3339),
 			},
-		}
-		query["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"] = conditions
-
-	} else {
-		var searchVal time.Time
-
-		if m.FromDate == nil {
-			searchVal = from
-		} else {
-			searchVal = *m.FromDate
-		}
-		conditions := map[string]interface{}{
-			"range": map[string]interface{}{
-				"metadata__updated_on": map[string]interface{}{
-					"gte": (searchVal).Format(time.RFC3339),
-				},
-			},
-		}
-		query["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"] = conditions
-
+		},
 	}
+
+	query["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"] = conditions
+
 
 	results := m.EnrichSize
 	offset := 0
@@ -309,7 +286,7 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) erro
 
 		data := make([]*utils.BulkData, 0)
 		for _, hit := range topHits.Hits.Hits {
-			enrichedItem, err := enricher.EnrichItem(hit.Source, time.Now())
+			enrichedItem, err := enricher.EnrichItem(hit.Source, time.Now().UTC())
 			if err != nil {
 				return err
 			}
