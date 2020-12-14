@@ -54,7 +54,6 @@ where
 	// Act
 	srv := NewIdentityProvider(dataBase)
 	res, err := srv.GetIdentity(key, val)
-	fmt.Println(res)
 	// Assert
 	assert.NoError(t, err)
 	assert.Equal(t, res.UUID, "5")
@@ -87,7 +86,6 @@ func TestGetOrganizations(t *testing.T) {
 	// Act
 	srv := NewIdentityProvider(dataBase)
 	res, err := srv.GetOrganizations(fakeUUID, date)
-	fmt.Println(res)
 
 	// Assert
 	assert.NoError(t, err)
