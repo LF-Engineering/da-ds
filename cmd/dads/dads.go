@@ -30,7 +30,7 @@ func runDS(ctx *lib.Ctx) (err error) {
 		}
 		return manager.Sync()
 	case bugzilla.Bugzilla:
-		manager, err := buildDockerhubManager(ctx)
+		manager, err := buildBugzillaManager(ctx)
 		if err != nil {
 			return err
 		}
@@ -118,39 +118,19 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 }
 
 func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
-	origin := ctx.ForceFull
-	fetcherBackendVersion := ctx.Env("FETCHER_BACKEND_VERSION")
-	enricherBackendVersion := ctx.Env("ENRICHER_BACKEND_VERSION")
-	doFetch := ctx.Env("DO_FETCH")
-	doEnrich := ctx.Env("DO_FETCH")
-	enricherBackendVersion := ctx.Env("ENRICHER_BACKEND_VERSION")
-	ctx.
-		xxxxxxxx
+	origin := ctx.BugZilla.Origin
+	fetcherBackendVersion := "0.1.0"
+	enricherBackendVersion := "0.1.0"
+	doFetch := ctx.BugZilla.DoFetch.Bool()
+	doEnrich := ctx.BugZilla.DoEnrich.Bool()
+	fromDate := ctx.BugZilla.FromDate.Date()
+	fetchSize := ctx.BugZilla.FetchSize.Int()
+	enrichSize := ctx.BugZilla.EnrichSize.Int()
+	project := ctx.BugZilla.Project.String()
+	esIndex := ctx.BugZilla.EsIndex.String()
 
-	// todo delete it later
-	// Dockerhub credentials
-	/*username := ctx.Env("USERNAME")
-	password := ctx.Env("PASSWORD")
-	fetcherBackendVersion := "0.0.1"  //ctx.Env("FETCHER_BACKEND_VERSION")
-	enricherBackendVersion := "0.0.1" //ctx.Env("ENRICHER_BACKEND_VERSION")
-	esURL := ctx.ESURL
-	httpTimeout := ctx.Env("HTTP_TIMEOUT") // "60s" 60 seconds...
-	repositoriesJSON := ctx.Env("REPOSITORIES_JSON")
-	enrichOnly := ctx.NoRaw
-	enrich := ctx.Enrich
-	fromDate := ctx.DateFrom
-	noIncremental := ctx.BoolEnv("NO_INCREMENTAL")
+	return bugzilla.NewManager(origin.String(), ctx.DBConn, fetcherBackendVersion, enricherBackendVersion,
+		doFetch, doEnrich, ctx.ESURL, "", "", esIndex, fromDate, project,
+		fetchSize, enrichSize), nil
 
-	var repositories []*dockerhub.Repository
-	if err := jsoniter.Unmarshal([]byte(repositoriesJSON), &repositories); err != nil {
-		return nil, err
-	}
-
-	timeout, err := time.ParseDuration(httpTimeout)
-	if err != nil {
-		return nil, err
-	}
-
-	return dockerhub.NewManager(username, password, fetcherBackendVersion, enricherBackendVersion,
-		enrichOnly, enrich, esURL, timeout, repositories, fromDate, noIncremental), nil*/
 }

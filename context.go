@@ -63,10 +63,10 @@ type Ctx struct {
 }
 
 type BugZilla struct {
-	Origin     *StringFlag
-	EsIndex    *StringFlag
+	Origin     *Flag
+	EsIndex    *Flag
 	FromDate   *Flag
-	Project    *StringFlag
+	Project    *Flag
 	DoFetch    *Flag
 	DoEnrich   *Flag
 	FetchSize  *Flag
