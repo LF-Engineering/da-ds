@@ -121,9 +121,8 @@ func (f *Fetcher) Fetch(url string, fromDate *time.Time) (map[string]string, err
 	return fetched, nil
 }
 
-// FetchItem pulls image data
+// FetchItem extracts data from archives
 func (f *Fetcher) FetchItem(owner string, link string, now time.Time) (interface{}, error) {
-	//url := fmt.Sprintf("%s/%s/%s", ArchiveDownloadsPath, owner, link)
 
 	archives, err := f.Fetch(link, &DefaultDateTime)
 	if err != nil {
