@@ -118,7 +118,7 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 }
 
 func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
-	origin := ctx.Env("ORIGIN")
+	origin := ctx.ForceFull
 	fetcherBackendVersion := ctx.Env("FETCHER_BACKEND_VERSION")
 	enricherBackendVersion := ctx.Env("ENRICHER_BACKEND_VERSION")
 	doFetch := ctx.Env("DO_FETCH")

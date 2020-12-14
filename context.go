@@ -1,6 +1,7 @@
 package dads
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"strconv"
@@ -56,11 +57,39 @@ type Ctx struct {
 	OffsetFromDetected bool
 	DB                 *sqlx.DB
 	ESScrollWaitSecs   float64
+
+	// Bugzilla contains all bugzilla params
+	BugZilla *BugZilla
+}
+
+type BugZilla struct {
+	Origin     *StringFlag
+	EsIndex    *StringFlag
+	FromDate   *Flag
+	Project    *StringFlag
+	DoFetch    *Flag
+	DoEnrich   *Flag
+	FetchSize  *Flag
+	EnrichSize *Flag
 }
 
 // Env - get env value using current DS prefix
 func (ctx *Ctx) Env(v string) string {
 	return os.Getenv(ctx.DSPrefix + v)
+}
+
+// ParseFlags declare and parse CLI flags
+func (ctx *Ctx) ParseFlags() {
+	flag.Var(ctx.BugZilla.Origin, "bugzilla-origin", "Bugzilla origin url")
+	flag.Var(ctx.BugZilla.EsIndex, "bugzilla-es-index", "Bugzilla es index base name")
+	flag.Var(ctx.BugZilla.FromDate, "bugzilla-from-date", "Optional, date to start syncing from")
+	flag.Var(ctx.BugZilla.Project, "bugzilla-project", "Slug name of a project e.g. yocto")
+	flag.Var(ctx.BugZilla.DoFetch, "bugzilla-do-fetch", "To decide whether will fetch raw data or not")
+	flag.Var(ctx.BugZilla.DoEnrich, "bugzilla-do-enrich", "To decide whether will do enrich raw data or not.")
+	flag.Var(ctx.BugZilla.FetchSize, "bugzilla-fetch-size", "Total number of fetched items per request.")
+	flag.Var(ctx.BugZilla.EnrichSize, "bugzilla-enrich-size", "Total number of enriched items per request.")
+
+	flag.Parse()
 }
 
 // BoolEnv - parses env variable as bool
