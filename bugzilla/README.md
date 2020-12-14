@@ -13,6 +13,6 @@ must set proper environment variables to
 select Bugzilla as an engine and other 
 parameters that determine the intended behavior.
 
-These are the needed environment variables to run Bugzilla:
+These are the needed environment variables to run Bugzilla DA-DS:
 - DA_BUGZILLA_ENDPOINT={}
     - bugzilla url

@@ -5,6 +5,8 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/LF-Engineering/da-ds/bugzilla"
+
 	jsoniter "github.com/json-iterator/go"
 
 	"github.com/LF-Engineering/da-ds/dockerhub"
@@ -22,6 +24,12 @@ func runDS(ctx *lib.Ctx) (err error) {
 	case lib.Groupsio:
 		ds = &lib.DSGroupsio{}
 	case dockerhub.Dockerhub:
+		manager, err := buildDockerhubManager(ctx)
+		if err != nil {
+			return err
+		}
+		return manager.Sync()
+	case bugzilla.Bugzilla:
 		manager, err := buildDockerhubManager(ctx)
 		if err != nil {
 			return err
@@ -107,4 +115,42 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 
 	return dockerhub.NewManager(username, password, fetcherBackendVersion, enricherBackendVersion,
 		enrichOnly, enrich, esURL, timeout, repositories, fromDate, noIncremental), nil
+}
+
+func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
+	origin := ctx.Env("ORIGIN")
+	fetcherBackendVersion := ctx.Env("FETCHER_BACKEND_VERSION")
+	enricherBackendVersion := ctx.Env("ENRICHER_BACKEND_VERSION")
+	doFetch := ctx.Env("DO_FETCH")
+	doEnrich := ctx.Env("DO_FETCH")
+	enricherBackendVersion := ctx.Env("ENRICHER_BACKEND_VERSION")
+	ctx.
+		xxxxxxxx
+
+	// todo delete it later
+	// Dockerhub credentials
+	/*username := ctx.Env("USERNAME")
+	password := ctx.Env("PASSWORD")
+	fetcherBackendVersion := "0.0.1"  //ctx.Env("FETCHER_BACKEND_VERSION")
+	enricherBackendVersion := "0.0.1" //ctx.Env("ENRICHER_BACKEND_VERSION")
+	esURL := ctx.ESURL
+	httpTimeout := ctx.Env("HTTP_TIMEOUT") // "60s" 60 seconds...
+	repositoriesJSON := ctx.Env("REPOSITORIES_JSON")
+	enrichOnly := ctx.NoRaw
+	enrich := ctx.Enrich
+	fromDate := ctx.DateFrom
+	noIncremental := ctx.BoolEnv("NO_INCREMENTAL")
+
+	var repositories []*dockerhub.Repository
+	if err := jsoniter.Unmarshal([]byte(repositoriesJSON), &repositories); err != nil {
+		return nil, err
+	}
+
+	timeout, err := time.ParseDuration(httpTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	return dockerhub.NewManager(username, password, fetcherBackendVersion, enricherBackendVersion,
+		enrichOnly, enrich, esURL, timeout, repositories, fromDate, noIncremental), nil*/
 }

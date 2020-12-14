@@ -33,7 +33,18 @@ type Manager struct {
 }
 
 // NewManager initiates bugzilla manager instance
-func NewManager(endPoint string, shConnStr string, fetcherBackendVersion string, enricherBackendVersion string, fetch bool, enrich bool, eSUrl string, esUser string, esPassword string, esIndex string, fromDate *time.Time, httpTimeout time.Duration, project string, fetchSize int, enrichSize int) *Manager {
+func NewManager(endPoint string,
+	shConnStr string,
+	fetcherBackendVersion string,
+	enricherBackendVersion string,
+	fetch bool,
+	enrich bool,
+	eSUrl string,
+	esUser string,
+	esPassword string,
+	esIndex string,
+	fromDate *time.Time,
+	httpTimeout time.Duration, project string, fetchSize int, enrichSize int) *Manager {
 
 	mgr := &Manager{
 		Endpoint:               endPoint,
