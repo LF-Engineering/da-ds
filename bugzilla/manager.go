@@ -102,9 +102,23 @@ func (m *Manager) Sync() error {
 
 	for waitTimes > 0 {
 		select {
-		case <-m.fetch(m.fetcher, lastActionCachePostfix):
-		case <-m.enrich(m.enricher, lastActionCachePostfix):
-			waitTimes--
+		case err := <-m.fetch(m.fetcher, lastActionCachePostfix):
+			if err == nil {
+				waitTimes--
+				fmt.Println("fetch suc")
+
+			} else {
+				fmt.Println("fetch err")
+				fmt.Println(err)
+			}
+		case err := <-m.enrich(m.enricher, lastActionCachePostfix):
+			if err == nil {
+				waitTimes--
+				fmt.Println("enrich suc")
+			} else {
+			fmt.Println("enrich err")
+			fmt.Println(err)
+		}
 		}
 	}
 
@@ -174,6 +188,7 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 			bugs, err := fetcher.FetchItem(*from, m.FetchSize, now)
 			if err != nil {
 				ch <- err
+				return
 			}
 
 			result = len(bugs)
@@ -200,6 +215,7 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 
 			if err != nil {
 				ch <- err
+				return
 			}
 
 			if len(data) > 0 {
@@ -212,6 +228,7 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 				_, err = m.esClientProvider.BulkInsert(data)
 				if err != nil {
 					ch <- err
+					return
 				}
 			}
 
@@ -227,6 +244,7 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 	ch := make(chan error)
 
 	go func() {
+		fmt.Println("in enrich")
 		enrichID := "enrich"
 
 		query := map[string]interface{}{
@@ -285,7 +303,8 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 			query["from"] = offset
 			topHits, err = m.fetcher.Query(fmt.Sprintf("%s-raw", m.ESIndex), query)
 			if err != nil {
-				ch <- err
+				ch <- nil
+				return
 			}
 
 			data := make([]*utils.BulkData, 0)
@@ -293,6 +312,7 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 				enrichedItem, err := enricher.EnrichItem(hit.Source, time.Now().UTC())
 				if err != nil {
 					ch <- err
+					return
 				}
 				data = append(data, &utils.BulkData{IndexName: m.ESIndex, ID: enrichedItem.UUID, Data: enrichedItem})
 			}
@@ -306,6 +326,7 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 
 				if err != nil {
 					ch <- err
+					return
 				}
 			}
 
@@ -319,6 +340,7 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 				_, err = m.esClientProvider.BulkInsert(data)
 				if err != nil {
 					ch <- err
+					return
 				}
 			}
 
