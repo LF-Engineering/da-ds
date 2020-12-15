@@ -96,9 +96,11 @@ func (m *Manager) Sync() error {
 	doneJobs["doneFetch"] = !m.Fetch
 	doneJobs["doneEnrich"] = !m.Enrich
 
+	fetchCh := m.fetch(m.fetcher, lastActionCachePostfix)
+
 	for doneJobs["doneFetch"] == false || doneJobs["doneEnrich"] == false {
 		select {
-		case err := <-m.fetch(m.fetcher, lastActionCachePostfix):
+		case err := <-fetchCh:
 			if err == nil {
 				doneJobs["doneFetch"] = true
 				fmt.Println("fetch suc")
@@ -115,6 +117,7 @@ func (m *Manager) Sync() error {
 				fmt.Println("enrich err")
 				fmt.Println(err)
 			}
+			time.Sleep(5*time.Second)
 		}
 	}
 
