@@ -91,20 +91,16 @@ type HitSource struct {
 func (m *Manager) Sync() error {
 	lastActionCachePostfix := "-last-action-date-cache"
 
-	waitTimes := 0
-	if m.Fetch {
-		waitTimes++
-	}
+	// register disabled job as done
+	doneJobs := make(map[string]bool)
+	doneJobs["doneFetch"] = !m.Fetch
+	doneJobs["doneEnrich"] = !m.Enrich
 
-	if m.Enrich {
-		waitTimes++
-	}
-
-	for waitTimes > 0 {
+	for doneJobs["doneFetch"] == false || doneJobs["doneEnrich"] == false {
 		select {
 		case err := <-m.fetch(m.fetcher, lastActionCachePostfix):
 			if err == nil {
-				waitTimes--
+				doneJobs["doneFetch"] = true
 				fmt.Println("fetch suc")
 
 			} else {
@@ -113,12 +109,12 @@ func (m *Manager) Sync() error {
 			}
 		case err := <-m.enrich(m.enricher, lastActionCachePostfix):
 			if err == nil {
-				waitTimes--
+				doneJobs["doneEnrich"] = true
 				fmt.Println("enrich suc")
 			} else {
-			fmt.Println("enrich err")
-			fmt.Println(err)
-		}
+				fmt.Println("enrich err")
+				fmt.Println(err)
+			}
 		}
 	}
 
