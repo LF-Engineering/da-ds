@@ -103,19 +103,10 @@ func (m *Manager) Sync() error {
 		case err := <-fetchCh:
 			if err == nil {
 				doneJobs["doneFetch"] = true
-				fmt.Println("fetch suc")
-
-			} else {
-				fmt.Println("fetch err")
-				fmt.Println(err)
 			}
 		case err := <-m.enrich(m.enricher, lastActionCachePostfix):
 			if err == nil {
 				doneJobs["doneEnrich"] = true
-				fmt.Println("enrich suc")
-			} else {
-				fmt.Println("enrich err")
-				fmt.Println(err)
 			}
 			time.Sleep(5*time.Second)
 		}
@@ -220,7 +211,7 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 			if len(data) > 0 {
 				// Update changed at in elastic cache index
 				cacheDoc, _ := data[len(data)-1].Data.(*BugRaw)
-				updateChan := HitSource{ID: fetchID, ChangedAt: cacheDoc.MetadataUpdatedOn}
+				updateChan := HitSource{ID: fetchID, ChangedAt: cacheDoc.ChangedAt}
 				data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: fetchID, Data: updateChan})
 
 				// Insert raw data to elasticsearch
@@ -332,7 +323,7 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 			if len(data) > 0 {
 				// Update changed at in elastic cache index
 				cacheDoc, _ := data[len(data)-1].Data.(*BugEnrich)
-				updateChan := HitSource{ID: enrichID, ChangedAt: cacheDoc.MetadataEnrichedOn}
+				updateChan := HitSource{ID: enrichID, ChangedAt: cacheDoc.ChangedDate}
 				data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: enrichID, Data: updateChan})
 
 				// Insert enriched data to elasticsearch

@@ -79,10 +79,6 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 		}
 
 		assignedTo, err := e.identityProvider.GetIdentity(assignedToFieldName, enriched.Assigned)
-		if err != nil {
-			fmt.Println("ppppp")
-			fmt.Println(err)
-		}
 		if err == nil {
 			enriched.AssignedToID = assignedTo.ID
 			enriched.AssignedToUUID = assignedTo.UUID
