@@ -127,7 +127,7 @@ func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 	fetchSize := ctx.BugZilla.FetchSize.Int()
 	enrichSize := ctx.BugZilla.EnrichSize.Int()
 	project := ctx.BugZilla.Project.String()
-	esIndex := ctx.RawIndex
+	esIndex := ctx.BugZilla.EsIndex.String()
 
 	return bugzilla.NewManager(origin.String(), ctx.DBConn, fetcherBackendVersion, enricherBackendVersion,
 		doFetch, doEnrich, ctx.ESURL, "", "", esIndex, fromDate, project,
