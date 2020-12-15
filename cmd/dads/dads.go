@@ -81,6 +81,7 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 	dtStart := time.Now()
 	ctx.Init()
+	ctx.ParseFlags()
 	lib.FatalOnError(ctx.Validate())
 	lib.CreateESCache(&ctx)
 	lib.FatalOnError(runDS(&ctx))
@@ -118,7 +119,9 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 }
 
 func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
-	origin := ctx.BugZilla.Origin
+
+
+	origin := ctx.BugZilla.Origin.String()
 	fetcherBackendVersion := "0.1.0"
 	enricherBackendVersion := "0.1.0"
 	doFetch := ctx.BugZilla.DoFetch.Bool()
@@ -128,9 +131,12 @@ func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 	enrichSize := ctx.BugZilla.EnrichSize.Int()
 	project := ctx.BugZilla.Project.String()
 	esIndex := ctx.BugZilla.EsIndex.String()
-
-	return bugzilla.NewManager(origin.String(), ctx.DBConn, fetcherBackendVersion, enricherBackendVersion,
+	mgr, err := bugzilla.NewManager(origin, ctx.DBConn, fetcherBackendVersion, enricherBackendVersion,
 		doFetch, doEnrich, ctx.ESURL, "", "", esIndex, fromDate, project,
-		fetchSize, enrichSize), nil
+		fetchSize, enrichSize)
+	if err != nil {
+		return nil,err
+	}
 
+return mgr, nil
 }

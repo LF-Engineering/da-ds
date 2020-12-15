@@ -90,6 +90,8 @@ func (ctx *Ctx) ParseFlags() {
 	flag.Var(ctx.BugZilla.EnrichSize, "bugzilla-enrich-size", "Total number of enriched items per request.")
 
 	flag.Parse()
+	fmt.Println("doen")
+	fmt.Println(ctx.BugZilla.DoEnrich)
 }
 
 // BoolEnv - parses env variable as bool
@@ -287,6 +289,18 @@ func (ctx *Ctx) Init() {
 			ctx.OffsetTo = offset
 		}
 	}
+	ctx.BugZilla = &BugZilla{
+		Origin: NewFlag(),
+		EsIndex: &s,
+		DoFetch: &s,
+		DoEnrich: &s,
+		FetchSize: &s,
+		EnrichSize: &s,
+		Project: &s,
+
+	}
+
+
 }
 
 // Validate - check if config is correct
