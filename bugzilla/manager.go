@@ -91,18 +91,29 @@ type HitSource struct {
 func (m *Manager) Sync() error {
 	lastActionCachePostfix := "-last-action-date-cache"
 
+	errCH := make(chan error)
 	if m.Fetch {
-		err := m.fetch(m.fetcher, lastActionCachePostfix)
-		if err != nil {
-			return err
-		}
+		go func() {
+			err := m.fetch(m.fetcher, lastActionCachePostfix)
+			if err != nil {
+				errCH <- err
+			}
+		}()
+
 	}
 
 	if m.Enrich {
-		err := m.enrich(m.enricher, lastActionCachePostfix)
-		if err != nil {
-			return err
-		}
+		go func() {
+			err := m.enrich(m.enricher, lastActionCachePostfix)
+			if err != nil {
+				errCH <- err
+			}
+		}()
+	}
+
+	select {
+	case err := <-errCH:
+		return err
 	}
 
 	return nil
