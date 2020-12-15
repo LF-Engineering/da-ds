@@ -290,16 +290,14 @@ func (ctx *Ctx) Init() {
 		}
 	}
 	ctx.BugZilla = &BugZilla{
-		Origin: NewFlag(),
-		EsIndex: &s,
-		DoFetch: &s,
-		DoEnrich: &s,
-		FetchSize: &s,
-		EnrichSize: &s,
-		Project: &s,
-
+		Origin:     NewFlag(),
+		EsIndex:    NewFlag(),
+		DoFetch:    NewFlag(),
+		DoEnrich:   NewFlag(),
+		FetchSize:  NewFlag(),
+		EnrichSize: NewFlag(),
+		Project:    NewFlag(),
 	}
-
 
 }
 
