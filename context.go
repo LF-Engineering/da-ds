@@ -90,8 +90,6 @@ func (ctx *Ctx) ParseFlags() {
 	flag.Var(ctx.BugZilla.EnrichSize, "bugzilla-enrich-size", "Total number of enriched items per request.")
 
 	flag.Parse()
-	fmt.Println("doen")
-	fmt.Println(ctx.BugZilla.DoEnrich)
 }
 
 // BoolEnv - parses env variable as bool
