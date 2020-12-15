@@ -62,6 +62,7 @@ type Ctx struct {
 	BugZilla *BugZilla
 }
 
+// BugZilla parameter context contains all required parameters to run Bugzilla fetch and enrich
 type BugZilla struct {
 	Origin     *Flag
 	EsIndex    *Flag
