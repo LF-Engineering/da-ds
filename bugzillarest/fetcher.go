@@ -2,12 +2,13 @@ package bugzillarest
 
 import (
 	"fmt"
-	jsoniter "github.com/json-iterator/go"
 	"strconv"
 	"time"
+
+	jsoniter "github.com/json-iterator/go"
 )
 
-type Comments struct {
+type Comment struct {
 	ID           int
 	Creator      string
 	Time         time.Time
@@ -18,9 +19,11 @@ type Comments struct {
 	Tags         []string
 }
 
+type Comments []Comment
+
 type CommentsResponse struct {
-	 Bugs map[string]interface{
-	 }
+	Bugs map[string]interface {
+	}
 }
 
 // HTTPClientProvider used in connecting to remote http server
@@ -43,7 +46,7 @@ func NewFetcher(httpClientProvider HTTPClientProvider) *Fetcher {
 func (f *Fetcher) FetchItem() error {
 	url := "https://bugs.dpdk.org/rest/bug"
 	bugId := 601
-	bugUrl := fmt.Sprintf("%s/%v",url, bugId)
+	bugUrl := fmt.Sprintf("%s/%v", url, bugId)
 	_, res, err := f.HTTPClientProvider.Request(bugUrl, "GET", nil, nil, nil)
 	if err != nil {
 		return err
@@ -65,22 +68,20 @@ func (f *Fetcher) FetchItem() error {
 }
 
 func (f *Fetcher) FetchComments(url string, id int) error {
-	commentsUrl := fmt.Sprintf("%s/%v/%s",url, id, "comment")
+	commentsUrl := fmt.Sprintf("%s/%v/%s", url, id, "comment")
 	_, res, err := f.HTTPClientProvider.Request(commentsUrl, "GET", nil, nil, nil)
 	if err != nil {
 		return err
 	}
-	result := make(map[string]interface{})
+
+	result := map[string]map[string]map[string]Comments{}
 
 	err = jsoniter.Unmarshal(res, &result)
 	if err != nil {
 		return err
 	}
+	arr := result["bugs"][strconv.Itoa(id)]["comments"]
+	fmt.Println(arr[0].Creator)
 
-	//var comments Comments
-	x := result["bugs"].(map[string]interface{})[strconv.Itoa(id)].(map[string]interface{})["comments"]
-x.Creator
-	fmt.Println("commmmm")
-	fmt.Println(x)
 	return nil
 }
