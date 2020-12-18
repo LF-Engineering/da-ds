@@ -2,6 +2,7 @@ package bugzillarest
 
 import (
 	"fmt"
+	"github.com/LF-Engineering/da-ds/utils"
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 	"strconv"
 	"time"
@@ -33,6 +34,7 @@ type HistoryRes struct {
 type HistoryBug struct {
 	ID      int
 	History []History
+	Alias   []string
 }
 
 type History struct {
@@ -66,8 +68,18 @@ type Attachment struct {
 }
 
 type BugzillaRestRaw struct {
-	Data BugData
-	UUID string
+	Data                     BugData `json:"data"`
+	UUID                     string `json:"uuid"`
+	MetadataUpdatedOn        time.Time `json:"metadata__updated_on"`
+	ClassifiedFieldsFiltered *string `json:"classified_fields_filtered"`
+	UpdatedOn                float64 `json:"updated_on"`
+	BackendName              string `json:"backend_name"`
+	Category                 string `json:"category"`
+	Origin                   string `json:"origin"`
+	BackendVersion           string `json:"backend_version"`
+	Tag                      string `json:"tag"`
+	TimeStamp                float64 `json:"time_stamp"`
+	MetadataTimestamp        time.Time `json:"metadata__timestamp"`
 }
 
 type FetchedBugs struct {
@@ -75,68 +87,57 @@ type FetchedBugs struct {
 }
 
 type BugData struct {
-	History             []History
-	Resolution          string
-	Priority            string
-	Keywords            []string
-	DependsOn           []string
-	Alias               []string
-	IsCcAccessible      bool
-	Duplicates          []int
-	SeeAlso             []string
-	LastChangeTime      time.Time
-	CreatorDetail       PersonDetail
-	Blocks              []int
-	TargetMilestone     string
-	Deadline            *string
-	IsOpen              bool
-	RemainingTime       int
-	Flags               []string
-	Groups              []string
-	Component           string
-	Platform            string
-	Comments            Comments
-	EstimatedTime       int
-	OpSys               string
-	Severity            string
-	Url                 string
-	Cc                  []string
-	IsConfirmed         bool
-	IsCreatorAccessible bool
-	ActualTime          int
-	AssignedTo          string
-	DupeOf              *string
-	Attachments         []Attachment
-	Tags                []string
-	CreationTime        time.Time
-	Whiteboard          string
-	CcDetail            PersonDetail
+	History             []History `json:"history"`
+	Resolution          string `json:"resolution"`
+	Priority            string `json:"priority"`
+	Keywords            []string `json:"keywords"`
+	DependsOn           []string `json:"depends_on"`
+	Alias               []string `json:"alias"`
+	IsCcAccessible      bool `json:"is_cc_accessible"`
+	Duplicates          []int `json:"duplicates"`
+	SeeAlso             []string `json:"see_also"`
+	LastChangeTime      time.Time `json:"last_change_time"`
+	CreatorDetail       *PersonDetail `json:"creator_detail"`
+	Blocks              []int `json:"blocks"`
+	TargetMilestone     string `json:"target_milestone"`
+	Deadline            *string `json:"deadline"`
+	IsOpen              bool `json:"is_open"`
+	RemainingTime       int `json:"remaining_time"`
+	Flags               []string `json:"flags"`
+	Groups              []string `json:"groups"`
+	Component           string `json:"component"`
+	Platform            string `json:"platform"`
+	Comments            Comments `json:"comments"`
+	EstimatedTime       int `json:"estimated_time"`
+	OpSys               string `json:"op_sys"`
+	Severity            string `json:"severity"`
+	Url                 string `json:"url"`
+	Cc                  []string `json:"cc"`
+	IsConfirmed         bool `json:"is_confirmed"`
+	IsCreatorAccessible bool `json:"is_creator_accessible"`
+	ActualTime          int `json:"actual_time"`
+	AssignedTo          string `json:"assigned_to"`
+	DupeOf              *string`json:"dupe_of"`
+	Attachments         []Attachment `json:"attachments"`
+	Tags                []string `json:"tags"`
+	CreationTime        time.Time`json:"creation_time"`
+	Whiteboard          string `json:"whiteboard"`
+	CcDetail            []PersonDetail `json:"cc_detail"`
 	Status              string
 	Summary             string
 	Classification      string
 	QaContact           string
-	Product             string
-	ID                  int
-	Creator             string
-	Version             string
-	AssignedToDetail    PersonDetail
-
-	MetadataUpdatedOn time.Time `json:"metadata__updated_on"`
-	UpdatedOn int
-	BackendName string
-	Category string
-	Origin string
-	BackendVersion string
-	Tag string
-	TimeStamp string
-	MetadataTimestamp	time.Time `json:"metadata__timestamp"`
-
+	Product             string `json:"product"`
+	ID                  int `json:"id"`
+	Creator             string `json:"creator"`
+	Version             string `json:"version"`
+	AssignedToDetail    *PersonDetail `json:"assigned_to_detail"`
 }
 
 type PersonDetail struct {
-	Name     string
-	RealName string
-	ID       int
+	Name     string `json:"name"`
+	RealName string `json:"real_name"`
+	ID       int    `json:"id"`
 }
 
 // HTTPClientProvider used in connecting to remote http server
@@ -156,9 +157,9 @@ func NewFetcher(httpClientProvider HTTPClientProvider) *Fetcher {
 }
 
 // FetchItem fetches bug item
-func (f *Fetcher) FetchAll(url string, date string, limit string, offset string) ([]BugzillaRestRaw,error) {
+func (f *Fetcher) FetchAll(url string, date string, limit string, offset string) ([]BugzillaRestRaw, error) {
 
-	d := fmt.Sprintf("%s?include_fields=_extra,_default&last_change_time=%s&limit=%s&offset=%s&",url, date, limit, offset)
+	d := fmt.Sprintf("%s?include_fields=_extra,_default&last_change_time=%s&limit=%s&offset=%s&", url, date, limit, offset)
 
 	// fetch all bugs from a specific date
 	_, res, err := f.HTTPClientProvider.Request(d, "GET", nil, nil, nil)
@@ -176,8 +177,8 @@ func (f *Fetcher) FetchAll(url string, date string, limit string, offset string)
 	fmt.Println(len(result.Bugs))
 
 	data := make([]BugzillaRestRaw, 0)
-	for _,bug := range result.Bugs{
-		bugRaw,err := f.FetchItem(url , bug.ID , bug )
+	for _, bug := range result.Bugs {
+		bugRaw, err := f.FetchItem(url, bug.ID, bug)
 		if err != nil {
 			return nil, err
 		}
@@ -223,8 +224,6 @@ func (f *Fetcher) FetchItem(url string, bugId int, fetchedBug BugData) (*Bugzill
 	bugRaw.Data.History = history
 	bugRaw.Data.Attachments = attachments
 
-	//fetchedBug := result
-
 	bugRaw.Data.ID = fetchedBug.ID
 	bugRaw.Data.Resolution = fetchedBug.Resolution
 	bugRaw.Data.Priority = fetchedBug.Priority
@@ -265,8 +264,20 @@ func (f *Fetcher) FetchItem(url string, bugId int, fetchedBug BugData) (*Bugzill
 	bugRaw.Data.Version = fetchedBug.Version
 	bugRaw.Data.Duplicates = fetchedBug.Duplicates
 
-	bugRaw.Data.MetadataUpdatedOn = fetchedBug.LastChangeTime
+	bugRaw.MetadataUpdatedOn = fetchedBug.LastChangeTime
+	bugRaw.ClassifiedFieldsFiltered = nil
+	bugRaw.UpdatedOn = utils.ConvertTimeToFloat(fetchedBug.LastChangeTime)
+	bugRaw.Category = "bug"
 
+	// todo : BackendName, BackendVersion will be a param
+	bugRaw.BackendName = "bugzillarest"
+	bugRaw.BackendVersion = "0.0.1"
+	bugRaw.Origin = url
+	bugRaw.Tag = url
+
+	now := time.Now()
+	bugRaw.MetadataTimestamp = now.UTC()
+	bugRaw.TimeStamp = utils.ConvertTimeToFloat(bugRaw.MetadataTimestamp)
 
 	return &bugRaw, nil
 }
