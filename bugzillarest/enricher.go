@@ -17,8 +17,6 @@ type Enricher struct {
 	Project          string
 }
 
-
-
 // IdentityProvider manages user identity
 type IdentityProvider interface {
 	GetIdentity(key string, val string) (*affiliation.Identity, error)
@@ -42,7 +40,6 @@ func (e *Enricher) EnrichItem(rawItem BugzillaRestRaw, now time.Time) (*BugRestE
 	enriched.Project = e.Project
 	enriched.ChangedDate = rawItem.Data.LastChangeTime
 	enriched.DeltaTs = rawItem.Data.LastChangeTime
-	//enriched.OpSys = rawItem.Data.OpSys
 	enriched.Product = rawItem.Data.Product
 	enriched.Component = rawItem.Data.Component
 
@@ -62,17 +59,15 @@ func (e *Enricher) EnrichItem(rawItem BugzillaRestRaw, now time.Time) (*BugRestE
 	enriched.CreationDate = rawItem.Data.CreationTime
 	enriched.Status = rawItem.Data.Status
 	enriched.CreationTs = rawItem.Data.CreationTime.Format("2006-01-02T15:04:05")
+	enriched.ISOpen = rawItem.Data.IsOpen
 
-
-	//enriched.ResolutionDays = utils.GetDaysbetweenDates(enriched.DeltaTs, enriched.CreationDate)
 	if rawItem.Data.Whiteboard != "" {
 		enriched.Whiteboard = &rawItem.Data.Whiteboard
 	}
 
-
 	enriched.Changes = 0
 	// count history changes
-	for _, history := range rawItem.Data.History{
+	for _, history := range rawItem.Data.History {
 		if len(history.Changes) > 0 {
 			enriched.Changes += len(history.Changes)
 		}
@@ -81,13 +76,12 @@ func (e *Enricher) EnrichItem(rawItem BugzillaRestRaw, now time.Time) (*BugRestE
 	enriched.NumberOfComments = 0
 	enriched.Comments = len(rawItem.Data.Comments)
 
-	if rawItem.Data.CreatorDetail != nil && rawItem.Data.CreatorDetail.RealName != ""{
+	if rawItem.Data.CreatorDetail != nil && rawItem.Data.CreatorDetail.RealName != "" {
 		enriched.Creator = rawItem.Data.CreatorDetail.RealName
 	}
 
 	unknown := "Unknown"
 	multiOrgs := []string{unknown}
-	fmt.Println("ssssssss")
 	if rawItem.Data.AssignedToDetail != nil && rawItem.Data.AssignedToDetail.RealName != "" {
 		enriched.AssignedTo = rawItem.Data.AssignedToDetail.RealName
 
@@ -109,7 +103,6 @@ func (e *Enricher) EnrichItem(rawItem BugzillaRestRaw, now time.Time) (*BugRestE
 
 			enriched.AssignedToUUID = assignedTo.UUID
 
-
 			if assignedTo.Gender != nil {
 				enriched.AssignedToDetailGender = *assignedTo.Gender
 			} else if assignedTo.Gender == nil {
@@ -121,8 +114,6 @@ func (e *Enricher) EnrichItem(rawItem BugzillaRestRaw, now time.Time) (*BugRestE
 			} else if assignedTo.GenderACC == nil {
 				enriched.AssignedToDetailGenderAcc = 0
 			}
-			fmt.Println("asss org")
-			fmt.Println(assignedTo.OrgName)
 			if assignedTo.OrgName != nil {
 				enriched.AssignedToDetailOrgName = *assignedTo.OrgName
 				enriched.AssignedToOrgName = *assignedTo.OrgName
@@ -152,7 +143,7 @@ func (e *Enricher) EnrichItem(rawItem BugzillaRestRaw, now time.Time) (*BugRestE
 			reporterFieldName = "email"
 		}
 
-		creator, err := e.identityProvider.GetIdentity(reporterFieldName, enriched.Creator )
+		creator, err := e.identityProvider.GetIdentity(reporterFieldName, enriched.Creator)
 
 		if err == nil {
 			enriched.CreatorDetailID = creator.ID
@@ -207,7 +198,6 @@ func (e *Enricher) EnrichItem(rawItem BugzillaRestRaw, now time.Time) (*BugRestE
 	}
 
 	if rawItem.Data.Summary != "" {
-		fmt.Println(rawItem.Data.Summary)
 		enriched.Summary = rawItem.Data.Summary
 		enriched.SummaryAnalyzed = rawItem.Data.Summary
 
@@ -216,11 +206,6 @@ func (e *Enricher) EnrichItem(rawItem BugzillaRestRaw, now time.Time) (*BugRestE
 
 	}
 
-	//enriched.BugID = rawItem.BugID
-	//enriched.Comments = 0
-	//if len(rawItem.LongDesc) > 0 {
-	//	enriched.Comments = len(rawItem.LongDesc)
-	//}
 	enriched.RepositoryLabels = nil
 
 	return enriched, nil
@@ -230,4 +215,3 @@ func (e *Enricher) EnrichItem(rawItem BugzillaRestRaw, now time.Time) (*BugRestE
 func (e *Enricher) EnrichAffiliation(key string, val string) (*affiliation.Identity, error) {
 	return e.identityProvider.GetIdentity(key, val)
 }
-

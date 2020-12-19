@@ -89,19 +89,19 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 
 			if assignedTo.Gender != nil {
 				enriched.AssignedToGender = *assignedTo.Gender
-			} else if assignedTo.Gender == nil {
+			} else {
 				enriched.AssignedToGender = unknown
 			}
 
 			if assignedTo.GenderACC != nil {
 				enriched.AssignedToGenderAcc = *assignedTo.GenderACC
-			} else if assignedTo.GenderACC == nil {
+			} else {
 				enriched.AssignedToGenderAcc = 0
 			}
 
 			if assignedTo.OrgName != nil {
 				enriched.AssignedToOrgName = *assignedTo.OrgName
-			} else if assignedTo.OrgName == nil {
+			} else {
 				enriched.AssignedToOrgName = unknown
 			}
 
@@ -144,21 +144,21 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 			if reporter.Gender != nil {
 				enriched.ReporterGender = *reporter.Gender
 				enriched.AuthorGender = *reporter.Gender
-			} else if reporter.Gender == nil {
+			} else {
 				enriched.ReporterGender = unknown
 				enriched.AuthorGender = unknown
 			}
 			if reporter.GenderACC != nil {
 				enriched.ReporterGenderACC = *reporter.GenderACC
 				enriched.AuthorGenderAcc = *reporter.GenderACC
-			} else if reporter.GenderACC == nil {
+			} else {
 				enriched.ReporterGenderACC = 0
 				enriched.AuthorGenderAcc = 0
 			}
 			if reporter.OrgName != nil {
 				enriched.ReporterOrgName = *reporter.OrgName
 				enriched.AuthorOrgName = *reporter.OrgName
-			} else if reporter.OrgName == nil {
+			} else {
 				enriched.ReporterOrgName = unknown
 				enriched.AuthorOrgName = unknown
 			}
