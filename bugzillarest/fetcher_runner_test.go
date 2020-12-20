@@ -24,7 +24,7 @@ func TestBugzillaRestFetchItem(t *testing.T){
 	d := from.Format("2006-01-02T15:04:05")
 	httpClientProvider := utils.NewHTTPClientProvider(60*time.Second)
 	srv := NewFetcher(httpClientProvider)
-	data, err := srv.FetchAll(url , d , "2", "2")
+	data, err := srv.FetchAll(url , d , "2", "2", from)
 
 	fmt.Println("data")
 	fmt.Println(len(data))

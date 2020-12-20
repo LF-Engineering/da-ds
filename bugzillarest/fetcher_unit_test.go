@@ -3,25 +3,27 @@ package bugzillarest
 import (
 	"fmt"
 	"github.com/LF-Engineering/da-ds/bugzillarest/mocks"
+	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"strconv"
 	"testing"
 	"time"
 )
 
 func TestFetchAll(t *testing.T) {
-	url := "https://bugs.dpdk.org/rest/bug"
+	url := "https://bugs.dpdk.org/"
 	limit := "1"
 	offset := "3"
-	id := 601
+	id := 511
 	from, err := time.Parse("2006-01-02 15:04:05", "2020-12-10 03:00:00")
 	if err != nil {
 		fmt.Println(err)
 	}
 	date := from.Format("2006-01-02T15:04:05")
 
-	bugsUrl := fmt.Sprintf("%s?include_fields=_extra,_default&last_change_time=%s&limit=%s&offset=%s&", url, date, limit, offset)
+	bugsUrl := fmt.Sprintf("%srest/bug?include_fields=_extra,_default&last_change_time=%s&limit=%s&offset=%s&", url, date, limit, offset)
 
 	httpClientProviderMock := &mocks.HTTPClientProvider{}
 
@@ -34,19 +36,14 @@ func TestFetchAll(t *testing.T) {
 		name: "testTdd",
 		expected: `[{
           "category" : "bug",
-          "search_fields" : {
-            "item_id" : "511",
-            "product" : "lab",
-            "component" : "job scripts"
-          },
           "tag" : "https://bugs.dpdk.org/",
           "origin" : "https://bugs.dpdk.org/",
           "classified_fields_filtered" : null,
-          "metadata__updated_on" : "2020-07-30T13:29:50+00:00",
-          "updated_on" : 1596115790,
-          "backend_name" : "BugzillaREST",
-          "metadata__timestamp" : "2020-07-30T18:30:11.666836+00:00",
-          "timestamp" : 1.596133811666836E9,
+          "metadata__updated_on" : "2020-07-30T13:29:50Z",
+          "updated_on" : 1.608214048e+09,
+          "backend_name" : "bugzillarest",
+          "metadata__timestamp" : "2020-12-20T18:32:58.68373Z",
+          "timestamp" : 1.60848917868373e+09,
           "data" : {
             "status" : "CONFIRMED",
             "severity" : "enhancement",
@@ -56,13 +53,13 @@ func TestFetchAll(t *testing.T) {
             "classification" : "Unclassified",
             "duplicates" : [ ],
             "remaining_time" : 0,
-            "assigned_to" : "ci@dpdk.org",
+            "assigned_to" : "ci",
             "component" : "job scripts",
             "id" : 511,
             "assigned_to_detail" : {
               "real_name" : "",
               "id" : 149,
-              "name" : "ci@dpdk.org"
+              "name" : "ci"
             },
             "deadline" : null,
             "estimated_time" : 0,
@@ -73,17 +70,17 @@ func TestFetchAll(t *testing.T) {
               {
                 "real_name" : "Brandon Lo",
                 "id" : 376,
-                "name" : "blo@iol.unh.edu"
+                "name" : "blo"
               },
               {
                 "real_name" : "IOL-UNH",
                 "id" : 138,
-                "name" : "dpdklab@iol.unh.edu"
+                "name" : "dpdklab"
               },
               {
                 "real_name" : "Lincoln Lavoie",
                 "id" : 199,
-                "name" : "lylavoie@iol.unh.edu"
+                "name" : "lylavoie"
               }
             ],
             "attachments" : [ ],
@@ -92,13 +89,13 @@ func TestFetchAll(t *testing.T) {
             "actual_time" : 0,
             "is_confirmed" : true,
             "cc" : [
-              "blo@iol.unh.edu",
-              "dpdklab@iol.unh.edu",
-              "lylavoie@iol.unh.edu"
+              "blo",
+              "dpdklab",
+              "lylavoie"
             ],
             "is_cc_accessible" : true,
             "flags" : [ ],
-            "last_change_time" : "2020-07-30T13:29:50Z",
+            "last_change_time" : "2020-12-17T14:07:28Z",
             "dupe_of" : null,
             "priority" : "Normal",
             "target_milestone" : "---",
@@ -107,14 +104,14 @@ func TestFetchAll(t *testing.T) {
             "creator_detail" : {
               "real_name" : "Kevin Traynor",
               "id" : 134,
-              "name" : "kevuzaj@gmail.com"
+              "name" : "kevuzaj"
             },
             "alias" : [ ],
             "keywords" : [ ],
             "is_open" : true,
             "summary" : "Add check if performance tests are needed",
             "platform" : "All",
-            "creator" : "kevuzaj@gmail.com",
+            "creator" : "kevuzaj",
             "history" : [
               {
                 "changes" : [
@@ -125,7 +122,7 @@ func TestFetchAll(t *testing.T) {
                   },
                   {
                     "removed" : "",
-                    "added" : "blo@iol.unh.edu",
+                    "added" : "blo",
                     "field_name" : "cc"
                   },
                   {
@@ -134,11 +131,11 @@ func TestFetchAll(t *testing.T) {
                     "field_name" : "is_confirmed"
                   }
                 ],
-                "who" : "blo@iol.unh.edu",
+                "who" : "blo",
                 "when" : "2020-07-20T21:07:21Z"
               },
               {
-                "who" : "lylavoie@iol.unh.edu",
+                "who" : "lylavoie",
                 "when" : "2020-07-30T13:29:50Z",
                 "changes" : [
                   {
@@ -148,7 +145,7 @@ func TestFetchAll(t *testing.T) {
                   },
                   {
                     "removed" : "",
-                    "added" : "dpdklab@iol.unh.edu, lylavoie@iol.unh.edu",
+                    "added" : "dpdklab, lylavoie",
                     "field_name" : "cc"
                   }
                 ]
@@ -164,17 +161,8 @@ func TestFetchAll(t *testing.T) {
                 "creation_time" : "2020-07-20T13:17:11Z",
                 "is_private" : false,
                 "count" : 0,
-                "text" : """I submitted a patch for DPDK Unit Test [1], that only changed one file in app/test/.
-
-I noticed that UNH is running performance testing on these patches, when really it is not required. It may also run performance testing when there is a change to a .rst only etc.
-
-Sometimes it may be difficult to know if something will impact performance, but for these very obvious cases at least maybe some rule could be added so that performance testing is not run. 
-
-Of course, it is not an issue in receiving the mails with the results, but perhaps it would free up some lab resources, hence the suggestion.
-
-[1]
-http://patchwork.dpdk.org/patch/74486/""",
-                "creator" : "kevuzaj@gmail.com",
+                "text" : "",
+                "creator" : "kevuzaj",
                 "bug_id" : 511,
                 "id" : 2536,
                 "attachment_id" : null,
@@ -187,7 +175,7 @@ http://patchwork.dpdk.org/patch/74486/""",
                 "is_private" : false,
                 "count" : 1,
                 "text" : "Yeah, this seems like something we could implement. I'll start looking into this when I have the time. Thanks",
-                "creator" : "blo@iol.unh.edu",
+                "creator" : "blo",
                 "bug_id" : 511,
                 "id" : 2538,
                 "attachment_id" : null,
@@ -199,35 +187,30 @@ http://patchwork.dpdk.org/patch/74486/""",
                 "is_private" : false,
                 "creation_time" : "2020-07-30T13:29:50Z",
                 "count" : 2,
-                "text" : """Idea: Develop a script to determine the "category" of the patch, which can be used by the infrastructure to appropriately test the path.  
-
-Categories could include:
-1. Documentation - would be tested for syntax, etc
-2. Tooling Changes - scripts, dev tools
-3. Base Code - changes to DPDK "main" - requires compile / performance
-4. Unit Tests -""",
+                "text" : "",
                 "tags" : [ ],
                 "id" : 2580,
                 "time" : "2020-07-30T13:29:50Z",
                 "bug_id" : 511,
-                "creator" : "lylavoie@iol.unh.edu"
+                "creator" : "lylavoie"
               }
             ],
             "url" : ""
           },
-          "perceval_version" : "0.17.0",
-          "backend_version" : "0.10.0",
+          "version" : "0.17.0",
+          "backend_version" : "0.0.1",
           "uuid" : "dcfbadc47f39165ca0d56605c7a28363bb0ffc6e"
         }]`}
-	fmt.Println(tddtest.name)
-	bugsDa := `[
+
+	bugsDa := `{
+    "bugs":[
         {
             "flags": [],
             "severity": "enhancement",
             "classification": "Unclassified",
             "is_confirmed": true,
             "summary": "Add check if performance tests are needed",
-            "assigned_to": "thomas",
+            "assigned_to": "ci",
             "last_change_time": "2020-12-17T14:07:28Z",
             "qa_contact": "",
             "see_also": [],
@@ -256,9 +239,9 @@ Categories could include:
             "component": "job scripts",
             "depends_on": [],
             "assigned_to_detail": {
-                "name": "thomas",
-                "real_name": "Thomas Monjalon",
-                "id": 2
+			  "real_name" : "",
+              "id" : 149,
+              "name" : "ci"
             },
             "op_sys": "All",
             "keywords": [],
@@ -290,28 +273,30 @@ Categories could include:
             ],
             "status": "CONFIRMED"
         }
-    ]`
-	expectedRaw, err := toBugzillarestRaw(bugsDa)
+    ]}`
+
+	expecRaw, err := toBugzillarestRaw(tddtest.expected)
 	if err != nil {
 		t.Error(err)
 	}
 
-	data, err := jsoniter.Marshal(expectedRaw)
-	if err != nil {
-		t.Error(err)
-	}
+
+	bugRes := []byte(bugsDa)
+
+	var expectedRaw FetchedBugs
+
+	err = jsoniter.Unmarshal(bugRes,expectedRaw)
 
 	httpClientProviderMock.On("Request", bugsUrl, "GET",
-		mock.Anything, mock.Anything, mock.Anything).Return(200, data, nil)
+		mock.Anything, mock.Anything, mock.Anything).Return(200, bugRes, nil)
 
-	var result FetchedBugs
-	err = jsoniter.Unmarshal(data, &result.Bugs)
+	err = jsoniter.Unmarshal(bugRes, &expectedRaw)
 	if err != nil {
 		t.Error(err)
 	}
 
 	// arrange comments request and result
-	commentsUrl := fmt.Sprintf("%s/%v/%s", url, id, "comment")
+	commUrl := fmt.Sprintf("%srest/bug/%v/%s", url, id, "comment")
 
 	commByte := `{
     "bugs": {
@@ -320,8 +305,8 @@ Categories could include:
                 {
                     "id": 2536,
                     "tags": [],
-                    "text": "I submitted a patch for DPDK Unit Test [1], that only changed one file in app/test/.\n\nI noticed that UNH is running performance testing on these patches, when really it is not required. It may also run performance testing when there is a change to a .rst only etc.\n\nSometimes it may be difficult to know if something will impact performance, but for these very obvious cases at least maybe some rule could be added so that performance testing is not run. \n\nOf course, it is not an issue in receiving the mails with the results, but perhaps it would free up some lab resources, hence the suggestion.\n\n[1]\nhttp://patchwork.dpdk.org/patch/74486/",
-                    "time": "2020-07-20T13:17:11Z",
+                    "text": "",
+					"time": "2020-07-20T13:17:11Z",
                     "creator": "kevuzaj",
                     "is_markdown": false,
                     "is_private": false,
@@ -348,56 +333,36 @@ Categories could include:
                     "is_private": false,
                     "time": "2020-07-30T13:29:50Z",
                     "creator": "lylavoie",
-                    "text": "Idea: Develop a script to determine the \"category\" of the patch, which can be used by the infrastructure to appropriately test the path.  \n\nCategories could include:\n1. Documentation - would be tested for syntax, etc\n2. Tooling Changes - scripts, dev tools\n3. Base Code - changes to DPDK \"main\" - requires compile / performance\n4. Unit Tests -",
-                    "tags": [],
+                    "text": "",
+					"tags": [],
                     "id": 2580,
                     "attachment_id": null,
                     "bug_id": 511,
                     "count": 2,
                     "creation_time": "2020-07-30T13:29:50Z"
-                },
-                {
-                    "text": "https://mails.dpdk.org/archives/ci/2020-December/000902.html",
-                    "tags": [],
-                    "id": 3020,
-                    "creator": "lylavoie",
-                    "time": "2020-12-17T14:07:03Z",
-                    "is_markdown": false,
-                    "is_private": false,
-                    "bug_id": 511,
-                    "creation_time": "2020-12-17T14:07:03Z",
-                    "count": 3,
-                    "attachment_id": null
                 }
             ]
         }
     }
 }`
 
-	//commRes, err := jsoniter.Marshal(commByte)
-	//if err != nil {
-	//	t.Error(err)
-	//}
-
 	commentResult := map[string]map[string]map[string]Comments{}
 
 	commRes := []byte(commByte)
-	err = jsoniter.Unmarshal(commRes, &commentResult )
+	err = jsoniter.Unmarshal(commRes, &commentResult)
 	if err != nil {
 		t.Error(err)
 	}
 
-	httpClientProviderMock.On("Request", commentsUrl, "GET",
+	httpClientProviderMock.On("Request", commUrl, "GET",
 		mock.Anything, mock.Anything, mock.Anything).Return(
-			200, commRes, nil)
+		200, commRes, nil)
 
-
-	//comments := commentResult["bugs"][strconv.Itoa(id)]["comments"]
 
 	// arrange history
-	historyUrl := fmt.Sprintf("%s/%v/%s", url, id, "history")
+	historyUrl := fmt.Sprintf("%srest/bug/%v/%s", url, id, "history")
 
-	hisJs := `
+	hisJs := `{
     "bugs": [
         {
             "history": [
@@ -410,7 +375,7 @@ Categories could include:
                             "field_name": "status"
                         },
                         {
-                            "added": "blo@iol.unh.edu",
+                            "added": "blo",
                             "field_name": "cc",
                             "removed": ""
                         },
@@ -420,7 +385,7 @@ Categories could include:
                             "removed": "0"
                         }
                     ],
-                    "who": "blo@iol.unh.edu"
+                    "who": "blo"
                 },
                 {
                     "when": "2020-07-30T13:29:50Z",
@@ -432,22 +397,11 @@ Categories could include:
                         },
                         {
                             "removed": "",
-                            "added": "dpdklab@iol.unh.edu, lylavoie@iol.unh.edu",
+                            "added": "dpdklab, lylavoie",
                             "field_name": "cc"
                         }
                     ],
-                    "who": "lylavoie@iol.unh.edu"
-                },
-                {
-                    "when": "2020-12-17T14:07:28Z",
-                    "changes": [
-                        {
-                            "removed": "ci@dpdk.org",
-                            "field_name": "assigned_to",
-                            "added": "thomas@monjalon.net"
-                        }
-                    ],
-                    "who": "lylavoie@iol.unh.edu"
+                    "who": "lylavoie"
                 }
             ],
             "id": 511,
@@ -467,19 +421,16 @@ Categories could include:
 
 	httpClientProviderMock.On("Request", historyUrl, "GET",
 		mock.Anything, mock.Anything, mock.Anything).Return(
-			200, hisByte, nil)
+		200, hisByte, nil)
 
-
-
-	//history := hisResult.Bugs[0].History
 
 	// arrange attachments
-	attachmentUrl := fmt.Sprintf("%s/%v/%s", url, id, "attachment")
+	attachmentUrl := fmt.Sprintf("%srest/bug/%v/%s", url, id, "attachment")
 
 	attaSt := `{
     "bugs": {
         "511": []
-    },
+    }
 }`
 	attaByte := []byte(attaSt)
 
@@ -490,16 +441,37 @@ Categories could include:
 	}
 	httpClientProviderMock.On("Request", attachmentUrl, "GET",
 		mock.Anything, mock.Anything, mock.Anything).Return(
-			200, attaByte, nil)
+		200, attaByte, nil)
 
-	//attachment := attachmentResult.Bugs[strconv.Itoa(id)]
 
 	srv := NewFetcher(httpClientProviderMock)
 	var bugs []BugzillaRestRaw
-	bugs, err = srv.FetchAll(url, date, limit, offset)
-	fmt.Println(bugs)
+	bugs, err = srv.FetchAll(url, date, limit, offset, expecRaw[0].MetadataTimestamp)
+	if err != nil {
+		t.Error(err)
+	}
 
+	origin := fmt.Sprintf("%srest/bug", url)
+
+	// generate UUID
+	uid, err := uuid.Generate(origin, strconv.Itoa(id))
+	if err != nil {
+		t.Error(err)
+	}
+	expecRaw[0].UUID = uid
+
+	fmt.Println(expecRaw[0].Timestamp)
+fmt.Println(bugs[0].Timestamp)
+	expect := expecRaw[0].Data
+	act := bugs[0].Data
 	assert.NoError(t, err)
+	assert.Equal(t, expecRaw[0].MetadataTimestamp, bugs[0].MetadataTimestamp)
+	assert.Equal(t, expecRaw[0], bugs[0] )
+	assert.Equal(t, *expecRaw[0].Data.History , *bugs[0].Data.History )
+	assert.Equal(t, expecRaw[0].Data.Comments , bugs[0].Data.Comments )
+	assert.Equal(t, expecRaw[0].Data.Attachments , bugs[0].Data.Attachments )
+	assert.Equal(t, expecRaw[0].Data.LastChangeTime, bugs[0].Data.LastChangeTime)
+	assert.Equal(t, expect.Cc, act.Cc)
 
 }
 

@@ -24,7 +24,7 @@ type Comment struct {
 type Comments []Comment
 
 type AttachmentRes struct {
-	Bugs map[string][]Attachment
+	Bugs map[string][]Attachment `json:"bugs"`
 }
 
 type HistoryRes struct {
@@ -78,7 +78,7 @@ type BugzillaRestRaw struct {
 	Origin                   string `json:"origin"`
 	BackendVersion           string `json:"backend_version"`
 	Tag                      string `json:"tag"`
-	TimeStamp                float64 `json:"time_stamp"`
+	Timestamp                float64 `json:"timestamp"`
 	MetadataTimestamp        time.Time `json:"metadata__timestamp"`
 }
 
@@ -87,7 +87,7 @@ type FetchedBugs struct {
 }
 
 type BugData struct {
-	History             []History `json:"history"`
+	History             *[]History `json:"history"`
 	Resolution          string `json:"resolution"`
 	Priority            string `json:"priority"`
 	Keywords            []string `json:"keywords"`
@@ -157,9 +157,10 @@ func NewFetcher(httpClientProvider HTTPClientProvider) *Fetcher {
 }
 
 // FetchItem fetches bug item
-func (f *Fetcher) FetchAll(url string, date string, limit string, offset string) ([]BugzillaRestRaw, error) {
+func (f *Fetcher) FetchAll(origin string, date string, limit string, offset string, now time.Time) ([]BugzillaRestRaw, error) {
 
-	d := fmt.Sprintf("%s?include_fields=_extra,_default&last_change_time=%s&limit=%s&offset=%s&", url, date, limit, offset)
+	url := fmt.Sprintf("%s", origin)
+	d := fmt.Sprintf("%srest/bug?include_fields=_extra,_default&last_change_time=%s&limit=%s&offset=%s&", url, date, limit, offset)
 
 	// fetch all bugs from a specific date
 	_, res, err := f.HTTPClientProvider.Request(d, "GET", nil, nil, nil)
@@ -173,25 +174,22 @@ func (f *Fetcher) FetchAll(url string, date string, limit string, offset string)
 		return nil, err
 	}
 
-	fmt.Println("bugs ===")
-	fmt.Println(len(result.Bugs))
-
 	data := make([]BugzillaRestRaw, 0)
 	for _, bug := range result.Bugs {
-		bugRaw, err := f.FetchItem(url, bug.ID, bug)
+		bugRaw, err := f.FetchItem(url, bug.ID, bug, now)
 		if err != nil {
 			return nil, err
 		}
 		data = append(data, *bugRaw)
-		fmt.Println("bug no :")
-		fmt.Println(bug.ID)
 	}
 
 	return data, nil
 }
 
 // FetchItem fetches bug item
-func (f *Fetcher) FetchItem(url string, bugId int, fetchedBug BugData) (*BugzillaRestRaw, error) {
+func (f *Fetcher) FetchItem(origin string, bugId int, fetchedBug BugData, now time.Time) (*BugzillaRestRaw, error) {
+
+	url := fmt.Sprintf("%srest/bug", origin)
 
 	// fetch bug comments
 	comments, err := f.fetchComments(url, bugId)
@@ -221,7 +219,7 @@ func (f *Fetcher) FetchItem(url string, bugId int, fetchedBug BugData) (*Bugzill
 
 	bugRaw.UUID = uid
 	bugRaw.Data.Comments = comments
-	bugRaw.Data.History = history
+	bugRaw.Data.History = &history
 	bugRaw.Data.Attachments = attachments
 
 	bugRaw.Data.ID = fetchedBug.ID
@@ -272,18 +270,24 @@ func (f *Fetcher) FetchItem(url string, bugId int, fetchedBug BugData) (*Bugzill
 	// todo : BackendName, BackendVersion will be a param
 	bugRaw.BackendName = "bugzillarest"
 	bugRaw.BackendVersion = "0.0.1"
-	bugRaw.Origin = url
-	bugRaw.Tag = url
+	bugRaw.Origin = origin
+	bugRaw.Tag = origin
+	bugRaw.Data.Cc = fetchedBug.Cc
+	bugRaw.Data.CcDetail = fetchedBug.CcDetail
+	bugRaw.Data.AssignedTo = fetchedBug.AssignedTo
+	bugRaw.Data.AssignedToDetail = fetchedBug.AssignedToDetail
 
-	now := time.Now()
 	bugRaw.MetadataTimestamp = now.UTC()
-	bugRaw.TimeStamp = utils.ConvertTimeToFloat(bugRaw.MetadataTimestamp)
-
+	bugRaw.Timestamp = utils.ConvertTimeToFloat(bugRaw.MetadataTimestamp)
+fmt.Println("=====xx")
+	fmt.Println(bugRaw.Timestamp)
 	return &bugRaw, nil
 }
 
 func (f *Fetcher) fetchComments(url string, id int) (Comments, error) {
 	commentsUrl := fmt.Sprintf("%s/%v/%s", url, id, "comment")
+	fmt.Println("fetch")
+	fmt.Println(commentsUrl)
 	_, res, err := f.HTTPClientProvider.Request(commentsUrl, "GET", nil, nil, nil)
 	if err != nil {
 		return nil, err

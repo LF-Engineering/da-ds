@@ -67,7 +67,7 @@ func (e *Enricher) EnrichItem(rawItem BugzillaRestRaw, now time.Time) (*BugRestE
 
 	enriched.Changes = 0
 	// count history changes
-	for _, history := range rawItem.Data.History {
+	for _, history := range *rawItem.Data.History {
 		if len(history.Changes) > 0 {
 			enriched.Changes += len(history.Changes)
 		}
