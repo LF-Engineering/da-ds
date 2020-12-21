@@ -55,7 +55,7 @@ func (e *Enricher) EnrichItem(rawItem BugzillaRestRaw, now time.Time) (*BugRestE
 	enriched.MetadataBackendVersion = e.BackendVersion
 	enriched.ISBugzillarestBugrest = 1
 	enriched.Origin = rawItem.Origin
-	enriched.URL = rawItem.Origin + "/show_bug.cgi?id=" + fmt.Sprint(rawItem.Data.ID)
+	enriched.URL = rawItem.Origin + "show_bug.cgi?id=" + fmt.Sprint(rawItem.Data.ID)
 	enriched.CreationDate = rawItem.Data.CreationTime
 	enriched.Status = rawItem.Data.Status
 	enriched.CreationTs = rawItem.Data.CreationTime.Format("2006-01-02T15:04:05")

@@ -26,7 +26,7 @@ func TestFetchAll(t *testing.T) {
 	bugsUrl := fmt.Sprintf("%srest/bug?include_fields=_extra,_default&last_change_time=%s&limit=%s&offset=%s&", url, date, limit, offset)
 
 	httpClientProviderMock := &mocks.HTTPClientProvider{}
-
+	eSClientProvider := &mocks.ESClientProvider{}
 	type test struct {
 		name     string
 		expected string
@@ -39,7 +39,7 @@ func TestFetchAll(t *testing.T) {
           "tag" : "https://bugs.dpdk.org/",
           "origin" : "https://bugs.dpdk.org/",
           "classified_fields_filtered" : null,
-          "metadata__updated_on" : "2020-07-30T13:29:50Z",
+          "metadata__updated_on" : "2020-12-17T14:07:28Z",
           "updated_on" : 1.608214048e+09,
           "backend_name" : "bugzillarest",
           "metadata__timestamp" : "2020-12-20T18:32:58.68373Z",
@@ -443,10 +443,13 @@ func TestFetchAll(t *testing.T) {
 		mock.Anything, mock.Anything, mock.Anything).Return(
 		200, attaByte, nil)
 
-
-	srv := NewFetcher(httpClientProviderMock)
+	params := &Params{
+		Endpoint:   "https://bugs.dpdk.org/",
+		BackendVersion: "0.0.1",
+	}
+	srv := NewFetcher( *params, httpClientProviderMock, eSClientProvider)
 	var bugs []BugzillaRestRaw
-	bugs, err = srv.FetchAll(url, date, limit, offset, expecRaw[0].MetadataTimestamp)
+	bugs,_, err = srv.FetchAll(url, date, limit, offset, expecRaw[0].MetadataTimestamp)
 	if err != nil {
 		t.Error(err)
 	}
@@ -460,8 +463,6 @@ func TestFetchAll(t *testing.T) {
 	}
 	expecRaw[0].UUID = uid
 
-	fmt.Println(expecRaw[0].Timestamp)
-fmt.Println(bugs[0].Timestamp)
 	expect := expecRaw[0].Data
 	act := bugs[0].Data
 	assert.NoError(t, err)
@@ -472,6 +473,8 @@ fmt.Println(bugs[0].Timestamp)
 	assert.Equal(t, expecRaw[0].Data.Attachments , bugs[0].Data.Attachments )
 	assert.Equal(t, expecRaw[0].Data.LastChangeTime, bugs[0].Data.LastChangeTime)
 	assert.Equal(t, expect.Cc, act.Cc)
+	assert.Equal(t, expecRaw[0].Timestamp, bugs[0].Timestamp)
+	assert.Equal(t, expecRaw[0].MetadataUpdatedOn,bugs[0].MetadataUpdatedOn)
 
 }
 

@@ -292,7 +292,7 @@ func TestEnrichItem(t *testing.T) {
           "creator" : "Qian",
           "assigned_to_detail_user_name" : "",
           "changed_date" : "2017-09-14T09:46:38Z",
-          "url" : "https://bugs.dpdk.org//show_bug.cgi?id=3",
+          "url" : "https://bugs.dpdk.org/show_bug.cgi?id=3",
           "is_open" : false,
           "id" : 3,
           "creator_detail_gender" : "Unknown",
