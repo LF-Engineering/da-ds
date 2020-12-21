@@ -10,40 +10,15 @@ import (
 	jsoniter "github.com/json-iterator/go"
 )
 
-type AttachmentRes struct {
-	Bugs map[string][]Attachment `json:"bugs"`
-}
-
-type HistoryRes struct {
-	Bugs []HistoryBug
-}
-
-type HistoryBug struct {
-	ID      int
-	History []History
-	Alias   []string
-}
-
-type History struct {
-	Changes []Change
-	Who     string
-	When    time.Time
-}
-
-type Change struct {
-	Added        string
-	Removed      string
-	FieldName    string
-	AttachmentID *string
-}
 
 // HTTPClientProvider used in connecting to remote http server
 type HTTPClientProvider interface {
 	Request(url string, method string, header map[string]string, body []byte, params map[string]string) (statusCode int, resBody []byte, err error)
 }
 
+// Fetcher
 type Fetcher struct {
-	DSName                string
+	dSName                string
 	HTTPClientProvider    HTTPClientProvider
 	ElasticSearchProvider ESClientProvider
 	BackendVersion        string
@@ -69,7 +44,7 @@ func NewFetcher(params Params, httpClientProvider HTTPClientProvider, esClientPr
 		ElasticSearchProvider: esClientProvider,
 		BackendVersion:        params.BackendVersion,
 		Endpoint:              params.Endpoint,
-		DSName:                BugzillaRest,
+		dSName:                BugzillaRest,
 	}
 }
 
@@ -191,7 +166,7 @@ func (f *Fetcher) FetchItem(origin string, bugId int, fetchedBug BugData, now ti
 	bugRaw.UpdatedOn = utils.ConvertTimeToFloat(fetchedBug.LastChangeTime)
 	bugRaw.Category = Category
 
-	bugRaw.BackendName = f.DSName
+	bugRaw.BackendName = f.dSName
 	bugRaw.BackendVersion = f.BackendVersion
 	bugRaw.Origin = origin
 	bugRaw.Tag = origin

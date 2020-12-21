@@ -2,6 +2,7 @@ package bugzillarest
 
 import "time"
 
+//Attachment describe bug attachment
 type Attachment struct {
 	Data           string
 	Size           int
@@ -19,6 +20,7 @@ type Attachment struct {
 	Flags          []string
 }
 
+// BugzillaRestRaw bugzilla rest raw data
 type BugzillaRestRaw struct {
 	Data                     BugData `json:"data"`
 	UUID                     string `json:"uuid"`
@@ -34,10 +36,12 @@ type BugzillaRestRaw struct {
 	MetadataTimestamp        time.Time `json:"metadata__timestamp"`
 }
 
+// FetchedBugs bugs fetched from bugzilla rest api
 type FetchedBugs struct {
 	Bugs []BugData
 }
 
+// BugData single bug data
 type BugData struct {
 	History             *[]History `json:"history"`
 	Resolution          string `json:"resolution"`
@@ -86,6 +90,7 @@ type BugData struct {
 	AssignedToDetail    *PersonDetail `json:"assigned_to_detail"`
 }
 
+// PersonDetail describe user data
 type PersonDetail struct {
 	Name     string `json:"name"`
 	RealName string `json:"real_name"`
@@ -170,7 +175,7 @@ type BugRestEnrich struct {
 	ID                    int       `json:"id"`
 }
 
-
+// Comment describe comment details
 type Comment struct {
 	ID           int
 	Creator      string
@@ -182,8 +187,42 @@ type Comment struct {
 	Tags         []string
 }
 
+// Comments slice of bug comments
 type Comments []Comment
 
+// AttachmentRes response from bug attachment api
+type AttachmentRes struct {
+	Bugs map[string][]Attachment `json:"bugs"`
+}
+
+// HistoryRes response from bug history api
+type HistoryRes struct {
+	Bugs []HistoryBug
+}
+
+// HistoryBug bug history
+type HistoryBug struct {
+	ID      int
+	History []History
+	Alias   []string
+}
+
+// History single bug history data
+type History struct {
+	Changes []Change
+	Who     string
+	When    time.Time
+}
+
+// Change history element changes data
+type Change struct {
+	Added        string
+	Removed      string
+	FieldName    string
+	AttachmentID *string
+}
+
+// RawHits hits returned from elastic
 type RawHits struct {
 	Hits NHits `json:"hits"`
 }

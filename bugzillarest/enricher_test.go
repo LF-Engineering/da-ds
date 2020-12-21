@@ -26,7 +26,7 @@ func TestEnrichItem(t *testing.T) {
           "classified_fields_filtered" : null,
           "updated_on" : 1505382398,
           "category" : "bug",
-          "backend_name" : "BugzillaREST",
+          "backend_name" : "BugzillarestEnrich",
           "data" : {
             "history" : [
               {
@@ -232,7 +232,7 @@ func TestEnrichItem(t *testing.T) {
           "status" : "RESOLVED",
           "delta_ts" : "2017-09-14T09:46:38Z",
           "main_description" : "Test bug",
-          "metadata__backend_name" : "BugzillaRESTEnrich",
+          "metadata__backend_name" : "BugzillarestEnrich",
           "author_user_name" : "",
           "number_of_comments" : 0,
           "author_bot" : false,

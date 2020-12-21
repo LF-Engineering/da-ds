@@ -27,7 +27,7 @@ type IdentityProvider interface {
 func NewEnricher(identProvider IdentityProvider, backendVersion string, project string) *Enricher {
 	return &Enricher{
 		identityProvider: identProvider,
-		DSName:           "BugzillaREST",
+		DSName:           BugzillaRest,
 		BackendVersion:   backendVersion,
 		Project:          project,
 	}
@@ -65,8 +65,8 @@ func (e *Enricher) EnrichItem(rawItem BugzillaRestRaw, now time.Time) (*BugRestE
 		enriched.Whiteboard = &rawItem.Data.Whiteboard
 	}
 
-	enriched.Changes = 0
 	// count history changes
+	enriched.Changes = 0
 	for _, history := range *rawItem.Data.History {
 		if len(history.Changes) > 0 {
 			enriched.Changes += len(history.Changes)
@@ -105,19 +105,19 @@ func (e *Enricher) EnrichItem(rawItem BugzillaRestRaw, now time.Time) (*BugRestE
 
 			if assignedTo.Gender != nil {
 				enriched.AssignedToDetailGender = *assignedTo.Gender
-			} else if assignedTo.Gender == nil {
+			} else {
 				enriched.AssignedToDetailGender = unknown
 			}
 
 			if assignedTo.GenderACC != nil {
 				enriched.AssignedToDetailGenderAcc = *assignedTo.GenderACC
-			} else if assignedTo.GenderACC == nil {
+			} else {
 				enriched.AssignedToDetailGenderAcc = 0
 			}
 			if assignedTo.OrgName != nil {
 				enriched.AssignedToDetailOrgName = *assignedTo.OrgName
 				enriched.AssignedToOrgName = *assignedTo.OrgName
-			} else if assignedTo.OrgName == nil {
+			} else {
 				enriched.AssignedToDetailOrgName = unknown
 				enriched.AssignedToOrgName = unknown
 			}
@@ -161,21 +161,23 @@ func (e *Enricher) EnrichItem(rawItem BugzillaRestRaw, now time.Time) (*BugRestE
 			if creator.Gender != nil {
 				enriched.CreatorDetailGender = *creator.Gender
 				enriched.AuthorGender = *creator.Gender
-			} else if creator.Gender == nil {
+			} else  {
 				enriched.CreatorDetailGender = unknown
 				enriched.AuthorGender = unknown
 			}
+
 			if creator.GenderACC != nil {
 				enriched.CreatorDetailGenderACC = *creator.GenderACC
 				enriched.AuthorGenderAcc = *creator.GenderACC
-			} else if creator.GenderACC == nil {
+			} else {
 				enriched.CreatorDetailGenderACC = 0
 				enriched.AuthorGenderAcc = 0
 			}
+
 			if creator.OrgName != nil {
 				enriched.CreatorDetailOrgName = *creator.OrgName
 				enriched.AuthorOrgName = *creator.OrgName
-			} else if creator.OrgName == nil {
+			} else {
 				enriched.CreatorDetailOrgName = unknown
 				enriched.AuthorOrgName = unknown
 			}
