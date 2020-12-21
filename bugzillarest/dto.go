@@ -34,6 +34,9 @@ type BugzillaRestRaw struct {
 	Tag                      string `json:"tag"`
 	Timestamp                float64 `json:"timestamp"`
 	MetadataTimestamp        time.Time `json:"metadata__timestamp"`
+	ActualTime int `json:"actual_time"`
+	EstimatedTime int `json:"estimated_time"`
+	RemainingTime int `json:"remaining_time"`
 }
 
 // FetchedBugs bugs fetched from bugzilla rest api
