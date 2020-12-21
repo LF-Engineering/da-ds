@@ -308,13 +308,6 @@ func (ctx *Ctx) Validate() (err error) {
 	if strings.HasSuffix(ctx.ESURL, "/") {
 		ctx.ESURL = ctx.ESURL[:len(ctx.ESURL)-1]
 	}
-	// todo: delete it later
-	/*if !ctx.NoRaw && ctx.RawIndex == "" {
-		return fmt.Errorf("you must specify raw index name unless skipping raw processing")
-	}
-	if ctx.Enrich && ctx.RichIndex == "" {
-		return fmt.Errorf("you must specify rich index name unless skipping enrichment")
-	}*/
 	return
 }
 
