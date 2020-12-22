@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/LF-Engineering/da-ds/jenkins"
 	"math/rand"
 	"time"
 
@@ -25,6 +26,12 @@ func runDS(ctx *lib.Ctx) (err error) {
 		manager, err := buildDockerhubManager(ctx)
 		if err != nil {
 			return err
+		}
+		return manager.Sync()
+	case jenkins.Jenkins:
+		manager, err := buildJenkinsManager(ctx)
+		if err != nil {
+			return
 		}
 		return manager.Sync()
 	case lib.Git:
@@ -107,4 +114,27 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 
 	return dockerhub.NewManager(username, password, fetcherBackendVersion, enricherBackendVersion,
 		enrichOnly, enrich, esURL, timeout, repositories, fromDate, noIncremental), nil
+}
+
+func buildJenkinsManager(ctx *lib.Ctx) (*jenkins.Manager, error) {
+	fetcherBackendVersion := "0.0.1"  //ctx.Env("FETCHER_BACKEND_VERSION")
+	enricherBackendVersion := "0.0.1" //ctx.Env("ENRICHER_BACKEND_VERSION")
+	noIncremental := ctx.BoolEnv("NO_INCREMENTAL")
+	httpTimeout := ctx.Env("HTTP_TIMEOUT") // "60s" 60 seconds...
+	//example jenkinsJSON = `[{"username": "user", "password": "Admin123", "url":"https://jenkins.soramitsu.co.jp/job/iroha/job/iroha-hyperledger","project":"Iroha","index":"sds-hyperledger-iroha"}]`
+	jenkinsJSON := ctx.Env("JENKINS_JSON")
+	esURL := ctx.ESURL
+	enrichOnly := ctx.NoRaw
+	enrich := ctx.Enrich
+	fromDate := ctx.DateFrom
+	var buildServers []*jenkins.BuildServer
+	if err := jsoniter.Unmarshal([]byte(jenkinsJSON), &buildServers); err != nil {
+		return nil, err
+	}
+	timeout, err := time.ParseDuration(httpTimeout)
+	if err != nil {
+		return nil, err
+	}
+	return jenkins.NewManager(fetcherBackendVersion, enricherBackendVersion,
+		enrichOnly, enrich, esURL, timeout, buildServers, fromDate, noIncremental), nil
 }
