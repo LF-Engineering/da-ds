@@ -13,12 +13,16 @@ import (
 )
 
 const (
+	// MessageDateField ...
 	MessageDateField            = "date"
+	// MessageIDField ...
 	MessageIDField              = "Message-ID"
+	// MessageReceivedField ...
 	MessageReceivedField        = "received"
+	// MaxMessageBodyLength ...
 	MaxMessageBodyLength = 1000
-	// MBoxDropXFields - drop fields starting with X- - to avoid ES 1000 fields limit
-	MBoxDropXFields = true
+	// DropXFields - drop fields starting with X- - to avoid ES 1000 fields limit
+	DropXFields = true
 	// MaxMessageProperties maximum properties that can be set on the message object
 	MaxMessageProperties = 255
 	// ContentType - common constant string
@@ -74,12 +78,8 @@ var (
 	// Can be 3 disgits or 3 digits then whitespace and then anything
 	TZOffsetRE = regexp.MustCompile(`^(\d{3})(\s+.*$|$)`)
 
-	MessageLineSeparator = []byte("\r\n")
+	MessageLineSeparator = []byte("\n")
 )
-
-func main() {
-
-}
 
 // ParseMBoxMsg - parse a raw MBox message into object to be inserted into raw ES
 func ParseMBoxMsg(Debug int, groupName string, msg []byte) (item map[string]interface{}, valid, warn bool) {
@@ -610,7 +610,6 @@ func ParseMBoxMsg(Debug int, groupName string, msg []byte) (item map[string]inte
 			return
 		}
 	}
-	// item["Date"] = dt
 	item[MessageDateField] = dt
 	item["date_tz"] = tz
 	item["date_in_tz"] = dttz
@@ -657,7 +656,7 @@ func ParseMBoxMsg(Debug int, groupName string, msg []byte) (item map[string]inte
 		}
 		lib.Printf("#%d: %s %s %d\n", i, string(body.ContentType), propertiesString(body.Properties), len(body.Data))
 	}
-	if MBoxDropXFields {
+	if DropXFields {
 		ks := []string{}
 		for k := range item {
 			lk := strings.ToLower(k)
