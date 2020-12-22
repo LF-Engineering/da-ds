@@ -115,10 +115,12 @@ func (e *Enricher) EnrichItem(rawItem JenkinsRaw, project string, now time.Time)
 			enriched.Testproject = jobParts[0]
 			enriched.Installer = jobParts[1]
 		}
+		enriched.Loop = jobParts[len(jobParts)-2]
+		enriched.Branch = jobParts[len(jobParts)-1]
 	}
-	enriched.Pod = jobParts[len(jobParts)-3]
-	enriched.Loop = jobParts[len(jobParts)-2]
-	enriched.Branch = jobParts[len(jobParts)-1]
+	if len(jobParts) >= 3 {
+		enriched.Pod = jobParts[len(jobParts)-3]
+	}
 	return &enriched, nil
 }
 
