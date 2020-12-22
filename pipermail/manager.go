@@ -22,19 +22,15 @@ type Manager struct {
 	Links                  []*Link       `json:"links,omitempty"`
 	FromDate               *time.Time    `json:"from_date,omitempty"`
 	NoIncremental          bool          `json:"no_incremental,omitempty"`
-	DS           string `json:"ds,omitempty"`
-	Email        string `json:"email,omitempty"`
-	NoSSLVerify  bool   `json:"no_ssl_verify,omitempty"`
-	SaveArchives bool   `json:"save_archives,omitempty"`
-	ArchPath     string `json:"arch_path,omitempty"`
-	MultiOrigin  bool   `json:"multi_origin,omitempty"`
 }
 
 // Link represents piper mail link data
 type Link struct {
-	Link    string `json:"Link"`
-	Project string `json:"Project"`
-	ESIndex string `json:"ESIndex"`
+	Link        string `json:"Link"`
+	Project     string `json:"Project"`
+	ESIndex     string `json:"ESIndex"`
+	GroupName   string `json:"GroupName"`
+	ProjectSlug string `json:"ProjectSlug"`
 }
 
 // NewManager initiates piper mail manager instance
@@ -71,26 +67,39 @@ func (m *Manager) Sync() error {
 		return errors.New("no links found")
 	}
 
-	fetcher, _, _, err := buildServices(m)
+	fetcher, _, esClientProvider, err := buildServices(m)
 	if err != nil {
 		return err
 	}
 
-
 	if !m.EnrichOnly {
-		//data := make([]*utils.BulkData, 0)
+		data := make([]*utils.BulkData, 0)
 
 		// fetch data
 		for _, link := range m.Links {
 			// Fetch data for single link
-			_, err = fetcher.FetchItem("", link.Link, time.Now())
+			raw, err := fetcher.FetchItem(link.ProjectSlug, link.GroupName, link.Link, time.Now())
 			if err != nil {
-				return fmt.Errorf("could not fetch data arcchives from link: %s-%s",err.Error(), link.Link)
+				return fmt.Errorf("could not fetch data arcchives from link: %s-%s", err.Error(), link.Link)
+			}
+
+			for _, message := range raw {
+				data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s-raw", link.ESIndex), ID: message.UUID, Data: message})
+			}
+
+			// set mapping and create index if not exists
+			_ = fetcher.HandleMapping(fmt.Sprintf("%s-raw", link.ESIndex))
+		}
+
+		if len(data) > 0 {
+			// Insert raw data to elasticsearch
+			_, err = esClientProvider.BulkInsert(data)
+			if err != nil {
+				return err
 			}
 		}
 
 	}
-
 
 	return nil
 }
@@ -99,6 +108,7 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 	httpClientProvider := utils.NewHTTPClientProvider(m.HTTPTimeout)
 	params := &Params{
 		BackendVersion: m.FetcherBackendVersion,
+		Links:          m.Links,
 	}
 	esClientProvider, err := utils.NewESClientProvider(&utils.ESParams{
 		URL:      m.ESUrl,

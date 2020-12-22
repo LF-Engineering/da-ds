@@ -5,34 +5,43 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
+	"github.com/LF-Engineering/da-ds/mbox"
+	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	lib "github.com/LF-Engineering/da-ds"
 	"github.com/LF-Engineering/da-ds/utils"
 )
 
-// Fetcher contains pipermail datasource fetch logic
+// Fetcher contains piper mail datasource fetch logic
 type Fetcher struct {
-	DSName                string // Datasource will be used as key for ES
+	DSName                string
 	IncludeArchived       bool
-	MultiOrigin           bool // can we store multiple endpoints in a single index?
 	HTTPClientProvider    HTTPClientProvider
 	ElasticSearchProvider ESClientProvider
-	Project               string
-	Token                 string
 	BackendVersion        string
+	Debug                 int
+	DateFrom              time.Time
+	Links                 []*Link
 }
 
 // Params required parameters for piper mail fetcher
 type Params struct {
 	FromDate       time.Time
 	BackendVersion string
+	Project        string
+	Debug          int
+	ProjectSlug    string
+	GroupName      string
+	Links          []*Link
 }
 
 // HTTPClientProvider used in connecting to remote http server
@@ -58,6 +67,8 @@ func NewFetcher(params *Params, httpClientProvider HTTPClientProvider, esClientP
 		HTTPClientProvider:    httpClientProvider,
 		ElasticSearchProvider: esClientProvider,
 		BackendVersion:        params.BackendVersion,
+		Debug:                 params.Debug,
+		Links:                 params.Links,
 	}
 }
 
@@ -122,8 +133,8 @@ func (f *Fetcher) Fetch(url string, fromDate *time.Time) (map[string]string, err
 }
 
 // FetchItem extracts data from archives
-func (f *Fetcher) FetchItem(owner string, link string, now time.Time) (interface{}, error) {
-
+func (f *Fetcher) FetchItem(slug, groupName, link string, now time.Time) ([]*RawMessage, error) {
+	var allMsgs []*RawMessage
 	archives, err := f.Fetch(link, &DefaultDateTime)
 	if err != nil {
 		return nil, err
@@ -135,10 +146,9 @@ func (f *Fetcher) FetchItem(owner string, link string, now time.Time) (interface
 	if err != nil || statusCode != http.StatusOK {
 		return nil, err
 	}
-	fmt.Printf("\n\n statusCode: %+v \n\n", statusCode)
 
 	for _, filePath := range archives {
-		f, err := os.Open(filePath)
+		fl, err := os.Open(filePath)
 		if err != nil {
 			lib.Printf("os.Open: %+v", err)
 			return nil, err
@@ -155,7 +165,7 @@ func (f *Fetcher) FetchItem(owner string, link string, now time.Time) (interface
 
 		// Create new reader to decompress gzip.
 		if baseExtension == ".gz" {
-			decompressedFileContentReader, err = gzip.NewReader(f)
+			decompressedFileContentReader, err = gzip.NewReader(fl)
 			if err != nil {
 				lib.Printf("\nfilePath: %+v\n", filePath)
 				lib.Printf("\ngzip.NewReader: %+v\n", err)
@@ -204,7 +214,7 @@ func (f *Fetcher) FetchItem(owner string, link string, now time.Time) (interface
 			lib.Printf("zipWriter.Close: %+v", err)
 			return nil, err
 		}
-		ioutil.WriteFile(filename+".zip", buf.Bytes(), 0777)
+		//ioutil.WriteFile(filename+".zip", buf.Bytes(), 0777)
 
 		nBytes := int64(len(buf.Bytes()))
 		bytesReader := bytes.NewReader(buf.Bytes())
@@ -230,16 +240,135 @@ func (f *Fetcher) FetchItem(owner string, link string, now time.Time) (interface
 				return nil, err
 			}
 			fmt.Printf("%s uncompressed %d bytes\n", file.Name, len(data))
-			ary := bytes.Split(data, []byte(Separator))
+			ary := bytes.Split(data, MessageSeparator)
 			fmt.Printf("%s # of messages: %d\n", file.Name, len(ary))
 			messages = append(messages, ary...)
 		}
+		fmt.Printf("number of messages to parse: %d\n", len(messages))
+
+		var (
+			statMtx *sync.Mutex
+		)
+		thrN := 3
+		empty := 0
+		warns := 0
+		invalid := 0
+		filtered := 0
+		if thrN > 1 {
+			statMtx = &sync.Mutex{}
+		}
+		stat := func(emp, warn, valid, oor bool) {
+			if thrN > 1 {
+				statMtx.Lock()
+			}
+			if emp {
+				empty++
+			}
+			if warn {
+				warns++
+			}
+			if !valid {
+				invalid++
+			}
+			if oor {
+				filtered++
+			}
+			if thrN > 1 {
+				statMtx.Unlock()
+			}
+		}
+		processMsg := func(c chan error, msg []byte, link string) (wch chan error, e error) {
+			defer func() {
+				if c != nil {
+					c <- e
+				}
+			}()
+			nBytes := len(msg)
+			if nBytes < len(MessageSeparator) {
+				stat(true, false, false, false)
+				return
+			}
+			if !bytes.HasPrefix(msg, MessageSeparator[1:]) {
+				msg = append(MessageSeparator[1:], msg...)
+			}
+			var (
+				valid   bool
+				warn    bool
+				message map[string]interface{}
+			)
+			message, valid, warn = mbox.ParseMBoxMsg(2, groupName, msg)
+			stat(false, warn, valid, false)
+			if !valid {
+				return
+			}
+			from := f.DateFrom
+			updatedOn := f.ItemUpdatedOn(message)
+			if &f.DateFrom != nil && updatedOn.Before(from) {
+				stat(false, false, false, true)
+				return
+			}
+			rawMessage := f.AddMetadata(message, slug, groupName, link)
+			allMsgs = append(allMsgs, rawMessage)
+			return
+		}
+
+		for _, message := range messages {
+			_, err = processMsg(nil, message, link)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		if empty > 0 {
+			lib.Printf("%d empty messages\n", empty)
+		}
+		if warns > 0 {
+			lib.Printf("%d parse message warnings\n", warns)
+		}
+		if invalid > 0 {
+			lib.Printf("%d invalid messages\n", invalid)
+		}
+		if filtered > 0 {
+			lib.Printf("%d filtered messages (updated before %+v)\n", invalid, f.DateFrom)
+		}
+
 	}
 
-	return nil, nil
+	return allMsgs, nil
 }
 
-// HandleMapping updates pipermail raw mapping
+// AddMetadata - add metadata to the raw message
+func (f *Fetcher) AddMetadata(msg interface{}, slug, groupName, link string) *RawMessage {
+	timestamp := time.Now().UTC()
+	rawMessage := new(RawMessage)
+
+	rawMessage.BackendName = f.DSName
+	rawMessage.BackendVersion = PiperBackendVersion
+	rawMessage.Timestamp = utils.ConvertTimeToFloat(timestamp)
+	rawMessage.Origin = link
+	rawMessage.Tag = link
+	updatedOn := f.ItemUpdatedOn(msg)
+	rawMessage.UpdatedOn = utils.ConvertTimeToFloat(updatedOn)
+	rawMessage.Category = f.ItemCategory(msg)
+	rawMessage.SearchFields = &MessageSearchFields{
+		Name:   groupName,
+		ItemID: f.ItemID(msg),
+	}
+	rawMessage.GroupName = groupName
+	rawMessage.MetadataUpdatedOn = lib.ToESDate(updatedOn)
+	rawMessage.MetadataTimestamp = lib.ToESDate(timestamp)
+	rawMessage.ProjectSlug = slug
+	rawMessage.Data = msg
+	// generate UUID
+	uid, err := uuid.Generate(groupName, strconv.FormatFloat(utils.ConvertTimeToFloat(timestamp), 'f', -1, 64))
+	if err != nil {
+		fmt.Println(err)
+	}
+	rawMessage.UUID = uid
+	return rawMessage
+}
+
+// HandleMapping updates piper mail raw mapping
 func (f *Fetcher) HandleMapping(index string) error {
 	_, err := f.ElasticSearchProvider.CreateIndex(index, PipermailRawMapping)
 	return err
@@ -255,3 +384,36 @@ func (f *Fetcher) GetLastDate(link *Link, now time.Time) (time.Time, error) {
 	return lastDate, nil
 }
 
+// ItemID - return unique identifier for an item
+func (f *Fetcher) ItemID(item interface{}) string {
+	id, ok := item.(map[string]interface{})[MessageIDField].(string)
+	if !ok {
+		lib.Fatalf("%s: ItemID() - cannot extract %s from %+v", f.DSName, MessageIDField, lib.DumpKeys(item))
+	}
+	return id
+}
+
+// ItemUpdatedOn - return updated on date for an item
+func (f *Fetcher) ItemUpdatedOn(item interface{}) time.Time {
+	iUpdated, _ := lib.Dig(item, []string{MessageDateField}, true, false)
+	updated, ok := iUpdated.(time.Time)
+	if !ok {
+		lib.Fatalf("%s: ItemUpdatedOn() - cannot extract %s from %+v", f.DSName, MessageDateField, lib.DumpKeys(item))
+	}
+	return updated
+}
+
+// ItemCategory - return unique identifier for an item
+func (f *Fetcher) ItemCategory(item interface{}) string {
+	return Message
+}
+
+// ElasticRawMapping - Raw index mapping definition
+func (f *Fetcher) ElasticRawMapping() []byte {
+	return PiperRawMapping
+}
+
+// ElasticRichMapping - Rich index mapping definition
+func (f *Fetcher) ElasticRichMapping() []byte {
+	return PiperRichMapping
+}

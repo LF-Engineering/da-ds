@@ -29,10 +29,10 @@ type Total struct {
 
 // NestedHits result
 type NestedHits struct {
-	Index  string         `json:"_index"`
-	Type   string         `json:"_type"`
-	ID     string         `json:"_id"`
-	Score  float64        `json:"_score"`
+	Index string  `json:"_index"`
+	Type  string  `json:"_type"`
+	ID    string  `json:"_id"`
+	Score float64 `json:"_score"`
 }
 
 // Aggregations result
