@@ -446,7 +446,7 @@ func TestFetchAll(t *testing.T) {
 		BackendVersion: "0.0.1",
 	}
 	srv := NewFetcher(*params, httpClientProviderMock, eSClientProvider)
-	var bugs []BugzillaRestRaw
+	var bugs []Raw
 	bugs, _, err = srv.FetchAll(url, date, limit, offset, expecRaw[0].MetadataTimestamp)
 	if err != nil {
 		t.Error(err)
@@ -476,8 +476,8 @@ func TestFetchAll(t *testing.T) {
 
 }
 
-func toBugzillarestRaw(b string) ([]BugzillaRestRaw, error) {
-	expectedRaw := make([]BugzillaRestRaw, 0)
+func toBugzillarestRaw(b string) ([]Raw, error) {
+	expectedRaw := make([]Raw, 0)
 	err := jsoniter.Unmarshal([]byte(b), &expectedRaw)
 	return expectedRaw, err
 }

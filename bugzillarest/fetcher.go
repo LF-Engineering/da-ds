@@ -16,7 +16,7 @@ type HTTPClientProvider interface {
 	Request(url string, method string, header map[string]string, body []byte, params map[string]string) (statusCode int, resBody []byte, err error)
 }
 
-// Fetcher
+// Fetcher contains BugzillaRest fetch logic
 type Fetcher struct {
 	dSName                string
 	HTTPClientProvider    HTTPClientProvider
@@ -49,7 +49,7 @@ func NewFetcher(params Params, httpClientProvider HTTPClientProvider, esClientPr
 }
 
 // FetchAll fetches bug item including all nested fetches
-func (f *Fetcher) FetchAll(origin string, date string, limit string, offset string, now time.Time) ([]BugzillaRestRaw, *time.Time, error) {
+func (f *Fetcher) FetchAll(origin string, date string, limit string, offset string, now time.Time) ([]Raw, *time.Time, error) {
 
 	url := fmt.Sprintf("%s", origin)
 	bugsURL := fmt.Sprintf("%srest/bug?include_fields=_extra,_default&last_change_time=%s&limit=%s&offset=%s&", url, date, limit, offset)
@@ -66,7 +66,7 @@ func (f *Fetcher) FetchAll(origin string, date string, limit string, offset stri
 		return nil, nil, err
 	}
 
-	data := make([]BugzillaRestRaw, 0)
+	data := make([]Raw, 0)
 	var lastDate time.Time
 	if len(result.Bugs) != 0 {
 		lastDate = result.Bugs[0].LastChangeTime
@@ -86,7 +86,7 @@ func (f *Fetcher) FetchAll(origin string, date string, limit string, offset stri
 }
 
 // FetchItem fetches bug item
-func (f *Fetcher) FetchItem(origin string, bugID int, fetchedBug BugData, now time.Time) (*BugzillaRestRaw, error) {
+func (f *Fetcher) FetchItem(origin string, bugID int, fetchedBug BugData, now time.Time) (*Raw, error) {
 
 	url := fmt.Sprintf("%srest/bug", origin)
 
@@ -108,7 +108,7 @@ func (f *Fetcher) FetchItem(origin string, bugID int, fetchedBug BugData, now ti
 		return nil, err
 	}
 
-	var bugRaw BugzillaRestRaw
+	var bugRaw Raw
 
 	// generate UUID
 	uid, err := uuid.Generate(url, strconv.Itoa(bugID))
@@ -143,7 +143,7 @@ func (f *Fetcher) FetchItem(origin string, bugID int, fetchedBug BugData, now ti
 	bugRaw.Data.EstimatedTime = fetchedBug.EstimatedTime
 	bugRaw.Data.OpSys = fetchedBug.OpSys
 	bugRaw.Data.Severity = fetchedBug.Severity
-	bugRaw.Data.Url = fetchedBug.Url
+	bugRaw.Data.URL = fetchedBug.URL
 	bugRaw.Data.IsConfirmed = fetchedBug.IsConfirmed
 	bugRaw.Data.IsCreatorAccessible = fetchedBug.IsCreatorAccessible
 	bugRaw.Data.ActualTime = fetchedBug.ActualTime

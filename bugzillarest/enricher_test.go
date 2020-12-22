@@ -364,8 +364,8 @@ func toBugEnrich(b string) (*BugRestEnrich, error) {
 	return expectedEnrich, err
 }
 
-func toBugRaw(b string) (BugzillaRestRaw, error) {
-	expectedRaw := BugzillaRestRaw{}
+func toBugRaw(b string) (Raw, error) {
+	expectedRaw := Raw{}
 	err := jsoniter.Unmarshal([]byte(b), &expectedRaw)
 	return expectedRaw, err
 }

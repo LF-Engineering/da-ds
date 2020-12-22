@@ -2,9 +2,10 @@ package bugzillarest
 
 import (
 	"fmt"
-	"github.com/LF-Engineering/da-ds/utils"
 	"strings"
 	"time"
+
+	"github.com/LF-Engineering/da-ds/utils"
 
 	"github.com/LF-Engineering/da-ds/affiliation"
 )
@@ -34,7 +35,7 @@ func NewEnricher(identProvider IdentityProvider, backendVersion string, project 
 }
 
 // EnrichItem enrich Bugzilla raw item
-func (e *Enricher) EnrichItem(rawItem BugzillaRestRaw, now time.Time) (*BugRestEnrich, error) {
+func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error) {
 	enriched := &BugRestEnrich{}
 
 	enriched.Project = e.Project
@@ -161,7 +162,7 @@ func (e *Enricher) EnrichItem(rawItem BugzillaRestRaw, now time.Time) (*BugRestE
 			if creator.Gender != nil {
 				enriched.CreatorDetailGender = *creator.Gender
 				enriched.AuthorGender = *creator.Gender
-			} else  {
+			} else {
 				enriched.CreatorDetailGender = unknown
 				enriched.AuthorGender = unknown
 			}

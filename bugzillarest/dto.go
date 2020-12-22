@@ -20,23 +20,23 @@ type Attachment struct {
 	Flags          []string
 }
 
-// BugzillaRestRaw bugzilla rest raw data
-type BugzillaRestRaw struct {
-	Data                     BugData `json:"data"`
-	UUID                     string `json:"uuid"`
+// Raw bugzilla rest raw data
+type Raw struct {
+	Data                     BugData   `json:"data"`
+	UUID                     string    `json:"uuid"`
 	MetadataUpdatedOn        time.Time `json:"metadata__updated_on"`
-	ClassifiedFieldsFiltered *string `json:"classified_fields_filtered"`
-	UpdatedOn                float64 `json:"updated_on"`
-	BackendName              string `json:"backend_name"`
-	Category                 string `json:"category"`
-	Origin                   string `json:"origin"`
-	BackendVersion           string `json:"backend_version"`
-	Tag                      string `json:"tag"`
-	Timestamp                float64 `json:"timestamp"`
+	ClassifiedFieldsFiltered *string   `json:"classified_fields_filtered"`
+	UpdatedOn                float64   `json:"updated_on"`
+	BackendName              string    `json:"backend_name"`
+	Category                 string    `json:"category"`
+	Origin                   string    `json:"origin"`
+	BackendVersion           string    `json:"backend_version"`
+	Tag                      string    `json:"tag"`
+	Timestamp                float64   `json:"timestamp"`
 	MetadataTimestamp        time.Time `json:"metadata__timestamp"`
-	ActualTime int `json:"actual_time"`
-	EstimatedTime int `json:"estimated_time"`
-	RemainingTime int `json:"remaining_time"`
+	ActualTime               int       `json:"actual_time"`
+	EstimatedTime            int       `json:"estimated_time"`
+	RemainingTime            int       `json:"remaining_time"`
 }
 
 // FetchedBugs bugs fetched from bugzilla rest api
@@ -46,50 +46,50 @@ type FetchedBugs struct {
 
 // BugData single bug data
 type BugData struct {
-	History             *[]History `json:"history"`
-	Resolution          string `json:"resolution"`
-	Priority            string `json:"priority"`
-	Keywords            []string `json:"keywords"`
-	DependsOn           []string `json:"depends_on"`
-	Alias               []string `json:"alias"`
-	IsCcAccessible      bool `json:"is_cc_accessible"`
-	Duplicates          []int `json:"duplicates"`
-	SeeAlso             []string `json:"see_also"`
-	LastChangeTime      time.Time `json:"last_change_time"`
-	CreatorDetail       *PersonDetail `json:"creator_detail"`
-	Blocks              []int `json:"blocks"`
-	TargetMilestone     string `json:"target_milestone"`
-	Deadline            *string `json:"deadline"`
-	IsOpen              bool `json:"is_open"`
-	RemainingTime       int `json:"remaining_time"`
-	Flags               []string `json:"flags"`
-	Groups              []string `json:"groups"`
-	Component           string `json:"component"`
-	Platform            string `json:"platform"`
-	Comments            Comments `json:"comments"`
-	EstimatedTime       int `json:"estimated_time"`
-	OpSys               string `json:"op_sys"`
-	Severity            string `json:"severity"`
-	Url                 string `json:"url"`
-	Cc                  []string `json:"cc"`
-	IsConfirmed         bool `json:"is_confirmed"`
-	IsCreatorAccessible bool `json:"is_creator_accessible"`
-	ActualTime          int `json:"actual_time"`
-	AssignedTo          string `json:"assigned_to"`
-	DupeOf              *string`json:"dupe_of"`
-	Attachments         []Attachment `json:"attachments"`
-	Tags                []string `json:"tags"`
-	CreationTime        time.Time`json:"creation_time"`
-	Whiteboard          string `json:"whiteboard"`
+	History             *[]History     `json:"history"`
+	Resolution          string         `json:"resolution"`
+	Priority            string         `json:"priority"`
+	Keywords            []string       `json:"keywords"`
+	DependsOn           []string       `json:"depends_on"`
+	Alias               []string       `json:"alias"`
+	IsCcAccessible      bool           `json:"is_cc_accessible"`
+	Duplicates          []int          `json:"duplicates"`
+	SeeAlso             []string       `json:"see_also"`
+	LastChangeTime      time.Time      `json:"last_change_time"`
+	CreatorDetail       *PersonDetail  `json:"creator_detail"`
+	Blocks              []int          `json:"blocks"`
+	TargetMilestone     string         `json:"target_milestone"`
+	Deadline            *string        `json:"deadline"`
+	IsOpen              bool           `json:"is_open"`
+	RemainingTime       int            `json:"remaining_time"`
+	Flags               []string       `json:"flags"`
+	Groups              []string       `json:"groups"`
+	Component           string         `json:"component"`
+	Platform            string         `json:"platform"`
+	Comments            Comments       `json:"comments"`
+	EstimatedTime       int            `json:"estimated_time"`
+	OpSys               string         `json:"op_sys"`
+	Severity            string         `json:"severity"`
+	URL                 string         `json:"url"`
+	Cc                  []string       `json:"cc"`
+	IsConfirmed         bool           `json:"is_confirmed"`
+	IsCreatorAccessible bool           `json:"is_creator_accessible"`
+	ActualTime          int            `json:"actual_time"`
+	AssignedTo          string         `json:"assigned_to"`
+	DupeOf              *string        `json:"dupe_of"`
+	Attachments         []Attachment   `json:"attachments"`
+	Tags                []string       `json:"tags"`
+	CreationTime        time.Time      `json:"creation_time"`
+	Whiteboard          string         `json:"whiteboard"`
 	CcDetail            []PersonDetail `json:"cc_detail"`
 	Status              string
 	Summary             string
 	Classification      string
 	QaContact           string
-	Product             string `json:"product"`
-	ID                  int `json:"id"`
-	Creator             string `json:"creator"`
-	Version             string `json:"version"`
+	Product             string        `json:"product"`
+	ID                  int           `json:"id"`
+	Creator             string        `json:"creator"`
+	Version             string        `json:"version"`
 	AssignedToDetail    *PersonDetail `json:"assigned_to_detail"`
 }
 
@@ -102,20 +102,20 @@ type PersonDetail struct {
 
 // BugRestEnrich ...
 type BugRestEnrich struct {
-	UUID           string    `json:"uuid"`
-	Project        string    `json:"project"`
-	Changes        int       `json:"changes"`
-	Product        string    `json:"product"`
-	Component      string    `json:"component"`
-	Status         string    `json:"status"`
-	TimeOpenDays   float64   `json:"timeopen_days"`
-	ChangedDate    time.Time `json:"changed_date"`
-	Tag            string    `json:"tag"`
-	URL            string    `json:"url"`
-	CreationDate   time.Time `json:"creation_date"`
-	DeltaTs        time.Time `json:"delta_ts"`
-	Whiteboard     *string   `json:"whiteboard"`
-	AssignedTo      string    `json:"assigned_to"`
+	UUID         string    `json:"uuid"`
+	Project      string    `json:"project"`
+	Changes      int       `json:"changes"`
+	Product      string    `json:"product"`
+	Component    string    `json:"component"`
+	Status       string    `json:"status"`
+	TimeOpenDays float64   `json:"timeopen_days"`
+	ChangedDate  time.Time `json:"changed_date"`
+	Tag          string    `json:"tag"`
+	URL          string    `json:"url"`
+	CreationDate time.Time `json:"creation_date"`
+	DeltaTs      time.Time `json:"delta_ts"`
+	Whiteboard   *string   `json:"whiteboard"`
+	AssignedTo   string    `json:"assigned_to"`
 
 	CreatorDetailID           string   `json:"creator_detail_id"`
 	CreatorDetailUUID         string   `json:"creator_detail_uuid"`
@@ -139,8 +139,8 @@ type BugRestEnrich struct {
 	AuthorMultiOrgNames []string `json:"author_multi_org_names"`
 	AuthorBot           bool     `json:"author_bot"`
 
-	AssignedToUUID         string   `json:"assigned_to_uuid"`
-	AssignedToOrgName      string   `json:"assigned_to_org_name"`
+	AssignedToUUID    string `json:"assigned_to_uuid"`
+	AssignedToOrgName string `json:"assigned_to_org_name"`
 
 	AssignedToDetailID           string   `json:"assigned_to_detail_id"`
 	AssignedToDetailUUID         string   `json:"assigned_to_detail_uuid"`
@@ -167,15 +167,15 @@ type BugRestEnrich struct {
 	MetadataBackendName    string    `json:"metadata__backend_name"`
 	MetadataBackendVersion string    `json:"metadata__backend_version"`
 
-	ISBugzillarestBugrest int       `json:"is_bugzillarest_bugrest"`
-	CreationTs            string `json:"creation_ts"`
-	NumberOfComments      int       `json:"number_of_comments"`
-	Origin                string    `json:"origin"`
-	Offset                *string   `json:"offset"`
-	ProjectTs             float64   `json:"project_ts"`
-	Creator               string    `json:"creator"`
-	ISOpen                bool      `json:"is_open"`
-	ID                    int       `json:"id"`
+	ISBugzillarestBugrest int     `json:"is_bugzillarest_bugrest"`
+	CreationTs            string  `json:"creation_ts"`
+	NumberOfComments      int     `json:"number_of_comments"`
+	Origin                string  `json:"origin"`
+	Offset                *string `json:"offset"`
+	ProjectTs             float64 `json:"project_ts"`
+	Creator               string  `json:"creator"`
+	ISOpen                bool    `json:"is_open"`
+	ID                    int     `json:"id"`
 }
 
 // Comment describe comment details
@@ -238,5 +238,5 @@ type NHits struct {
 // NestedRawHits is the actual hit data
 type NestedRawHits struct {
 	ID     string `json:"_id"`
-	Source BugzillaRestRaw `json:"_source"`
+	Source Raw    `json:"_source"`
 }
