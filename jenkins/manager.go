@@ -26,9 +26,11 @@ type Manager struct {
 }
 
 type BuildServer struct {
-	URL  		string
-	project 	string
-	Index       string
+	Username    string	`json:"username"`
+	Password    string  `json:"password"`
+	URL  		string	`json:"url"`
+	Project 	string  `json:"project"`
+	Index       string  `json:"index"`
 }
 
 // NewManager initiates piper mail manager instance
@@ -39,6 +41,7 @@ func NewManager(
 	enrich bool,
 	eSUrl string,
 	httpTimeout time.Duration,
+	buildServers  []*BuildServer,
 	fromDate *time.Time,
 	noIncremental bool,
 ) *Manager {
@@ -49,6 +52,7 @@ func NewManager(
 		Enrich:                 enrich,
 		ESUrl:                  eSUrl,
 		HTTPTimeout:            httpTimeout,
+		BuildServers:           buildServers,
 		FromDate:               fromDate,
 		NoIncremental:          noIncremental,
 	}
@@ -67,7 +71,6 @@ func (m *Manager) Sync() error {
 	if err != nil {
 		return err
 	}
-
 	if !m.EnrichOnly {
 		data := make([]*utils.BulkData, 0)
 
@@ -83,7 +86,7 @@ func (m *Manager) Sync() error {
 				BackendVersion: "0.1.0",
 			})
 			if err != nil {
-				return fmt.Errorf("could not fetch data from repository: %s-%s", buildServer.URL, buildServer.project)
+				return fmt.Errorf("could not fetch data from repository: %s-%s", buildServer.URL, buildServer.Project)
 			}
 			for _, builds := range raw{
 				data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s-raw", buildServer.Index), ID: builds.UUID, Data: builds})
@@ -116,21 +119,18 @@ func (m *Manager) Sync() error {
 			} else {
 				fromDate = m.FromDate
 			}
-
 			esData, err := enricher.GetFetchedDataItem(buildServer, fromDate, &lastDate, m.NoIncremental)
 			if err != nil {
 				return err
 			}
-
 			if len(esData.Hits.Hits) > 0 {
 				// Enrich data for single repo
-				enriched, err := enricher.EnrichItem(*esData.Hits.Hits[0].Source, buildServer.project, time.Now())
+				enriched, err := enricher.EnrichItem(*esData.Hits.Hits[0].Source, buildServer.Project, time.Now())
 				if err != nil {
-					return fmt.Errorf("could not enrich data from repository: %s-%s", buildServer.project, buildServer.URL)
+					return fmt.Errorf("could not enrich data from repository: %s-%s", buildServer.Project, buildServer.URL)
 				}
-				data = append(data, &utils.BulkData{IndexName: buildServer.Index, ID: enriched.UUID, Data: enriched})
+				data = append(data, &utils.BulkData{IndexName: buildServer.Index, ID: enriched.UUID, Data: *enriched})
 				_ = enricher.HandleMapping(buildServer.Index)
-
 			}
 		}
 

@@ -68,22 +68,30 @@ func (e *Enricher) EnrichItem(rawItem JenkinsRaw, project string, now time.Time)
 
 	enriched := JenkinsEnrich{}
 
+	enriched.UUID = rawItem.UUID
 	enriched.FullDisplayName = rawItem.Data.FullDisplayName
 	enriched.FullDisplayNameAnalyzed = enriched.FullDisplayName
 	enriched.URL = rawItem.Data.URL
 	enriched.Origin = rawItem.Origin
 	enriched.Category = rawItem.Category
 	enriched.Duration = rawItem.Data.Duration
-	enriched.BuiltOn = rawItem.Data.BuiltOn
-
+	if rawItem.Data.BuiltOn == "" {
+		enriched.BuiltOn = "main"
+	} else {
+		enriched.BuiltOn = rawItem.Data.BuiltOn
+	}
+	enriched.MetadataTimestamp = rawItem.MetadataTimestamp
+	enriched.MetadataUpdatedOn = rawItem.MetadataUpdatedOn
+	enriched.ProjectTS = rawItem.Data.Timestamp
+	enriched.BuildDate = time.Unix(0, rawItem.Data.Timestamp * int64(time.Millisecond))
+	enriched.Build = rawItem.Data.Number
 	parts := strings.Split(rawItem.Data.DisplayName, " ")
 	enriched.Tag = rawItem.Tag
 	enriched.JobBuild = parts[0] + "/" + rawItem.Data.ID
 	enriched.JobURL = strings.TrimRight(rawItem.Data.URL, "/" + rawItem.Data.ID)
 	parts = strings.Split(enriched.JobURL, "/")
 	enriched.JobName = parts[len(parts)-1]
-
-	enriched.BuildDate = time.Unix(rawItem.Data.Timestamp, 0)
+	enriched.Result = rawItem.Data.Result
 	enriched.GrimoireCreationDate = enriched.BuildDate
 	enriched.IsJenkinsJob = 1
 	// Calculate Duration
@@ -93,26 +101,24 @@ func (e *Enricher) EnrichItem(rawItem JenkinsRaw, project string, now time.Time)
 
 	// Extract information from job_name
 	jobParts := strings.Split(enriched.JobName, "-")
-	if len(jobParts) < 2 {
-		enriched.Category = ""
-		enriched.Installer = ""
-		enriched.Scenario = ""
-	} else {
+	if len(jobParts) >= 2 {
 		kind := jobParts[1]
 		if kind == "os" {
 			enriched.Category = "parents/main"
 			enriched.Installer = jobParts[0]
 			enriched.Scenario = strings.Join(jobParts[2:len(jobParts)-3], "-")
 		} else if kind == "deploy" {
-			enriched.Category = "test"
+			enriched.Category = "deploy"
 			enriched.Installer = jobParts[0]
 		} else {
-			enriched.Pod = jobParts[len(jobParts)-3]
-			enriched.Loop = jobParts[len(jobParts)-2]
-			enriched.Branch = jobParts[len(jobParts)-1]
+			enriched.Category = "test"
+			enriched.Testproject = jobParts[0]
+			enriched.Installer = jobParts[1]
 		}
 	}
-
+	enriched.Pod = jobParts[len(jobParts)-3]
+	enriched.Loop = jobParts[len(jobParts)-2]
+	enriched.Branch = jobParts[len(jobParts)-1]
 	return &enriched, nil
 }
 

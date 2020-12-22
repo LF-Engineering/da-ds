@@ -114,6 +114,7 @@ type Build struct {
 }
 
 type JenkinsEnrich struct {
+	ProjectTS				int64       `json:"project_ts"`
 	MetadataUpdatedOn       time.Time   `json:"metadata__updated_on"`
 	MetadataTimestamp       time.Time   `json:"metadata__timestamp"`
 	Offset                  interface{} `json:"offset"`

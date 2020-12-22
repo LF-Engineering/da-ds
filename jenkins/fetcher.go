@@ -106,7 +106,6 @@ func (f *Fetcher) FetchItem(params *Params) ([]JenkinsRaw, error) {
 	if err != nil {
 		return raw, err
 	}
-	params.JenkinsURL = jobResponse.URL
 	for _,job := range jobResponse.Jobs {
 		// For every job fetch all the builds
 		builds, err := f.FetchBuilds(params, job.URL)
