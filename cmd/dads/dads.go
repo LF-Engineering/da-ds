@@ -5,6 +5,8 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/LF-Engineering/da-ds/bugzilla"
+
 	jsoniter "github.com/json-iterator/go"
 
 	"github.com/LF-Engineering/da-ds/dockerhub"
@@ -23,6 +25,12 @@ func runDS(ctx *lib.Ctx) (err error) {
 		ds = &lib.DSGroupsio{}
 	case dockerhub.Dockerhub:
 		manager, err := buildDockerhubManager(ctx)
+		if err != nil {
+			return err
+		}
+		return manager.Sync()
+	case bugzilla.Bugzilla:
+		manager, err := buildBugzillaManager(ctx)
 		if err != nil {
 			return err
 		}
@@ -73,6 +81,7 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 	dtStart := time.Now()
 	ctx.Init()
+	ctx.ParseFlags()
 	lib.FatalOnError(ctx.Validate())
 	lib.CreateESCache(&ctx)
 	lib.FatalOnError(runDS(&ctx))
@@ -107,4 +116,27 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 
 	return dockerhub.NewManager(username, password, fetcherBackendVersion, enricherBackendVersion,
 		enrichOnly, enrich, esURL, timeout, repositories, fromDate, noIncremental), nil
+}
+
+func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
+
+
+	origin := ctx.BugZilla.Origin.String()
+	fetcherBackendVersion := "0.1.0"
+	enricherBackendVersion := "0.1.0"
+	doFetch := ctx.BugZilla.DoFetch.Bool()
+	doEnrich := ctx.BugZilla.DoEnrich.Bool()
+	fromDate := ctx.BugZilla.FromDate.Date()
+	fetchSize := ctx.BugZilla.FetchSize.Int()
+	enrichSize := ctx.BugZilla.EnrichSize.Int()
+	project := ctx.BugZilla.Project.String()
+	esIndex := ctx.BugZilla.EsIndex.String()
+	mgr, err := bugzilla.NewManager(origin, ctx.DBConn, fetcherBackendVersion, enricherBackendVersion,
+		doFetch, doEnrich, ctx.ESURL, "", "", esIndex, fromDate, project,
+		fetchSize, enrichSize)
+	if err != nil {
+		return nil,err
+	}
+
+return mgr, nil
 }

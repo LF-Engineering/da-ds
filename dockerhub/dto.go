@@ -83,15 +83,15 @@ type RepositoryEnrich struct {
 	Offset             *string   `json:"offset"`
 	MetadataEnrichedOn time.Time `json:"metadata__enriched_on"`
 
-	BackendVersion    string    `json:"backend_version"`
-	Tag               string    `json:"tag"`
-	UUID              string    `json:"uuid"`
-	Origin            string    `json:"origin"`
-	MetadataUpdatedOn time.Time `json:"metadata__updated_on"`
-	BackendName       string    `json:"metadata__backend_name"`
-	MetadataTimestamp time.Time `json:"metadata__timestamp"`
-	BuildOnCloud      *string   `json:"build_on_cloud"`
-	ProjectTS         int64     `json:"project_ts"`
+	BackendVersion      string    `json:"backend_version"`
+	Tag                 string    `json:"tag"`
+	UUID                string    `json:"uuid"`
+	Origin              string    `json:"origin"`
+	MetadataUpdatedOn   time.Time `json:"metadata__updated_on"`
+	MetadataBackendName string    `json:"metadata__backend_name"`
+	MetadataTimestamp   time.Time `json:"metadata__timestamp"`
+	BuildOnCloud        *string   `json:"build_on_cloud"`
+	ProjectTS           int64     `json:"project_ts"`
 }
 
 // LoginResponse from login dockerhub web API
