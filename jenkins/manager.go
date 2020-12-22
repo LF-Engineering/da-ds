@@ -124,12 +124,14 @@ func (m *Manager) Sync() error {
 				return err
 			}
 			if len(esData.Hits.Hits) > 0 {
-				// Enrich data for single repo
-				enriched, err := enricher.EnrichItem(*esData.Hits.Hits[0].Source, buildServer.Project, time.Now())
-				if err != nil {
-					return fmt.Errorf("could not enrich data from repository: %s-%s", buildServer.Project, buildServer.URL)
+				// Enrich data for all the builds fetched from raw
+				for _, hit := range esData.Hits.Hits {
+					enriched, err := enricher.EnrichItem(*hit.Source, buildServer.Project, time.Now())
+					if err != nil {
+						return fmt.Errorf("could not enrich data from repository: %s-%s", buildServer.Project, buildServer.URL)
+					}
+					data = append(data, &utils.BulkData{IndexName: buildServer.Index, ID: enriched.UUID, Data: *enriched})
 				}
-				data = append(data, &utils.BulkData{IndexName: buildServer.Index, ID: enriched.UUID, Data: *enriched})
 				_ = enricher.HandleMapping(buildServer.Index)
 			}
 		}
