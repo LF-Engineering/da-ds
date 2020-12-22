@@ -60,7 +60,7 @@ func NewManager(
 	return mng
 }
 
-// Sync runs dockerhub fetch and enrich according to passed parameters
+// Sync runs jenkins fetch and enrich according to passed parameters
 func (m *Manager) Sync() error {
 
 	if len(m.BuildServers) == 0 {
@@ -171,7 +171,7 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 		return nil, nil, nil, err
 	}
 
-	// Initialize fetcher object to get data from dockerhub api
+	// Initialize fetcher object to get data from jenkins api
 	fetcher := NewFetcher(params, httpClientProvider, esClientProvider)
 
 	// Initialize enrich object to enrich raw data

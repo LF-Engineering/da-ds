@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Enricher contains dockerhub datasource enrich logic
+// Enricher contains jenkins datasource enrich logic
 type Enricher struct {
 	DSName                string // Datasource will be used as key for ES
 	ElasticSearchProvider ESClientProvider
