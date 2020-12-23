@@ -575,6 +575,7 @@ func TestInit(t *testing.T) {
 
 		// Initialize context while new environment is set
 		gotContext.Init()
+    gotContext.BugZilla = nil
 
 		// Restore original environment
 		for key := range test.environment {

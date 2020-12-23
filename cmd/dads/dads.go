@@ -120,7 +120,6 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 
 func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 
-
 	origin := ctx.BugZilla.Origin.String()
 	fetcherBackendVersion := "0.1.0"
 	enricherBackendVersion := "0.1.0"
@@ -135,8 +134,8 @@ func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 		doFetch, doEnrich, ctx.ESURL, "", "", esIndex, fromDate, project,
 		fetchSize, enrichSize)
 	if err != nil {
-		return nil,err
+		return nil, err
 	}
 
-return mgr, nil
+	return mgr, nil
 }

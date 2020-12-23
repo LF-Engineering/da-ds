@@ -28,11 +28,11 @@ func GetOldestDate(t1 *time.Time, t2 *time.Time) *time.Time {
 
 	if isT1Empty && !isT2Empty {
 		from = *t2
-	}else if !isT1Empty && isT2Empty {
+	} else if !isT1Empty && isT2Empty {
 		from = *t1
-	}else if !isT1Empty && !isT2Empty{
+	} else if !isT1Empty && !isT2Empty {
 		from = *t2
-		if t1.Before(*t2){
+		if t1.Before(*t2) {
 			from = *t1
 		}
 	}

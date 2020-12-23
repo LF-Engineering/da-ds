@@ -1,6 +1,5 @@
 package bugzillarest
 
-
 var (
 
 	// BugzillaRestRawMapping - bugzilla raw index mapping
@@ -56,4 +55,3 @@ var (
   "id": {"type":"keyword"}
 }}}`)
 )
-
