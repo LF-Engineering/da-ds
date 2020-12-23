@@ -11,7 +11,7 @@ type MessageSearchFields struct {
 // RawMessage represents piper mail raw message
 type RawMessage struct {
 	BackendVersion    string               `json:"backend_version"`
-	Data              *RawMessageData       `json:"data"`
+	Data              *RawMessageData      `json:"data"`
 	Tag               string               `json:"tag"`
 	UUID              string               `json:"uuid"`
 	SearchFields      *MessageSearchFields `json:"search_fields"`
@@ -56,7 +56,7 @@ type EnrichMessage struct {
 	ID                   string    `json:"id"`
 	ProjectTS            int64     `json:"project_ts"`
 	FromUserName         string    `json:"from_user_name"`
-	TZ                   int64     `json:"tz"`
+	TZ                   int       `json:"tz"`
 	MessageID            string    `json:"Message-ID"`
 	UUID                 string    `json:"uuid"`
 	AuthorName           string    `json:"author_name"`
@@ -83,15 +83,16 @@ type EnrichMessage struct {
 	AuthorUUID           string    `json:"author_uuid"`
 	AuthorMultiOrgNames  []string  `json:"author_multi_org_names"`
 	Origin               string    `json:"origin"`
-	Size                 string    `json:"size"`
+	Size                 int64     `json:"size"`
 	Tag                  string    `json:"tag"`
 	Subject              string    `json:"subject"`
 	FromID               string    `json:"from_id"`
 	AuthorGender         string    `json:"author_gender"`
 	FromGenderAcc        string    `json:"from_gender_acc"`
 	EmailDate            string    `json:"email_date"`
-	MetadataTimestamp    time.Time `json:"metadata__timestamp"`
+	MetadataTimestamp    string    `json:"metadata__timestamp"`
 	MetadataBackendName  string    `json:"metadata__backend_name"`
-	MetadataUpdatedOn    time.Time `json:"metadata__updated_on"`
+	MetadataUpdatedOn    string    `json:"metadata__updated_on"`
+	MetadataEnrichedOn   time.Time `json:"metadata__enriched_on"`
 	BackendVersion       string    `json:"backend_version"`
 }

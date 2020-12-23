@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/LF-Engineering/da-ds/pipermail"
 	"math/rand"
 	"time"
 
@@ -43,6 +44,12 @@ func runDS(ctx *lib.Ctx) (err error) {
 		ds = &lib.DSConfluence{}
 	case lib.Rocketchat:
 		ds = &lib.DSRocketchat{}
+	case pipermail.Pipermail:
+		manager, err := buildPipermailManager(ctx)
+		if err != nil {
+			return err
+		}
+		return manager.Sync()
 	default:
 		err = fmt.Errorf("unknown data source type: " + ctx.DS)
 		return
@@ -138,4 +145,29 @@ func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 	}
 
 	return mgr, nil
+}
+
+func buildPipermailManager(ctx *lib.Ctx) (*pipermail.Manager, error) {
+	fetcherBackendVersion := "0.0.1"
+	enricherBackendVersion := "0.0.1"
+	esURL := ctx.ESURL
+	httpTimeout := ctx.Env("HTTP_TIMEOUT") // "60s" 60 seconds...
+	urlLinks := ctx.Env("LINKS_JSON")
+	enrichOnly := ctx.NoRaw
+	enrich := ctx.Enrich
+	fromDate := ctx.DateFrom
+	noIncremental := ctx.BoolEnv("NO_INCREMENTAL")
+
+	var links []*pipermail.Link
+	if err := jsoniter.Unmarshal([]byte(urlLinks), &links); err != nil {
+		return nil, err
+	}
+
+	timeout, err := time.ParseDuration(httpTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	return pipermail.NewManager( fetcherBackendVersion, enricherBackendVersion,
+		enrichOnly, enrich, esURL, timeout, links, fromDate, noIncremental), nil
 }

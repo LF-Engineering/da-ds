@@ -3,6 +3,8 @@ package pipermail
 import (
 	"errors"
 	"fmt"
+	"github.com/LF-Engineering/da-ds/affiliation"
+	"github.com/LF-Engineering/da-ds/db"
 	"github.com/LF-Engineering/da-ds/utils"
 	"time"
 )
@@ -10,6 +12,7 @@ import (
 // Manager describes pipermail manager
 type Manager struct {
 	Username               string        `json:"username,omitempty"`
+	SHConnString           string `json:"sh_conn_string,omitempty"`
 	Password               string        `json:"password,omitempty"`
 	FetcherBackendVersion  string        `json:"fetcher_backend_version,omitempty"`
 	EnricherBackendVersion string        `json:"enricher_backend_version,omitempty"`
@@ -62,12 +65,13 @@ func NewManager(
 
 // Sync runs pipermail fetch and enrich according to passed parameters
 func (m *Manager) Sync() error {
+	var rawMessages []*RawMessage
 
 	if len(m.Links) == 0 {
 		return errors.New("no links found")
 	}
 
-	fetcher, _, esClientProvider, err := buildServices(m)
+	fetcher, enricher, esClientProvider, err := buildServices(m)
 	if err != nil {
 		return err
 	}
@@ -85,6 +89,7 @@ func (m *Manager) Sync() error {
 
 			for _, message := range raw {
 				data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s-raw", link.ESIndex), ID: message.UUID, Data: message})
+				rawMessages = append(rawMessages, message)
 			}
 
 			// set mapping and create index if not exists
@@ -99,6 +104,35 @@ func (m *Manager) Sync() error {
 			}
 		}
 
+	}
+
+	if m.Enrich || m.EnrichOnly {
+		data := make([]*utils.BulkData, 0)
+
+		// fetch data
+		for _, link := range m.Links {
+			if len(rawMessages) > 0 {
+				// Enrich data for single link
+				for _, message := range rawMessages {
+					enriched, err := enricher.EnrichMessage(message, time.Now())
+					if err != nil {
+						return fmt.Errorf("could not enrich data from link: %s", message.Origin)
+					}
+					data = append(data, &utils.BulkData{IndexName: link.ESIndex, ID: enriched.UUID, Data: enriched})
+					_ = enricher.HandleMapping(link.ESIndex)
+				}
+
+			}
+		}
+
+		if len(data) > 0 {
+			// Insert enriched data to elasticsearch
+			_, err = esClientProvider.BulkInsert(data)
+			if err != nil {
+				return err
+			}
+
+		}
 	}
 
 	return nil
@@ -122,8 +156,14 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 	// Initialize fetcher object to get data from pipermail archive link
 	fetcher := NewFetcher(params, httpClientProvider, esClientProvider)
 
-	// Initialize enrich object to enrich raw data
-	//enricher := NewEnricher(m.EnricherBackendVersion, esClientProvider)
+	dataBase, err := db.NewConnector("mysql", m.SHConnString)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	identityProvider := affiliation.NewIdentityProvider(dataBase)
 
-	return fetcher, nil, esClientProvider, err
+	//Initialize enrich object to enrich raw data
+	enricher := NewEnricher(identityProvider, m.EnricherBackendVersion, esClientProvider)
+
+	return fetcher, enricher, esClientProvider, err
 }
