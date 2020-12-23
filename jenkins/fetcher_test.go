@@ -75,7 +75,7 @@ func TestBasicFetchItem(t *testing.T) {
 					},
 				},
 			}})
-	var expectedJenkinsRaw []JenkinsRaw
+	var expectedJenkinsRaw []BuildsRaw
 	expectedRaw := `[{"backend_name":"jenkins","backend_version":"0.0.1","perceval_version":"","timestamp":0,"origin":"https://www.jenkins-mock.com","uuid":"0264b85b4465b98bf11fa5ec2aed63208f664245","updated_on":1557215745.02,"classified_fields_filtered":null,"category":"build","search_fields":{"item_id":"https://jenkins.soramitsu.co.jp/job/iroha/job/iroha-hyperledger/job/1.0.0/2/","number":2},"tag":"https://www.jenkins-mock.com","data":{"_class":"org.jenkinsci.plugins.workflow.job.WorkflowRun","actions":null,"artifacts":null,"building":false,"description":null,"displayName":"#2","duration":1343151,"estimatedDuration":1081333,"executor":null,"fullDisplayName":"iroha » iroha-hyperledger » 1.0.0 #2","id":"2","keepLog":false,"number":2,"queueId":404128,"result":"SUCCESS","timestamp":1557215745020,"url":"https://jenkins.soramitsu.co.jp/job/iroha/job/iroha-hyperledger/job/1.0.0/2/","builtOn":"","changeSet":{"_class":"","items":null,"kind":""},"culprits":null,"runs":null},"metadata__updated_on":"2020-12-22T19:21:30.884914298+05:30","metadata__timestamp":"2020-12-22T19:21:30.884914385+05:30"},{"backend_name":"jenkins","backend_version":"0.0.1","perceval_version":"","timestamp":0,"origin":"https://www.jenkins-mock.com","uuid":"37401f86e484931309c97de3f790aa3bb6ff5fac","updated_on":1557178382.19,"classified_fields_filtered":null,"category":"build","search_fields":{"item_id":"https://jenkins.soramitsu.co.jp/job/iroha/job/iroha-hyperledger/job/1.0.0/1/","number":1},"tag":"https://www.jenkins-mock.com","data":{"_class":"org.jenkinsci.plugins.workflow.job.WorkflowRun","actions":null,"artifacts":null,"building":false,"description":null,"displayName":"#1","duration":819514,"estimatedDuration":1081333,"executor":null,"fullDisplayName":"iroha » iroha-hyperledger » 1.0.0 #1","id":"1","keepLog":false,"number":1,"queueId":403836,"result":"SUCCESS","timestamp":1557178382190,"url":"https://jenkins.soramitsu.co.jp/job/iroha/job/iroha-hyperledger/job/1.0.0/1/","builtOn":"","changeSet":{"_class":"","items":null,"kind":""},"culprits":null,"runs":null},"metadata__updated_on":"2020-12-22T19:21:30.88491902+05:30","metadata__timestamp":"2020-12-22T19:21:30.884919102+05:30"}]`
 	_ = json.Unmarshal([]byte(expectedRaw), &expectedJenkinsRaw)
 	type fields struct {
@@ -94,7 +94,7 @@ func TestBasicFetchItem(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    []JenkinsRaw
+		want    []BuildsRaw
 		wantErr bool
 	}{
 		{
@@ -211,7 +211,7 @@ func TestFetchItem(t *testing.T) {
 					},
 				},
 			}})
-	var expectedJenkinsRaw []JenkinsRaw
+	var expectedJenkinsRaw []BuildsRaw
 	expectedRaw := `[{"backend_name":"jenkins","backend_version":"0.0.1","perceval_version":"","timestamp":0,"origin":"https://www.jenkins-mock.com","uuid":"0264b85b4465b98bf11fa5ec2aed63208f664245","updated_on":1557215745.02,"classified_fields_filtered":null,"category":"build","search_fields":{"item_id":"https://jenkins.soramitsu.co.jp/job/iroha/job/iroha-hyperledger/job/1.0.0/2/","number":2},"tag":"https://www.jenkins-mock.com","data":{"_class":"org.jenkinsci.plugins.workflow.job.WorkflowRun","actions":null,"artifacts":null,"building":false,"description":null,"displayName":"#2","duration":1343151,"estimatedDuration":1081333,"executor":null,"fullDisplayName":"iroha » iroha-hyperledger » 1.0.0 #2","id":"2","keepLog":false,"number":2,"queueId":404128,"result":"SUCCESS","timestamp":1557215745020,"url":"https://jenkins.soramitsu.co.jp/job/iroha/job/iroha-hyperledger/job/1.0.0/2/","builtOn":"","changeSet":{"_class":"","items":null,"kind":""},"culprits":null,"runs":null},"metadata__updated_on":"2020-12-22T19:21:30.884914298+05:30","metadata__timestamp":"2020-12-22T19:21:30.884914385+05:30"},{"backend_name":"jenkins","backend_version":"0.0.1","perceval_version":"","timestamp":0,"origin":"https://www.jenkins-mock.com","uuid":"37401f86e484931309c97de3f790aa3bb6ff5fac","updated_on":1557178382.19,"classified_fields_filtered":null,"category":"build","search_fields":{"item_id":"https://jenkins.soramitsu.co.jp/job/iroha/job/iroha-hyperledger/job/1.0.0/1/","number":1},"tag":"https://www.jenkins-mock.com","data":{"_class":"org.jenkinsci.plugins.workflow.job.WorkflowRun","actions":null,"artifacts":null,"building":false,"description":null,"displayName":"#1","duration":819514,"estimatedDuration":1081333,"executor":null,"fullDisplayName":"iroha » iroha-hyperledger » 1.0.0 #1","id":"1","keepLog":false,"number":1,"queueId":403836,"result":"SUCCESS","timestamp":1557178382190,"url":"https://jenkins.soramitsu.co.jp/job/iroha/job/iroha-hyperledger/job/1.0.0/1/","builtOn":"","changeSet":{"_class":"","items":null,"kind":""},"culprits":null,"runs":null},"metadata__updated_on":"2020-12-22T19:21:30.88491902+05:30","metadata__timestamp":"2020-12-22T19:21:30.884919102+05:30"}]`
 	err := json.Unmarshal([]byte(expectedRaw), &expectedJenkinsRaw)
 	fmt.Println(err)
@@ -231,7 +231,7 @@ func TestFetchItem(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    []JenkinsRaw
+		want    []BuildsRaw
 		wantErr bool
 	}{
 		{
@@ -265,7 +265,7 @@ func TestFetchItem(t *testing.T) {
 				Depth:          1,
 				BackendVersion: "0.0.1",
 			}},
-			[]JenkinsRaw{},
+			[]BuildsRaw{},
 			false,
 		},
 	}
@@ -295,8 +295,8 @@ func TestFetchItem(t *testing.T) {
 	}
 }
 
-func toJenkinsRaw(b string) (JenkinsRaw, error) {
-	expectedRaw := JenkinsRaw{}
+func toJenkinsRaw(b string) (BuildsRaw, error) {
+	expectedRaw := BuildsRaw{}
 	err := jsoniter.Unmarshal([]byte(b), &expectedRaw)
 	return expectedRaw, err
 }

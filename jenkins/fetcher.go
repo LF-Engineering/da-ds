@@ -102,8 +102,8 @@ func (f *Fetcher) FetchBuilds(params *Params, jobURL string) (*BuildResponse, er
 }
 
 // FetchItem pulls all the jobs and the builds data
-func (f *Fetcher) FetchItem(params *Params) ([]JenkinsRaw, error) {
-	var raw = make([]JenkinsRaw, 0)
+func (f *Fetcher) FetchItem(params *Params) ([]BuildsRaw, error) {
+	var raw = make([]BuildsRaw, 0)
 	// Fetch all jobs
 	jobResponse, err := f.FetchJobs(params)
 	if err != nil {
@@ -115,18 +115,18 @@ func (f *Fetcher) FetchItem(params *Params) ([]JenkinsRaw, error) {
 		if err != nil {
 			continue
 		}
-		// append the fetched builds to the JenkinsRaw slice
+		// append the fetched builds to the BuildsRaw slice
 		data := f.MapToJenkinsRaw(builds, params)
 		raw = append(raw, data...)
 	}
 	return raw, nil
 }
 
-// MapToJenkinsRaw maps the api response from jenkins to the JenkinsRaw documents
-func (f *Fetcher) MapToJenkinsRaw(response *BuildResponse, params *Params) []JenkinsRaw {
-	var data = make([]JenkinsRaw, 0)
+// MapToJenkinsRaw maps the api response from jenkins to the BuildsRaw documents
+func (f *Fetcher) MapToJenkinsRaw(response *BuildResponse, params *Params) []BuildsRaw {
+	var data = make([]BuildsRaw, 0)
 	for _,build := range response.Builds {
-		var raw JenkinsRaw
+		var raw BuildsRaw
 		raw.Data = build
 		raw.MetadataUpdatedOn = time.Now()
 		raw.MetadataTimestamp = time.Now()

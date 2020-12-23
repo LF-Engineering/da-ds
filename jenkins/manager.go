@@ -75,7 +75,7 @@ func (m *Manager) Sync() error {
 		data := make([]*utils.BulkData, 0)
 		// fetch data
 		for _, buildServer := range m.BuildServers {
-			var raw []JenkinsRaw
+			var raw []BuildsRaw
 			// Fetch data for single build
 			raw, err = fetcher.FetchItem(&Params{
 				JenkinsURL:     buildServer.URL,

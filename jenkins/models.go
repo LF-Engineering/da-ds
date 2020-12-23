@@ -20,9 +20,9 @@ type BuildResponse struct {
 	Builds  []Build  `json:"builds"`
 }
 
-// JenkinsRaw struct represent the schema of
+// BuildsRaw struct represent the schema of
 // the raw documents in ES
-type JenkinsRaw struct {
+type BuildsRaw struct {
 	BackendName              string      `json:"backend_name"`
 	BackendVersion           string      `json:"backend_version"`
 	PercevalVersion          string      `json:"perceval_version"`
@@ -120,9 +120,9 @@ type Build struct {
 	} `json:"runs"`
 }
 
-// JenkinsEnrich represents the schema for the
+// BuildsEnrich represents the schema for the
 // enriched documents in ES
-type JenkinsEnrich struct {
+type BuildsEnrich struct {
 	ProjectTS				int64       `json:"project_ts"`
 	MetadataUpdatedOn       time.Time   `json:"metadata__updated_on"`
 	MetadataTimestamp       time.Time   `json:"metadata__timestamp"`

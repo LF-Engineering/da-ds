@@ -14,7 +14,7 @@ func TestEnrichItem(t *testing.T) {
 		BackendVersion        string
 	}
 	type args struct {
-		rawItem JenkinsRaw
+		rawItem BuildsRaw
 		project string
 		now     time.Time
 	}
@@ -34,7 +34,7 @@ func TestEnrichItem(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    *JenkinsEnrich
+		want    *BuildsEnrich
 		wantErr bool
 	}{
 		{
@@ -105,8 +105,8 @@ func TestEnrichItem(t *testing.T) {
 	}
 }
 
-func toJenkinsEnrich(b string) (JenkinsEnrich, error) {
-	expectedEnrich := JenkinsEnrich{}
+func toJenkinsEnrich(b string) (BuildsEnrich, error) {
+	expectedEnrich := BuildsEnrich{}
 	err := jsoniter.Unmarshal([]byte(b), &expectedEnrich)
 	return expectedEnrich, err
 }

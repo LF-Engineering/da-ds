@@ -36,11 +36,11 @@ type Total struct {
 
 // NestedHits result
 type NestedHits struct {
-	Index  string         `json:"_index"`
-	Type   string         `json:"_type"`
-	ID     string         `json:"_id"`
-	Score  float64        `json:"_score"`
-	Source *JenkinsRaw    `json:"_source"`
+	Index  string     `json:"_index"`
+	Type   string     `json:"_type"`
+	ID     string     `json:"_id"`
+	Score  float64    `json:"_score"`
+	Source *BuildsRaw `json:"_source"`
 }
 
 // Aggregations result
@@ -64,9 +64,9 @@ func NewEnricher(backendVersion string, esClientProvider ESClientProvider) *Enri
 }
 
 // EnrichItem enriches raw item
-func (e *Enricher) EnrichItem(rawItem JenkinsRaw, project string, now time.Time) (*JenkinsEnrich, error) {
+func (e *Enricher) EnrichItem(rawItem BuildsRaw, project string, now time.Time) (*BuildsEnrich, error) {
 
-	enriched := JenkinsEnrich{}
+	enriched := BuildsEnrich{}
 
 	enriched.UUID = rawItem.UUID
 	enriched.FullDisplayName = rawItem.Data.FullDisplayName
