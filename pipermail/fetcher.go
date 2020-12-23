@@ -370,7 +370,7 @@ func (f *Fetcher) AddMetadata(msg interface{}, slug, groupName, link string) *Ra
 	if err != nil {
 		fmt.Println(err)
 	}
-	rawMessage.Data = mData
+	rawMessage.Data = &mData
 
 	// generate UUID
 	uid, err := uuid.Generate(groupName, strconv.FormatFloat(utils.ConvertTimeToFloat(timestamp), 'f', -1, 64))
