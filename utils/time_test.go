@@ -17,29 +17,25 @@ func TestFloatTime(t *testing.T) {
 	fmt.Printf("%v\n", x)
 }
 
-
-func TestGetOldestDate(t *testing.T){
+func TestGetOldestDate(t *testing.T) {
 
 	// Arrange
 	from, err := time.Parse("2006-01-02 15:04:05", "1970-01-01 00:00:00")
 	if err != nil {
 		fmt.Println(err)
 	}
-   var d1 time.Time
+	var d1 time.Time
 	d1, _ = time.Parse("2006-01-02 15:04:05", "2020-01-01 00:00:00")
-
 
 	var d2 time.Time
 	d2, _ = time.Parse("2006-01-02 15:04:05", "2020-05-01 00:00:00")
 
 	// Act
 	case2nil := GetOldestDate(nil, nil)
-	case1 := GetOldestDate( &d1, nil)
-	case2 := GetOldestDate( nil, &d1)
+	case1 := GetOldestDate(&d1, nil)
+	case2 := GetOldestDate(nil, &d1)
 	case1after2 := GetOldestDate(&d2, &d1)
 	case1before2 := GetOldestDate(&d1, &d2)
-
-
 
 	// Assert
 	assert.Equal(t, case2nil, &from)

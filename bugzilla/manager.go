@@ -108,7 +108,7 @@ func (m *Manager) Sync() error {
 			if err == nil {
 				doneJobs["doneEnrich"] = true
 			}
-			time.Sleep(5*time.Second)
+			time.Sleep(5 * time.Second)
 		}
 	}
 

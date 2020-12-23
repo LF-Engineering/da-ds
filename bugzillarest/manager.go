@@ -1,15 +1,14 @@
 package bugzillarest
 
 import (
-"fmt"
+	"fmt"
 	"strconv"
 	"time"
 
-"github.com/LF-Engineering/da-ds/affiliation"
-db "github.com/LF-Engineering/da-ds/db"
-"github.com/LF-Engineering/da-ds/utils"
+	"github.com/LF-Engineering/da-ds/affiliation"
+	db "github.com/LF-Engineering/da-ds/db"
+	"github.com/LF-Engineering/da-ds/utils"
 )
-
 
 // ESClientProvider used in connecting to ES server
 type ESClientProvider interface {
@@ -121,7 +120,7 @@ func (m *Manager) Sync() error {
 			if err == nil {
 				doneJobs["doneEnrich"] = true
 			}
-			time.Sleep(5*time.Second)
+			time.Sleep(5 * time.Second)
 		}
 	}
 
@@ -144,7 +143,7 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 	}
 
 	// Initialize fetcher object to get data from bugzilla rest api
-	fetcher := NewFetcher( *params, httpClientProvider, esClientProvider)
+	fetcher := NewFetcher(*params, httpClientProvider, esClientProvider)
 
 	dataBase, err := db.NewConnector("mysql", m.SHConnString)
 	if err != nil {
@@ -189,7 +188,7 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 		offset := 0
 		for result == m.FetchSize {
 			data := make([]*utils.BulkData, 0)
-			bugs,lastChange, err := fetcher.FetchAll(m.Endpoint, date,strconv.Itoa(m.FetchSize), strconv.Itoa(offset) , now)
+			bugs, lastChange, err := fetcher.FetchAll(m.Endpoint, date, strconv.Itoa(m.FetchSize), strconv.Itoa(offset), now)
 			if err != nil {
 				ch <- err
 				return
@@ -201,11 +200,9 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 				from = &bugs[len(bugs)-1].Data.LastChangeTime
 			}
 
-
-				for _, bug := range bugs {
-					data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s-raw", m.ESIndex), ID: bug.UUID, Data: bug})
-				}
-
+			for _, bug := range bugs {
+				data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s-raw", m.ESIndex), ID: bug.UUID, Data: bug})
+			}
 
 			//set mapping and create index if not exists
 			_, err = m.esClientProvider.CreateIndex(fmt.Sprintf("%s-raw", m.ESIndex), BugzillaRestRawMapping)
@@ -234,7 +231,6 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 
 	return ch
 }
-
 
 func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-chan error {
 	ch := make(chan error)
@@ -346,4 +342,3 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 
 	return ch
 }
-
