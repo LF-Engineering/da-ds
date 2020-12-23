@@ -11,8 +11,8 @@ import (
 	"time"
 )
 
-// This is the default time used when the time is not given and index does not exist
-var DEFAULT_TIME = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
+// DefaultTime represents the default time used when the time is not given and index does not exist
+var DefaultTime = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
 
 // Fetcher contains Jenkins datasource fetch logic
 type Fetcher struct {
@@ -58,6 +58,7 @@ func NewFetcher(params *Params, httpClientProvider HTTPClientProvider, esClientP
 	}
 }
 
+// FetchJobs fetches the total jobs associated with the url provided
 func (f *Fetcher) FetchJobs(params *Params) (*JobResponse,error) {
 	var header = make(map[string]string)
 	if params.Username != "" && params.Password != "" {
@@ -77,7 +78,7 @@ func (f *Fetcher) FetchJobs(params *Params) (*JobResponse,error) {
 	return &jobResponse, nil
 }
 
-
+// FetchBuilds fetches all the builds associated with a jobURL provided
 func (f *Fetcher) FetchBuilds(params *Params, jobURL string) (*BuildResponse, error) {
 	var header = make(map[string]string)
 	if params.Username != "" && params.Password != "" {
@@ -100,7 +101,7 @@ func (f *Fetcher) FetchBuilds(params *Params, jobURL string) (*BuildResponse, er
 	return &buildResponse, nil
 }
 
-// FetchItem pulls builds data
+// FetchItem pulls all the jobs and the builds data
 func (f *Fetcher) FetchItem(params *Params) ([]JenkinsRaw, error) {
 	var raw = make([]JenkinsRaw, 0)
 	// Fetch all jobs
@@ -121,6 +122,7 @@ func (f *Fetcher) FetchItem(params *Params) ([]JenkinsRaw, error) {
 	return raw, nil
 }
 
+// MapToJenkinsRaw maps the api response from jenkins to the JenkinsRaw documents
 func (f *Fetcher) MapToJenkinsRaw(response *BuildResponse, params *Params) []JenkinsRaw {
 	var data = make([]JenkinsRaw, 0)
 	for _,build := range response.Builds {
@@ -156,7 +158,7 @@ func (f *Fetcher) HandleMapping(index string) error {
 func (f *Fetcher) GetLastDate(buildServer BuildServer, now time.Time) (time.Time, error) {
 	lastDate, err := f.ElasticSearchProvider.GetStat(fmt.Sprintf("%s", buildServer.Index), "metadata__updated_on", "max", nil, nil)
 	if err != nil {
-		return DEFAULT_TIME, err
+		return DefaultTime, err
 	}
 
 	return lastDate, nil

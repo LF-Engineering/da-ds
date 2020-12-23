@@ -23,6 +23,8 @@ type Manager struct {
 	NoIncremental          bool
 }
 
+// BuildServer is a single Jenkins
+// Configuration for a single project
 type BuildServer struct {
 	Username    string	`json:"username"`
 	Password    string  `json:"password"`

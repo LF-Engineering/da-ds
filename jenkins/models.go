@@ -2,6 +2,8 @@ package jenkins
 
 import "time"
 
+// JobResponse struct represent the response of the
+// Jenkins api to get all the jobs
 type JobResponse struct {
 	Jobs            []struct {
 		Class string `json:"_class"`
@@ -12,11 +14,14 @@ type JobResponse struct {
 	URL     string   `json:"url"`
 }
 
+// BuildResponse struct represent the response of
+// the jenkins api to get all the builds
 type BuildResponse struct {
 	Builds  []Build  `json:"builds"`
 }
 
-
+// JenkinsRaw struct represent the schema of
+// the raw documents in ES
 type JenkinsRaw struct {
 	BackendName              string      `json:"backend_name"`
 	BackendVersion           string      `json:"backend_version"`
@@ -37,6 +42,8 @@ type JenkinsRaw struct {
 	MetadataTimestamp time.Time `json:"metadata__timestamp"`
 }
 
+// Build is the single build in the response of
+// the jenkins api to get the builds
 type Build struct {
 	Class   string `json:"_class"`
 	Actions []struct {
@@ -113,6 +120,8 @@ type Build struct {
 	} `json:"runs"`
 }
 
+// JenkinsEnrich represents the schema for the
+// enriched documents in ES
 type JenkinsEnrich struct {
 	ProjectTS				int64       `json:"project_ts"`
 	MetadataUpdatedOn       time.Time   `json:"metadata__updated_on"`
