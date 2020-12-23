@@ -11,11 +11,13 @@ import (
 	"time"
 )
 
+// This is the default time used when the time is not given and index does not exist
+var DEFAULT_TIME = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
+
 // Fetcher contains Jenkins datasource fetch logic
 type Fetcher struct {
 	DSName                string // Datasource will be used as key for ES
 	IncludeArchived       bool
-	MultiOrigin           bool // can we store multiple endpoints in a single index?
 	HTTPClientProvider    HTTPClientProvider
 	ElasticSearchProvider ESClientProvider
 	BackendVersion        string
@@ -154,7 +156,7 @@ func (f *Fetcher) HandleMapping(index string) error {
 func (f *Fetcher) GetLastDate(buildServer BuildServer, now time.Time) (time.Time, error) {
 	lastDate, err := f.ElasticSearchProvider.GetStat(fmt.Sprintf("%s-raw", buildServer.Index), "metadata__updated_on", "max", nil, nil)
 	if err != nil {
-		return now.UTC(), err
+		return DEFAULT_TIME, err
 	}
 
 	return lastDate, nil

@@ -73,7 +73,6 @@ func (m *Manager) Sync() error {
 	}
 	if !m.EnrichOnly {
 		data := make([]*utils.BulkData, 0)
-
 		// fetch data
 		for _, buildServer := range m.BuildServers {
 			var raw []JenkinsRaw
@@ -128,7 +127,8 @@ func (m *Manager) Sync() error {
 				for _, hit := range esData.Hits.Hits {
 					enriched, err := enricher.EnrichItem(*hit.Source, buildServer.Project, time.Now())
 					if err != nil {
-						return fmt.Errorf("could not enrich data from repository: %s-%s", buildServer.Project, buildServer.URL)
+						log.Printf("could not enrich data from repository: %s-%s", buildServer.Project, buildServer.URL)
+						continue
 					}
 					data = append(data, &utils.BulkData{IndexName: buildServer.Index, ID: enriched.UUID, Data: *enriched})
 				}
@@ -142,13 +142,6 @@ func (m *Manager) Sync() error {
 			if err != nil {
 				return err
 			}
-
-			// Insert enriched data to elasticsearch
-			_, err = esClientProvider.BulkInsert(data)
-			if err != nil {
-				return err
-			}
-
 		}
 	}
 

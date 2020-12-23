@@ -82,6 +82,7 @@ func (e *Enricher) EnrichItem(rawItem JenkinsRaw, project string, now time.Time)
 	}
 	enriched.MetadataTimestamp = rawItem.MetadataTimestamp
 	enriched.MetadataUpdatedOn = rawItem.MetadataUpdatedOn
+	enriched.MetadataEnrichedOn = time.Now()
 	enriched.ProjectTS = rawItem.Data.Timestamp
 	enriched.BuildDate = time.Unix(0, rawItem.Data.Timestamp * int64(time.Millisecond))
 	enriched.Build = rawItem.Data.Number
