@@ -31,7 +31,7 @@ type BuildServer struct {
 	Index       string  `json:"index"`
 }
 
-// NewManager initiates piper mail manager instance
+// NewManager initiates Jenkins manager instance
 func NewManager(
 	fetcherBackendVersion string,
 	enricherBackendVersion string,
@@ -74,7 +74,7 @@ func (m *Manager) Sync() error {
 		// fetch data
 		for _, buildServer := range m.BuildServers {
 			var raw []JenkinsRaw
-			// Fetch data for single repo
+			// Fetch data for single build
 			raw, err = fetcher.FetchItem(&Params{
 				JenkinsURL:     buildServer.URL,
 				Username:       buildServer.Username,

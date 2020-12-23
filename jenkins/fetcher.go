@@ -100,7 +100,7 @@ func (f *Fetcher) FetchBuilds(params *Params, jobURL string) (*BuildResponse, er
 	return &buildResponse, nil
 }
 
-// FetchItem pulls image data
+// FetchItem pulls builds data
 func (f *Fetcher) FetchItem(params *Params) ([]JenkinsRaw, error) {
 	var raw = make([]JenkinsRaw, 0)
 	// Fetch all jobs
