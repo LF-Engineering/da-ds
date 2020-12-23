@@ -1,6 +1,7 @@
 package dads
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"strconv"
@@ -56,11 +57,40 @@ type Ctx struct {
 	OffsetFromDetected bool
 	DB                 *sqlx.DB
 	ESScrollWaitSecs   float64
+
+	// Bugzilla contains all bugzilla params
+	BugZilla *BugZilla
+}
+
+// BugZilla parameter context contains all required parameters to run Bugzilla fetch and enrich
+type BugZilla struct {
+	Origin     *Flag
+	EsIndex    *Flag
+	FromDate   *Flag
+	Project    *Flag
+	DoFetch    *Flag
+	DoEnrich   *Flag
+	FetchSize  *Flag
+	EnrichSize *Flag
 }
 
 // Env - get env value using current DS prefix
 func (ctx *Ctx) Env(v string) string {
 	return os.Getenv(ctx.DSPrefix + v)
+}
+
+// ParseFlags declare and parse CLI flags
+func (ctx *Ctx) ParseFlags() {
+	flag.Var(ctx.BugZilla.Origin, "bugzilla-origin", "Bugzilla origin url")
+	flag.Var(ctx.BugZilla.EsIndex, "bugzilla-es-index", "Bugzilla es index base name")
+	flag.Var(ctx.BugZilla.FromDate, "bugzilla-from-date", "Optional, date to start syncing from")
+	flag.Var(ctx.BugZilla.Project, "bugzilla-project", "Slug name of a project e.g. yocto")
+	flag.Var(ctx.BugZilla.DoFetch, "bugzilla-do-fetch", "To decide whether will fetch raw data or not")
+	flag.Var(ctx.BugZilla.DoEnrich, "bugzilla-do-enrich", "To decide whether will do enrich raw data or not.")
+	flag.Var(ctx.BugZilla.FetchSize, "bugzilla-fetch-size", "Total number of fetched items per request.")
+	flag.Var(ctx.BugZilla.EnrichSize, "bugzilla-enrich-size", "Total number of enriched items per request.")
+
+	flag.Parse()
 }
 
 // BoolEnv - parses env variable as bool
@@ -258,6 +288,16 @@ func (ctx *Ctx) Init() {
 			ctx.OffsetTo = offset
 		}
 	}
+	ctx.BugZilla = &BugZilla{
+		Origin:     NewFlag(),
+		EsIndex:    NewFlag(),
+		DoFetch:    NewFlag(),
+		DoEnrich:   NewFlag(),
+		FetchSize:  NewFlag(),
+		EnrichSize: NewFlag(),
+		Project:    NewFlag(),
+	}
+
 }
 
 // Validate - check if config is correct
@@ -267,12 +307,6 @@ func (ctx *Ctx) Validate() (err error) {
 	}
 	if strings.HasSuffix(ctx.ESURL, "/") {
 		ctx.ESURL = ctx.ESURL[:len(ctx.ESURL)-1]
-	}
-	if !ctx.NoRaw && ctx.RawIndex == "" {
-		return fmt.Errorf("you must specify raw index name unless skipping raw processing")
-	}
-	if ctx.Enrich && ctx.RichIndex == "" {
-		return fmt.Errorf("you must specify rich index name unless skipping enrichment")
 	}
 	return
 }
