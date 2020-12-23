@@ -33,9 +33,9 @@ func runDS(ctx *lib.Ctx) (err error) {
 	case jenkins.Jenkins:
 		manager, err := buildJenkinsManager(ctx)
 		if err != nil {
-			return
-    }
-    return manager.Sync()
+			return err
+    	}
+    	return manager.Sync()
 	case bugzilla.Bugzilla:
 		manager, err := buildBugzillaManager(ctx)
 		if err != nil {
