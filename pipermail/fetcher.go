@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
+	"encoding/json"
 	"fmt"
 	"github.com/LF-Engineering/da-ds/mbox"
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
@@ -358,7 +359,19 @@ func (f *Fetcher) AddMetadata(msg interface{}, slug, groupName, link string) *Ra
 	rawMessage.MetadataUpdatedOn = lib.ToESDate(updatedOn)
 	rawMessage.MetadataTimestamp = lib.ToESDate(timestamp)
 	rawMessage.ProjectSlug = slug
-	rawMessage.Data = msg
+
+	// handle message data
+	var mData RawMessageData
+	messageBytes, err := json.Marshal(msg)
+	if err != nil {
+		fmt.Println(err)
+	}
+	err = json.Unmarshal(messageBytes, &mData)
+	if err != nil {
+		fmt.Println(err)
+	}
+	rawMessage.Data = mData
+
 	// generate UUID
 	uid, err := uuid.Generate(groupName, strconv.FormatFloat(utils.ConvertTimeToFloat(timestamp), 'f', -1, 64))
 	if err != nil {
