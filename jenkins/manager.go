@@ -10,8 +10,6 @@ import (
 
 // Manager describes Jenkins manager
 type Manager struct {
-	Username               string
-	Password               string
 	FetcherBackendVersion  string
 	EnricherBackendVersion string
 	EnrichOnly             bool
@@ -79,10 +77,9 @@ func (m *Manager) Sync() error {
 			// Fetch data for single repo
 			raw, err = fetcher.FetchItem(&Params{
 				JenkinsURL:     buildServer.URL,
-				Username:       m.Username,
-				Password:       m.Password,
+				Username:       buildServer.Username,
+				Password:       buildServer.Password,
 				Depth:          Depth,
-				BackendVersion: "0.1.0",
 			})
 			if err != nil {
 				return fmt.Errorf("could not fetch data from repository: %s-%s", buildServer.URL, buildServer.Project)
@@ -151,8 +148,6 @@ func (m *Manager) Sync() error {
 func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 	httpClientProvider := utils.NewHTTPClientProvider(m.HTTPTimeout)
 	params := &Params{
-		Username:       m.Username,
-		Password:       m.Password,
 		BackendVersion: m.FetcherBackendVersion,
 	}
 	esClientProvider, err := utils.NewESClientProvider(&utils.ESParams{

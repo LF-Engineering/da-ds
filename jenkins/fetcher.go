@@ -131,7 +131,7 @@ func (f *Fetcher) MapToJenkinsRaw(response *BuildResponse, params *Params) []Jen
 		raw.Tag = params.JenkinsURL
 		raw.SearchFields.ItemID = build.URL
 		raw.SearchFields.Number = build.Number
-		raw.BackendVersion = params.BackendVersion
+		raw.BackendVersion = f.BackendVersion
 		raw.Category = BuildCategory
 		raw.Origin = params.JenkinsURL
 		raw.UpdatedOn = float64(build.Timestamp)/1000
