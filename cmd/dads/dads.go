@@ -6,6 +6,8 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/LF-Engineering/da-ds/bugzilla"
+
 	jsoniter "github.com/json-iterator/go"
 
 	"github.com/LF-Engineering/da-ds/dockerhub"
@@ -32,6 +34,12 @@ func runDS(ctx *lib.Ctx) (err error) {
 		manager, err := buildJenkinsManager(ctx)
 		if err != nil {
 			return
+    }
+    return manager.Sync()
+	case bugzilla.Bugzilla:
+		manager, err := buildBugzillaManager(ctx)
+		if err != nil {
+			return err
 		}
 		return manager.Sync()
 	case lib.Git:
@@ -80,6 +88,7 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 	dtStart := time.Now()
 	ctx.Init()
+	ctx.ParseFlags()
 	lib.FatalOnError(ctx.Validate())
 	lib.CreateESCache(&ctx)
 	lib.FatalOnError(runDS(&ctx))
@@ -116,9 +125,10 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 		enrichOnly, enrich, esURL, timeout, repositories, fromDate, noIncremental), nil
 }
 
+
 func buildJenkinsManager(ctx *lib.Ctx) (*jenkins.Manager, error) {
-	fetcherBackendVersion := "0.0.1"  //ctx.Env("FETCHER_BACKEND_VERSION")
-	enricherBackendVersion := "0.0.1" //ctx.Env("ENRICHER_BACKEND_VERSION")
+	fetcherBackendVersion := "0.0.1"
+	enricherBackendVersion := "0.0.1" 
 	noIncremental := ctx.BoolEnv("NO_INCREMENTAL")
 	httpTimeout := ctx.Env("HTTP_TIMEOUT") // "60s" 60 seconds...
 	//example jenkinsJSON = `[{"username": "user", "password": "Admin123", "url":"https://jenkins.soramitsu.co.jp/job/iroha/job/iroha-hyperledger","project":"Iroha","index":"sds-hyperledger-iroha"}]`
@@ -137,4 +147,26 @@ func buildJenkinsManager(ctx *lib.Ctx) (*jenkins.Manager, error) {
 	}
 	return jenkins.NewManager(fetcherBackendVersion, enricherBackendVersion,
 		enrichOnly, enrich, esURL, timeout, buildServers, fromDate, noIncremental), nil
+}
+
+func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
+
+	origin := ctx.BugZilla.Origin.String()
+	fetcherBackendVersion := "0.1.0"
+	enricherBackendVersion := "0.1.0"
+	doFetch := ctx.BugZilla.DoFetch.Bool()
+	doEnrich := ctx.BugZilla.DoEnrich.Bool()
+	fromDate := ctx.BugZilla.FromDate.Date()
+	fetchSize := ctx.BugZilla.FetchSize.Int()
+	enrichSize := ctx.BugZilla.EnrichSize.Int()
+	project := ctx.BugZilla.Project.String()
+	esIndex := ctx.BugZilla.EsIndex.String()
+	mgr, err := bugzilla.NewManager(origin, ctx.DBConn, fetcherBackendVersion, enricherBackendVersion,
+		doFetch, doEnrich, ctx.ESURL, "", "", esIndex, fromDate, project,
+		fetchSize, enrichSize)
+	if err != nil {
+		return nil, err
+	}
+
+	return mgr, nil
 }

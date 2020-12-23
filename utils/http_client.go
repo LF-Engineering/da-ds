@@ -47,6 +47,7 @@ func (h *HTTPClientProvider) Request(url string, method string, header map[strin
 			req.URL.Query().Add(k, v)
 		}
 	}
+
 	// Do request
 	res, err := h.httpclient.Do(req)
 	if err != nil {

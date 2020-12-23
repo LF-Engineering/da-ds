@@ -1,0 +1,502 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en">
+
+<head>
+    <title>Changes made to bug 14051</title>
+
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+
+    <link rel="Top" href="https://bugzilla.yoctoproject.org/">
+
+
+
+
+
+    <link rel="Show" title="Dependency Tree" href="showdependencytree.cgi?id=14051&amp;hide_resolved=1">
+    <link rel="Show" title="Dependency Graph" href="showdependencygraph.cgi?id=14051">
+
+    <link rel="Show" title="Bug Activity" href="show_activity.cgi?id=14051">
+    <link rel="Show" title="Printer-Friendly Version" href="show_bug.cgi?format=multiple&amp;id=14051">
+
+
+
+
+
+    <link href="skins/standard/global.css?1445397864" rel="alternate stylesheet" title="Classic">
+    <link href="skins/standard/global.css?1445397864" rel="stylesheet" type="text/css">
+    <!--[if lte IE 7]>
+
+
+
+
+    <link href="skins/standard/IE-fixes.css?1445397864" rel="stylesheet"
+          type="text/css" >
+    <![endif]-->
+
+
+    <link href="skins/contrib/Dusk/global.css?1445397864" rel="alternate stylesheet" type="text/css" title="Dusk">
+
+
+
+
+
+
+    <script type="text/javascript" src="js/yui/yahoo-dom-event/yahoo-dom-event.js?1445397864"></script>
+    <script type="text/javascript" src="js/yui/cookie/cookie-min.js?1445397864"></script>
+    <script type="text/javascript" src="js/global.js?1445397864"></script>
+
+    <script type="text/javascript">
+        <!--
+        YAHOO.namespace('bugzilla');
+        YAHOO.util.Event.addListener = function (el, sType, fn, obj, overrideContext) {
+            if ( ("onpagehide" in window || YAHOO.env.ua.gecko) && sType === "unload") { sType = "pagehide"; };
+            var capture = ((sType == "focusin" || sType == "focusout") && !YAHOO.env.ua.ie) ? true : false;
+            return this._addListener(el, this._getType(sType), fn, obj, overrideContext, capture);
+        };
+        if ( "onpagehide" in window || YAHOO.env.ua.gecko) {
+            YAHOO.util.Event._simpleRemove(window, "unload",
+                YAHOO.util.Event._unload);
+        }
+
+        function unhide_language_selector() {
+            YAHOO.util.Dom.removeClass(
+                'lang_links_container', 'bz_default_hidden'
+            );
+        }
+        YAHOO.util.Event.onDOMReady(unhide_language_selector);
+
+
+        var BUGZILLA = {
+            param: {
+                cookiepath: '\/',
+                maxusermatches: 0
+            },
+            constant: {
+                COMMENT_COLS: 80
+            },
+            string: {
+
+
+                attach_desc_required:
+                    'You must enter a Description for this attachment.',
+                component_required:
+                    'You must select a Component for this bug.',
+                description_required:
+                    'You must enter a Description for this bug.',
+                short_desc_required:
+                    'You must enter a Summary for this bug.',
+                version_required:
+                    'You must select a Version for this bug.'
+            }
+        };
+
+        //
+        -->
+    </script>
+
+
+
+
+
+    <link rel="search" type="application/opensearchdescription+xml" title="Bugzilla" href="./search_plugin.cgi">
+    <link rel="shortcut icon" href="images/favicon.ico">
+    <link href="extensions/Testopia/css/testopia.css" rel="stylesheet" type="text/css">
+    <link href="extensions/Testopia/extjs/examples/ux/css/RowEditor.css" rel="stylesheet" type="text/css" />
+    <script type="text/javascript">
+        Testopia_user = {login: "", id: 0};
+        DEFAULT_CASE_STATUS = 'PROPOSED';
+    </script>
+</head>
+
+
+
+<body onload="" class="bugzilla-yoctoproject-org yui-skin-sam">
+
+
+
+<div id="header">
+    <div id="banner">
+    </div>
+
+    <table border="0" cellspacing="0" cellpadding="0" id="titles">
+        <tr>
+            <td id="title">
+                <p>Bugzilla &ndash; Activity log for bug 14051: [QA 3.2 M3 RC1] failure in ptest : valgrind.drd and
+                    valgrind.helgrind</p>
+            </td>
+
+
+        </tr>
+    </table>
+
+    <table id="lang_links_container" cellpadding="0" cellspacing="0" class="bz_default_hidden">
+        <tr>
+            <td>
+            </td>
+        </tr>
+    </table>
+    <ul class="links">
+        <li><a href="./">Home</a></li>
+        <li><span class="separator">| </span><a href="enter_bug.cgi">New</a></li>
+        <li><span class="separator">| </span><a href="describecomponents.cgi">Browse</a></li>
+        <li><span class="separator">| </span><a href="query.cgi">Search</a></li>
+
+        <li class="form">
+            <span class="separator">| </span>
+            <form action="buglist.cgi" method="get" onsubmit="if (this.quicksearch.value == '')
+                  { alert('Please enter one or more search terms first.');
+                    return false; } return true;">
+                <input class="txt" type="text" id="quicksearch_top" name="quicksearch"
+                       title="Quick Search" value="">
+                <input class="btn" type="submit" value="Search"
+                       id="find_top"></form>
+            <a href="page.cgi?id=quicksearch.html" title="Quicksearch Help">[?]</a></li>
+
+        <li><span class="separator">| </span><a href="report.cgi">Reports</a></li>
+
+        <li>
+            <span class="separator">| </span>
+            <a href="request.cgi">Requests</a></li>
+
+
+
+        <li id="new_account_container_top">
+            <span class="separator">| </span>
+            <a href="createaccount.cgi">New&nbsp;Account</a>
+        </li>
+
+        <li id="mini_login_container_top">
+            <span class="separator">| </span>
+            <a id="login_link_top"
+               href="https://bugzilla.yoctoproject.org/show_activity.cgi?id=14051&amp;ctype=xml&amp;GoAheadAndLogIn=1"
+               onclick="return show_mini_login_form('_top')">Log In</a>
+
+
+            <form action="https://bugzilla.yoctoproject.org/show_activity.cgi?id=14051&amp;ctype=xml" method="POST"
+                  class="mini_login bz_default_hidden" id="mini_login_top"
+                  onsubmit="return check_mini_login_fields( '_top' );">
+                <input id="Bugzilla_login_top"
+                       class="bz_login"
+                       name="Bugzilla_login"
+                       title="Login"
+                       onfocus="mini_login_on_focus('_top')"
+                >
+                <input class="bz_password"
+                       id="Bugzilla_password_top"
+                       name="Bugzilla_password"
+                       type="password"
+                       title="Password"
+                >
+                <input class="bz_password bz_default_hidden bz_mini_login_help" type="text"
+                       id="Bugzilla_password_dummy_top" value="password"
+                       title="Password"
+                       onfocus="mini_login_on_focus('_top')"
+                >
+                <input type="submit" name="GoAheadAndLogIn" value="Log in"
+                       id="log_in_top">
+                <script type="text/javascript">
+                    mini_login_constants = {
+                        "login" : "login",
+                        "warning" : "You must set the login and password before logging in."
+                    };
+
+                    if (YAHOO.env.ua.gecko || YAHOO.env.ua.ie || YAHOO.env.ua.opera) {
+                        YAHOO.util.Event.onDOMReady(function() {
+                            init_mini_login_form('_top');
+                        });
+                    }
+                    else {
+                        YAHOO.util.Event.on(window, 'load', function () {
+                            window.setTimeout(function() {
+                                init_mini_login_form('_top');
+                            }, 200);
+                        });
+                    }
+                </script>
+                <a href="#" onclick="return hide_mini_login_form('_top')">[x]</a>
+            </form>
+        </li>
+        <li id="forgot_container_top">
+            <span class="separator">| </span>
+            <a id="forgot_link_top"
+               href="https://bugzilla.yoctoproject.org/show_activity.cgi?id=14051&amp;ctype=xml&amp;GoAheadAndLogIn=1#forgot"
+               onclick="return show_forgot_form('_top')">Forgot Password</a>
+            <form action="token.cgi" method="post" id="forgot_form_top" class="mini_forgot bz_default_hidden">
+                <label for="login_top">Login:</label>
+                <input type="text" name="loginname" size="20" id="login_top">
+                <input id="forgot_button_top" value="Reset Password"
+                       type="submit">
+                <input type="hidden" name="a" value="reqpw">
+                <input type="hidden" id="token_top" name="token" value="1607103676-101c01e2ec402495c4c65df23b839ee6">
+                <a href="#" onclick="return hide_forgot_form('_top')">[x]</a>
+            </form>
+        </li>
+    </ul>
+</div>
+
+<div id="bugzilla-body">
+
+    <p><a class="bz_bug_link
+          bz_status_RESOLVED  bz_closed"
+          title="RESOLVED FIXED - [QA 3.2 M3 RC1] failure in ptest : valgrind.drd and valgrind.helgrind"
+          href="show_bug.cgi?id=14051">Back to bug 14051</a>
+    </p>
+    <table border cellpadding="4">
+        <tr>
+            <th>Who</th>
+            <th>When</th>
+            <th>What</th>
+            <th>Removed</th>
+            <th>Added</th>
+        </tr>
+
+        <tr>
+            <td rowspan="2" valign="top">jay.shen.teoh
+            </td>
+            <td rowspan="2" valign="top">2020-09-20 21:39:36 UTC
+            </td>
+            <td>
+                CC
+            </td>
+            <td>
+            </td>
+            <td>akuster808, randy.macleod, richard.purdie, sangeeta.jain
+            </td>
+        </tr>
+        <tr>
+            <td>
+                Target Milestone
+            </td>
+            <td>---
+            </td>
+            <td>3.2 M3
+            </td>
+        </tr>
+        <tr>
+            <td rowspan="1" valign="top">sangeeta.jain
+            </td>
+            <td rowspan="1" valign="top">2020-09-20 22:48:49 UTC
+            </td>
+            <td>
+                Target Milestone
+            </td>
+            <td>3.2 M3
+            </td>
+            <td>3.2 M4
+            </td>
+        </tr>
+        <tr>
+            <td rowspan="2" valign="top">randy.macleod
+            </td>
+            <td rowspan="2" valign="top">2020-09-24 07:44:45 UTC
+            </td>
+            <td>
+                Priority
+            </td>
+            <td>Undecided
+            </td>
+            <td>Medium+
+            </td>
+        </tr>
+        <tr>
+            <td>
+                Assignee
+            </td>
+            <td>unassigned
+            </td>
+            <td>stacy.gaikovaia
+            </td>
+        </tr>
+        <tr>
+            <td rowspan="1" valign="top">jay.shen.teoh
+            </td>
+            <td rowspan="1" valign="top">2020-10-29 22:09:39 UTC
+            </td>
+            <td>
+                Status
+            </td>
+            <td>NEW
+            </td>
+            <td>IN PROGRESS REVIEW
+            </td>
+        </tr>
+        <tr>
+            <td rowspan="2" valign="top">randy.macleod
+            </td>
+            <td rowspan="2" valign="top">2020-11-05 09:53:55 UTC
+            </td>
+            <td>
+                Target Milestone
+            </td>
+            <td>3.2 M4
+            </td>
+            <td>3.3 M1
+            </td>
+        </tr>
+        <tr>
+            <td>
+                Whiteboard
+            </td>
+            <td>
+            </td>
+            <td>backport to 3.2
+            </td>
+        </tr>
+        <tr>
+            <td rowspan="2" valign="top">stacy.gaikovaia
+            </td>
+            <td rowspan="2" valign="top">2020-11-26 15:32:36 UTC
+            </td>
+            <td>
+                Status
+            </td>
+            <td>IN PROGRESS REVIEW
+            </td>
+            <td>RESOLVED
+            </td>
+        </tr>
+        <tr>
+            <td>
+                Resolution
+            </td>
+            <td>---
+            </td>
+            <td>FIXED
+            </td>
+        </tr>
+    </table>
+
+    <p><a class="bz_bug_link
+          bz_status_RESOLVED  bz_closed"
+          title="RESOLVED FIXED - [QA 3.2 M3 RC1] failure in ptest : valgrind.drd and valgrind.helgrind"
+          href="show_bug.cgi?id=14051">Back to bug 14051</a>
+    </p>
+</div>
+
+
+
+<div id="footer">
+    <div class="intro"></div>
+
+
+
+
+    <ul id="useful-links">
+        <li id="links-actions">
+            <ul class="links">
+                <li><a href="./">Home</a></li>
+                <li><span class="separator">| </span><a href="enter_bug.cgi">New</a></li>
+                <li><span class="separator">| </span><a href="describecomponents.cgi">Browse</a></li>
+                <li><span class="separator">| </span><a href="query.cgi">Search</a></li>
+
+                <li class="form">
+                    <span class="separator">| </span>
+                    <form action="buglist.cgi" method="get" onsubmit="if (this.quicksearch.value == '')
+                  { alert('Please enter one or more search terms first.');
+                    return false; } return true;">
+                        <input class="txt" type="text" id="quicksearch_bottom" name="quicksearch"
+                               title="Quick Search" value="">
+                        <input class="btn" type="submit" value="Search"
+                               id="find_bottom"></form>
+                    <a href="page.cgi?id=quicksearch.html" title="Quicksearch Help">[?]</a></li>
+
+                <li><span class="separator">| </span><a href="report.cgi">Reports</a></li>
+
+                <li>
+                    <span class="separator">| </span>
+                    <a href="request.cgi">Requests</a></li>
+
+
+
+                <li id="new_account_container_bottom">
+                    <span class="separator">| </span>
+                    <a href="createaccount.cgi">New&nbsp;Account</a>
+                </li>
+
+                <li id="mini_login_container_bottom">
+                    <span class="separator">| </span>
+                    <a id="login_link_bottom"
+                       href="https://bugzilla.yoctoproject.org/show_activity.cgi?id=14051&amp;ctype=xml&amp;GoAheadAndLogIn=1"
+                       onclick="return show_mini_login_form('_bottom')">Log In</a>
+
+
+                    <form action="https://bugzilla.yoctoproject.org/show_activity.cgi?id=14051&amp;ctype=xml"
+                          method="POST" class="mini_login bz_default_hidden" id="mini_login_bottom"
+                          onsubmit="return check_mini_login_fields( '_bottom' );">
+                        <input id="Bugzilla_login_bottom"
+                               class="bz_login"
+                               name="Bugzilla_login"
+                               title="Login"
+                               onfocus="mini_login_on_focus('_bottom')"
+                        >
+                        <input class="bz_password"
+                               id="Bugzilla_password_bottom"
+                               name="Bugzilla_password"
+                               type="password"
+                               title="Password"
+                        >
+                        <input class="bz_password bz_default_hidden bz_mini_login_help" type="text"
+                               id="Bugzilla_password_dummy_bottom" value="password"
+                               title="Password"
+                               onfocus="mini_login_on_focus('_bottom')"
+                        >
+                        <input type="submit" name="GoAheadAndLogIn" value="Log in"
+                               id="log_in_bottom">
+                        <script type="text/javascript">
+                            mini_login_constants = {
+                                "login" : "login",
+                                "warning" : "You must set the login and password before logging in."
+                            };
+
+                            if (YAHOO.env.ua.gecko || YAHOO.env.ua.ie || YAHOO.env.ua.opera) {
+                                YAHOO.util.Event.onDOMReady(function() {
+                                    init_mini_login_form('_bottom');
+                                });
+                            }
+                            else {
+                                YAHOO.util.Event.on(window, 'load', function () {
+                                    window.setTimeout(function() {
+                                        init_mini_login_form('_bottom');
+                                    }, 200);
+                                });
+                            }
+                        </script>
+                        <a href="#" onclick="return hide_mini_login_form('_bottom')">[x]</a>
+                    </form>
+                </li>
+                <li id="forgot_container_bottom">
+                    <span class="separator">| </span>
+                    <a id="forgot_link_bottom"
+                       href="https://bugzilla.yoctoproject.org/show_activity.cgi?id=14051&amp;ctype=xml&amp;GoAheadAndLogIn=1#forgot"
+                       onclick="return show_forgot_form('_bottom')">Forgot Password</a>
+                    <form action="token.cgi" method="post" id="forgot_form_bottom"
+                          class="mini_forgot bz_default_hidden">
+                        <label for="login_bottom">Login:</label>
+                        <input type="text" name="loginname" size="20" id="login_bottom">
+                        <input id="forgot_button_bottom" value="Reset Password"
+                               type="submit">
+                        <input type="hidden" name="a" value="reqpw">
+                        <input type="hidden" id="token_bottom" name="token" value="1607103676-101c01e2ec402495c4c65df23b839ee6">
+                        <a href="#" onclick="return hide_forgot_form('_bottom')">[x]</a>
+                    </form>
+                </li>
+            </ul>
+        </li>
+
+
+
+
+
+
+
+        <form id="testopia_helper_frm"></form>
+    </ul>
+
+    <div class="outro"></div>
+</div>
+
+
+</body>
+
+</html>

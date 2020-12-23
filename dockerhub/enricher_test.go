@@ -1,7 +1,6 @@
 package dockerhub
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/LF-Engineering/da-ds/dockerhub/mocks"
@@ -532,8 +531,6 @@ func TestEnrichItem(t *testing.T) {
 			if err != nil {
 				tt.Error(err)
 			}
-			fmt.Println("xxxxxx")
-			fmt.Println(expectedEnrich)
 			// Assert
 			assert.Equal(tt, expectedEnrich.MetadataUpdatedOn.String(), enrich.MetadataUpdatedOn.String())
 			assert.Equal(tt, expectedEnrich.LastUpdated, enrich.LastUpdated)
