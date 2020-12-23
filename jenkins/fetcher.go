@@ -154,7 +154,7 @@ func (f *Fetcher) HandleMapping(index string) error {
 
 // GetLastDate gets fetching lastDate
 func (f *Fetcher) GetLastDate(buildServer BuildServer, now time.Time) (time.Time, error) {
-	lastDate, err := f.ElasticSearchProvider.GetStat(fmt.Sprintf("%s-raw", buildServer.Index), "metadata__updated_on", "max", nil, nil)
+	lastDate, err := f.ElasticSearchProvider.GetStat(fmt.Sprintf("%s", buildServer.Index), "metadata__updated_on", "max", nil, nil)
 	if err != nil {
 		return DEFAULT_TIME, err
 	}
