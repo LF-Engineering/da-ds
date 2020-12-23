@@ -2,11 +2,15 @@ package bugzilla
 
 import (
 	"fmt"
+	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
 	"time"
 
 	"github.com/LF-Engineering/da-ds/affiliation"
-	db "github.com/LF-Engineering/da-ds/db"
-	"github.com/LF-Engineering/da-ds/utils"
+	"github.com/LF-Engineering/da-ds/db"
+	"github.com/LF-Engineering/dev-analytics-libraries/http"
+	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
+
+
 )
 
 // Manager describes bugzilla manager
@@ -116,12 +120,12 @@ func (m *Manager) Sync() error {
 }
 
 func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
-	httpClientProvider := utils.NewHTTPClientProvider(m.HTTPTimeout)
+	httpClientProvider := utils.NewHTTPClientProvider (m.HTTPTimeout)
 	params := &Params{
 		Endpoint:       m.Endpoint,
 		BackendVersion: m.FetcherBackendVersion,
 	}
-	esClientProvider, err := utils.NewESClientProvider(&utils.ESParams{
+	esClientProvider, err := elastic.NewClientProvider(&elastic.ESParams{
 		URL:      m.ESUrl,
 		Username: m.ESUsername,
 		Password: m.ESPassword,
@@ -170,11 +174,11 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 			lastFetch = &val.Hits.Hits[0].Source.ChangedAt
 		}
 
-		from := utils.GetOldestDate(m.FromDate, lastFetch)
+		from := timeLib.GetOldestDate(m.FromDate, lastFetch)
 
 		round := false
 		for result == m.FetchSize {
-			data := make([]*utils.BulkData, 0)
+			data := make([]*elastic.BulkData, 0)
 			bugs, err := fetcher.FetchItem(*from, m.FetchSize, now)
 			if err != nil {
 				ch <- err
@@ -190,13 +194,13 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 				bugs = nil
 			} else if round {
 				for _, bug := range bugs {
-					data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s-raw", m.ESIndex), ID: bug.UUID, Data: bug})
+					data = append(data, &elastic.BulkData{IndexName: fmt.Sprintf("%s-raw", m.ESIndex), ID: bug.UUID, Data: bug})
 				}
 				round = true
 			} else {
 				bugs = bugs[1:result]
 				for _, bug := range bugs {
-					data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s-raw", m.ESIndex), ID: bug.UUID, Data: bug})
+					data = append(data, &elastic.BulkData{IndexName: fmt.Sprintf("%s-raw", m.ESIndex), ID: bug.UUID, Data: bug})
 				}
 			}
 
@@ -212,7 +216,7 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 				// Update changed at in elastic cache index
 				cacheDoc, _ := data[len(data)-1].Data.(*BugRaw)
 				updateChan := HitSource{ID: fetchID, ChangedAt: cacheDoc.ChangedAt}
-				data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: fetchID, Data: updateChan})
+				data = append(data, &elastic.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: fetchID, Data: updateChan})
 
 				// Insert raw data to elasticsearch
 				_, err = m.esClientProvider.BulkInsert(data)
@@ -271,7 +275,7 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 			lastEnrich = val.Hits.Hits[0].Source.ChangedAt
 		}
 
-		from := utils.GetOldestDate(m.FromDate, &lastEnrich)
+		from := timeLib.GetOldestDate(m.FromDate, &lastEnrich)
 
 		conditions := map[string]interface{}{
 			"range": map[string]interface{}{
@@ -297,14 +301,14 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 				return
 			}
 
-			data := make([]*utils.BulkData, 0)
+			data := make([]*elastic.BulkData, 0)
 			for _, hit := range topHits.Hits.Hits {
 				enrichedItem, err := enricher.EnrichItem(hit.Source, time.Now().UTC())
 				if err != nil {
 					ch <- err
 					return
 				}
-				data = append(data, &utils.BulkData{IndexName: m.ESIndex, ID: enrichedItem.UUID, Data: enrichedItem})
+				data = append(data, &elastic.BulkData{IndexName: m.ESIndex, ID: enrichedItem.UUID, Data: enrichedItem})
 			}
 
 			results = len(data)
@@ -324,7 +328,7 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 				// Update changed at in elastic cache index
 				cacheDoc, _ := data[len(data)-1].Data.(*BugEnrich)
 				updateChan := HitSource{ID: enrichID, ChangedAt: cacheDoc.ChangedDate}
-				data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: enrichID, Data: updateChan})
+				data = append(data, &elastic.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: enrichID, Data: updateChan})
 
 				// Insert enriched data to elasticsearch
 				_, err = m.esClientProvider.BulkInsert(data)

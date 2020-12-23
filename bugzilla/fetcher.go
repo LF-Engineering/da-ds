@@ -3,12 +3,14 @@ package bugzilla
 import (
 	"encoding/xml"
 	"fmt"
+	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
+	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
+
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/LF-Engineering/da-ds/utils"
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 )
 
@@ -35,7 +37,7 @@ type ESClientProvider interface {
 	Bulk(body []byte) ([]byte, error)
 	Get(index string, query map[string]interface{}, result interface{}) (err error)
 	GetStat(index string, field string, aggType string, mustConditions []map[string]interface{}, mustNotConditions []map[string]interface{}) (result time.Time, err error)
-	BulkInsert(data []*utils.BulkData) ([]byte, error)
+	BulkInsert(data []*elastic.BulkData) ([]byte, error)
 }
 
 // Params required parameters for bugzilla fetcher
@@ -128,7 +130,7 @@ func (f *Fetcher) FetchItem(fromDate time.Time, limit int, now time.Time) ([]*Bu
 
 		raw.MetadataUpdatedOn = now
 		raw.MetadataTimestamp = now
-		raw.Timestamp = utils.ConvertTimeToFloat(now)
+		raw.Timestamp = timeLib.ConvertTimeToFloat(now)
 		raw.Category = Category
 
 		t, err = time.Parse("2006-01-02 15:04:05", strings.TrimSuffix(bug.ChangedAt, " +0000"))

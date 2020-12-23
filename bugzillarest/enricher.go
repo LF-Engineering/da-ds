@@ -2,9 +2,9 @@ package bugzillarest
 
 import (
 	"fmt"
-	"github.com/LF-Engineering/da-ds/utils"
 	"strings"
 	"time"
+	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
 
 	"github.com/LF-Engineering/da-ds/affiliation"
 )
@@ -49,7 +49,7 @@ func (e *Enricher) EnrichItem(rawItem BugzillaRestRaw, now time.Time) (*BugRestE
 	enriched.MetadataTimestamp = rawItem.MetadataTimestamp
 	enriched.MetadataEnrichedOn = now
 	enriched.MetadataFilterRaw = nil
-	enriched.ProjectTs = utils.ConvertTimeToFloat(now)
+	enriched.ProjectTs = timeLib.ConvertTimeToFloat(now)
 	enriched.ID = rawItem.Data.ID
 	enriched.MetadataBackendName = fmt.Sprintf("%sEnrich", strings.Title(e.DSName))
 	enriched.MetadataBackendVersion = e.BackendVersion

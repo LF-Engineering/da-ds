@@ -3,10 +3,11 @@ package dockerhub
 import (
 	"errors"
 	"fmt"
+	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
+	utils "github.com/LF-Engineering/dev-analytics-libraries/http"
 	"log"
 	"time"
 
-	"github.com/LF-Engineering/da-ds/utils"
 )
 
 // Manager describes dockerhub manager
@@ -85,7 +86,7 @@ func (m *Manager) Sync() error {
 	}
 
 	if !m.EnrichOnly {
-		data := make([]*utils.BulkData, 0)
+		data := make([]*elastic.BulkData, 0)
 
 		// fetch data
 		for _, repo := range m.Repositories {
@@ -95,7 +96,7 @@ func (m *Manager) Sync() error {
 			if err != nil {
 				return fmt.Errorf("could not fetch data from repository: %s-%s", repo.Owner, repo.Repository)
 			}
-			data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s-raw", repo.ESIndex), ID: raw.UUID, Data: raw})
+			data = append(data, &elastic.BulkData{IndexName: fmt.Sprintf("%s-raw", repo.ESIndex), ID: raw.UUID, Data: raw})
 
 			// set mapping and create index if not exists
 			_ = fetcher.HandleMapping(fmt.Sprintf("%s-raw", repo.ESIndex))
@@ -111,7 +112,7 @@ func (m *Manager) Sync() error {
 	}
 
 	if m.Enrich || m.EnrichOnly {
-		data := make([]*utils.BulkData, 0)
+		data := make([]*elastic.BulkData, 0)
 
 		for _, repo := range m.Repositories {
 			var fromDate *time.Time
@@ -136,7 +137,7 @@ func (m *Manager) Sync() error {
 				if err != nil {
 					return fmt.Errorf("could not enrich data from repository: %s-%s", repo.Owner, repo.Repository)
 				}
-				data = append(data, &utils.BulkData{IndexName: repo.ESIndex, ID: enriched.UUID, Data: enriched})
+				data = append(data, &elastic.BulkData{IndexName: repo.ESIndex, ID: enriched.UUID, Data: enriched})
 				_ = enricher.HandleMapping(repo.ESIndex)
 
 			}
@@ -177,7 +178,7 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 		Password:       m.Password,
 		BackendVersion: m.FetcherBackendVersion,
 	}
-	esClientProvider, err := utils.NewESClientProvider(&utils.ESParams{
+	esClientProvider, err := elastic.NewClientProvider(&elastic.ESParams{
 		URL:      m.ESUrl,
 		Username: m.ESUsername,
 		Password: m.ESPassword,
