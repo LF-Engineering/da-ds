@@ -230,7 +230,7 @@ func (j *DSRocketchat) SleepAsRequested(res interface{}) {
 		return
 	}
 	sleepFor, _ := strconv.Atoi(match[0][1])
-	Printf("Sleeping for %d seconds, as requested in '%s'\n", errorMsg)
+	Printf("Sleeping for %d seconds, as requested in '%s'\n", sleepFor, errorMsg)
 	sleepFor++
 	time.Sleep(time.Duration(sleepFor) * time.Second)
 }
