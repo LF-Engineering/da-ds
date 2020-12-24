@@ -259,7 +259,6 @@ func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
 		}
 		// curl -s -H 'X-Auth-Token: token' -H 'X-User-ID: user' URL/api/v1/channels.info?roomName=channel | jq '.'
 		// 48 hours for caching channel info
-		Printf("expecting 429 as OK\n")
 		res, status, _, outHeaders, err = Request(
 			ctx,
 			url,

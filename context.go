@@ -19,7 +19,7 @@ type Ctx struct {
 	DebugSQL           int        // From DA_DS_DEBUG_SQL SQL Debug level
 	Retry              int        // From DA_DS_RETRY: how many times retry failed operatins, default 5
 	ST                 bool       // From DA_DS_ST true: use single threaded version, false: use multi threaded version, default false
-	NCPUs              int        // From DA_DS_NCPUS, set to override number of CPUs to run, this overwrites DA_ST, default 0 (which means do not use it, use all CPU reported by go library)
+	NCPUs              int        // From DA_DS_NCPUS, set to override number of CPUs to run, this overwrites DA_DS_ST, default 0 (which means do not use it, use all CPU reported by go library)
 	NCPUsScale         float64    // From DA_DS_NCPUS_SCALE, scale number of CPUs, for example 2.0 will report number of cpus 2.0 the number of actually available CPUs
 	Enrich             bool       // From DA_DS_ENRICH, flag to run enrichment
 	RawIndex           string     // From DA_DS_RAW_INDEX - raw index name

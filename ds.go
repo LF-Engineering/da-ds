@@ -202,6 +202,87 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 			identsAry = append(identsAry, ident)
 		}
 		nIdents := len(identsAry)
+		source := ds.Name()
+		runOneByOne := func() (err error) {
+			var errs []error
+			defer func() {
+				nErrs := len(errs)
+				if nErrs == 0 {
+					return
+				}
+				s := fmt.Sprintf("%d errors: ", nErrs)
+				for _, e := range errs {
+					s += e.Error() + ", "
+				}
+				s = s[:len(s)-2]
+				err = fmt.Errorf("%s", s)
+			}()
+			for i := 0; i < nIdents; i++ {
+				ident := identsAry[i]
+				queryU := "insert ignore into uidentities(uuid,last_modified) values"
+				queryI := "insert ignore into identities(id,source,name,email,username,uuid,last_modified) values"
+				queryP := "insert ignore into profiles(uuid,name,email) values"
+				argsU := []interface{}{}
+				argsI := []interface{}{}
+				argsP := []interface{}{}
+				name := ident[0]
+				username := ident[1]
+				email := ident[2]
+				var (
+					pname     *string
+					pemail    *string
+					pusername *string
+					profname  *string
+				)
+				if name != Nil {
+					pname = &name
+					profname = &name
+				}
+				if email != Nil {
+					pemail = &email
+				}
+				if username != Nil {
+					pusername = &username
+					if profname == nil {
+						profname = &username
+					}
+				}
+				if pname == nil && pemail == nil && pusername == nil {
+					continue
+				}
+				// if username matches a real email and there is no email set, assume email=username
+				if pemail == nil && pusername != nil && IsValidEmail(username) {
+					pemail = &username
+					email = username
+				}
+				// if name matches a real email and there is no email set, assume email=name
+				if pemail == nil && pname != nil && IsValidEmail(name) {
+					pemail = &name
+					email = name
+				}
+				// uuid(source, email, name, username)
+				uuid := UUIDAffs(ctx, source, email, name, username)
+				queryU += fmt.Sprintf("(?,now())")
+				queryI += fmt.Sprintf("(?,?,?,?,?,?,now())")
+				queryP += fmt.Sprintf("(?,?,?)")
+				argsU = append(argsU, uuid)
+				argsI = append(argsI, uuid, source, pname, pemail, pusername, uuid)
+				argsP = append(argsP, uuid, profname, pemail)
+				_, e = ExecSQL(ctx, tx, queryU, argsU...)
+				if e != nil {
+					errs = append(errs, e)
+				}
+				_, e = ExecSQL(ctx, tx, queryP, argsP...)
+				if e != nil {
+					errs = append(errs, e)
+				}
+				_, e = ExecSQL(ctx, tx, queryI, argsI...)
+				if e != nil {
+					errs = append(errs, e)
+				}
+			}
+			return
+		}
 		defer func() {
 			if tx != nil {
 				if ctx.DryRun {
@@ -210,6 +291,7 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 					Printf("rolling back %d identities insert\n", nIdents)
 				}
 				_ = tx.Rollback()
+				err = runOneByOne()
 			}
 		}()
 		if ctx.Debug > 0 {
@@ -219,7 +301,6 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 		if nIdents%bulkSize != 0 {
 			nPacks++
 		}
-		source := ds.Name()
 		for i := 0; i < nPacks; i++ {
 			from := i * bulkSize
 			to := from + bulkSize
