@@ -146,7 +146,7 @@ func (j *DSRocketchat) CalculateTimeToReset(ctx *Ctx, rateLimit, rateLimitReset 
 }
 
 // GetRocketchatMessages - get confluence historical contents
-func (j *DSRocketchat) GetRocketchatMessages(ctx *Ctx, fromDate string, offset, rateLimit, rateLimitReset int) (messages []map[string]interface{}, newOffset, total, outRateLimit, outRateLimitReset int, err error) {
+func (j *DSRocketchat) GetRocketchatMessages(ctx *Ctx, fromDate string, offset, rateLimit, rateLimitReset, thrN int) (messages []map[string]interface{}, newOffset, total, outRateLimit, outRateLimitReset int, err error) {
 	query := `{"_updatedAt": {"$gte": {"$date": "` + fromDate + `"}}}`
 	url := j.URL + fmt.Sprintf(
 		`/api/v1/channels.messages?roomName=%s&count=%d&offset=%d&sort=%s&query=%s`,
@@ -192,7 +192,7 @@ func (j *DSRocketchat) GetRocketchatMessages(ctx *Ctx, fromDate string, offset, 
 		}
 		// Too many requests
 		if status == 429 {
-			j.SleepAsRequested(res)
+			j.SleepAsRequested(res, thrN)
 			continue
 		}
 		if err != nil {
@@ -215,23 +215,24 @@ func (j *DSRocketchat) GetRocketchatMessages(ctx *Ctx, fromDate string, offset, 
 // SleepAsRequested - parse server's:
 // {"success":false,"error":"Error, too many requests. Please slow down. You must wait 23 seconds before trying this endpoint again. [error-too-many-requests]"}
 // And sleep N+1 requested seconds
-func (j *DSRocketchat) SleepAsRequested(res interface{}) {
+func (j *DSRocketchat) SleepAsRequested(res interface{}, thrN int) {
 	iErrorMsg, ok := res.(map[string]interface{})["error"]
 	if !ok {
-		Printf("Unable to parse sleep duration, assuming 30s\n")
-		time.Sleep(time.Duration(30) * time.Second)
+		Printf("Unable to parse sleep duration, assuming 1m\n")
+		time.Sleep(time.Duration(60) * time.Second)
 		return
 	}
 	errorMsg, _ := iErrorMsg.(string)
 	match := MustWaitRE.FindAllStringSubmatch(errorMsg, -1)
 	if len(match) < 1 {
-		Printf("Unable to parse sleep duration from '%s', assuming 30s\n", errorMsg)
-		time.Sleep(time.Duration(30) * time.Second)
+		Printf("Unable to parse sleep duration from '%s', assuming 1m\n", errorMsg)
+		time.Sleep(time.Duration(60) * time.Second)
 		return
 	}
 	sleepFor, _ := strconv.Atoi(match[0][1])
-	Printf("Sleeping for %d seconds, as requested in '%s'\n", sleepFor, errorMsg)
 	sleepFor++
+	sleepFor *= thrN
+	Printf("Sleeping for %d (adjusted for MT) seconds, as requested in '%s'\n", sleepFor, errorMsg)
 	time.Sleep(time.Duration(sleepFor) * time.Second)
 }
 
@@ -257,6 +258,7 @@ func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
 		status     int
 		outHeaders map[string][]string
 	)
+	thrN := GetThreadsNum(ctx)
 	for {
 		err = SleepForRateLimit(ctx, j, rateLimit, rateLimitReset, j.MinRate, j.WaitRate)
 		if err != nil {
@@ -285,7 +287,7 @@ func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
 		}
 		// Too many requests
 		if status == 429 {
-			j.SleepAsRequested(res)
+			j.SleepAsRequested(res, thrN)
 			continue
 		}
 		if err != nil {
@@ -307,7 +309,6 @@ func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
 		escha      []chan error
 		eschaMtx   *sync.Mutex
 	)
-	thrN := GetThreadsNum(ctx)
 	if thrN > 1 {
 		ch = make(chan error)
 		allMsgsMtx = &sync.Mutex{}
@@ -369,7 +370,7 @@ func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
 	if thrN > 1 {
 		for {
 			var messages []map[string]interface{}
-			messages, offset, total, rateLimit, rateLimitReset, err = j.GetRocketchatMessages(ctx, sDateFrom, offset, rateLimit, rateLimitReset)
+			messages, offset, total, rateLimit, rateLimitReset, err = j.GetRocketchatMessages(ctx, sDateFrom, offset, rateLimit, rateLimitReset, thrN)
 			if err != nil {
 				return
 			}
@@ -418,7 +419,7 @@ func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
 	} else {
 		for {
 			var messages []map[string]interface{}
-			messages, offset, total, rateLimit, rateLimitReset, err = j.GetRocketchatMessages(ctx, sDateFrom, offset, rateLimit, rateLimitReset)
+			messages, offset, total, rateLimit, rateLimitReset, err = j.GetRocketchatMessages(ctx, sDateFrom, offset, rateLimit, rateLimitReset, thrN)
 			if err != nil {
 				return
 			}
