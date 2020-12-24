@@ -74,23 +74,21 @@ func NewFetcher(params *Params, httpClientProvider HTTPClientProvider, esClientP
 	}
 }
 
-// Fetch the mbox files from the remote archiver.
-/*
-   Stores the archives in the path given during the initialization
-   of this object. Those archives which don't have not valid extensions will
-   be ignored.
-
-   Pipermail archives usually have on their file names the date of
-   the archives stored following the schema year-month. When fromDate
-   property is called, it will return the mboxes for which their year
-   and month are equal or after that date.
-
-   fromDate: fetch archives that store messages equal or after the given date; only year and month values
-   are compared
-
-   returns a map of links and their paths of the fetched archives
-
-*/
+//Fetch the mbox files from the remote archiver.
+//
+//Stores the archives in the path given during the initialization
+//of this object. Those archives which don't have not valid extensions will
+//be ignored.
+//
+//Pipermail archives have on their file names the date of
+//the archive is stored following the schema year-month. When fromDate
+//property is called, it will return the mboxes for which their year
+//and month are equal or after that date.
+//
+//fromDate: fetch archives that store messages equal or after the given date; only year and month values
+//are compared
+//
+//returns a map of links and their paths of the fetched archives
 func (f *Fetcher) Fetch(url string, fromDate *time.Time) (map[string]string, error) {
 	if fromDate == nil {
 		fromDate = &DefaultDateTime
@@ -137,16 +135,16 @@ func (f *Fetcher) Fetch(url string, fromDate *time.Time) (map[string]string, err
 }
 
 // FetchItem extracts data from archives
-func (f *Fetcher) FetchItem(slug, groupName, link string, now time.Time) ([]*RawMessage, error) {
+func (f *Fetcher) FetchItem(slug, groupName, project, endpoint string, fromDate time.Time, limit int, now time.Time) ([]*RawMessage, error) {
 	var allMsgs []*RawMessage
-	archives, err := f.Fetch(link, &DefaultDateTime)
+	archives, err := f.Fetch(endpoint, &DefaultDateTime)
 	if err != nil {
 		return nil, err
 	}
 	fmt.Printf("\n\n %+v \n\n", archives)
 	var messages [][]byte
 
-	statusCode, _, err := f.HTTPClientProvider.Request(link, "GET", nil, nil, nil)
+	statusCode, _, err := f.HTTPClientProvider.Request(endpoint, "GET", nil, nil, nil)
 	if err != nil || statusCode != http.StatusOK {
 		return nil, err
 	}
@@ -311,13 +309,13 @@ func (f *Fetcher) FetchItem(slug, groupName, link string, now time.Time) ([]*Raw
 				stat(false, false, false, true)
 				return
 			}
-			rawMessage := f.AddMetadata(message, slug, groupName, link)
+			rawMessage := f.AddMetadata(message, endpoint, slug, groupName, link)
 			allMsgs = append(allMsgs, rawMessage)
 			return
 		}
 
 		for _, message := range messages {
-			_, err = processMsg(nil, message, link)
+			_, err = processMsg(nil, message, endpoint)
 			if err != nil {
 				return nil, err
 			}
@@ -342,7 +340,7 @@ func (f *Fetcher) FetchItem(slug, groupName, link string, now time.Time) ([]*Raw
 }
 
 // AddMetadata - add metadata to the raw message
-func (f *Fetcher) AddMetadata(msg interface{}, slug, groupName, link string) *RawMessage {
+func (f *Fetcher) AddMetadata(msg interface{}, endpoint, slug, groupName, link string) *RawMessage {
 	timestamp := time.Now().UTC()
 	rawMessage := new(RawMessage)
 
@@ -376,7 +374,7 @@ func (f *Fetcher) AddMetadata(msg interface{}, slug, groupName, link string) *Ra
 	rawMessage.Data = &mData
 
 	// generate UUID
-	uid, err := uuid.Generate(groupName, strconv.FormatFloat(utils.ConvertTimeToFloat(timestamp), 'f', -1, 64))
+	uid, err := uuid.Generate(endpoint, strconv.FormatFloat(utils.ConvertTimeToFloat(timestamp), 'f', -1, 64))
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -432,4 +430,17 @@ func (f *Fetcher) ElasticRawMapping() []byte {
 // ElasticRichMapping - Rich index mapping definition
 func (f *Fetcher) ElasticRichMapping() []byte {
 	return PiperRichMapping
+}
+
+// Query query saved raw data from ES
+func (f *Fetcher) Query(index string, query map[string]interface{}) (*RawHits, error) {
+
+	var hits RawHits
+
+	err := f.ElasticSearchProvider.Get(index, query, &hits)
+	if err != nil {
+		return nil, err
+	}
+
+	return &hits, err
 }

@@ -24,28 +24,30 @@ type RawMessage struct {
 	Category          string               `json:"category"`
 	ProjectSlug       string               `json:"project_slug"`
 	GroupName         string               `json:"group_name"`
+	Project           string               `json:"project"`
+	ChangedAt         time.Time            `json:"changed_at"`
 }
 
 // RawMessageData ...
 type RawMessageData struct {
-	ContentType     string `json:"content_type,Content-Type"`
-	Date            string `json:"date,Date"`
-	From            string `json:"from,From"`
-	InReplyTo       string `json:"in_reply_to,In-Reply-To"`
-	MboxByteLength  int64  `json:"mbox_byte_length,MBox-Bytes-Length"`
-	MboxNBodies     int    `json:"mbox_n_bodies,MBox-N-Bodies"`
-	MboxNLines      int64  `json:"mbox_n_lines,MBox-N-Lines"`
-	MboxProjectName string `json:"mbox_project_name,MBox-Project-Name"`
-	MboxValid       bool   `json:"mbox_valid,MBox-Valid"`
-	MboxWarn        bool   `json:"mbox_warn,MBox-Warn"`
-	MessageID       string `json:"message_id,Message-ID"`
-	References      string `json:"references,References"`
-	Subject         string `json:"subject,Subject"`
+	ContentType     string `json:"Content-Type"`
+	Date            string `json:"Date"`
+	From            string `json:"From"`
+	InReplyTo       string `json:"In-Reply-To"`
+	MboxByteLength  int64  `json:"MBox-Bytes-Length"`
+	MboxNBodies     int    `json:"MBox-N-Bodies"`
+	MboxNLines      int64  `json:"MBox-N-Lines"`
+	MboxProjectName string `json:"MBox-Project-Name"`
+	MboxValid       bool   `json:"MBox-Valid"`
+	MboxWarn        bool   `json:"MBox-Warn"`
+	MessageID       string `json:"Message-ID"`
+	References      string `json:"References"`
+	Subject         string `json:"Subject"`
 	Data            struct {
 		Text struct {
 			Plain []struct {
 				Data string `json:"data"`
-			}
+			} `json:"plain"`
 		} `json:"text"`
 	} `json:"data"`
 	DateInTZ string `json:"date_in_tz"`
@@ -96,4 +98,22 @@ type EnrichMessage struct {
 	MetadataUpdatedOn    string    `json:"metadata__updated_on"`
 	MetadataEnrichedOn   time.Time `json:"metadata__enriched_on"`
 	BackendVersion       string    `json:"backend_version"`
+	ProjectSlug          string    `json:"project_slug"`
+	ChangedDate          time.Time `json:"changed_date"`
+}
+
+// RawHits result
+type RawHits struct {
+	Hits NHits `json:"hits"`
+}
+
+// NHits result
+type NHits struct {
+	Hits []NestedRawHits `json:"hits"`
+}
+
+// NestedRawHits is the actual hit data
+type NestedRawHits struct {
+	ID     string     `json:"_id"`
+	Source RawMessage `json:"_source"`
 }
