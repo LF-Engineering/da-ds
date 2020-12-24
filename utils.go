@@ -605,9 +605,6 @@ func RequestNoRetry(
 				break
 			}
 		}
-		if !cache {
-			Printf("status %d is considered a success, but not caching it\n")
-		}
 	}
 	return
 }
