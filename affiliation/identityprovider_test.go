@@ -1,6 +1,7 @@
 package affiliation
 
 import (
+	"database/sql"
 	"fmt"
 	"reflect"
 	"testing"
@@ -37,15 +38,15 @@ where
 	dataBase.On("Get", &ide, query).Run(func(args mock.Arguments) {
 		email := "ayman@gmail.com"
 		o := Identity{
-			ID:        "5",
-			UUID:      "5",
-			Name:      "vvavrychuk",
-			Username:  "vvavrychuk",
-			Email:     &email,
-			Domain:    "inc.com",
-			Gender:    nil,
+			ID:        sql.NullString{String: "5", Valid: true},
+			UUID:      sql.NullString{String: "5", Valid: true},
+			Name:      sql.NullString{String: "vvavrychuk", Valid: true},
+			Username:  sql.NullString{String: "vvavrychuk", Valid: true},
+			Email:     sql.NullString{String: email, Valid: true},
+			Domain:    sql.NullString{String: "inc.com", Valid: true},
+			Gender:    sql.NullString{},
 			GenderACC: nil,
-			OrgName:   nil,
+			OrgName:   sql.NullString{},
 			IsBot:     false,
 		}
 		reflect.ValueOf(args.Get(0)).Elem().Set(reflect.ValueOf(o))
@@ -56,9 +57,9 @@ where
 	res, err := srv.GetIdentity(key, val)
 	// Assert
 	assert.NoError(t, err)
-	assert.Equal(t, res.UUID, "5")
-	assert.Equal(t, res.Domain, "inc.com")
-	assert.Equal(t, *res.Email, "ayman@gmail.com")
+	assert.Equal(t, res.UUID.String, "5")
+	assert.Equal(t, res.Domain.String, "inc.com")
+	assert.Equal(t, res.Email.String, "ayman@gmail.com")
 	assert.Equal(t, res.IsBot, false)
 
 }
