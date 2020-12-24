@@ -7,8 +7,6 @@ import (
 
 	lib "github.com/LF-Engineering/da-ds"
 	"github.com/LF-Engineering/da-ds/affiliation"
-
-	"github.com/LF-Engineering/da-ds/affiliation"
 )
 
 // Enricher contains pipermail datasource enrich logic

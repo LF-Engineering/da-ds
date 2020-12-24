@@ -55,6 +55,7 @@ func runDS(ctx *lib.Ctx) (err error) {
 	case pipermail.Pipermail:
 		manager, err := buildPipermailManager(ctx)
 		if err != nil {
+			fmt.Println(err)
 			return err
 		}
 		return manager.Sync()
@@ -179,26 +180,25 @@ func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 }
 
 func buildPipermailManager(ctx *lib.Ctx) (*pipermail.Manager, error) {
+	origin := ctx.PiperMail.Origin.String()
+	slug := ctx.PiperMail.ProjectSlug.String()
+	groupName := ctx.PiperMail.GroupName.String()
 	fetcherBackendVersion := "0.0.1"
 	enricherBackendVersion := "0.0.1"
-	esURL := ctx.ESURL
-	httpTimeout := ctx.Env("HTTP_TIMEOUT") // "60s" 60 seconds...
-	urlLinks := ctx.Env("LINKS_JSON")
-	enrichOnly := ctx.NoRaw
-	enrich := ctx.Enrich
-	fromDate := ctx.DateFrom
-	noIncremental := ctx.BoolEnv("NO_INCREMENTAL")
+	doFetch := ctx.PiperMail.DoFetch.Bool()
+	doEnrich := ctx.PiperMail.DoEnrich.Bool()
+	fromDate := ctx.PiperMail.FromDate.Date()
+	fetchSize := ctx.PiperMail.FetchSize.Int()
+	enrichSize := ctx.PiperMail.EnrichSize.Int()
+	project := ctx.PiperMail.Project.String()
+	esIndex := ctx.PiperMail.EsIndex.String()
 
-	var links []*pipermail.Link
-	if err := jsoniter.Unmarshal([]byte(urlLinks), &links); err != nil {
-		return nil, err
-	}
-
-	timeout, err := time.ParseDuration(httpTimeout)
+	mgr, err := pipermail.NewManager(origin, slug, groupName, ctx.DBConn, fetcherBackendVersion, enricherBackendVersion,
+		doFetch, doEnrich, ctx.ESURL, "", "", esIndex, fromDate, project,
+		fetchSize, enrichSize)
 	if err != nil {
 		return nil, err
 	}
 
-	return pipermail.NewManager(fetcherBackendVersion, enricherBackendVersion,
-		enrichOnly, enrich, esURL, timeout, links, fromDate, noIncremental), nil
+	return mgr, nil
 }

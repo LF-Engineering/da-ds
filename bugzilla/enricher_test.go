@@ -149,17 +149,17 @@ func TestEnrichItem(t *testing.T) {
 		identityProviderMock := &mocks.IdentityProvider{}
 		unknown := "Unknown"
 		zero := 0
-		fakeAff1 := &affiliation.Identity{ID: sql.NullString{ String: "50ffba4dfbedc6dc4390fc8bde7aeec0a7191056", Valid: true},
-			UUID: sql.NullString{ String: "50ffba4dfbedc6dc4390fc8bde7aeec0a7191056", Valid: true}, Name: sql.NullString{ String: "Vasyl", Valid: true}, IsBot: false,
-			Domain: sql.NullString{ String: "gmail.com", Valid: true}, OrgName: sql.NullString{}, Username: sql.NullString{ String:"", Valid: false}, GenderACC: &zero,
-			MultiOrgNames: []string{}, Gender: sql.NullString{ String: unknown, Valid: true},
+		fakeAff1 := &affiliation.Identity{ID: sql.NullString{String: "50ffba4dfbedc6dc4390fc8bde7aeec0a7191056", Valid: true},
+			UUID: sql.NullString{String: "50ffba4dfbedc6dc4390fc8bde7aeec0a7191056", Valid: true}, Name: sql.NullString{String: "Vasyl", Valid: true}, IsBot: false,
+			Domain: sql.NullString{String: "gmail.com", Valid: true}, OrgName: sql.NullString{}, Username: sql.NullString{String: "", Valid: false}, GenderACC: &zero,
+			MultiOrgNames: []string{}, Gender: sql.NullString{String: unknown, Valid: true},
 		}
 
 		dd := "MontaVista Software, LLC"
-		fakeAff2 := &affiliation.Identity{ID: sql.NullString{ String: "a89364af9818412b8c59193ca83b30dd67b20e35", Valid: true},
-			UUID: sql.NullString{ String: "5d408e590365763c3927084d746071fa84dc8e52", Valid: true}, Name: sql.NullString{ String: "akuster", Valid: true}, IsBot: false,
-			Domain: sql.NullString{ String: "gmail.com", Valid: true}, OrgName: sql.NullString{ String: dd, Valid: true}, Username: sql.NullString{ String:"", Valid: false}, GenderACC: &zero,
-			MultiOrgNames: []string{"MontaVista Software, LLC"}, Gender: sql.NullString{ String: unknown, Valid: true},
+		fakeAff2 := &affiliation.Identity{ID: sql.NullString{String: "a89364af9818412b8c59193ca83b30dd67b20e35", Valid: true},
+			UUID: sql.NullString{String: "5d408e590365763c3927084d746071fa84dc8e52", Valid: true}, Name: sql.NullString{String: "akuster", Valid: true}, IsBot: false,
+			Domain: sql.NullString{String: "gmail.com", Valid: true}, OrgName: sql.NullString{String: dd, Valid: true}, Username: sql.NullString{String: "", Valid: false}, GenderACC: &zero,
+			MultiOrgNames: []string{"MontaVista Software, LLC"}, Gender: sql.NullString{String: unknown, Valid: true},
 		}
 		rmultiorg1 := []string{"MontaVista Software, LLC"}
 		rmultiorg2 := []string{unknown}
