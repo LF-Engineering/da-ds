@@ -179,15 +179,20 @@ func (j *DSRocketchat) GetRocketchatMessages(ctx *Ctx, fromDate string, offset, 
 			headers,
 			nil,
 			nil,
-			map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses: 200
-			nil,                                 // Error statuses
-			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
-			true,                                // retry
-			&cacheDur,                           // cache duration
-			false,                               // skip in dry-run mode
+			map[[2]int]struct{}{{200, 200}: {}, {429, 429}: {}}, // JSON statuses: 200, 429
+			nil, // Error statuses
+			map[[2]int]struct{}{{200, 200}: {}, {429, 429}: {}}, // OK statuses: 200, 429
+			true,      // retry
+			&cacheDur, // cache duration
+			false,     // skip in dry-run mode
 		)
 		rateLimit, rateLimitReset, _ = UpdateRateLimit(ctx, j, outHeaders, "", "")
 		if status == 413 {
+			continue
+		}
+		// Too many requests
+		if status == 429 {
+			j.SleepAsRequested(res)
 			continue
 		}
 		if err != nil {

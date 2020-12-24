@@ -556,6 +556,7 @@ func RequestNoRetry(
 	hit := false
 	for r := range jsonStatuses {
 		if status >= r[0] && status <= r[1] {
+			//fmt.Printf("ddd: jsonStatuses: %+v, hit %d - %v\n", jsonStatuses, status, r)
 			hit = true
 			break
 		}
@@ -569,12 +570,15 @@ func RequestNoRetry(
 			return
 		}
 		isJSON = true
+		//fmt.Printf("ddd: is JSON\n")
 	} else {
 		result = body
+		//fmt.Printf("ddd: is bytes\n")
 	}
 	hit = false
 	for r := range errorStatuses {
 		if status >= r[0] && status <= r[1] {
+			//fmt.Printf("ddd: errorStatuses: %+v, hit %d - %v\n", errorStatuses, status, r)
 			hit = true
 			break
 		}
@@ -588,6 +592,7 @@ func RequestNoRetry(
 		hit = false
 		for r := range okStatuses {
 			if status >= r[0] && status <= r[1] {
+				//fmt.Printf("ddd: okStatuses: %+v, hit %d - %v\n", okStatuses, status, r)
 				hit = true
 				break
 			}
