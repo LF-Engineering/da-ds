@@ -155,7 +155,7 @@ func (j *DSJira) GetFields(ctx *Ctx) (customFields map[string]JiraField, err err
 	var resp interface{}
 	// Week for caching fields, they don't change that often
 	cacheFor := time.Duration(168) * time.Hour
-	resp, _, _, _, err = Request(ctx, url, method, headers, []byte{}, []string{}, nil, nil, map[[2]int]struct{}{{200, 200}: {}}, true, &cacheFor, false)
+	resp, _, _, _, err = Request(ctx, url, method, headers, []byte{}, []string{}, nil, nil, map[[2]int]struct{}{{200, 200}: {}}, map[[2]int]struct{}{{200, 200}: {}}, true, &cacheFor, false)
 	if err != nil {
 		return
 	}
@@ -293,6 +293,7 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 				map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses
 				nil,                                 // Error statuses
 				map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
+				map[[2]int]struct{}{{200, 200}: {}}, // Cache statuses: 200
 				true,                                // retry
 				&cacheFor,                           // cache duration
 				false,                               // skip in dry-run mode
@@ -575,7 +576,8 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 			[]string{},
 			map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses
 			nil,                                 // Error statuses
-			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200, 404
+			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
+			map[[2]int]struct{}{{200, 200}: {}}, // Cache statuses: 200
 			true,                                // retry
 			&cacheFor,                           // cache duration
 			false,                               // skip in dry-run mode

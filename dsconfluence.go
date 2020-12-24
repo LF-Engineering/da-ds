@@ -158,9 +158,10 @@ func (j *DSConfluence) GetHistoricalContents(ctx *Ctx, content map[string]interf
 			map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses: 200
 			nil,                                 // Error statuses
 			map[[2]int]struct{}{{200, 200}: {}, {500, 500}: {}, {404, 404}: {}}, // OK statuses: 200
-			false,     // retry
-			&cacheDur, // cache duration
-			false,     // skip in dry-run mode
+			map[[2]int]struct{}{{200, 200}: {}},                                 // Cache statuses: 200
+			false,                                                               // retry
+			&cacheDur,                                                           // cache duration
+			false,                                                               // skip in dry-run mode
 		)
 		if status == 404 || status == 500 {
 			if ctx.Debug > 1 {
@@ -256,6 +257,7 @@ func (j *DSConfluence) GetConfluenceContents(ctx *Ctx, fromDate, next string) (c
 		map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses: 200
 		nil,                                 // Error statuses
 		map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
+		map[[2]int]struct{}{{200, 200}: {}}, // Cache statuses: 200
 		false,                               // retry
 		&cacheDur,                           // cache duration
 		false,                               // skip in dry-run mode

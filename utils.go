@@ -509,8 +509,8 @@ func RequestNoRetry(
 	headers map[string]string,
 	payload []byte,
 	cookies []string,
-	jsonStatuses, errorStatuses, okStatuses map[[2]int]struct{},
-) (result interface{}, status int, isJSON bool, outCookies []string, outHeaders map[string][]string, err error) {
+	jsonStatuses, errorStatuses, okStatuses, cacheStatuses map[[2]int]struct{},
+) (result interface{}, status int, isJSON bool, outCookies []string, outHeaders map[string][]string, cache bool, err error) {
 	var (
 		payloadBody *bytes.Reader
 		req         *http.Request
@@ -556,7 +556,6 @@ func RequestNoRetry(
 	hit := false
 	for r := range jsonStatuses {
 		if status >= r[0] && status <= r[1] {
-			//fmt.Printf("ddd: jsonStatuses: %+v, hit %d - %v\n", jsonStatuses, status, r)
 			hit = true
 			break
 		}
@@ -570,15 +569,12 @@ func RequestNoRetry(
 			return
 		}
 		isJSON = true
-		//fmt.Printf("ddd: is JSON\n")
 	} else {
 		result = body
-		//fmt.Printf("ddd: is bytes\n")
 	}
 	hit = false
 	for r := range errorStatuses {
 		if status >= r[0] && status <= r[1] {
-			//fmt.Printf("ddd: errorStatuses: %+v, hit %d - %v\n", errorStatuses, status, r)
 			hit = true
 			break
 		}
@@ -592,7 +588,6 @@ func RequestNoRetry(
 		hit = false
 		for r := range okStatuses {
 			if status >= r[0] && status <= r[1] {
-				//fmt.Printf("ddd: okStatuses: %+v, hit %d - %v\n", okStatuses, status, r)
 				hit = true
 				break
 			}
@@ -601,6 +596,14 @@ func RequestNoRetry(
 			sPayload := BytesToStringTrunc(payload, MaxPayloadPrintfLen, true)
 			sBody := BytesToStringTrunc(body, MaxPayloadPrintfLen, true)
 			err = fmt.Errorf("status not success:%+v for method:%s url:%s headers:%v status:%d payload:%s body:%s result:%+v", err, method, url, headers, status, sPayload, sBody, result)
+		}
+	}
+	if err == nil {
+		for r := range cacheStatuses {
+			if status >= r[0] && status <= r[1] {
+				cache = true
+				break
+			}
 		}
 	}
 	return
@@ -613,7 +616,7 @@ func Request(
 	headers map[string]string,
 	payload []byte,
 	cookies []string,
-	jsonStatuses, errorStatuses, okStatuses map[[2]int]struct{},
+	jsonStatuses, errorStatuses, okStatuses, cacheStatuses map[[2]int]struct{},
 	retryRequest bool,
 	cacheFor *time.Duration,
 	skipInDryRun bool,
@@ -624,7 +627,10 @@ func Request(
 		}
 		return
 	}
-	var isJSON bool
+	var (
+		isJSON bool
+		cache  bool
+	)
 	if cacheFor != nil && !ctx.NoCache {
 		b := []byte(method + url + fmt.Sprintf("%+v", headers))
 		b = append(b, payload...)
@@ -667,7 +673,7 @@ func Request(
 			}
 			cacheDuration := *cacheFor
 			defer func() {
-				if err != nil {
+				if err != nil || !cache {
 					return
 				}
 				// cache entry is 'status:isJson:b64cookies:headers:data
@@ -702,12 +708,12 @@ func Request(
 		}
 	}
 	if !retryRequest {
-		result, status, isJSON, outCookies, outHeaders, err = RequestNoRetry(ctx, url, method, headers, payload, cookies, jsonStatuses, errorStatuses, okStatuses)
+		result, status, isJSON, outCookies, outHeaders, cache, err = RequestNoRetry(ctx, url, method, headers, payload, cookies, jsonStatuses, errorStatuses, okStatuses, cacheStatuses)
 		return
 	}
 	retry := 0
 	for {
-		result, status, isJSON, outCookies, outHeaders, err = RequestNoRetry(ctx, url, method, headers, payload, cookies, jsonStatuses, errorStatuses, okStatuses)
+		result, status, isJSON, outCookies, outHeaders, cache, err = RequestNoRetry(ctx, url, method, headers, payload, cookies, jsonStatuses, errorStatuses, okStatuses, cacheStatuses)
 		info := func() (inf string) {
 			inf = fmt.Sprintf("%s.%s:%s=%d", method, url, BytesToStringTrunc(payload, MaxPayloadPrintfLen, true), status)
 			if ctx.Debug > 1 {

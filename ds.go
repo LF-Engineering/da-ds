@@ -204,10 +204,12 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 		nIdents := len(identsAry)
 		source := ds.Name()
 		runOneByOne := func() (err error) {
+			Printf("falling back to one-by-one mode for %d items\n", nIdents)
 			var errs []error
 			defer func() {
 				nErrs := len(errs)
 				if nErrs == 0 {
+					Printf("one-by-one mode for %d items - all succeeded\n", nIdents)
 					return
 				}
 				s := fmt.Sprintf("%d errors: ", nErrs)
@@ -216,6 +218,7 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				}
 				s = s[:len(s)-2]
 				err = fmt.Errorf("%s", s)
+				Printf("one-by-one mode for %d items: %d errors\n", nIdents, nErrs)
 			}()
 			for i := 0; i < nIdents; i++ {
 				ident := identsAry[i]
@@ -270,14 +273,17 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				argsP = append(argsP, uuid, profname, pemail)
 				_, e = ExecSQL(ctx, tx, queryU, argsU...)
 				if e != nil {
+					Printf("one-by-one(%d/%d): %s[%+v]: %v\n", i+1, nIdents, queryU, argsU, e)
 					errs = append(errs, e)
 				}
 				_, e = ExecSQL(ctx, tx, queryP, argsP...)
 				if e != nil {
+					Printf("one-by-one(%d/%d): %s[%+v]: %v\n", i+1, nIdents, queryP, argsP, e)
 					errs = append(errs, e)
 				}
 				_, e = ExecSQL(ctx, tx, queryI, argsI...)
 				if e != nil {
+					Printf("one-by-one(%d/%d): %s[%+v]: %v\n", i+1, nIdents, queryI, argsI, e)
 					errs = append(errs, e)
 				}
 			}
@@ -682,6 +688,7 @@ func ForEachESItem(
 			nil,
 			nil,                                 // Error statuses
 			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses
+			nil,                                 // Cache statuses
 			false,                               // retry request
 			nil,                                 // cacheExpire duration
 			false,                               // skip in dry-run mode
@@ -766,6 +773,7 @@ func ForEachESItem(
 			map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses
 			nil,                                 // Error statuses
 			map[[2]int]struct{}{{200, 200}: {}, {404, 404}: {}, {500, 500}: {}}, // OK statuses
+			map[[2]int]struct{}{{200, 200}: {}},                                 // Cache statuses
 			true,
 			cacheFor,
 			false,
@@ -919,6 +927,7 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 		nil,                                 // JSON statuses
 		map[[2]int]struct{}{{401, 599}: {}}, // error statuses: 401-599
 		nil,                                 // OK statuses
+		nil,                                 // Cache statuses
 		true,                                // retry
 		nil,                                 // cache duration
 		true,                                // skip in dry run
@@ -942,6 +951,7 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 		nil,
 		nil,
 		map[[2]int]struct{}{{200, 200}: {}},
+		nil,
 		true,
 		nil,
 		true,
@@ -958,6 +968,7 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 		nil,
 		nil,
 		map[[2]int]struct{}{{200, 200}: {}},
+		nil,
 		true,
 		nil,
 		true,

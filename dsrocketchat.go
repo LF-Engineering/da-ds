@@ -183,9 +183,10 @@ func (j *DSRocketchat) GetRocketchatMessages(ctx *Ctx, fromDate string, offset, 
 			map[[2]int]struct{}{{200, 200}: {}, {429, 429}: {}}, // JSON statuses: 200, 429
 			nil, // Error statuses
 			map[[2]int]struct{}{{200, 200}: {}, {429, 429}: {}}, // OK statuses: 200, 429
-			true,      // retry
-			&cacheDur, // cache duration
-			false,     // skip in dry-run mode
+			map[[2]int]struct{}{{200, 200}: {}},                 // Cache statuses: 200
+			true,                                                // retry
+			&cacheDur,                                           // cache duration
+			false,                                               // skip in dry-run mode
 		)
 		rateLimit, rateLimitReset, _ = UpdateRateLimit(ctx, j, outHeaders, "", "")
 		if status == 413 {
@@ -283,9 +284,10 @@ func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
 			map[[2]int]struct{}{{200, 200}: {}, {429, 429}: {}}, // JSON statuses: 200, 429
 			nil, // Error statuses
 			map[[2]int]struct{}{{200, 200}: {}, {429, 429}: {}}, // OK statuses: 200, 429
-			true,      // retry
-			&cacheDur, // cache duration
-			false,     // skip in dry-run mode
+			map[[2]int]struct{}{{200, 200}: {}},                 // Cache statuses: 200
+			true,                                                // retry
+			&cacheDur,                                           // cache duration
+			false,                                               // skip in dry-run mode
 		)
 		rateLimit, rateLimitReset, _ = UpdateRateLimit(ctx, j, outHeaders, "", "")
 		// Rate limit

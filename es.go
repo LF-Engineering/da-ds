@@ -384,7 +384,7 @@ func MaybeESCacheCleanup(ctx *Ctx) {
 // CreateESCache - creates dads_cache index needed for caching
 func CreateESCache(ctx *Ctx) {
 	// Create index, ignore if exists (see status 400 is not in error statuses)
-	_, _, _, _, err := Request(ctx, ctx.ESURL+"/dads_cache", Put, nil, []byte{}, []string{}, nil, map[[2]int]struct{}{{401, 599}: {}}, nil, false, nil, false)
+	_, _, _, _, err := Request(ctx, ctx.ESURL+"/dads_cache", Put, nil, []byte{}, []string{}, nil, map[[2]int]struct{}{{401, 599}: {}}, nil, nil, false, nil, false)
 	FatalOnError(err)
 }
 
@@ -432,6 +432,7 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 		map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses
 		map[[2]int]struct{}{{400, 599}: {}}, // error statuses: 400-599
 		nil,                                 // OK statuses
+		nil,                                 // Cache statuses
 		true,                                // retry
 		nil,                                 // cache duration
 		true,                                // skip in dry-run mode
@@ -477,6 +478,7 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 			nil,                                 // JSON statuses
 			map[[2]int]struct{}{{400, 599}: {}}, // error statuses: 400-599
 			map[[2]int]struct{}{{200, 201}: {}}, // OK statuses: 200-201
+			nil,                                 // Cache statuses
 			retry,                               // retry
 			nil,                                 // cache duration
 			true,                                // skip in dry-run mode
@@ -538,7 +540,8 @@ func GetLastUpdate(ctx *Ctx, ds DS, raw bool) (lastUpdate *time.Time) {
 		[]string{},                          // cookies
 		nil,                                 // JSON statuses
 		nil,                                 // Error statuses
-		map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200, 404
+		map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
+		nil,                                 // Cache statuses
 		true,                                // retry
 		nil,                                 // cache for
 		false,                               // skip in dry-run mode
@@ -602,6 +605,7 @@ func GetLastOffset(ctx *Ctx, ds DS, raw bool) (offset float64) {
 		nil,                                 // JSON statuses
 		nil,                                 // Error statuses
 		map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200, 404
+		nil,                                 // Cache statuses
 		true,                                // retry
 		nil,                                 // cache for
 		false,                               // skip in dry-run mode

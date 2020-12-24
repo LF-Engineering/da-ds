@@ -221,6 +221,7 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 		nil,                                 // JSON statuses
 		nil,                                 // Error statuses
 		map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
+		map[[2]int]struct{}{{200, 200}: {}}, // Cache statuses: 200
 		false,                               // retry
 		&cacheLoginDur,                      // cache duration
 		false,                               // skip in dry-run mode
@@ -296,9 +297,10 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 		nil,
 		[]byte{},
 		cookies,
-		nil,
+		nil,                                 // JSON statuses
 		nil,                                 // Error statuses
 		map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
+		map[[2]int]struct{}{{200, 200}: {}}, // Cache statuses: 200
 		false,                               // retry
 		&cacheMsgDur,                        // cache duration
 		false,                               // skip in dry-run mode
