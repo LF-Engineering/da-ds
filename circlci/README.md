@@ -31,64 +31,35 @@ e.g `https://circleci.com/api/v2/project/gh/LF-Engineering/dev-analytics-ui/pipe
 This will return data in this form.
 ```
 {
-  "next_page_token": "AARLwwV5GuP_eZfqQKSifvJEpDJCxl1PbYpFnPVtSa4ZG9eZTdzmm3TmKNZU6w1ORiutZd_vKxfYvE0kj0KqC2FBS4RQJoBu6svS1BQkChXEBXtUPHTGeIsW7vs6N_kUkvN4QvrB1u1G",
-  "items": [
-    {
-      "id": "f03c1064-7ec0-4b38-94e3-e674421a0ab7",
-      "errors": [],
-      "project_slug": "gh/LF-Engineering/dev-analytics-ui",
-      "updated_at": "2020-12-23T11:04:49.393Z",
-      "number": 1704,
-      "state": "created",
-      "created_at": "2020-12-23T11:04:49.393Z",
-      "trigger": {
-        "received_at": "2020-12-23T11:04:49.013Z",
-        "type": "webhook",
-        "actor": {
-          "login": "NahlaEssam",
-          "avatar_url": "https://avatars0.githubusercontent.com/u/7237940?v=4"
-        }
-      },
-      "vcs": {
-        "origin_repository_url": "https://github.com/LF-Engineering/dev-analytics-ui",
-        "target_repository_url": "https://github.com/LF-Engineering/dev-analytics-ui",
-        "revision": "002135ef7b9504f6c3073806a1cb4e41d40b8da8",
-        "provider_name": "GitHub",
-        "commit": {
-          "body": "",
-          "subject": "fix DA-3240: Mobile View - Affiliation views"
-        },
-        "branch": "DA-3205"
+  "next_page_token" : "AARLwwWYCXtgaRy9oukzlxti_r-78HgZD223Cke0LMjnGlP6LEy_GDsUMrtL41rfJdhIy-dGJrJku8MSfU1r2SbuPRA4zEUNmHS9vsOH-eyx8az1VnFuNdDykYnOhPRdXKZlo3W-inRI",
+  "items" : [ {
+    "id" : "98b1071e-c364-4b39-91b9-820b8588e2ae",
+    "errors" : [ ],
+    "project_slug" : "gh/LF-Engineering/da-ds",
+    "updated_at" : "2020-12-24T12:59:23.906Z",
+    "number" : 154,
+    "state" : "created",
+    "created_at" : "2020-12-24T12:59:23.906Z",
+    "trigger" : {
+      "received_at" : "2020-12-24T12:59:23.721Z",
+      "type" : "webhook",
+      "actor" : {
+        "login" : "lukaszgryglicki",
+        "avatar_url" : "https://avatars2.githubusercontent.com/u/2469783?v=4"
       }
     },
-    {
-      "id": "0eb0c7a5-a05b-444f-8db5-008e2baa7bce",
-      "errors": [],
-      "project_slug": "gh/LF-Engineering/dev-analytics-ui",
-      "updated_at": "2020-12-22T15:18:47.536Z",
-      "number": 1703,
-      "state": "created",
-      "created_at": "2020-12-22T15:18:47.536Z",
-      "trigger": {
-        "received_at": "2020-12-22T15:18:47.059Z",
-        "type": "webhook",
-        "actor": {
-          "login": "NahlaEssam",
-          "avatar_url": "https://avatars0.githubusercontent.com/u/7237940?v=4"
-        }
+    "vcs" : {
+      "origin_repository_url" : "https://github.com/LF-Engineering/da-ds",
+      "target_repository_url" : "https://github.com/LF-Engineering/da-ds",
+      "revision" : "db4e4736effbf25d0b48f9027dd81660fc114cb4",
+      "provider_name" : "GitHub",
+      "commit" : {
+        "body" : "Signed-off-by: Łukasz Gryglicki <lukaszgryglicki@o2.pl>",
+        "subject" : "Confirmed - no more needed"
       },
-      "vcs": {
-        "origin_repository_url": "https://github.com/LF-Engineering/dev-analytics-ui",
-        "target_repository_url": "https://github.com/LF-Engineering/dev-analytics-ui",
-        "revision": "9ff2a47d6030a5b6773768f47e58b6475e21f0f1",
-        "provider_name": "GitHub",
-        "commit": {
-          "body": "",
-          "subject": "fix DA-3208: Mobile View - Project dashboard"
-        },
-        "branch": "DA-3205"
-      }
+      "branch" : "master"
     }
+  }
   ]
 }
 ```
@@ -98,87 +69,87 @@ Below are the steps taken to process pipeline data.
 2. For every circle ci endpoint provided in the fixure file, use the last_pull_date to determine the point in which data gathring will start.
     - Each output provides a pipeline ID which can be used to get the pipeline's workflow. To get the workflows for a given pipeline you need the pipeline's id. See pipeline response above. 
 
-    Worflows endpoint: `https://circleci.com/api/v2/pipeline/3f0abeea-1c0a-4922-bf63-ad87c469b668/workflow`. This will return the following
+    Worflows endpoint: `https://circleci.com/api/v2/pipeline/98b1071e-c364-4b39-91b9-820b8588e2ae/workflow`. This will return the following
     ```
         {
-    "next_page_token" : null,
-    "items" : [ {
-        "pipeline_id" : "3f0abeea-1c0a-4922-bf63-ad87c469b668",
-        "id" : "1a912544-8530-47d3-81c2-64c9f02dd254",
-        "name" : "build_and_deploy",
-        "project_slug" : "gh/LF-Engineering/dev-analytics-api",
-        "status" : "success",
-        "started_by" : "a68db03b-ff65-4156-bcbb-7d386ee0c692",
-        "pipeline_number" : 4151,
-        "created_at" : "2020-12-18T20:27:44Z",
-        "stopped_at" : "2020-12-18T20:29:31Z"
-    } ]
-    }
-    ```
+        "next_page_token" : null,
+        "items" : [ {
+            "pipeline_id" : "98b1071e-c364-4b39-91b9-820b8588e2ae",
+            "id" : "9552b8fe-f5b7-4f7b-92a3-8bedc0ee35ca",
+            "name" : "workflow",
+            "project_slug" : "gh/LF-Engineering/da-ds",
+            "status" : "success",
+            "started_by" : "fb72a952-6ec3-49ae-97df-b3f7e12f6093",
+            "pipeline_number" : 154,
+            "created_at" : "2020-12-24T12:59:23Z",
+            "stopped_at" : "2020-12-24T13:00:08Z"
+        } ]
+        }
+     ```
 
     - With the workflow id, you can then get the job number. 
      Endpoint: `https://circleci.com/api/v2/workflow/1a912544-8530-47d3-81c2-64c9f02dd254/job`
 
      Response:
      ```
-        {
+       {
         "next_page_token" : null,
         "items" : [ {
             "dependencies" : [ ],
-            "job_number" : 4189,
-            "id" : "c3055f24-ffde-4e51-a0b9-28959010188d",
-            "started_at" : "2020-12-18T20:27:50Z",
-            "name" : "build_and_test",
-            "project_slug" : "gh/LF-Engineering/dev-analytics-api",
+            "job_number" : 155,
+            "id" : "8aa5022e-ad9c-49c4-a45d-9ce04def8b00",
+            "started_at" : "2020-12-24T12:59:27Z",
+            "name" : "build",
+            "project_slug" : "gh/LF-Engineering/da-ds",
             "status" : "success",
             "type" : "build",
-            "stopped_at" : "2020-12-18T20:29:31Z"
+            "stopped_at" : "2020-12-24T13:00:08Z"
         } ]
         }
      ```
 
     - From the reponse above you can get the job_number. which will be used to get the job details
 
-    Endpoint: `https://circleci.com/api/v2/project/gh/LF-Engineering/dev-analytics-api/job/4189`
+    Endpoint: `https://circleci.com/api/v2/project/github/LF-Engineering/da-ds/job/155`
 
     Response:
     ```
     {
-        "web_url" : "https://circleci.com/gh/LF-Engineering/dev-analytics-api/4189",
+        "web_url" : "https://circleci.com/gh/LF-Engineering/da-ds/155",
         "project" : {
-            "external_url" : "https://github.com/LF-Engineering/dev-analytics-api",
-            "slug" : "gh/LF-Engineering/dev-analytics-api",
-            "name" : "dev-analytics-api"
+            "external_url" : "https://github.com/LF-Engineering/da-ds",
+            "slug" : "gh/LF-Engineering/da-ds",
+            "name" : "da-ds"
         },
         "parallel_runs" : [ {
             "index" : 0,
             "status" : "success"
         } ],
-        "started_at" : "2020-12-18T20:27:50.097Z",
+        "started_at" : "2020-12-24T12:59:27.236Z",
         "latest_workflow" : {
-            "name" : "build_and_deploy",
-            "id" : "1a912544-8530-47d3-81c2-64c9f02dd254"
+            "name" : "workflow",
+            "id" : "9552b8fe-f5b7-4f7b-92a3-8bedc0ee35ca"
         },
-        "name" : "build_and_test",
+        "name" : "build",
         "executor" : {
-            "resource_class" : "large",
+            "resource_class" : "medium",
             "type" : "docker"
         },
         "parallelism" : 1,
         "status" : "success",
-        "number" : 4189,
+        "number" : 155,
         "pipeline" : {
-            "id" : "3f0abeea-1c0a-4922-bf63-ad87c469b668"
+            "id" : "98b1071e-c364-4b39-91b9-820b8588e2ae"
         },
-        "duration" : 101446,
-        "created_at" : "2020-12-18T20:27:44.816Z",
+        "duration" : 41658,
+        "created_at" : "2020-12-24T12:59:24.233Z",
         "messages" : [ ],
         "contexts" : [ ],
         "organization" : {
             "name" : "LF-Engineering"
         },
-        "queued_at" : "2020-12-18T20:27:44.844Z",
-        "stopped_at" : "2020-12-18T20:29:31.543Z"
+        "queued_at" : "2020-12-24T12:59:24.256Z",
+        "stopped_at" : "2020-12-24T13:00:08.894Z"
         }
     ```
 3. Use the next_page_token to navigate to the next page where necessary.
