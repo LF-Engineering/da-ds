@@ -111,6 +111,9 @@ func UUIDAffs(ctx *Ctx, args ...string) (h string) {
 	} else {
 		h, err = uuid.GenerateIdentity(&args[0], &args[1], &args[2], &args[3])
 	}
+	if err != nil {
+		Printf("UUIDAffs error for: %+v\n", args)
+	}
 	FatalOnError(err)
 	return
 }
