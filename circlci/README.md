@@ -1,5 +1,4 @@
 # Circle CI Instrumentation
-=========
 
 ## Onboarding
 * To onboard a project, you need the project_slug which is a combination of the vcs, org name (same as Github Org name if using Github) and project name i.e vcs/org_name/project_name e.g `github/LF-Engineering/da-ds`
@@ -205,6 +204,7 @@ pipeline_number | 4185 | Pipeline Number | int | `true` | n/a
 project_slug | github.com/LF-Engineering/da-ds | Circle CI project slug | string | `true` | n/a
 pipeline_created_at | 2020-12-11T20:24:47.003Z | Time pipeline was created | Datetime | `true` | n/a
 pipeline_updated_at | 2020-12-11T20:24:47.003Z | Time pipeline was updated | Datetime | `true` | n/a
+<<<<<<< HEAD
 pipeline_state | created | Pipeline state | string | `true` | n/a
 pipeline_trigger_type | webhook | How pipeline was triggered | string | `true` | n/a
 pipeline_trigger_date | 2020-12-11T20:24:47.003Z | Time pipeline was triggered | Datetime | `true` | n/a
@@ -257,3 +257,8 @@ job_parallelism | 1 | Job parallelism | int | `true` | n/a
 job_duration | 186872 | Total time taken in seconds | int | `true` | n/a
 job_executor_resource_class | large | Job executor class | string | `true` | n/a
 job_executor_type | docker | Job executor class | string | `true` | n/a
+=======
+creator_name | Foo Bar | Name of actor who triggered the pipeline | string | `false` | Unknown
+creator_username | foobar | Username of actor who triggered the pipeline | string | `true` | n/a
+
+>>>>>>> Populating Elasticsearch sample document table
