@@ -605,6 +605,9 @@ func RequestNoRetry(
 				break
 			}
 		}
+		if !cache {
+			Printf("status %d is considered a success, but not caching it\n")
+		}
 	}
 	return
 }
@@ -632,7 +635,7 @@ func Request(
 		cache  bool
 	)
 	if cacheFor != nil && !ctx.NoCache {
-		// cacheKey is hash(method,url,headers,payload,cookies)
+		// cacheKey is hash(method,url,headers,payload,cookies
 		b := []byte(method + url + fmt.Sprintf("%+v", headers))
 		b = append(b, payload...)
 		b = append(b, []byte(strings.Join(cookies, "==="))...)
