@@ -4,11 +4,12 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/http"
+	"time"
+
 	"github.com/LF-Engineering/da-ds/utils"
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 	jsoniter "github.com/json-iterator/go"
-	"net/http"
-	"time"
 )
 
 // DefaultTime represents the default time used when the time is not given and index does not exist
@@ -59,7 +60,7 @@ func NewFetcher(params *Params, httpClientProvider HTTPClientProvider, esClientP
 }
 
 // FetchJobs fetches the total jobs associated with the url provided
-func (f *Fetcher) FetchJobs(params *Params) (*JobResponse,error) {
+func (f *Fetcher) FetchJobs(params *Params) (*JobResponse, error) {
 	var header = make(map[string]string)
 	if params.Username != "" && params.Password != "" {
 		auth := params.Username + ":" + params.Password
@@ -67,7 +68,7 @@ func (f *Fetcher) FetchJobs(params *Params) (*JobResponse,error) {
 		header["Authorization"] = auth
 	}
 	url := fmt.Sprintf("%s/api/json", params.JenkinsURL)
-	statusCode, body, err := f.HTTPClientProvider.Request(url,"GET", header,nil, nil)
+	statusCode, body, err := f.HTTPClientProvider.Request(url, "GET", header, nil, nil)
 	if err != nil || statusCode != http.StatusOK {
 		return nil, err
 	}
@@ -90,7 +91,7 @@ func (f *Fetcher) FetchBuilds(params *Params, jobURL string) (*BuildResponse, er
 		params.Depth = Depth
 	}
 	url := fmt.Sprintf("%s/api/json?depth=%d", jobURL, params.Depth)
-	statusCode, body, err := f.HTTPClientProvider.Request(url,"GET", header,nil, nil)
+	statusCode, body, err := f.HTTPClientProvider.Request(url, "GET", header, nil, nil)
 	if err != nil || statusCode != http.StatusOK {
 		return nil, err
 	}
@@ -109,7 +110,7 @@ func (f *Fetcher) FetchItem(params *Params) ([]BuildsRaw, error) {
 	if err != nil {
 		return raw, err
 	}
-	for _,job := range jobResponse.Jobs {
+	for _, job := range jobResponse.Jobs {
 		// For every job fetch all the builds
 		builds, err := f.FetchBuilds(params, job.URL)
 		if err != nil {
@@ -125,7 +126,7 @@ func (f *Fetcher) FetchItem(params *Params) ([]BuildsRaw, error) {
 // MapToJenkinsRaw maps the api response from jenkins to the BuildsRaw documents
 func (f *Fetcher) MapToJenkinsRaw(response *BuildResponse, params *Params) []BuildsRaw {
 	var data = make([]BuildsRaw, 0)
-	for _,build := range response.Builds {
+	for _, build := range response.Builds {
 		var raw BuildsRaw
 		raw.Data = build
 		raw.MetadataUpdatedOn = time.Now()
@@ -136,9 +137,9 @@ func (f *Fetcher) MapToJenkinsRaw(response *BuildResponse, params *Params) []Bui
 		raw.BackendVersion = f.BackendVersion
 		raw.Category = BuildCategory
 		raw.Origin = params.JenkinsURL
-		raw.UpdatedOn = float64(build.Timestamp)/1000
+		raw.UpdatedOn = float64(build.Timestamp) / 1000
 		raw.BackendName = f.DSName
-		uuid, err := uuid.Generate(params.JenkinsURL,build.URL)
+		uuid, err := uuid.Generate(params.JenkinsURL, build.URL)
 		if err != nil {
 			continue
 		}

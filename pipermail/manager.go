@@ -3,16 +3,17 @@ package pipermail
 import (
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/LF-Engineering/da-ds/affiliation"
 	"github.com/LF-Engineering/da-ds/db"
 	"github.com/LF-Engineering/da-ds/utils"
-	"time"
 )
 
 // Manager describes pipermail manager
 type Manager struct {
 	Username               string        `json:"username,omitempty"`
-	SHConnString           string `json:"sh_conn_string,omitempty"`
+	SHConnString           string        `json:"sh_conn_string,omitempty"`
 	Password               string        `json:"password,omitempty"`
 	FetcherBackendVersion  string        `json:"fetcher_backend_version,omitempty"`
 	EnricherBackendVersion string        `json:"enricher_backend_version,omitempty"`

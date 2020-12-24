@@ -3,12 +3,13 @@ package jenkins
 import (
 	"encoding/json"
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/LF-Engineering/da-ds/utils"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/h2non/gock.v1"
-	"testing"
-	"time"
 )
 
 // TestFetcherSimpleFetchItem tests the working of the fetchItem function
@@ -17,15 +18,15 @@ func TestBasicFetchItem(t *testing.T) {
 		Get("/api/json").
 		Reply(200).
 		JSON(map[string]interface{}{
-		"jobs": []map[string]interface{}{
-			{
-				"_class": "org.jenkinsci.plugins.workflow.job.WorkflowJob",
-				"name": "1.0.0",
-				"url": "https://www.jenkins-mock.com/job/1.0.0/",
-				"color": "blue",
+			"jobs": []map[string]interface{}{
+				{
+					"_class": "org.jenkinsci.plugins.workflow.job.WorkflowJob",
+					"name":   "1.0.0",
+					"url":    "https://www.jenkins-mock.com/job/1.0.0/",
+					"color":  "blue",
+				},
 			},
-		},
-	})
+		})
 	gock.New("https://www.jenkins-mock.com/job/1.0.0/").
 		Get("/api/json").
 		Reply(200).
@@ -106,7 +107,7 @@ func TestBasicFetchItem(t *testing.T) {
 				ElasticSearchProvider: nil,
 				BackendVersion:        "0.0.1",
 			},
-			args{params:&Params{
+			args{params: &Params{
 				JenkinsURL:     "https://www.jenkins-mock.com",
 				Depth:          1,
 				BackendVersion: "0.0.1",
@@ -142,9 +143,9 @@ func TestFetchItem(t *testing.T) {
 			"jobs": []map[string]interface{}{
 				{
 					"_class": "org.jenkinsci.plugins.workflow.job.WorkflowJob",
-					"name": "1.0.0",
-					"url": "https://www.jenkins-mock.com/job/1.0.0/",
-					"color": "blue",
+					"name":   "1.0.0",
+					"url":    "https://www.jenkins-mock.com/job/1.0.0/",
+					"color":  "blue",
 				},
 			},
 		})
@@ -156,9 +157,9 @@ func TestFetchItem(t *testing.T) {
 			"jobs": []map[string]interface{}{
 				{
 					"_class": "org.jenkinsci.plugins.workflow.job.WorkflowJob",
-					"name": "2.0.0",
-					"url": "https://www.jenkins-mock.com/job/2.0.0/",
-					"color": "blue",
+					"name":   "2.0.0",
+					"url":    "https://www.jenkins-mock.com/job/2.0.0/",
+					"color":  "blue",
 				},
 			},
 		})
@@ -243,7 +244,7 @@ func TestFetchItem(t *testing.T) {
 				ElasticSearchProvider: nil,
 				BackendVersion:        "0.0.1",
 			},
-			args{params:&Params{
+			args{params: &Params{
 				JenkinsURL:     "https://www.jenkins-mock.com",
 				Depth:          1,
 				BackendVersion: "0.0.1",
@@ -260,7 +261,7 @@ func TestFetchItem(t *testing.T) {
 				ElasticSearchProvider: nil,
 				BackendVersion:        "0.0.1",
 			},
-			args{params:&Params{
+			args{params: &Params{
 				JenkinsURL:     "https://www.jenkins-mock-fail.com",
 				Depth:          1,
 				BackendVersion: "0.0.1",

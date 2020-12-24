@@ -84,12 +84,12 @@ func (e *Enricher) EnrichItem(rawItem BuildsRaw, project string, now time.Time) 
 	enriched.MetadataUpdatedOn = rawItem.MetadataUpdatedOn
 	enriched.MetadataEnrichedOn = time.Now()
 	enriched.ProjectTS = rawItem.Data.Timestamp
-	enriched.BuildDate = time.Unix(0, rawItem.Data.Timestamp * int64(time.Millisecond))
+	enriched.BuildDate = time.Unix(0, rawItem.Data.Timestamp*int64(time.Millisecond))
 	enriched.Build = rawItem.Data.Number
 	parts := strings.Split(rawItem.Data.DisplayName, " ")
 	enriched.Tag = rawItem.Tag
 	enriched.JobBuild = parts[0] + "/" + rawItem.Data.ID
-	enriched.JobURL = strings.TrimRight(rawItem.Data.URL, "/" + rawItem.Data.ID)
+	enriched.JobURL = strings.TrimRight(rawItem.Data.URL, "/"+rawItem.Data.ID)
 	parts = strings.Split(enriched.JobURL, "/")
 	enriched.JobName = parts[len(parts)-1]
 	enriched.Result = rawItem.Data.Result

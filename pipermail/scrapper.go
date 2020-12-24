@@ -3,10 +3,11 @@ package pipermail
 import (
 	"bytes"
 	"fmt"
-	"github.com/PuerkitoBio/goquery"
 	"net/http"
 	"path/filepath"
 	"strings"
+
+	"github.com/PuerkitoBio/goquery"
 )
 
 // ParseArchiveLinks scraps the contents of a given url to extract compressed files

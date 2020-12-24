@@ -3,9 +3,10 @@ package jenkins
 import (
 	"errors"
 	"fmt"
-	"github.com/LF-Engineering/da-ds/utils"
 	"log"
 	"time"
+
+	"github.com/LF-Engineering/da-ds/utils"
 )
 
 // Manager describes Jenkins manager
@@ -18,7 +19,7 @@ type Manager struct {
 	ESUsername             string
 	ESPassword             string
 	HTTPTimeout            time.Duration
-	BuildServers		   []*BuildServer
+	BuildServers           []*BuildServer
 	FromDate               *time.Time
 	NoIncremental          bool
 }
@@ -26,11 +27,11 @@ type Manager struct {
 // BuildServer is a single Jenkins
 // Configuration for a single project
 type BuildServer struct {
-	Username    string	`json:"username"`
-	Password    string  `json:"password"`
-	URL  		string	`json:"url"`
-	Project 	string  `json:"project"`
-	Index       string  `json:"index"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+	URL      string `json:"url"`
+	Project  string `json:"project"`
+	Index    string `json:"index"`
 }
 
 // NewManager initiates Jenkins manager instance
@@ -41,7 +42,7 @@ func NewManager(
 	enrich bool,
 	eSUrl string,
 	httpTimeout time.Duration,
-	buildServers  []*BuildServer,
+	buildServers []*BuildServer,
 	fromDate *time.Time,
 	noIncremental bool,
 ) *Manager {
@@ -78,15 +79,15 @@ func (m *Manager) Sync() error {
 			var raw []BuildsRaw
 			// Fetch data for single build
 			raw, err = fetcher.FetchItem(&Params{
-				JenkinsURL:     buildServer.URL,
-				Username:       buildServer.Username,
-				Password:       buildServer.Password,
-				Depth:          Depth,
+				JenkinsURL: buildServer.URL,
+				Username:   buildServer.Username,
+				Password:   buildServer.Password,
+				Depth:      Depth,
 			})
 			if err != nil {
 				return fmt.Errorf("could not fetch data from repository: %s-%s", buildServer.URL, buildServer.Project)
 			}
-			for _, builds := range raw{
+			for _, builds := range raw {
 				data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s-raw", buildServer.Index), ID: builds.UUID, Data: builds})
 			}
 

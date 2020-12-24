@@ -2,10 +2,11 @@ package pipermail
 
 import (
 	"fmt"
-	"github.com/LF-Engineering/da-ds/affiliation"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/LF-Engineering/da-ds/affiliation"
 )
 
 // Enricher contains pipermail datasource enrich logic

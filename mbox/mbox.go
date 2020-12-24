@@ -3,22 +3,23 @@ package mbox
 import (
 	"bytes"
 	"fmt"
-	lib "github.com/LF-Engineering/da-ds"
 	"io/ioutil"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	lib "github.com/LF-Engineering/da-ds"
 )
 
 const (
 	// MessageDateField ...
-	MessageDateField            = "date"
+	MessageDateField = "date"
 	// MessageIDField ...
-	MessageIDField              = "Message-ID"
+	MessageIDField = "Message-ID"
 	// MessageReceivedField ...
-	MessageReceivedField        = "received"
+	MessageReceivedField = "received"
 	// MaxMessageBodyLength ...
 	MaxMessageBodyLength = 1000
 	// DropXFields - drop fields starting with X- - to avoid ES 1000 fields limit
@@ -77,7 +78,7 @@ var (
 	// TZOffsetRE - time zone offset that comes after +0... +1... -0... -1...
 	// Can be 3 disgits or 3 digits then whitespace and then anything
 	TZOffsetRE = regexp.MustCompile(`^(\d{3})(\s+.*$|$)`)
-
+	// MessageLineSeparator - message line separator
 	MessageLineSeparator = []byte("\n")
 )
 
@@ -285,7 +286,7 @@ func ParseMBoxMsg(Debug int, groupName string, msg []byte) (item map[string]inte
 					}
 				}
 			}
-			if len(ary) > 1{
+			if len(ary) > 1 {
 				line = ary[1]
 			}
 		}

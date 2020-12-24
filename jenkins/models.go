@@ -5,19 +5,19 @@ import "time"
 // JobResponse struct represent the response of the
 // Jenkins api to get all the jobs
 type JobResponse struct {
-	Jobs            []struct {
+	Jobs []struct {
 		Class string `json:"_class"`
 		Name  string `json:"name"`
 		URL   string `json:"url"`
 		Color string `json:"color,omitempty"`
 	} `json:"jobs"`
-	URL     string   `json:"url"`
+	URL string `json:"url"`
 }
 
 // BuildResponse struct represent the response of
 // the jenkins api to get all the builds
 type BuildResponse struct {
-	Builds  []Build  `json:"builds"`
+	Builds []Build `json:"builds"`
 }
 
 // BuildsRaw struct represent the schema of
@@ -36,8 +36,8 @@ type BuildsRaw struct {
 		ItemID string `json:"item_id"`
 		Number int    `json:"number"`
 	} `json:"search_fields"`
-	Tag  string `json:"tag"`
-	Data Build  `json:"data"`
+	Tag               string    `json:"tag"`
+	Data              Build     `json:"data"`
 	MetadataUpdatedOn time.Time `json:"metadata__updated_on"`
 	MetadataTimestamp time.Time `json:"metadata__timestamp"`
 }
@@ -123,7 +123,7 @@ type Build struct {
 // BuildsEnrich represents the schema for the
 // enriched documents in ES
 type BuildsEnrich struct {
-	ProjectTS				int64       `json:"project_ts"`
+	ProjectTS               int64       `json:"project_ts"`
 	MetadataUpdatedOn       time.Time   `json:"metadata__updated_on"`
 	MetadataTimestamp       time.Time   `json:"metadata__timestamp"`
 	Offset                  interface{} `json:"offset"`

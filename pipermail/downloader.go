@@ -10,16 +10,19 @@ import (
 	"time"
 )
 
+// TrimFirstDot ...
 func TrimFirstDot(s string) string {
 	st := strings.Split(s, ".")
 	return st[0]
 }
 
+// TrimFirstDash ...
 func TrimFirstDash(s string) (year, month string) {
 	m := strings.Split(s, "-")
 	return m[0], m[1]
 }
 
+// ParseDateFromFilePath ...
 func ParseDateFromFilePath(path string) time.Time {
 	layoutISO := "2006-1-2"
 	baseName := filepath.Base(path)
@@ -34,6 +37,7 @@ func ParseDateFromFilePath(path string) time.Time {
 	return t
 }
 
+// DateTimeToUTC ...
 func DateTimeToUTC(date string) time.Time {
 	layout := "2006-01-02T15:04:05.000Z"
 	t, err := time.Parse(layout, date)
@@ -51,14 +55,14 @@ func DownloadFile(url, filepath string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Create the file
 	out, err := os.Create(filepath)
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+	defer func() { _ = out.Close() }()
 
 	// Write the body to file
 	_, err = io.Copy(out, resp.Body)

@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/LF-Engineering/da-ds/pipermail"
-	"github.com/LF-Engineering/da-ds/jenkins"
 	"math/rand"
 	"time"
+
+	"github.com/LF-Engineering/da-ds/jenkins"
+	"github.com/LF-Engineering/da-ds/pipermail"
 
 	"github.com/LF-Engineering/da-ds/bugzilla"
 
@@ -35,8 +36,8 @@ func runDS(ctx *lib.Ctx) (err error) {
 		manager, err := buildJenkinsManager(ctx)
 		if err != nil {
 			return err
-    	}
-    	return manager.Sync()
+		}
+		return manager.Sync()
 	case bugzilla.Bugzilla:
 		manager, err := buildBugzillaManager(ctx)
 		if err != nil {
@@ -132,10 +133,9 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 		enrichOnly, enrich, esURL, timeout, repositories, fromDate, noIncremental), nil
 }
 
-
 func buildJenkinsManager(ctx *lib.Ctx) (*jenkins.Manager, error) {
 	fetcherBackendVersion := "0.0.1"
-	enricherBackendVersion := "0.0.1" 
+	enricherBackendVersion := "0.0.1"
 	noIncremental := ctx.BoolEnv("NO_INCREMENTAL")
 	httpTimeout := ctx.Env("HTTP_TIMEOUT") // "60s" 60 seconds...
 	//example jenkinsJSON = `[{"username": "user", "password": "Admin123", "url":"https://jenkins.soramitsu.co.jp/job/iroha/job/iroha-hyperledger","project":"Iroha","index":"sds-hyperledger-iroha"}]`
@@ -199,6 +199,6 @@ func buildPipermailManager(ctx *lib.Ctx) (*pipermail.Manager, error) {
 		return nil, err
 	}
 
-	return pipermail.NewManager( fetcherBackendVersion, enricherBackendVersion,
+	return pipermail.NewManager(fetcherBackendVersion, enricherBackendVersion,
 		enrichOnly, enrich, esURL, timeout, links, fromDate, noIncremental), nil
 }

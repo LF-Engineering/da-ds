@@ -1,10 +1,11 @@
 package jenkins
 
 import (
-	jsoniter "github.com/json-iterator/go"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
+
+	jsoniter "github.com/json-iterator/go"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestEnrichItem(t *testing.T) {
@@ -39,47 +40,47 @@ func TestEnrichItem(t *testing.T) {
 	}{
 		{
 			name: "Test Case #1",
-			fields:fields{
+			fields: fields{
 				DSName:                "jenkins",
 				ElasticSearchProvider: nil,
 				BackendVersion:        "0.0.1",
 			},
-			args:args{
+			args: args{
 				rawItem: jenkinsRaw1,
 				project: "project1",
 				now:     time.Time{},
 			},
-			want: &jenkinsEnrich1,
+			want:    &jenkinsEnrich1,
 			wantErr: false,
 		},
 		{
 			name: "Test Case #2",
-			fields:fields{
+			fields: fields{
 				DSName:                "jenkins",
 				ElasticSearchProvider: nil,
 				BackendVersion:        "0.0.1",
 			},
-			args:args{
+			args: args{
 				rawItem: jenkinsRaw2,
 				project: "project1",
 				now:     time.Time{},
 			},
-			want: &jenkinsEnrich2,
+			want:    &jenkinsEnrich2,
 			wantErr: false,
 		},
 		{
 			name: "Test Case #3",
-			fields:fields{
+			fields: fields{
 				DSName:                "jenkins",
 				ElasticSearchProvider: nil,
 				BackendVersion:        "0.0.1",
 			},
-			args:args{
+			args: args{
 				rawItem: jenkinsRaw3,
 				project: "project1",
 				now:     time.Time{},
 			},
-			want: &jenkinsEnrich3,
+			want:    &jenkinsEnrich3,
 			wantErr: false,
 		},
 	}

@@ -26,6 +26,7 @@ type RawMessage struct {
 	GroupName         string               `json:"group_name"`
 }
 
+// RawMessageData ...
 type RawMessageData struct {
 	ContentType     string `json:"content_type,Content-Type"`
 	Date            string `json:"date,Date"`

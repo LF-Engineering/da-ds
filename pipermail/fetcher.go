@@ -6,8 +6,6 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
-	"github.com/LF-Engineering/da-ds/mbox"
-	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -17,6 +15,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/LF-Engineering/da-ds/mbox"
+	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 
 	lib "github.com/LF-Engineering/da-ds"
 	"github.com/LF-Engineering/da-ds/utils"
@@ -73,9 +74,8 @@ func NewFetcher(params *Params, httpClientProvider HTTPClientProvider, esClientP
 	}
 }
 
+// Fetch the mbox files from the remote archiver.
 /*
-   Fetch the mbox files from the remote archiver.
-
    Stores the archives in the path given during the initialization
    of this object. Those archives which don't have not valid extensions will
    be ignored.
@@ -112,7 +112,10 @@ func (f *Fetcher) Fetch(url string, fromDate *time.Time) (map[string]string, err
 	fetched := make(map[string]string)
 
 	if _, err := os.Stat(dirpath); os.IsNotExist(err) {
-		os.MkdirAll(dirpath, os.ModePerm)
+		err := os.MkdirAll(dirpath, os.ModePerm)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	for _, link := range links {

@@ -7,4 +7,4 @@ const (
 	Depth = 1
 	// BuildCategory is the default category for jenkins build
 	BuildCategory = "build"
-	)
+)
