@@ -4,6 +4,7 @@ import (
 	"fmt"
 	neturl "net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -32,6 +33,8 @@ var (
 	RocketchatDefaultSearchField = "item_id"
 	// RocketchatRoles - roles to fetch affiliation data for rocketchat messages
 	RocketchatRoles = []string{"u"}
+	// MustWaitRE - parse too many requests error message
+	MustWaitRE = regexp.MustCompile(`must wait (\d+) seconds before`)
 )
 
 // DSRocketchat - DS implementation for rocketchat - does nothing at all, just presents a skeleton code
@@ -204,6 +207,29 @@ func (j *DSRocketchat) GetRocketchatMessages(ctx *Ctx, fromDate string, offset, 
 	return
 }
 
+// SleepAsRequested - parse server's:
+// {"success":false,"error":"Error, too many requests. Please slow down. You must wait 23 seconds before trying this endpoint again. [error-too-many-requests]"}
+// And sleep N+1 requested seconds
+func (j *DSRocketchat) SleepAsRequested(res interface{}) {
+	iErrorMsg, ok := res.(map[string]interface{})["error"]
+	if !ok {
+		Printf("Unable to parse sleep duration, assuming 30s\n")
+		time.Sleep(time.Duration(30) * time.Second)
+		return
+	}
+	errorMsg, _ := iErrorMsg.(string)
+	match := MustWaitRE.FindAllStringSubmatch(errorMsg, -1)
+	if len(match) < 1 {
+		Printf("Unable to parse sleep duration from '%s', assuming 30s\n", errorMsg)
+		time.Sleep(time.Duration(30) * time.Second)
+		return
+	}
+	sleepFor, _ := strconv.Atoi(match[0][1])
+	Printf("Sleeping for %d seconds, as requested in '%s'\n", errorMsg)
+	sleepFor++
+	time.Sleep(time.Duration(sleepFor) * time.Second)
+}
+
 // FetchItems - implement enrich data for rocketchat datasource
 func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
 	var (
@@ -240,16 +266,21 @@ func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
 			headers,
 			nil,
 			nil,
-			map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses: 200
-			nil,                                 // Error statuses
-			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
-			true,                                // retry
-			&cacheDur,                           // cache duration
-			false,                               // skip in dry-run mode
+			map[[2]int]struct{}{{200, 200}: {}, {429, 429}: {}}, // JSON statuses: 200, 429
+			nil, // Error statuses
+			map[[2]int]struct{}{{200, 200}: {}, {429, 429}: {}}, // OK statuses: 200, 429
+			true,      // retry
+			&cacheDur, // cache duration
+			false,     // skip in dry-run mode
 		)
 		rateLimit, rateLimitReset, _ = UpdateRateLimit(ctx, j, outHeaders, "", "")
 		// Rate limit
 		if status == 413 {
+			continue
+		}
+		// Too many requests
+		if status == 429 {
+			j.SleepAsRequested(res)
 			continue
 		}
 		if err != nil {
