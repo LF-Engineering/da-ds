@@ -1,5 +1,4 @@
 # Circle CI Instrumentation
-=========
 
 ## Onboarding
 * To onboard a project, you need the project_slug which is a combination of the vcs, org name (same as Github Org name if using Github) and project name i.e vcs/org_name/project_name e.g `github/LF-Engineering/da-ds`
@@ -26,7 +25,7 @@ data_sources:
 
 ### Data Gathering
 * The first step to instrumenting Circle CI for a given project is pulling all pipelines Incrementally. The Endpoint for pulling pipelines is `https://circleci.com/api/v2/project/<project_slug>/pipeline`
-e.g `https://circleci.com/api/v2/project/gh/LF-Engineering/dev-analytics-ui/pipeline`
+e.g `https://circleci.com/api/v2/project/gh/LF-Engineering/da-ds/pipeline`
 
 This will return data in this form.
 ```
@@ -108,6 +107,48 @@ Below are the steps taken to process pipeline data.
         }
      ```
 
+     There's a corner case where the job requires approval. There response would look like this.
+     Endpoint: `https://circleci.com/api/v2/workflow/716a0d67-e379-420a-b84c-7cd3a2787c7e/job`
+
+     Response:
+     ```
+        {
+            "next_page_token" : null,
+            "items" : [ {
+                "dependencies" : [ ],
+                "id" : "949f0edf-83c6-4a0e-a34e-c376f8fc7499",
+                "started_at" : null,
+                "name" : "approve_prod",
+                "approved_by" : "382334b0-ea3e-40f6-8dbb-130e7cb3816c",
+                "project_slug" : "gh/LF-Engineering/dev-analytics-ui",
+                "status" : "success",
+                "type" : "approval",
+                "approval_request_id" : "949f0edf-83c6-4a0e-a34e-c376f8fc7499"
+            }, {
+                "dependencies" : [ "949f0edf-83c6-4a0e-a34e-c376f8fc7499" ],
+                "job_number" : 1008,
+                "id" : "48ed6602-87ca-40f7-9762-54f73f1b058e",
+                "started_at" : "2020-12-18T16:18:02Z",
+                "name" : "build_and_deploy_prod",
+                "project_slug" : "gh/LF-Engineering/dev-analytics-ui",
+                "status" : "success",
+                "type" : "build",
+                "stopped_at" : "2020-12-18T16:26:18Z"
+            } ]
+            }
+     ```
+    We can then get the approval's name using the `approved_by` id and the endpoint below
+    Endpoint: `https://circleci.com/api/v2/user/382334b0-ea3e-40f6-8dbb-130e7cb3816c`
+
+    Response: 
+    ```
+        {
+            "name" : "Fayaz",
+            "login" : "fayazg",
+            "id" : "382334b0-ea3e-40f6-8dbb-130e7cb3816c"
+        }
+    ```
+
     - From the reponse above you can get the job_number. which will be used to get the job details
 
     Endpoint: `https://circleci.com/api/v2/project/github/LF-Engineering/da-ds/job/155`
@@ -153,4 +194,16 @@ Below are the steps taken to process pipeline data.
         }
     ```
 3. Use the next_page_token to navigate to the next page where necessary.
+
+4. Sample Elasticsearch Document can be seen in the table below
+
+Document Key | Value | Description | Type | Required | Default 
+-------------|-------|-------------|------|----------|--------
+pipeline_id | 36bf400b-b767-416b-8e8d-a6bfce3de473 | Pipeline ID | string | `true` | n/a
+pipeline_number | 4185 | Pipeline Number | int | `true` | n/a
+project_slug | github.com/LF-Engineering/da-ds | Circle CI project slug | string | `true` | n/a
+pipeline_created_at | 2020-12-11T20:24:47.003Z | Time pipeline was created | Datetime | `true` | n/a
+pipeline_updated_at | 2020-12-11T20:24:47.003Z | Time pipeline was updated | Datetime | `true` | n/a
+creator_name | Foo Bar | Name of actor who triggered the pipeline | string | `false` | Unknown
+creator_username | foobar | Username of actor who triggered the pipeline | string | `true` | n/a
 
