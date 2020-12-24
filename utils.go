@@ -632,6 +632,7 @@ func Request(
 		cache  bool
 	)
 	if cacheFor != nil && !ctx.NoCache {
+		// cacheKey is hash(method,url,headers,payload,cookies)
 		b := []byte(method + url + fmt.Sprintf("%+v", headers))
 		b = append(b, payload...)
 		b = append(b, []byte(strings.Join(cookies, "==="))...)
