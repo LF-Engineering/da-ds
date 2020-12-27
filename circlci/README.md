@@ -205,6 +205,7 @@ project_slug | github.com/LF-Engineering/da-ds | Circle CI project slug | string
 pipeline_created_at | 2020-12-11T20:24:47.003Z | Time pipeline was created | Datetime | `true` | n/a
 pipeline_updated_at | 2020-12-11T20:24:47.003Z | Time pipeline was updated | Datetime | `true` | n/a
 <<<<<<< HEAD
+<<<<<<< HEAD
 pipeline_state | created | Pipeline state | string | `true` | n/a
 pipeline_trigger_type | webhook | How pipeline was triggered | string | `true` | n/a
 pipeline_trigger_date | 2020-12-11T20:24:47.003Z | Time pipeline was triggered | Datetime | `true` | n/a
@@ -262,3 +263,57 @@ creator_name | Foo Bar | Name of actor who triggered the pipeline | string | `fa
 creator_username | foobar | Username of actor who triggered the pipeline | string | `true` | n/a
 
 >>>>>>> Populating Elasticsearch sample document table
+=======
+pipeline_state | created | Pipeline state | string | `true` | n/a
+pipeline_trigger_type | webhook | How pipeline was triggered | string | `true` | n/a
+pipeline_trigger_date | 2020-12-11T20:24:47.003Z | Time pipeline was triggered | Datetime | `true` | n/a
+creator_name | Foo Bar | Name of actor who triggered the pipeline | string | `false` | Unknown
+creator_username | foobar | Username of actor who triggered the pipeline | string | `true` | n/a
+creator_org_name | Linux Foundation | Creator's current enrollmnent | string | `false` | Unknown
+creator_bot | `false` | Pipeline creator is a bot. | boolean | `false` | `false`
+creator_id | 36bf400bb767416b8e8da6bfce3de473 | Creator ID from Affiliations Database | string | `true`| n/a 
+creator_multi_org_names | [LF, ATT] | List of creator's enrollments | keyword | `false` | Unknown
+creator_uuid | 36bf400bb767416b8e8da6bfce3de473 | Creator UUID from Affiliations Database | string | `true` | n/a
+original_repository_url | https://github.com/LF-Engineering/dev-analytics-api | Repository URL | string | `true` | n/a
+target_repository_url | https://github.com/LF-Engineering/dev-analytics-api | Repository URL | string | `true` | n/a
+revision | 6a1a9ae892e42f563dc89992ccfc726761275c24 | Commit hash | string | `true` | n/a
+provider | GitHub | VCS | string | `true` | n/a
+commit_body | Build | Message body of the commit | string | `false` | n/a
+commit_subject | Update the token | Subject of the commit | string | `false` | n/a
+commit_branch | main | Branch that triggered the pipeline | string | `true` | n/a
+workflow_id | 716a0d67-e379-420a-b84c-7cd3a2787c7e | Workflow ID | string | `true` | n/a
+workflow_name | build_and_deploy | Workflow name | string | `true` | n/a
+workflow_status | success | Workflow status | string | `true` | n/a
+workflow_creator_name | Foo Bar | Name of actor who triggered the pipeline | string | `false` | Unknown
+workflow_creator_username | foobar | Username of actor who triggered the pipeline | string | `true` | n/a
+workflow_creator_org_name | Linux Foundation | Creator's current enrollmnent | string | `false` | Unknown
+workflow_creator_bot | `false` | Pipeline creator is a bot. | boolean | `false` | `false`
+workflow_creator_id | 36bf400bb767416b8e8da6bfce3de473 | Creator ID from Affiliations Database | string | `true`| n/a 
+workflow_creator_multi_org_names | [LF, ATT] | List of creator's enrollments | keyword | `false` | Unknown
+workflow_creator_uuid | 36bf400bb767416b8e8da6bfce3de473 | Creator UUID from Affiliations Database | string | `true` | n/a
+workflow_created_at | 2020-12-11T20:24:47.003Z | Time workflow was created | Datetime | `true` | n/a
+workflow_stopped_at | 2020-12-11T20:24:47.003Z | Time workflow was stopped | Datetime | `true` | n/a
+workflow_job_type | approval | Workflow job type | string | `true` | n/a
+workflow_approval_request_id | 36bf400bb767416b8e8da6bfce3de473 | Workflow approval request id | string | `true`| n/a 
+workflow_job_id | 716a0d67-e379-420a-b84c-7cd3a2787c7e | Workflow job ID | string | `true` | n/a
+workflow_approval_name | Foo Bar | Name of actor who triggered the pipeline | string | `false` | Unknown
+workflow_approval_username | foobar | Username of actor who triggered the pipeline | string | `true` | n/a
+workflow_approval_org_name | Linux Foundation | Creator's current enrollmnent | string | `false` | Unknown
+workflow_approval_bot | `false` | Pipeline creator is a bot. | boolean | `false` | `false`
+workflow_approval_id | 36bf400bb767416b8e8da6bfce3de473 | Creator ID from Affiliations Database | string | `true`| n/a 
+workflow_approval_multi_org_names | [LF, ATT] | List of creator's enrollments | keyword | `false` | Unknown
+workflow_approval_uuid | 36bf400bb767416b8e8da6bfce3de473 | Creator UUID from Affiliations Database | string | `true` | n/a
+workflow_job_started_at | 2020-12-11T20:24:47.003Z | Time workflow job was started | Datetime | `false` | n/a
+workflow_job_stopped_at | 2020-12-11T20:24:47.003Z | Time workflow job was stopped | Datetime | `false` | n/a
+workflow_job_status | success | Workflow job status | string | `true` | n/a
+workflow_job_name | approve_prod | Workflow job name | string | `true` | n/a
+job_number | 111 | Job number | int | `false` | n/a
+job_created_at | 2020-12-11T20:24:47.003Z | Time job was created | Datetime | `false` | n/a
+job_queued_at | 2020-12-11T20:24:47.003Z | Time job was queued | Datetime | `false` | n/a
+job_stopped_at | 2020-12-11T20:24:47.003Z | Time job was stopped | Datetime | `false` | n/a
+job_status | success | job status | string | `true` | n/a
+job_parallelism | 1 | Job parallelism | int | `true` | n/a
+job_duration | 186872 | Total time taken in seconds | int | `true` | n/a
+job_executor_resource_class | large | Job executor class | string | `true` | n/a
+job_executor_type | docker | Job executor class | string | `true` | n/a
+>>>>>>> Updated ES document fields
