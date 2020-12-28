@@ -34,7 +34,7 @@ func NewEnricher(identProvider IdentityProvider, backendVersion string, project 
 }
 
 // EnrichItem enrich Bugzilla raw item
-func (e *Enricher) EnrichItem(rawItem BugzillaRestRaw, now time.Time) (*BugRestEnrich, error) {
+func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error) {
 	enriched := &BugRestEnrich{}
 
 	enriched.Project = e.Project

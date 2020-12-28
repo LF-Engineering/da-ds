@@ -20,8 +20,8 @@ type Attachment struct {
 	Flags          []string
 }
 
-// BugzillaRestRaw bugzilla rest raw data
-type BugzillaRestRaw struct {
+// Raw bugzilla rest raw data
+type Raw struct {
 	Data                     BugData   `json:"data"`
 	UUID                     string    `json:"uuid"`
 	MetadataUpdatedOn        time.Time `json:"metadata__updated_on"`
@@ -237,6 +237,6 @@ type NHits struct {
 
 // NestedRawHits is the actual hit data
 type NestedRawHits struct {
-	ID     string          `json:"_id"`
-	Source BugzillaRestRaw `json:"_source"`
+	ID     string `json:"_id"`
+	Source Raw    `json:"_source"`
 }
