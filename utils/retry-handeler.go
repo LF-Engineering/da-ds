@@ -22,7 +22,7 @@ func BackOfDelay(ex func([]BulkData) ([]byte,error), uin uint, du time.Duration,
 	return err
 }
 
-
+// DelayOfCreateIndex ...
 func DelayOfCreateIndex(ex func(string2 string, b []byte) ([]byte,error), uin uint, du time.Duration, index string, data []byte ) error {
 
 	retry.DefaultAttempts = uin

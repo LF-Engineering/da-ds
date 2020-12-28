@@ -23,7 +23,7 @@ func TestFetchAll(t *testing.T) {
 	}
 	date := from.Format("2006-01-02T15:04:05")
 
-	bugsUrl := fmt.Sprintf("%srest/bug?include_fields=_extra,_default&last_change_time=%s&limit=%s&offset=%s&", url, date, limit, offset)
+	bugsURL := fmt.Sprintf("%srest/bug?include_fields=_extra,_default&last_change_time=%s&limit=%s&offset=%s&", url, date, limit, offset)
 
 	httpClientProviderMock := &mocks.HTTPClientProvider{}
 	eSClientProvider := &mocks.ESClientProvider{}
@@ -286,7 +286,7 @@ func TestFetchAll(t *testing.T) {
 
 	err = jsoniter.Unmarshal(bugRes, expectedRaw)
 
-	httpClientProviderMock.On("Request", bugsUrl, "GET",
+	httpClientProviderMock.On("Request", bugsURL, "GET",
 		mock.Anything, mock.Anything, mock.Anything).Return(200, bugRes, nil)
 
 	err = jsoniter.Unmarshal(bugRes, &expectedRaw)
@@ -295,7 +295,7 @@ func TestFetchAll(t *testing.T) {
 	}
 
 	// arrange comments request and result
-	commUrl := fmt.Sprintf("%srest/bug/%v/%s", url, id, "comment")
+	commURL := fmt.Sprintf("%srest/bug/%v/%s", url, id, "comment")
 
 	commByte := `{
     "bugs": {
@@ -353,12 +353,12 @@ func TestFetchAll(t *testing.T) {
 		t.Error(err)
 	}
 
-	httpClientProviderMock.On("Request", commUrl, "GET",
+	httpClientProviderMock.On("Request", commURL, "GET",
 		mock.Anything, mock.Anything, mock.Anything).Return(
 		200, commRes, nil)
 
 	// arrange history
-	historyUrl := fmt.Sprintf("%srest/bug/%v/%s", url, id, "history")
+	historyURL := fmt.Sprintf("%srest/bug/%v/%s", url, id, "history")
 
 	hisJs := `{
     "bugs": [
@@ -417,12 +417,12 @@ func TestFetchAll(t *testing.T) {
 		t.Error(err)
 	}
 
-	httpClientProviderMock.On("Request", historyUrl, "GET",
+	httpClientProviderMock.On("Request", historyURL, "GET",
 		mock.Anything, mock.Anything, mock.Anything).Return(
 		200, hisByte, nil)
 
 	// arrange attachments
-	attachmentUrl := fmt.Sprintf("%srest/bug/%v/%s", url, id, "attachment")
+	attachmentURL := fmt.Sprintf("%srest/bug/%v/%s", url, id, "attachment")
 
 	attaSt := `{
     "bugs": {
@@ -436,7 +436,7 @@ func TestFetchAll(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	httpClientProviderMock.On("Request", attachmentUrl, "GET",
+	httpClientProviderMock.On("Request", attachmentURL, "GET",
 		mock.Anything, mock.Anything, mock.Anything).Return(
 		200, attaByte, nil)
 

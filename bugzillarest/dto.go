@@ -70,7 +70,7 @@ type BugData struct {
 	EstimatedTime       int            `json:"estimated_time"`
 	OpSys               string         `json:"op_sys"`
 	Severity            string         `json:"severity"`
-	Url                 string         `json:"url"`
+	URL                string         `json:"url"`
 	Cc                  []string       `json:"cc"`
 	IsConfirmed         bool           `json:"is_confirmed"`
 	IsCreatorAccessible bool           `json:"is_creator_accessible"`

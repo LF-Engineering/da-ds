@@ -15,7 +15,7 @@ type HTTPClientProvider interface {
 	Request(url string, method string, header map[string]string, body []byte, params map[string]string) (statusCode int, resBody []byte, err error)
 }
 
-// Fetcher
+// Fetcher ...
 type Fetcher struct {
 	dSName                string
 	HTTPClientProvider    HTTPClientProvider
@@ -47,14 +47,14 @@ func NewFetcher(params Params, httpClientProvider HTTPClientProvider, esClientPr
 	}
 }
 
-// FetchItem fetches bug item
+// FetchAll fetches all bugs
 func (f *Fetcher) FetchAll(origin string, date string, limit string, offset string, now time.Time) ([]BugzillaRestRaw, *time.Time, error) {
 
 	url := fmt.Sprintf("%s", origin)
-	bugsUrl := fmt.Sprintf("%srest/bug?include_fields=_extra,_default&last_change_time=%s&limit=%s&offset=%s&", url, date, limit, offset)
+	bugsURL:= fmt.Sprintf("%srest/bug?include_fields=_extra,_default&last_change_time=%s&limit=%s&offset=%s&", url, date, limit, offset)
 
 	// fetch all bugs from a specific date
-	_, res, err := f.HTTPClientProvider.Request(bugsUrl, "GET", nil, nil, nil)
+	_, res, err := f.HTTPClientProvider.Request(bugsURL, "GET", nil, nil, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -85,24 +85,24 @@ func (f *Fetcher) FetchAll(origin string, date string, limit string, offset stri
 }
 
 // FetchItem fetches bug item
-func (f *Fetcher) FetchItem(origin string, bugId int, fetchedBug BugData, now time.Time) (*BugzillaRestRaw, error) {
+func (f *Fetcher) FetchItem(origin string, bugID int, fetchedBug BugData, now time.Time) (*BugzillaRestRaw, error) {
 
 	url := fmt.Sprintf("%srest/bug", origin)
 
 	// fetch bug comments
-	comments, err := f.fetchComments(url, bugId)
+	comments, err := f.fetchComments(url, bugID)
 	if err != nil {
 		return nil, err
 	}
 
 	// fetch bug history
-	history, err := f.fetchHistory(url, bugId)
+	history, err := f.fetchHistory(url, bugID)
 	if err != nil {
 		return nil, err
 	}
 
 	// fetch bug attachments
-	attachments, err := f.fetchAttachments(url, bugId)
+	attachments, err := f.fetchAttachments(url, bugID)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +110,7 @@ func (f *Fetcher) FetchItem(origin string, bugId int, fetchedBug BugData, now ti
 	var bugRaw BugzillaRestRaw
 
 	// generate UUID
-	uid, err := uuid.Generate(url, strconv.Itoa(bugId))
+	uid, err := uuid.Generate(url, strconv.Itoa(bugID))
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +142,7 @@ func (f *Fetcher) FetchItem(origin string, bugId int, fetchedBug BugData, now ti
 	bugRaw.Data.EstimatedTime = fetchedBug.EstimatedTime
 	bugRaw.Data.OpSys = fetchedBug.OpSys
 	bugRaw.Data.Severity = fetchedBug.Severity
-	bugRaw.Data.Url = fetchedBug.Url
+	bugRaw.Data.URL = fetchedBug.URL
 	bugRaw.Data.IsConfirmed = fetchedBug.IsConfirmed
 	bugRaw.Data.IsCreatorAccessible = fetchedBug.IsCreatorAccessible
 	bugRaw.Data.ActualTime = fetchedBug.ActualTime
@@ -180,8 +180,8 @@ func (f *Fetcher) FetchItem(origin string, bugId int, fetchedBug BugData, now ti
 }
 
 func (f *Fetcher) fetchComments(url string, id int) (Comments, error) {
-	commentsUrl := fmt.Sprintf("%s/%v/%s", url, id, "comment")
-	_, res, err := f.HTTPClientProvider.Request(commentsUrl, "GET", nil, nil, nil)
+	commentsURL := fmt.Sprintf("%s/%v/%s", url, id, "comment")
+	_, res, err := f.HTTPClientProvider.Request(commentsURL, "GET", nil, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -199,8 +199,8 @@ func (f *Fetcher) fetchComments(url string, id int) (Comments, error) {
 
 func (f *Fetcher) fetchHistory(url string, id int) ([]History, error) {
 
-	historyUrl := fmt.Sprintf("%s/%v/%s", url, id, "history")
-	_, res, err := f.HTTPClientProvider.Request(historyUrl, "GET", nil, nil, nil)
+	historyURL := fmt.Sprintf("%s/%v/%s", url, id, "history")
+	_, res, err := f.HTTPClientProvider.Request(historyURL, "GET", nil, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -216,8 +216,8 @@ func (f *Fetcher) fetchHistory(url string, id int) ([]History, error) {
 
 func (f *Fetcher) fetchAttachments(url string, id int) ([]Attachment, error) {
 
-	attachmentUrl := fmt.Sprintf("%s/%v/%s", url, id, "attachment")
-	_, res, err := f.HTTPClientProvider.Request(attachmentUrl, "GET", nil, nil, nil)
+	attachmentURL := fmt.Sprintf("%s/%v/%s", url, id, "attachment")
+	_, res, err := f.HTTPClientProvider.Request(attachmentURL, "GET", nil, nil, nil)
 	if err != nil {
 		return nil, err
 	}
