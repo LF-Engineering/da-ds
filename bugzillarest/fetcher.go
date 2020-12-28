@@ -2,14 +2,13 @@ package bugzillarest
 
 import (
 	"fmt"
-	"github.com/LF-Engineering/da-ds/utils"
+	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 	"strconv"
 	"time"
 
 	jsoniter "github.com/json-iterator/go"
 )
-
 
 // HTTPClientProvider used in connecting to remote http server
 type HTTPClientProvider interface {
@@ -163,7 +162,7 @@ func (f *Fetcher) FetchItem(origin string, bugId int, fetchedBug BugData, now ti
 
 	bugRaw.MetadataUpdatedOn = fetchedBug.LastChangeTime
 	bugRaw.ClassifiedFieldsFiltered = nil
-	bugRaw.UpdatedOn = utils.ConvertTimeToFloat(fetchedBug.LastChangeTime)
+	bugRaw.UpdatedOn = timeLib.ConvertTimeToFloat(fetchedBug.LastChangeTime)
 	bugRaw.Category = Category
 
 	bugRaw.BackendName = f.dSName
@@ -176,7 +175,7 @@ func (f *Fetcher) FetchItem(origin string, bugId int, fetchedBug BugData, now ti
 	bugRaw.Data.AssignedToDetail = fetchedBug.AssignedToDetail
 
 	bugRaw.MetadataTimestamp = now.UTC()
-	bugRaw.Timestamp = utils.ConvertTimeToFloat(bugRaw.MetadataTimestamp)
+	bugRaw.Timestamp = timeLib.ConvertTimeToFloat(bugRaw.MetadataTimestamp)
 	return &bugRaw, nil
 }
 

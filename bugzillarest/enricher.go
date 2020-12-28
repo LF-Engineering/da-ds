@@ -2,9 +2,9 @@ package bugzillarest
 
 import (
 	"fmt"
+	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
 	"strings"
 	"time"
-	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
 
 	"github.com/LF-Engineering/da-ds/affiliation"
 )
@@ -161,7 +161,7 @@ func (e *Enricher) EnrichItem(rawItem BugzillaRestRaw, now time.Time) (*BugRestE
 			if creator.Gender != nil {
 				enriched.CreatorDetailGender = *creator.Gender
 				enriched.AuthorGender = *creator.Gender
-			} else  {
+			} else {
 				enriched.CreatorDetailGender = unknown
 				enriched.AuthorGender = unknown
 			}

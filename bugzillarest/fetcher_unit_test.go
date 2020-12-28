@@ -280,12 +280,11 @@ func TestFetchAll(t *testing.T) {
 		t.Error(err)
 	}
 
-
 	bugRes := []byte(bugsDa)
 
 	var expectedRaw FetchedBugs
 
-	err = jsoniter.Unmarshal(bugRes,expectedRaw)
+	err = jsoniter.Unmarshal(bugRes, expectedRaw)
 
 	httpClientProviderMock.On("Request", bugsUrl, "GET",
 		mock.Anything, mock.Anything, mock.Anything).Return(200, bugRes, nil)
@@ -358,7 +357,6 @@ func TestFetchAll(t *testing.T) {
 		mock.Anything, mock.Anything, mock.Anything).Return(
 		200, commRes, nil)
 
-
 	// arrange history
 	historyUrl := fmt.Sprintf("%srest/bug/%v/%s", url, id, "history")
 
@@ -423,7 +421,6 @@ func TestFetchAll(t *testing.T) {
 		mock.Anything, mock.Anything, mock.Anything).Return(
 		200, hisByte, nil)
 
-
 	// arrange attachments
 	attachmentUrl := fmt.Sprintf("%srest/bug/%v/%s", url, id, "attachment")
 
@@ -444,12 +441,12 @@ func TestFetchAll(t *testing.T) {
 		200, attaByte, nil)
 
 	params := &Params{
-		Endpoint:   "https://bugs.dpdk.org/",
+		Endpoint:       "https://bugs.dpdk.org/",
 		BackendVersion: "0.0.1",
 	}
-	srv := NewFetcher( *params, httpClientProviderMock, eSClientProvider)
+	srv := NewFetcher(*params, httpClientProviderMock, eSClientProvider)
 	var bugs []BugzillaRestRaw
-	bugs,_, err = srv.FetchAll(url, date, limit, offset, expecRaw[0].MetadataTimestamp)
+	bugs, _, err = srv.FetchAll(url, date, limit, offset, expecRaw[0].MetadataTimestamp)
 	if err != nil {
 		t.Error(err)
 	}
@@ -467,14 +464,14 @@ func TestFetchAll(t *testing.T) {
 	act := bugs[0].Data
 	assert.NoError(t, err)
 	assert.Equal(t, expecRaw[0].MetadataTimestamp, bugs[0].MetadataTimestamp)
-	assert.Equal(t, expecRaw[0], bugs[0] )
-	assert.Equal(t, *expecRaw[0].Data.History , *bugs[0].Data.History )
-	assert.Equal(t, expecRaw[0].Data.Comments , bugs[0].Data.Comments )
-	assert.Equal(t, expecRaw[0].Data.Attachments , bugs[0].Data.Attachments )
+	assert.Equal(t, expecRaw[0], bugs[0])
+	assert.Equal(t, *expecRaw[0].Data.History, *bugs[0].Data.History)
+	assert.Equal(t, expecRaw[0].Data.Comments, bugs[0].Data.Comments)
+	assert.Equal(t, expecRaw[0].Data.Attachments, bugs[0].Data.Attachments)
 	assert.Equal(t, expecRaw[0].Data.LastChangeTime, bugs[0].Data.LastChangeTime)
 	assert.Equal(t, expect.Cc, act.Cc)
 	assert.Equal(t, expecRaw[0].Timestamp, bugs[0].Timestamp)
-	assert.Equal(t, expecRaw[0].MetadataUpdatedOn,bugs[0].MetadataUpdatedOn)
+	assert.Equal(t, expecRaw[0].MetadataUpdatedOn, bugs[0].MetadataUpdatedOn)
 
 }
 

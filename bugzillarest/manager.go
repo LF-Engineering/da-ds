@@ -1,15 +1,18 @@
 package bugzillarest
 
 import (
-"fmt"
+	b64 "encoding/base64"
+	"encoding/json"
+	"fmt"
+	"github.com/LF-Engineering/dev-analytics-libraries/http"
+	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
 	"strconv"
 	"time"
 
-"github.com/LF-Engineering/da-ds/affiliation"
-db "github.com/LF-Engineering/da-ds/db"
-"github.com/LF-Engineering/da-ds/utils"
+	"github.com/LF-Engineering/da-ds/affiliation"
+	db "github.com/LF-Engineering/da-ds/db"
+	"github.com/LF-Engineering/da-ds/utils"
 )
-
 
 // ESClientProvider used in connecting to ES server
 type ESClientProvider interface {
@@ -19,7 +22,7 @@ type ESClientProvider interface {
 	Bulk(body []byte) ([]byte, error)
 	Get(index string, query map[string]interface{}, result interface{}) (err error)
 	GetStat(index string, field string, aggType string, mustConditions []map[string]interface{}, mustNotConditions []map[string]interface{}) (result time.Time, err error)
-	BulkInsert(data []*utils.BulkData) ([]byte, error)
+	BulkInsert(data []utils.BulkData) ([]byte, error)
 }
 
 // Manager describes bugzilla manager
@@ -43,10 +46,14 @@ type Manager struct {
 	esClientProvider ESClientProvider
 	fetcher          *Fetcher
 	enricher         *Enricher
+
+	Retries                uint
+	Delay                  time.Duration
+	GabURL                 string
 }
 
 // NewManager initiates bugzilla manager instance
-func NewManager(endPoint string, shConnStr string, fetcherBackendVersion string, enricherBackendVersion string, fetch bool, enrich bool, eSUrl string, esUser string, esPassword string, esIndex string, fromDate *time.Time, project string, fetchSize int, enrichSize int) (*Manager, error) {
+func NewManager(endPoint string, shConnStr string, fetcherBackendVersion string, enricherBackendVersion string, fetch bool, enrich bool, eSUrl string, esUser string, esPassword string, esIndex string, fromDate *time.Time, project string, fetchSize int, enrichSize int, retries uint, delay time.Duration, gapURL string) (*Manager, error) {
 
 	mgr := &Manager{
 		Endpoint:               endPoint,
@@ -64,6 +71,9 @@ func NewManager(endPoint string, shConnStr string, fetcherBackendVersion string,
 		Project:                project,
 		FetchSize:              fetchSize,
 		EnrichSize:             enrichSize,
+		Retries:                retries,
+		Delay:                  delay,
+		GabURL:                 gapURL,
 	}
 
 	fetcher, enricher, esClientProvider, err := buildServices(mgr)
@@ -121,7 +131,7 @@ func (m *Manager) Sync() error {
 			if err == nil {
 				doneJobs["doneEnrich"] = true
 			}
-			time.Sleep(5*time.Second)
+			time.Sleep(5 * time.Second)
 		}
 	}
 
@@ -129,12 +139,12 @@ func (m *Manager) Sync() error {
 }
 
 func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
-	httpClientProvider := utils.NewHTTPClientProvider(m.HTTPTimeout)
+	httpClientProvider := http.NewHTTPClientProvider(m.HTTPTimeout)
 	params := &Params{
 		Endpoint:       m.Endpoint,
 		BackendVersion: m.FetcherBackendVersion,
 	}
-	esClientProvider, err := utils.NewESClientProvider(&utils.ESParams{
+	esClientProvider, err := utils.NewClientProvider(&utils.Params{
 		URL:      m.ESUrl,
 		Username: m.ESUsername,
 		Password: m.ESPassword,
@@ -144,7 +154,7 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 	}
 
 	// Initialize fetcher object to get data from bugzilla rest api
-	fetcher := NewFetcher( *params, httpClientProvider, esClientProvider)
+	fetcher := NewFetcher(*params, httpClientProvider, esClientProvider)
 
 	dataBase, err := db.NewConnector("mysql", m.SHConnString)
 	if err != nil {
@@ -183,13 +193,13 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 			lastFetch = &val.Hits.Hits[0].Source.ChangedAt
 		}
 
-		from := utils.GetOldestDate(m.FromDate, lastFetch)
+		from := timeLib.GetOldestDate(m.FromDate, lastFetch)
 		date := from.Format("2006-01-02T15:04:05")
 
 		offset := 0
 		for result == m.FetchSize {
-			data := make([]*utils.BulkData, 0)
-			bugs,lastChange, err := fetcher.FetchAll(m.Endpoint, date,strconv.Itoa(m.FetchSize), strconv.Itoa(offset) , now)
+			data := make([]utils.BulkData, 0)
+			bugs, lastChange, err := fetcher.FetchAll(m.Endpoint, date, strconv.Itoa(m.FetchSize), strconv.Itoa(offset), now)
 			if err != nil {
 				ch <- err
 				return
@@ -201,23 +211,43 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 				from = &bugs[len(bugs)-1].Data.LastChangeTime
 			}
 
-
-				for _, bug := range bugs {
-					data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s-raw", m.ESIndex), ID: bug.UUID, Data: bug})
-				}
-
-
-			//set mapping and create index if not exists
-			_, err = m.esClientProvider.CreateIndex(fmt.Sprintf("%s-raw", m.ESIndex), BugzillaRestRawMapping)
-			if err != nil {
-				ch <- err
-				return
+			for _, bug := range bugs {
+				data = append(data, utils.BulkData{IndexName: fmt.Sprintf("%s-raw", m.ESIndex), ID: bug.UUID, Data: bug})
 			}
+
 
 			if len(data) > 0 {
 				// Update changed at in elastic cache index
 				updateChan := HitSource{ID: fetchID, ChangedAt: *lastChange}
-				data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: fetchID, Data: updateChan})
+				data = append(data, utils.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: fetchID, Data: updateChan})
+
+				//set mapping and create index if not exists
+				err := utils.DelayOfCreateIndex(m.esClientProvider.CreateIndex, m.Retries, m.Delay, fmt.Sprintf("%s-raw", m.ESIndex), BugzillaRestRawMapping)
+				if err != nil {
+					ch <- err
+
+					byteData, err := json.Marshal(data)
+					if err != nil {
+						ch <- err
+						return
+					}
+					dataEnc := b64.StdEncoding.EncodeToString(byteData)
+					gabBody := map[string]string{"payload": dataEnc}
+					bData, err := json.Marshal(gabBody)
+					if err != nil {
+						ch <- err
+						return
+					}
+
+					c, e, err := m.fetcher.HTTPClientProvider.Request(m.GabURL, "POST", nil, bData, nil)
+					if err != nil {
+						ch <- err
+						return
+					}
+					fmt.Println(c, string(e))
+					continue
+				}
+
 
 				// Insert raw data to elasticsearch
 				_, err = m.esClientProvider.BulkInsert(data)
@@ -235,12 +265,10 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 	return ch
 }
 
-
 func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-chan error {
 	ch := make(chan error)
 
 	go func() {
-		fmt.Println("in enrich")
 		enrichID := "enrich"
 
 		query := map[string]interface{}{
@@ -277,7 +305,7 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 			lastEnrich = val.Hits.Hits[0].Source.ChangedAt
 		}
 
-		from := utils.GetOldestDate(m.FromDate, &lastEnrich)
+		from := timeLib.GetOldestDate(m.FromDate, &lastEnrich)
 
 		conditions := map[string]interface{}{
 			"range": map[string]interface{}{
@@ -303,14 +331,14 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 				return
 			}
 
-			data := make([]*utils.BulkData, 0)
+			data := make([]utils.BulkData, 0)
 			for _, hit := range topHits.Hits.Hits {
 				enrichedItem, err := enricher.EnrichItem(hit.Source, time.Now().UTC())
 				if err != nil {
 					ch <- err
 					return
 				}
-				data = append(data, &utils.BulkData{IndexName: m.ESIndex, ID: enrichedItem.UUID, Data: enrichedItem})
+				data = append(data, utils.BulkData{IndexName: m.ESIndex, ID: enrichedItem.UUID, Data: enrichedItem})
 			}
 
 			results = len(data)
@@ -329,7 +357,7 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 				// Update changed at in elastic cache index
 				cacheDoc, _ := data[len(data)-1].Data.(*BugRestEnrich)
 				updateChan := HitSource{ID: enrichID, ChangedAt: cacheDoc.ChangedDate}
-				data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: enrichID, Data: updateChan})
+				data = append(data, utils.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: enrichID, Data: updateChan})
 
 				// Insert enriched data to elasticsearch
 				_, err = m.esClientProvider.BulkInsert(data)
@@ -346,4 +374,3 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 
 	return ch
 }
-
