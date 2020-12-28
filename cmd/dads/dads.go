@@ -103,6 +103,9 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	enrich := ctx.Enrich
 	fromDate := ctx.DateFrom
 	noIncremental := ctx.BoolEnv("NO_INCREMENTAL")
+	retries := uint(ctx.Retry)
+	delay := 2 * time.Second
+	gabURL := ctx.GabURL
 
 	var repositories []*dockerhub.Repository
 	if err := jsoniter.Unmarshal([]byte(repositoriesJSON), &repositories); err != nil {
@@ -115,7 +118,7 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	}
 
 	return dockerhub.NewManager(username, password, fetcherBackendVersion, enricherBackendVersion,
-		enrichOnly, enrich, esURL, timeout, repositories, fromDate, noIncremental), nil
+		enrichOnly, enrich, esURL, timeout, repositories, fromDate, noIncremental, retries, delay, gabURL), nil
 }
 
 func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
@@ -130,9 +133,13 @@ func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 	enrichSize := ctx.BugZilla.EnrichSize.Int()
 	project := ctx.BugZilla.Project.String()
 	esIndex := ctx.BugZilla.EsIndex.String()
+
+	retries := uint(ctx.Retry)
+	delay := 2 * time.Second
+	gabURL := ctx.GabURL
 	mgr, err := bugzilla.NewManager(origin, ctx.DBConn, fetcherBackendVersion, enricherBackendVersion,
 		doFetch, doEnrich, ctx.ESURL, "", "", esIndex, fromDate, project,
-		fetchSize, enrichSize)
+		fetchSize, enrichSize,retries, delay, gabURL)
 	if err != nil {
 		return nil, err
 	}

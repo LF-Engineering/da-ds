@@ -57,6 +57,7 @@ type Ctx struct {
 	OffsetFromDetected bool
 	DB                 *sqlx.DB
 	ESScrollWaitSecs   float64
+	GabURL             string
 
 	// Bugzilla contains all bugzilla params
 	BugZilla *BugZilla
