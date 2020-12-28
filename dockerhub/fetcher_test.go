@@ -2,6 +2,7 @@ package dockerhub
 
 import (
 	"fmt"
+	"github.com/LF-Engineering/dev-analytics-libraries/http"
 	"testing"
 	"time"
 
@@ -508,14 +509,14 @@ func toRepositoryRaw(b string) (RepositoryRaw, error) {
 }
 
 func prepareObject() (*Fetcher, ESClientProvider, error) {
-	httpClientProvider := utils.NewHTTPClientProvider(5 * time.Second)
+	httpClientProvider := http.NewHTTPClientProvider(5 * time.Second)
 
 	params := &Params{
 		Username:       "",
 		Password:       "",
 		BackendVersion: "0.0.1",
 	}
-	esClientProvider, err := utils.NewESClientProvider(&utils.ESParams{
+	esClientProvider, err := utils.NewClientProvider(&utils.Params{
 		URL:      "http://localhost:9200",
 		Username: "elastic",
 		Password: "changeme",
