@@ -205,7 +205,10 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 		source := ds.Name()
 		runOneByOne := func() (err error) {
 			Printf("falling back to one-by-one mode for %d items\n", nIdents)
-			var errs []error
+			var (
+				er   error
+				errs []error
+			)
 			defer func() {
 				nErrs := len(errs)
 				if nErrs == 0 {
@@ -213,8 +216,8 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 					return
 				}
 				s := fmt.Sprintf("%d errors: ", nErrs)
-				for _, e := range errs {
-					s += e.Error() + ", "
+				for _, er := range errs {
+					s += er.Error() + ", "
 				}
 				s = s[:len(s)-2]
 				err = fmt.Errorf("%s", s)
@@ -271,20 +274,20 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				argsU = append(argsU, uuid)
 				argsI = append(argsI, uuid, source, pname, pemail, pusername, uuid)
 				argsP = append(argsP, uuid, profname, pemail)
-				_, e = ExecSQL(ctx, tx, queryU, argsU...)
-				if e != nil {
-					Printf("one-by-one(%d/%d): %s[%+v]: %v\n", i+1, nIdents, queryU, argsU, e)
-					errs = append(errs, e)
+				_, er = ExecSQL(ctx, tx, queryU, argsU...)
+				if er != nil {
+					Printf("one-by-one(%d/%d): %s[%+v]: %v\n", i+1, nIdents, queryU, argsU, er)
+					errs = append(errs, er)
 				}
-				_, e = ExecSQL(ctx, tx, queryP, argsP...)
-				if e != nil {
-					Printf("one-by-one(%d/%d): %s[%+v]: %v\n", i+1, nIdents, queryP, argsP, e)
-					errs = append(errs, e)
+				_, er = ExecSQL(ctx, tx, queryP, argsP...)
+				if er != nil {
+					Printf("one-by-one(%d/%d): %s[%+v]: %v\n", i+1, nIdents, queryP, argsP, er)
+					errs = append(errs, er)
 				}
-				_, e = ExecSQL(ctx, tx, queryI, argsI...)
-				if e != nil {
-					Printf("one-by-one(%d/%d): %s[%+v]: %v\n", i+1, nIdents, queryI, argsI, e)
-					errs = append(errs, e)
+				_, er = ExecSQL(ctx, tx, queryI, argsI...)
+				if er != nil {
+					Printf("one-by-one(%d/%d): %s[%+v]: %v\n", i+1, nIdents, queryI, argsI, er)
+					errs = append(errs, er)
 				}
 			}
 			return
