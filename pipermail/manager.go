@@ -56,15 +56,6 @@ type Manager struct {
 	enricher         *Enricher
 }
 
-// Link represents piper mail link data
-type Link struct {
-	Link        string `json:"Link"`
-	Project     string `json:"Project"`
-	ESIndex     string `json:"ESIndex"`
-	GroupName   string `json:"GroupName"`
-	ProjectSlug string `json:"ProjectSlug"`
-}
-
 // NewManager initiates piper mail manager instance
 func NewManager(endPoint, slug, groupName, shConnStr, fetcherBackendVersion, enricherBackendVersion string, fetch bool, enrich bool, eSUrl string, esUser string, esPassword string, esIndex string, fromDate *time.Time, project string, fetchSize int, enrichSize int) (*Manager, error) {
 	mng := &Manager{
@@ -151,7 +142,12 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 			lastFetch = &val.Hits.Hits[0].Source.ChangedAt
 		}
 
-		from := utils.GetOldestDate(m.FromDate, lastFetch)
+		fromDate := m.FromDate
+		if fromDate == nil {
+			fromDate = &DefaultDateTime
+		}
+
+		from := utils.GetOldestDate(fromDate, lastFetch)
 
 		round := false
 		for result == m.FetchSize {

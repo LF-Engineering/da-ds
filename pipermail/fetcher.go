@@ -32,7 +32,6 @@ type Fetcher struct {
 	BackendVersion        string
 	Debug                 int
 	DateFrom              time.Time
-	Links                 []*Link
 }
 
 // Params required parameters for piper mail fetcher
@@ -43,7 +42,6 @@ type Params struct {
 	Debug          int
 	ProjectSlug    string
 	GroupName      string
-	Links          []*Link
 }
 
 // HTTPClientProvider used in connecting to remote http server
@@ -70,7 +68,6 @@ func NewFetcher(params *Params, httpClientProvider HTTPClientProvider, esClientP
 		ElasticSearchProvider: esClientProvider,
 		BackendVersion:        params.BackendVersion,
 		Debug:                 params.Debug,
-		Links:                 params.Links,
 	}
 }
 
@@ -90,9 +87,6 @@ func NewFetcher(params *Params, httpClientProvider HTTPClientProvider, esClientP
 //
 //returns a map of links and their paths of the fetched archives
 func (f *Fetcher) Fetch(url string, fromDate *time.Time) (map[string]string, error) {
-	if fromDate == nil {
-		fromDate = &DefaultDateTime
-	}
 
 	dirpath := filepath.Join(ArchiveDownloadsPath, url)
 	lib.Printf("\nDownloading mboxes from %s since %s\n", url, fromDate.String())
@@ -102,7 +96,7 @@ func (f *Fetcher) Fetch(url string, fromDate *time.Time) (map[string]string, err
 		return nil, err
 	}
 
-	links, err := f.ParseArchiveLinks(url)
+	links, err := f.ParseArchiveLinks(url, fromDate)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +131,7 @@ func (f *Fetcher) Fetch(url string, fromDate *time.Time) (map[string]string, err
 // FetchItem extracts data from archives
 func (f *Fetcher) FetchItem(slug, groupName, project, endpoint string, fromDate time.Time, limit int, now time.Time) ([]*RawMessage, error) {
 	var allMsgs []*RawMessage
-	archives, err := f.Fetch(endpoint, &DefaultDateTime)
+	archives, err := f.Fetch(endpoint, &fromDate)
 	if err != nil {
 		return nil, err
 	}
@@ -309,7 +303,7 @@ func (f *Fetcher) FetchItem(slug, groupName, project, endpoint string, fromDate 
 				stat(false, false, false, true)
 				return
 			}
-			rawMessage := f.AddMetadata(message, endpoint, slug, groupName, link)
+			rawMessage := f.AddMetadata(message, endpoint, slug, groupName)
 			allMsgs = append(allMsgs, rawMessage)
 			return
 		}
@@ -340,24 +334,23 @@ func (f *Fetcher) FetchItem(slug, groupName, project, endpoint string, fromDate 
 }
 
 // AddMetadata - add metadata to the raw message
-func (f *Fetcher) AddMetadata(msg interface{}, endpoint, slug, groupName, link string) *RawMessage {
+func (f *Fetcher) AddMetadata(msg interface{}, endpoint, slug, groupName string) *RawMessage {
 	timestamp := time.Now().UTC()
 	rawMessage := new(RawMessage)
 
 	rawMessage.BackendName = f.DSName
 	rawMessage.BackendVersion = PiperBackendVersion
 	rawMessage.Timestamp = utils.ConvertTimeToFloat(timestamp)
-	rawMessage.Origin = link
-	rawMessage.Tag = link
-	updatedOn := f.ItemUpdatedOn(msg)
-	rawMessage.UpdatedOn = utils.ConvertTimeToFloat(updatedOn)
+	rawMessage.Origin = endpoint
+	rawMessage.Tag = endpoint
+	rawMessage.UpdatedOn = utils.ConvertTimeToFloat(timestamp)
 	rawMessage.Category = f.ItemCategory(msg)
 	rawMessage.SearchFields = &MessageSearchFields{
 		Name:   groupName,
 		ItemID: f.ItemID(msg),
 	}
 	rawMessage.GroupName = groupName
-	rawMessage.MetadataUpdatedOn = lib.ToESDate(updatedOn)
+	rawMessage.MetadataUpdatedOn = lib.ToESDate(timestamp)
 	rawMessage.MetadataTimestamp = lib.ToESDate(timestamp)
 	rawMessage.ProjectSlug = slug
 
@@ -389,8 +382,8 @@ func (f *Fetcher) HandleMapping(index string) error {
 }
 
 // GetLastDate gets fetching lastDate
-func (f *Fetcher) GetLastDate(link *Link, now time.Time) (time.Time, error) {
-	lastDate, err := f.ElasticSearchProvider.GetStat(fmt.Sprintf("%s-raw", link.ESIndex), "metadata__updated_on", "max", nil, nil)
+func (f *Fetcher) GetLastDate(ESIndex string, now time.Time) (time.Time, error) {
+	lastDate, err := f.ElasticSearchProvider.GetStat(fmt.Sprintf("%s-raw", ESIndex), "metadata__updated_on", "max", nil, nil)
 	if err != nil {
 		return now.UTC(), err
 	}
