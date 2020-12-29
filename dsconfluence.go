@@ -860,7 +860,7 @@ func (j *DSConfluence) AffsItems(ctx *Ctx, page map[string]interface{}, roles []
 		if len(identity) == 0 {
 			continue
 		}
-		affsIdentity, empty := IdenityAffsData(ctx, j, identity, nil, dt, role)
+		affsIdentity, empty := IdentityAffsData(ctx, j, identity, nil, dt, role)
 		if empty {
 			Printf("no identity affiliation data for identity %+v\n", identity)
 			continue

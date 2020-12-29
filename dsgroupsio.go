@@ -1122,7 +1122,7 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 			"username": ary[1],
 			"email":    ary[2],
 		}
-		affsIdentity, empty := IdenityAffsData(ctx, j, identity, nil, dt, role)
+		affsIdentity, empty := IdentityAffsData(ctx, j, identity, nil, dt, role)
 		if empty {
 			Printf("no identity affiliation data for identity %+v\n", identity)
 		} else {
