@@ -208,6 +208,7 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 			var (
 				er   error
 				errs []error
+				itx  *sql.Tx
 			)
 			defer func() {
 				nErrs := len(errs)
@@ -274,21 +275,33 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				argsU = append(argsU, uuid)
 				argsI = append(argsI, uuid, source, pname, pemail, pusername, uuid)
 				argsP = append(argsP, uuid, profname, pemail)
-				_, er = ExecSQL(ctx, tx, queryU, argsU...)
+				itx, err = ctx.DB.Begin()
+				if err != nil {
+					return
+				}
+				_, er = ExecSQL(ctx, itx, queryU, argsU...)
 				if er != nil {
 					Printf("one-by-one(%d/%d): %s[%+v]: %v\n", i+1, nIdents, queryU, argsU, er)
+					_ = itx.Rollback()
 					errs = append(errs, er)
 				}
-				_, er = ExecSQL(ctx, tx, queryP, argsP...)
+				_, er = ExecSQL(ctx, itx, queryP, argsP...)
 				if er != nil {
 					Printf("one-by-one(%d/%d): %s[%+v]: %v\n", i+1, nIdents, queryP, argsP, er)
+					_ = itx.Rollback()
 					errs = append(errs, er)
 				}
-				_, er = ExecSQL(ctx, tx, queryI, argsI...)
+				_, er = ExecSQL(ctx, itx, queryI, argsI...)
 				if er != nil {
 					Printf("one-by-one(%d/%d): %s[%+v]: %v\n", i+1, nIdents, queryI, argsI, er)
+					_ = itx.Rollback()
 					errs = append(errs, er)
 				}
+				err = itx.Commit()
+				if err != nil {
+					return
+				}
+				itx = nil
 			}
 			return
 		}
