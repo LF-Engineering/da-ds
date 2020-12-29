@@ -96,7 +96,7 @@ func (f *Fetcher) Find(slice []string, val string) (bool, string) {
 	return false, ""
 }
 
-// TrimDot ...
+// TrimDots ...
 func TrimDots(s string) string {
 	var st []string
 	if strings.Contains(s, ".") {
