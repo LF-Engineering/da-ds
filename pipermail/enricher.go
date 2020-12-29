@@ -2,10 +2,10 @@ package pipermail
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
+	lib "github.com/LF-Engineering/da-ds"
 	"github.com/LF-Engineering/da-ds/affiliation"
 )
 
@@ -21,46 +21,6 @@ type Enricher struct {
 type IdentityProvider interface {
 	GetIdentity(key string, val string) (*affiliation.Identity, error)
 	GetOrganizations(uuid string, date time.Time) ([]string, error)
-}
-
-// TopHits result
-type TopHits struct {
-	Took         int          `json:"took"`
-	Hits         Hits         `json:"hits"`
-	Aggregations Aggregations `json:"aggregations"`
-}
-
-// Hits result
-type Hits struct {
-	Total    Total        `json:"total"`
-	MaxScore float32      `json:"max_score"`
-	Hits     []NestedHits `json:"hits"`
-}
-
-// Total result
-type Total struct {
-	Value    int    `json:"value"`
-	Relation string `json:"relation"`
-}
-
-// NestedHits result
-type NestedHits struct {
-	Index  string      `json:"_index"`
-	Type   string      `json:"_type"`
-	ID     string      `json:"_id"`
-	Score  float64     `json:"_score"`
-	Source *RawMessage `json:"_source"`
-}
-
-// Aggregations result
-type Aggregations struct {
-	LastDate LastDate `json:"last_date"`
-}
-
-// LastDate result
-type LastDate struct {
-	Value         float64 `json:"value"`
-	ValueAsString string  `json:"value_as_string"`
 }
 
 // NewEnricher initiates a new Enricher
@@ -92,11 +52,12 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 		AuthorOrgName:        "",
 		AuthorUserName:       "",
 		AuthorBot:            false,
-		BodyExtract:          "",
+		BodyExtract:          rawMessage.Data.Data.Text.Plain[0].Data,
 		AuthorID:             "",
 		SubjectAnalyzed:      rawMessage.Data.Subject,
 		FromBot:              false,
-		Project:              "",
+		Project:              rawMessage.Project,
+		ProjectSlug:          rawMessage.ProjectSlug,
 		MboxAuthorDomain:     "",
 		Date:                 rawMessage.Data.Date,
 		IsPipermailMessage:   1,
@@ -120,17 +81,50 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 		MetadataUpdatedOn:    rawMessage.MetadataUpdatedOn,
 		MetadataEnrichedOn:   now,
 		BackendVersion:       rawMessage.BackendVersion,
+		ChangedDate:          rawMessage.ChangedAt,
 	}
 
-	var emailObfuscationPatterns = []string{" at ", "_at_", " en "}
-	for _, pattern := range emailObfuscationPatterns {
-		trimBraces := strings.Split(rawMessage.Data.From, " (")
-		obfuscatedEmail := strings.TrimSpace(trimBraces[0])
-		if strings.Contains(obfuscatedEmail, pattern) {
-			email := strings.Replace(obfuscatedEmail, pattern, "@", 1)
-			fmt.Println(email)
-			os.Exit(1)
+	userAffiliationsEmail := e.HandleObfuscatedEmail(rawMessage.Data.From)
+	userData, err := e.identityProvider.GetIdentity("email", userAffiliationsEmail)
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+	enriched.MboxAuthorDomain = e.GetEmailDomain(userAffiliationsEmail)
+	// if user is already affiliated
+	if userData != nil {
+		if userData.ID.Valid {
+			enriched.AuthorID = userData.ID.String
 		}
+		if userData.Name.Valid {
+			enriched.AuthorName = userData.Name.String
+			enriched.FromName = userData.Name.String
+		}
+		if userData.Username.Valid {
+			enriched.FromUserName = userData.Username.String
+		}
+		if userData.OrgName.Valid {
+			enriched.FromOrgName = userData.OrgName.String
+		}
+		if userData.UUID.Valid {
+			enriched.AuthorUUID = userData.UUID.String
+		}
+		if userData.Gender.Valid {
+			enriched.AuthorGender = userData.Gender.String
+			enriched.FromGender = userData.Gender.String
+		}
+		mUpdatedOn, err := lib.TimeParseES(rawMessage.MetadataUpdatedOn)
+		assignedToMultiOrg, err := e.identityProvider.GetOrganizations(userData.UUID.String, mUpdatedOn)
+		if err == nil {
+			if len(assignedToMultiOrg) != 0 {
+				enriched.AuthorMultiOrgNames = assignedToMultiOrg
+			}
+		}
+		enriched.FromBot = userData.IsBot
+	}
+
+	if rawMessage.Data.InReplyTo != "" {
+		enriched.Root = true
 	}
 
 	return &enriched, nil
@@ -145,4 +139,41 @@ func (e *Enricher) EnrichAffiliation(key string, val string) (*affiliation.Ident
 func (e *Enricher) HandleMapping(index string) error {
 	_, err := e.ElasticSearchProvider.CreateIndex(index, PiperRichMapping)
 	return err
+}
+
+// HandleObfuscatedEmail ...
+func (e *Enricher) HandleObfuscatedEmail(rawMailString string) (email string) {
+	for _, pattern := range EmailObfuscationPatterns {
+		trimBraces := strings.Split(rawMailString, " (")
+		obfuscatedEmail := strings.TrimSpace(trimBraces[0])
+		if strings.Contains(obfuscatedEmail, pattern) {
+			email = strings.Replace(obfuscatedEmail, pattern, "@", 1)
+			return
+		}
+	}
+	return ""
+}
+
+// GetEmailDomain ...
+func (e *Enricher) GetEmailDomain(email string) string {
+	domain := strings.Split(email, "@")
+	return domain[1]
+}
+
+// GetUserName ...
+func (e *Enricher) GetUserName(rawMailString string) (username string) {
+	trimBraces := strings.Split(rawMailString, " (")
+	username = strings.TrimSpace(trimBraces[1])
+	username = strings.TrimSpace(strings.Replace(username, ")", "", 1))
+	return
+}
+
+// FormatTimestampString returns a formatted RFC 33339 Datetime string
+func (e *Enricher) FormatTimestampString(str string) (*time.Time, error) {
+	layout := "2006-01-02T15:04:05.000Z"
+	t, err := time.Parse(layout, str)
+	if err != nil {
+		return nil, err
+	}
+	return &t, nil
 }

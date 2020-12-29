@@ -60,6 +60,8 @@ type Ctx struct {
 
 	// Bugzilla contains all bugzilla params
 	BugZilla *BugZilla
+
+	PiperMail *PiperMail
 }
 
 // BugZilla parameter context contains all required parameters to run Bugzilla fetch and enrich
@@ -72,6 +74,20 @@ type BugZilla struct {
 	DoEnrich   *Flag
 	FetchSize  *Flag
 	EnrichSize *Flag
+}
+
+// PiperMail parameter context contains all required parameters to run Piper mail fetch and enrich
+type PiperMail struct {
+	Origin      *Flag
+	Project     *Flag
+	ProjectSlug *Flag
+	GroupName   *Flag
+	EsIndex     *Flag
+	FromDate    *Flag
+	DoFetch     *Flag
+	DoEnrich    *Flag
+	FetchSize   *Flag
+	EnrichSize  *Flag
 }
 
 // Env - get env value using current DS prefix
@@ -89,6 +105,17 @@ func (ctx *Ctx) ParseFlags() {
 	flag.Var(ctx.BugZilla.DoEnrich, "bugzilla-do-enrich", "To decide whether will do enrich raw data or not.")
 	flag.Var(ctx.BugZilla.FetchSize, "bugzilla-fetch-size", "Total number of fetched items per request.")
 	flag.Var(ctx.BugZilla.EnrichSize, "bugzilla-enrich-size", "Total number of enriched items per request.")
+
+	flag.Var(ctx.PiperMail.Origin, "pipermail-origin", "Pipermail origin url")
+	flag.Var(ctx.PiperMail.ProjectSlug, "pipermail-slug", "Pipermail project slug")
+	flag.Var(ctx.PiperMail.GroupName, "pipermail-groupname", "Pipermail group name")
+	flag.Var(ctx.PiperMail.EsIndex, "pipermail-es-index", "Pipermail es index base name")
+	flag.Var(ctx.PiperMail.FromDate, "pipermail-from-date", "Optional, date to start syncing from")
+	flag.Var(ctx.PiperMail.Project, "pipermail-project", "Slug name of a project e.g. yocto")
+	flag.Var(ctx.PiperMail.DoFetch, "pipermail-do-fetch", "To decide whether will fetch raw data or not")
+	flag.Var(ctx.PiperMail.DoEnrich, "pipermail-do-enrich", "To decide whether will do enrich raw data or not.")
+	flag.Var(ctx.PiperMail.FetchSize, "pipermail-fetch-size", "Total number of fetched items per request.")
+	flag.Var(ctx.PiperMail.EnrichSize, "pipermail-enrich-size", "Total number of enriched items per request.")
 
 	flag.Parse()
 }
@@ -296,6 +323,19 @@ func (ctx *Ctx) Init() {
 		FetchSize:  NewFlag(),
 		EnrichSize: NewFlag(),
 		Project:    NewFlag(),
+	}
+
+	ctx.PiperMail = &PiperMail{
+		Origin:      NewFlag(),
+		Project:     NewFlag(),
+		ProjectSlug: NewFlag(),
+		GroupName:   NewFlag(),
+		EsIndex:     NewFlag(),
+		FromDate:    NewFlag(),
+		DoFetch:     NewFlag(),
+		DoEnrich:    NewFlag(),
+		FetchSize:   NewFlag(),
+		EnrichSize:  NewFlag(),
 	}
 
 }

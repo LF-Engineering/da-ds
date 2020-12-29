@@ -575,8 +575,9 @@ func TestInit(t *testing.T) {
 
 		// Initialize context while new environment is set
 		gotContext.Init()
-		// FIXME: this is a hack that shoudl be removed, once BugZilla variable is only initialized in DS=bugzilla mode.
+		// FIXME: this is a hack that should be removed, once BugZilla variable is only initialized in DS=bugzilla mode.
 		gotContext.BugZilla = nil
+		gotContext.PiperMail = nil
 
 		// Restore original environment
 		for key := range test.environment {

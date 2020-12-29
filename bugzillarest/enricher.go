@@ -95,17 +95,17 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 		}
 		assignedTo, err := e.identityProvider.GetIdentity(assignedToFieldName, enriched.AssignedTo)
 		if err == nil {
-			enriched.AssignedToDetailID = assignedTo.ID
-			enriched.AssignedToDetailUUID = assignedTo.UUID
-			enriched.AssignedToDetailName = assignedTo.Name
-			enriched.AssignedToDetailUserName = assignedTo.Username
-			enriched.AssignedToDetailDomain = assignedTo.Domain
+			enriched.AssignedToDetailID = assignedTo.ID.String
+			enriched.AssignedToDetailUUID = assignedTo.UUID.String
+			enriched.AssignedToDetailName = assignedTo.Name.String
+			enriched.AssignedToDetailUserName = assignedTo.Username.String
+			enriched.AssignedToDetailDomain = assignedTo.Domain.String
 			enriched.AssignedToDetailBot = assignedTo.IsBot
 
-			enriched.AssignedToUUID = assignedTo.UUID
+			enriched.AssignedToUUID = assignedTo.UUID.String
 
-			if assignedTo.Gender != nil {
-				enriched.AssignedToDetailGender = *assignedTo.Gender
+			if assignedTo.Gender.Valid {
+				enriched.AssignedToDetailGender = assignedTo.Gender.String
 			} else {
 				enriched.AssignedToDetailGender = unknown
 			}
@@ -115,15 +115,15 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 			} else {
 				enriched.AssignedToDetailGenderAcc = 0
 			}
-			if assignedTo.OrgName != nil {
-				enriched.AssignedToDetailOrgName = *assignedTo.OrgName
-				enriched.AssignedToOrgName = *assignedTo.OrgName
+			if assignedTo.OrgName.Valid {
+				enriched.AssignedToDetailOrgName = assignedTo.OrgName.String
+				enriched.AssignedToOrgName = assignedTo.OrgName.String
 			} else {
 				enriched.AssignedToDetailOrgName = unknown
 				enriched.AssignedToOrgName = unknown
 			}
 
-			assignedToMultiOrg, err := e.identityProvider.GetOrganizations(assignedTo.UUID, enriched.MetadataUpdatedOn)
+			assignedToMultiOrg, err := e.identityProvider.GetOrganizations(assignedTo.UUID.String, enriched.MetadataUpdatedOn)
 			if err == nil {
 				enriched.AssignedToDetailMultiOrgName = multiOrgs
 
@@ -147,21 +147,21 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 		creator, err := e.identityProvider.GetIdentity(reporterFieldName, enriched.Creator)
 
 		if err == nil {
-			enriched.CreatorDetailID = creator.ID
-			enriched.CreatorDetailUUID = creator.UUID
-			enriched.CreatorDetailName = creator.Name
-			enriched.CreatorDetailUserName = creator.Username
-			enriched.CreatorDetailDomain = creator.Domain
+			enriched.CreatorDetailID = creator.ID.String
+			enriched.CreatorDetailUUID = creator.UUID.String
+			enriched.CreatorDetailName = creator.Name.String
+			enriched.CreatorDetailUserName = creator.Username.String
+			enriched.CreatorDetailDomain = creator.Domain.String
 
-			enriched.AuthorID = creator.ID
-			enriched.AuthorUUID = creator.UUID
-			enriched.AuthorName = creator.Name
-			enriched.AuthorUserName = creator.Username
-			enriched.AuthorDomain = creator.Domain
+			enriched.AuthorID = creator.ID.String
+			enriched.AuthorUUID = creator.UUID.String
+			enriched.AuthorName = creator.Name.String
+			enriched.AuthorUserName = creator.Username.String
+			enriched.AuthorDomain = creator.Domain.String
 
-			if creator.Gender != nil {
-				enriched.CreatorDetailGender = *creator.Gender
-				enriched.AuthorGender = *creator.Gender
+			if creator.Gender.Valid {
+				enriched.CreatorDetailGender = creator.Gender.String
+				enriched.AuthorGender = creator.Gender.String
 			} else {
 				enriched.CreatorDetailGender = unknown
 				enriched.AuthorGender = unknown
@@ -175,9 +175,9 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 				enriched.AuthorGenderAcc = 0
 			}
 
-			if creator.OrgName != nil {
-				enriched.CreatorDetailOrgName = *creator.OrgName
-				enriched.AuthorOrgName = *creator.OrgName
+			if creator.OrgName.Valid {
+				enriched.CreatorDetailOrgName = creator.OrgName.String
+				enriched.AuthorOrgName = creator.OrgName.String
 			} else {
 				enriched.CreatorDetailOrgName = unknown
 				enriched.AuthorOrgName = unknown
@@ -186,7 +186,7 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 			enriched.CreatorDetailBot = creator.IsBot
 			enriched.AuthorBot = creator.IsBot
 
-			reporterMultiOrg, err := e.identityProvider.GetOrganizations(creator.UUID, enriched.MetadataUpdatedOn)
+			reporterMultiOrg, err := e.identityProvider.GetOrganizations(creator.UUID.String, enriched.MetadataUpdatedOn)
 			if err == nil {
 				enriched.CreatorDetailMultiOrgName = multiOrgs
 				enriched.AuthorMultiOrgNames = multiOrgs

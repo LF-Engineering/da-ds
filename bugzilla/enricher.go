@@ -80,15 +80,15 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 
 		assignedTo, err := e.identityProvider.GetIdentity(assignedToFieldName, enriched.Assigned)
 		if err == nil {
-			enriched.AssignedToID = assignedTo.ID
-			enriched.AssignedToUUID = assignedTo.UUID
-			enriched.AssignedToName = assignedTo.Name
-			enriched.AssignedToUserName = assignedTo.Username
-			enriched.AssignedToDomain = assignedTo.Domain
+			enriched.AssignedToID = assignedTo.ID.String
+			enriched.AssignedToUUID = assignedTo.UUID.String
+			enriched.AssignedToName = assignedTo.Name.String
+			enriched.AssignedToUserName = assignedTo.Username.String
+			enriched.AssignedToDomain = assignedTo.Domain.String
 			enriched.AssignedToBot = assignedTo.IsBot
 
-			if assignedTo.Gender != nil {
-				enriched.AssignedToGender = *assignedTo.Gender
+			if assignedTo.Gender.Valid {
+				enriched.AssignedToGender = assignedTo.Gender.String
 			} else {
 				enriched.AssignedToGender = unknown
 			}
@@ -99,13 +99,13 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 				enriched.AssignedToGenderAcc = 0
 			}
 
-			if assignedTo.OrgName != nil {
-				enriched.AssignedToOrgName = *assignedTo.OrgName
+			if assignedTo.OrgName.Valid {
+				enriched.AssignedToOrgName = assignedTo.OrgName.String
 			} else {
 				enriched.AssignedToOrgName = unknown
 			}
 
-			assignedToMultiOrg, err := e.identityProvider.GetOrganizations(assignedTo.UUID, enriched.MetadataUpdatedOn)
+			assignedToMultiOrg, err := e.identityProvider.GetOrganizations(assignedTo.UUID.String, enriched.MetadataUpdatedOn)
 			if err == nil {
 				enriched.AssignedToMultiOrgName = multiOrgs
 
@@ -129,21 +129,21 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 		reporter, err := e.identityProvider.GetIdentity(reporterFieldName, enriched.ReporterUserName)
 
 		if err == nil {
-			enriched.ReporterID = reporter.ID
-			enriched.ReporterUUID = reporter.UUID
-			enriched.ReporterName = reporter.Name
-			enriched.ReporterUserName = reporter.Username
-			enriched.ReporterDomain = reporter.Domain
+			enriched.ReporterID = reporter.ID.String
+			enriched.ReporterUUID = reporter.UUID.String
+			enriched.ReporterName = reporter.Name.String
+			enriched.ReporterUserName = reporter.Username.String
+			enriched.ReporterDomain = reporter.Domain.String
 
-			enriched.AuthorID = reporter.ID
-			enriched.AuthorUUID = reporter.UUID
-			enriched.AuthorName = reporter.Name
-			enriched.AuthorUserName = reporter.Username
-			enriched.AuthorDomain = reporter.Domain
+			enriched.AuthorID = reporter.ID.String
+			enriched.AuthorUUID = reporter.UUID.String
+			enriched.AuthorName = reporter.Name.String
+			enriched.AuthorUserName = reporter.Username.String
+			enriched.AuthorDomain = reporter.Domain.String
 
-			if reporter.Gender != nil {
-				enriched.ReporterGender = *reporter.Gender
-				enriched.AuthorGender = *reporter.Gender
+			if reporter.Gender.Valid {
+				enriched.ReporterGender = reporter.Gender.String
+				enriched.AuthorGender = reporter.Gender.String
 			} else {
 				enriched.ReporterGender = unknown
 				enriched.AuthorGender = unknown
@@ -155,9 +155,9 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 				enriched.ReporterGenderACC = 0
 				enriched.AuthorGenderAcc = 0
 			}
-			if reporter.OrgName != nil {
-				enriched.ReporterOrgName = *reporter.OrgName
-				enriched.AuthorOrgName = *reporter.OrgName
+			if reporter.OrgName.Valid {
+				enriched.ReporterOrgName = reporter.OrgName.String
+				enriched.AuthorOrgName = reporter.OrgName.String
 			} else {
 				enriched.ReporterOrgName = unknown
 				enriched.AuthorOrgName = unknown
@@ -166,7 +166,7 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 			enriched.ReporterBot = reporter.IsBot
 			enriched.AuthorBot = reporter.IsBot
 
-			reporterMultiOrg, err := e.identityProvider.GetOrganizations(reporter.UUID, enriched.MetadataUpdatedOn)
+			reporterMultiOrg, err := e.identityProvider.GetOrganizations(reporter.UUID.String, enriched.MetadataUpdatedOn)
 			if err == nil {
 				enriched.ReporterMultiOrgName = multiOrgs
 				enriched.AuthorMultiOrgName = multiOrgs

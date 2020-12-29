@@ -6,13 +6,14 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 )
 
 // ParseArchiveLinks scraps the contents of a given url to extract compressed files
 // download links
-func (f *Fetcher) ParseArchiveLinks(archivesURL string) ([]string, error) {
+func (f *Fetcher) ParseArchiveLinks(archivesURL string, fromDate *time.Time) ([]string, error) {
 	// get all accepted & compressed types into one list
 	CombinedTypes = append(CombinedTypes, CompressedTypes...)
 	CombinedTypes = append(CombinedTypes, AcceptedTypes...)
@@ -50,7 +51,6 @@ func (f *Fetcher) ParseArchiveLinks(archivesURL string) ([]string, error) {
 					links = append(links, link)
 				}
 			}
-
 		})
 	}
 
@@ -76,7 +76,10 @@ func (f *Fetcher) ParseArchiveLinks(archivesURL string) ([]string, error) {
 		_, ext2 := f.Find(CombinedTypes, filepath.Ext(secondExtension))
 
 		if ext1 != "" || ext2 != "" {
-			sortedLinks = append(sortedLinks, link)
+			mboxDT := ParseDateFromFilePath(link)
+			if fromDate.Year() == mboxDT.Year() && fromDate.Month() == mboxDT.Month() || fromDate.After(mboxDT) {
+				sortedLinks = append(sortedLinks, link)
+			}
 		}
 	}
 	return sortedLinks, nil
@@ -91,4 +94,14 @@ func (f *Fetcher) Find(slice []string, val string) (bool, string) {
 		}
 	}
 	return false, ""
+}
+
+// TrimDots ...
+func TrimDots(s string) string {
+	var st []string
+	if strings.Contains(s, ".") {
+		st = strings.Split(s, ".")
+		TrimDots(st[0])
+	}
+	return s
 }

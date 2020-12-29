@@ -1,6 +1,7 @@
 package bugzillarest
 
 import (
+	"database/sql"
 	"testing"
 	"time"
 
@@ -316,16 +317,16 @@ func TestEnrichItem(t *testing.T) {
 		zero := 0
 		dd := "MontaVista Software, LLC"
 
-		fakeAff1 := &affiliation.Identity{ID: "756be8209f265138d271a6223fa0d85085e308db",
-			UUID: "756be8209f265138d271a6223fa0d85085e308db", Name: "Qian", IsBot: false,
-			Domain: "", OrgName: nil, Username: "", GenderACC: &zero,
-			MultiOrgNames: []string{unknown}, Gender: &unknown,
+		fakeAff1 := &affiliation.Identity{ID: sql.NullString{String: "756be8209f265138d271a6223fa0d85085e308db", Valid: true},
+			UUID: sql.NullString{String: "756be8209f265138d271a6223fa0d85085e308db", Valid: true}, Name: sql.NullString{String: "Qian", Valid: true}, IsBot: false,
+			Domain: sql.NullString{String: "", Valid: false}, OrgName: sql.NullString{}, Username: sql.NullString{String: "", Valid: false}, GenderACC: &zero,
+			MultiOrgNames: []string{unknown}, Gender: sql.NullString{String: unknown, Valid: true},
 		}
 
-		fakeAff2 := &affiliation.Identity{ID: "a89364af9818412b8c59193ca83b30dd67b20e35",
-			UUID: "5d408e590365763c3927084d746071fa84dc8e52", Name: "akuster", IsBot: false,
-			Domain: "gmail.com", OrgName: &dd, Username: "", GenderACC: &zero,
-			MultiOrgNames: []string{"MontaVista Software, LLC"}, Gender: &unknown,
+		fakeAff2 := &affiliation.Identity{ID: sql.NullString{String: "a89364af9818412b8c59193ca83b30dd67b20e35", Valid: true},
+			UUID: sql.NullString{String: "5d408e590365763c3927084d746071fa84dc8e52", Valid: true}, Name: sql.NullString{String: "akuster", Valid: true}, IsBot: false,
+			Domain: sql.NullString{String: "gmail.com", Valid: true}, OrgName: sql.NullString{String: dd, Valid: true}, Username: sql.NullString{String: "", Valid: false}, GenderACC: &zero,
+			MultiOrgNames: []string{"MontaVista Software, LLC"}, Gender: sql.NullString{String: unknown, Valid: true},
 		}
 		//rmultiorg1 := []string{"MontaVista Software, LLC"}
 		rmultiorg2 := []string{unknown}
