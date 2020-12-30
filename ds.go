@@ -284,18 +284,21 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 					Printf("one-by-one(%d/%d): %s[%+v]: %v\n", i+1, nIdents, queryU, argsU, er)
 					_ = itx.Rollback()
 					errs = append(errs, er)
+					continue
 				}
 				_, er = ExecSQL(ctx, itx, queryP, argsP...)
 				if er != nil {
 					Printf("one-by-one(%d/%d): %s[%+v]: %v\n", i+1, nIdents, queryP, argsP, er)
 					_ = itx.Rollback()
 					errs = append(errs, er)
+					continue
 				}
 				_, er = ExecSQL(ctx, itx, queryI, argsI...)
 				if er != nil {
 					Printf("one-by-one(%d/%d): %s[%+v]: %v\n", i+1, nIdents, queryI, argsI, er)
 					_ = itx.Rollback()
 					errs = append(errs, er)
+					continue
 				}
 				err = itx.Commit()
 				if err != nil {
