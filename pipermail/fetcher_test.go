@@ -2,11 +2,12 @@ package pipermail
 
 import (
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/LF-Engineering/da-ds/pipermail/mocks"
 	"github.com/LF-Engineering/da-ds/utils"
 	"github.com/stretchr/testify/mock"
-	"testing"
-	"time"
 
 	jsoniter "github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
@@ -27,12 +28,12 @@ func TestFetchAll(t *testing.T) {
 		200, rawMessageBytes, nil)
 	tt := []struct {
 		name     string
-		fields fields
+		fields   fields
 		expected []byte
 		err      bool
 	}{
 		{
-			name:     "ok message",
+			name: "ok message",
 			fields: fields{
 				DSName:                "pipermail",
 				IncludeArchived:       false,
@@ -145,6 +146,6 @@ type fields struct {
 	HTTPClientProvider    HTTPClientProvider
 	ElasticSearchProvider ESClientProvider
 	BackendVersion        string
-	Debug int
-	DateFrom time.Time
+	Debug                 int
+	DateFrom              time.Time
 }

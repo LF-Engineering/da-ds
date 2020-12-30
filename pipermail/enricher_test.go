@@ -2,10 +2,11 @@ package pipermail
 
 import (
 	"database/sql"
-	"github.com/LF-Engineering/da-ds/affiliation"
-	"github.com/LF-Engineering/da-ds/pipermail/mocks"
 	"testing"
 	"time"
+
+	"github.com/LF-Engineering/da-ds/affiliation"
+	"github.com/LF-Engineering/da-ds/pipermail/mocks"
 
 	jsoniter "github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
@@ -13,16 +14,16 @@ import (
 
 func TestEnrichAll(t *testing.T) {
 	tt := []struct {
-		name     string
+		name        string
 		fetchedData []byte
-		expected []byte
-		err      bool
+		expected    []byte
+		err         bool
 	}{
 		{
-			name:     "ok enriched message",
+			name:        "ok enriched message",
 			fetchedData: rawMsgBytes,
-			expected: rawMessageBytes,
-			err:      false,
+			expected:    rawMessageBytes,
+			err:         false,
 		},
 	}
 
@@ -61,7 +62,6 @@ func TestEnrichAll(t *testing.T) {
 			d, err := time.Parse(time.RFC3339, "2016-02-26T19:15:43Z")
 			identityProviderMock.On("GetOrganizations", "756be8209f265138d271a6223fa0d85085e308db", d).Return(nil, nil)
 			identityProviderMock.On("GetOrganizations", "50ffba4dfbedc6dc4390fc8bde7aeec0a7191056", d).Return(nil, nil)
-
 
 			// Act
 			srv := NewEnricher(identityProviderMock, "0.0.1", nil)
