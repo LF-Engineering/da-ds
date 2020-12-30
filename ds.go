@@ -269,6 +269,12 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				}
 				// uuid(source, email, name, username)
 				uuid := UUIDAffs(ctx, source, email, name, username)
+				if uuid == "" {
+					er := fmt.Errorf("error: uploadToDB: failed to generate uuid for (%s,%s,%s,%s)", source, email, name, username)
+					Printf("one-by-one(%d/%d): %v\n", i+1, nIdents, er)
+					errs = append(errs, er)
+					continue
+				}
 				queryU += fmt.Sprintf("(?,now())")
 				queryI += fmt.Sprintf("(?,?,?,?,?,?,now())")
 				queryP += fmt.Sprintf("(?,?,?)")
@@ -380,6 +386,10 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				}
 				// uuid(source, email, name, username)
 				uuid := UUIDAffs(ctx, source, email, name, username)
+				if uuid == "" {
+					Printf("error: uploadToDb(bulk): failed to generate uuid for (%s,%s,%s,%s), skipping this one\n", source, email, name, username)
+					continue
+				}
 				queryU += fmt.Sprintf("(?,now()),")
 				queryI += fmt.Sprintf("(?,?,?,?,?,?,now()),")
 				queryP += fmt.Sprintf("(?,?,?),")

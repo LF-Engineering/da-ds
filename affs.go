@@ -173,6 +173,9 @@ func AffsIdentityIDs(ctx *Ctx, ds DS, identity map[string]interface{}) (ids [2]i
 	}
 	source := ds.Name()
 	id := UUIDAffs(ctx, source, sEmail, sName, sUsername)
+	if id == "" {
+		return
+	}
 	identityFound, err := FindObject(ctx, "identities", "id", id, []string{"id", "uuid"})
 	if err != nil || identityFound == nil {
 		return
