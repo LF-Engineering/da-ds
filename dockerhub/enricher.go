@@ -123,7 +123,7 @@ func (e *Enricher) HandleMapping(index string) error {
 func (e *Enricher) GetFetchedDataItem(repo *Repository, cmdLastDate *time.Time, lastDate *time.Time, noIncremental bool) (result *TopHits, err error) {
 	rawIndex := fmt.Sprintf("%s-raw", repo.ESIndex)
 
-	var lastEnrichDate *time.Time = nil
+	var lastEnrichDate *time.Time
 
 	if noIncremental == false {
 		if cmdLastDate != nil && !cmdLastDate.IsZero() {

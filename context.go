@@ -19,7 +19,7 @@ type Ctx struct {
 	DebugSQL           int        // From DA_DS_DEBUG_SQL SQL Debug level
 	Retry              int        // From DA_DS_RETRY: how many times retry failed operatins, default 5
 	ST                 bool       // From DA_DS_ST true: use single threaded version, false: use multi threaded version, default false
-	NCPUs              int        // From DA_DS_NCPUS, set to override number of CPUs to run, this overwrites DA_ST, default 0 (which means do not use it, use all CPU reported by go library)
+	NCPUs              int        // From DA_DS_NCPUS, set to override number of CPUs to run, this overwrites DA_DS_ST, default 0 (which means do not use it, use all CPU reported by go library)
 	NCPUsScale         float64    // From DA_DS_NCPUS_SCALE, scale number of CPUs, for example 2.0 will report number of cpus 2.0 the number of actually available CPUs
 	Enrich             bool       // From DA_DS_ENRICH, flag to run enrichment
 	RawIndex           string     // From DA_DS_RAW_INDEX - raw index name
@@ -63,6 +63,8 @@ type Ctx struct {
 
 	// Bugzilla contains all bugzilla params
 	BugZilla *BugZilla
+
+	PiperMail *PiperMail
 }
 
 // BugZilla parameter context contains all required parameters to run Bugzilla fetch and enrich
@@ -75,6 +77,20 @@ type BugZilla struct {
 	DoEnrich   *Flag
 	FetchSize  *Flag
 	EnrichSize *Flag
+}
+
+// PiperMail parameter context contains all required parameters to run Piper mail fetch and enrich
+type PiperMail struct {
+	Origin      *Flag
+	Project     *Flag
+	ProjectSlug *Flag
+	GroupName   *Flag
+	EsIndex     *Flag
+	FromDate    *Flag
+	DoFetch     *Flag
+	DoEnrich    *Flag
+	FetchSize   *Flag
+	EnrichSize  *Flag
 }
 
 // Env - get env value using current DS prefix
@@ -92,6 +108,17 @@ func (ctx *Ctx) ParseFlags() {
 	flag.Var(ctx.BugZilla.DoEnrich, "bugzilla-do-enrich", "To decide whether will do enrich raw data or not.")
 	flag.Var(ctx.BugZilla.FetchSize, "bugzilla-fetch-size", "Total number of fetched items per request.")
 	flag.Var(ctx.BugZilla.EnrichSize, "bugzilla-enrich-size", "Total number of enriched items per request.")
+
+	flag.Var(ctx.PiperMail.Origin, "pipermail-origin", "Pipermail origin url")
+	flag.Var(ctx.PiperMail.ProjectSlug, "pipermail-slug", "Pipermail project slug")
+	flag.Var(ctx.PiperMail.GroupName, "pipermail-groupname", "Pipermail group name")
+	flag.Var(ctx.PiperMail.EsIndex, "pipermail-es-index", "Pipermail es index base name")
+	flag.Var(ctx.PiperMail.FromDate, "pipermail-from-date", "Optional, date to start syncing from")
+	flag.Var(ctx.PiperMail.Project, "pipermail-project", "Slug name of a project e.g. yocto")
+	flag.Var(ctx.PiperMail.DoFetch, "pipermail-do-fetch", "To decide whether will fetch raw data or not")
+	flag.Var(ctx.PiperMail.DoEnrich, "pipermail-do-enrich", "To decide whether will do enrich raw data or not.")
+	flag.Var(ctx.PiperMail.FetchSize, "pipermail-fetch-size", "Total number of fetched items per request.")
+	flag.Var(ctx.PiperMail.EnrichSize, "pipermail-enrich-size", "Total number of enriched items per request.")
 
 	flag.Parse()
 }
@@ -314,6 +341,19 @@ func (ctx *Ctx) Init() {
 		Project:    NewFlag(),
 	}
 
+	ctx.PiperMail = &PiperMail{
+		Origin:      NewFlag(),
+		Project:     NewFlag(),
+		ProjectSlug: NewFlag(),
+		GroupName:   NewFlag(),
+		EsIndex:     NewFlag(),
+		FromDate:    NewFlag(),
+		DoFetch:     NewFlag(),
+		DoEnrich:    NewFlag(),
+		FetchSize:   NewFlag(),
+		EnrichSize:  NewFlag(),
+	}
+
 }
 
 // Validate - check if config is correct
@@ -324,13 +364,6 @@ func (ctx *Ctx) Validate() (err error) {
 	if strings.HasSuffix(ctx.ESURL, "/") {
 		ctx.ESURL = ctx.ESURL[:len(ctx.ESURL)-1]
 	}
-	// todo: delete it later
-	/*if !ctx.NoRaw && ctx.RawIndex == "" {
-		return fmt.Errorf("you must specify raw index name unless skipping raw processing")
-	}
-	if ctx.Enrich && ctx.RichIndex == "" {
-		return fmt.Errorf("you must specify rich index name unless skipping enrichment")
-	}*/
 	return
 }
 

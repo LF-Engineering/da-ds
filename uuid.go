@@ -63,7 +63,10 @@ func UUIDNonEmpty(ctx *Ctx, args ...string) (h string) {
 	}
 	var err error
 	h, err = uuid.Generate(args...)
-	FatalOnError(err)
+	if err != nil {
+		Printf("UUIDNonEmpty error for: %+v\n", args)
+		h = ""
+	}
 	return
 }
 
@@ -111,6 +114,9 @@ func UUIDAffs(ctx *Ctx, args ...string) (h string) {
 	} else {
 		h, err = uuid.GenerateIdentity(&args[0], &args[1], &args[2], &args[3])
 	}
-	FatalOnError(err)
+	if err != nil {
+		Printf("UUIDAffs error for: %+v\n", args)
+		h = ""
+	}
 	return
 }

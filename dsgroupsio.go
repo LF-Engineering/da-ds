@@ -221,6 +221,7 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 		nil,                                 // JSON statuses
 		nil,                                 // Error statuses
 		map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
+		map[[2]int]struct{}{{200, 200}: {}}, // Cache statuses: 200
 		false,                               // retry
 		&cacheLoginDur,                      // cache duration
 		false,                               // skip in dry-run mode
@@ -296,9 +297,10 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 		nil,
 		[]byte{},
 		cookies,
-		nil,
+		nil,                                 // JSON statuses
 		nil,                                 // Error statuses
 		map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
+		map[[2]int]struct{}{{200, 200}: {}}, // Cache statuses: 200
 		false,                               // retry
 		&cacheMsgDur,                        // cache duration
 		false,                               // skip in dry-run mode
@@ -1120,7 +1122,7 @@ func (j *DSGroupsio) EnrichItem(ctx *Ctx, item map[string]interface{}, role stri
 			"username": ary[1],
 			"email":    ary[2],
 		}
-		affsIdentity, empty := IdenityAffsData(ctx, j, identity, nil, dt, role)
+		affsIdentity, empty := IdentityAffsData(ctx, j, identity, nil, dt, role)
 		if empty {
 			Printf("no identity affiliation data for identity %+v\n", identity)
 		} else {

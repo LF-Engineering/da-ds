@@ -62,7 +62,7 @@ func ResetThreadsNum(ctx *Ctx) {
 }
 
 // GetThreadsNum returns the number of available CPUs
-// If environment variable GHA_ST is set it retuns 1
+// If environment variable DA_DS_ST is set it retuns 1
 // It can be used to debug single threaded verion
 func GetThreadsNum(ctx *Ctx) int {
 	thrNMtx.Lock()
@@ -75,6 +75,10 @@ func GetThreadsNum(ctx *Ctx) int {
 			Printf("using %d threads\n", thrN)
 		}
 	}()
+	if ctx.ST {
+		thrN = 1
+		return thrN
+	}
 	// Use environment variable to have singlethreaded version
 	if ctx.NCPUs > 0 {
 		n := int(float64(runtime.NumCPU()) * ctx.NCPUsScale)
@@ -86,10 +90,6 @@ func GetThreadsNum(ctx *Ctx) int {
 		if thrN > 1 {
 			SetMT()
 		}
-		return thrN
-	}
-	if ctx.ST {
-		thrN = 1
 		return thrN
 	}
 	thrN = int(float64(runtime.NumCPU()) * ctx.NCPUsScale)

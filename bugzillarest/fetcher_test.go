@@ -2,14 +2,15 @@ package bugzillarest
 
 import (
 	"fmt"
+	"strconv"
+	"testing"
+	"time"
+
 	"github.com/LF-Engineering/da-ds/bugzillarest/mocks"
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"strconv"
-	"testing"
-	"time"
 )
 
 func TestFetchAll(t *testing.T) {

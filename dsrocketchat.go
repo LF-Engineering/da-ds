@@ -4,6 +4,7 @@ import (
 	"fmt"
 	neturl "net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -32,6 +33,8 @@ var (
 	RocketchatDefaultSearchField = "item_id"
 	// RocketchatRoles - roles to fetch affiliation data for rocketchat messages
 	RocketchatRoles = []string{"u"}
+	// MustWaitRE - parse too many requests error message
+	MustWaitRE = regexp.MustCompile(`must wait (\d+) seconds before`)
 )
 
 // DSRocketchat - DS implementation for rocketchat - does nothing at all, just presents a skeleton code
@@ -143,7 +146,7 @@ func (j *DSRocketchat) CalculateTimeToReset(ctx *Ctx, rateLimit, rateLimitReset 
 }
 
 // GetRocketchatMessages - get confluence historical contents
-func (j *DSRocketchat) GetRocketchatMessages(ctx *Ctx, fromDate string, offset, rateLimit, rateLimitReset int) (messages []map[string]interface{}, newOffset, total, outRateLimit, outRateLimitReset int, err error) {
+func (j *DSRocketchat) GetRocketchatMessages(ctx *Ctx, fromDate string, offset, rateLimit, rateLimitReset, thrN int) (messages []map[string]interface{}, newOffset, total, outRateLimit, outRateLimitReset int, err error) {
 	query := `{"_updatedAt": {"$gte": {"$date": "` + fromDate + `"}}}`
 	url := j.URL + fmt.Sprintf(
 		`/api/v1/channels.messages?roomName=%s&count=%d&offset=%d&sort=%s&query=%s`,
@@ -164,6 +167,7 @@ func (j *DSRocketchat) GetRocketchatMessages(ctx *Ctx, fromDate string, offset, 
 		status     int
 		outHeaders map[string][]string
 	)
+	sleeps, rates := 0, 0
 	for {
 		err = SleepForRateLimit(ctx, j, rateLimit, rateLimitReset, j.MinRate, j.WaitRate)
 		if err != nil {
@@ -176,19 +180,30 @@ func (j *DSRocketchat) GetRocketchatMessages(ctx *Ctx, fromDate string, offset, 
 			headers,
 			nil,
 			nil,
-			map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses: 200
-			nil,                                 // Error statuses
-			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
-			true,                                // retry
-			&cacheDur,                           // cache duration
-			false,                               // skip in dry-run mode
+			map[[2]int]struct{}{{200, 200}: {}, {429, 429}: {}}, // JSON statuses: 200, 429
+			nil, // Error statuses
+			map[[2]int]struct{}{{200, 200}: {}, {429, 429}: {}}, // OK statuses: 200, 429
+			map[[2]int]struct{}{{200, 200}: {}},                 // Cache statuses: 200
+			true,                                                // retry
+			&cacheDur,                                           // cache duration
+			false,                                               // skip in dry-run mode
 		)
 		rateLimit, rateLimitReset, _ = UpdateRateLimit(ctx, j, outHeaders, "", "")
 		if status == 413 {
+			rates++
+			continue
+		}
+		// Too many requests
+		if status == 429 {
+			j.SleepAsRequested(res, thrN)
+			sleeps++
 			continue
 		}
 		if err != nil {
 			return
+		}
+		if sleeps > 0 || rates > 0 {
+			Printf("recovered after %d sleeps and %d rate limits\n", sleeps, rates)
 		}
 		break
 	}
@@ -202,6 +217,30 @@ func (j *DSRocketchat) GetRocketchatMessages(ctx *Ctx, fromDate string, offset, 
 	// Printf("MESSAGES: %d, TOTAL: %d, OFFSET: %d\n", len(messages), total, offset)
 	outRateLimit, outRateLimitReset, newOffset = rateLimit, rateLimitReset, offset+len(messages)
 	return
+}
+
+// SleepAsRequested - parse server's:
+// {"success":false,"error":"Error, too many requests. Please slow down. You must wait 23 seconds before trying this endpoint again. [error-too-many-requests]"}
+// And sleep N+1 requested seconds
+func (j *DSRocketchat) SleepAsRequested(res interface{}, thrN int) {
+	iErrorMsg, ok := res.(map[string]interface{})["error"]
+	if !ok {
+		Printf("Unable to parse sleep duration, assuming 1m\n")
+		time.Sleep(time.Duration(60) * time.Second)
+		return
+	}
+	errorMsg, _ := iErrorMsg.(string)
+	match := MustWaitRE.FindAllStringSubmatch(errorMsg, -1)
+	if len(match) < 1 {
+		Printf("Unable to parse sleep duration from '%s', assuming 1m\n", errorMsg)
+		time.Sleep(time.Duration(60) * time.Second)
+		return
+	}
+	sleepFor, _ := strconv.Atoi(match[0][1])
+	sleepFor++
+	sleepFor *= thrN
+	Printf("Sleeping for %d (adjusted for MT) seconds, as requested in '%s'\n", sleepFor, errorMsg)
+	time.Sleep(time.Duration(sleepFor) * time.Second)
 }
 
 // FetchItems - implement enrich data for rocketchat datasource
@@ -226,6 +265,8 @@ func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
 		status     int
 		outHeaders map[string][]string
 	)
+	thrN := GetThreadsNum(ctx)
+	sleeps, rates := 0, 0
 	for {
 		err = SleepForRateLimit(ctx, j, rateLimit, rateLimitReset, j.MinRate, j.WaitRate)
 		if err != nil {
@@ -240,17 +281,28 @@ func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
 			headers,
 			nil,
 			nil,
-			map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses: 200
-			nil,                                 // Error statuses
-			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
-			true,                                // retry
-			&cacheDur,                           // cache duration
-			false,                               // skip in dry-run mode
+			map[[2]int]struct{}{{200, 200}: {}, {429, 429}: {}}, // JSON statuses: 200, 429
+			nil, // Error statuses
+			map[[2]int]struct{}{{200, 200}: {}, {429, 429}: {}}, // OK statuses: 200, 429
+			map[[2]int]struct{}{{200, 200}: {}},                 // Cache statuses: 200
+			true,                                                // retry
+			&cacheDur,                                           // cache duration
+			false,                                               // skip in dry-run mode
 		)
 		rateLimit, rateLimitReset, _ = UpdateRateLimit(ctx, j, outHeaders, "", "")
 		// Rate limit
 		if status == 413 {
+			rates++
 			continue
+		}
+		// Too many requests
+		if status == 429 {
+			sleeps++
+			j.SleepAsRequested(res, thrN)
+			continue
+		}
+		if sleeps > 0 || rates > 0 {
+			Printf("recovered after %d sleeps and %d rate limits\n", sleeps, rates)
 		}
 		if err != nil {
 			return
@@ -260,7 +312,7 @@ func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
 	channelInfo, ok := res.(map[string]interface{})["channel"]
 	if !ok {
 		data, _ := res.(map[string]interface{})
-		err = fmt.Errorf("Cannot read channel info from:\n%s", data)
+		err = fmt.Errorf("cannot read channel info from:\n%s", data)
 		return
 	}
 	// Process messages (possibly in threads)
@@ -271,7 +323,6 @@ func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
 		escha      []chan error
 		eschaMtx   *sync.Mutex
 	)
-	thrN := GetThreadsNum(ctx)
 	if thrN > 1 {
 		ch = make(chan error)
 		allMsgsMtx = &sync.Mutex{}
@@ -333,7 +384,7 @@ func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
 	if thrN > 1 {
 		for {
 			var messages []map[string]interface{}
-			messages, offset, total, rateLimit, rateLimitReset, err = j.GetRocketchatMessages(ctx, sDateFrom, offset, rateLimit, rateLimitReset)
+			messages, offset, total, rateLimit, rateLimitReset, err = j.GetRocketchatMessages(ctx, sDateFrom, offset, rateLimit, rateLimitReset, thrN)
 			if err != nil {
 				return
 			}
@@ -382,7 +433,7 @@ func (j *DSRocketchat) FetchItems(ctx *Ctx) (err error) {
 	} else {
 		for {
 			var messages []map[string]interface{}
-			messages, offset, total, rateLimit, rateLimitReset, err = j.GetRocketchatMessages(ctx, sDateFrom, offset, rateLimit, rateLimitReset)
+			messages, offset, total, rateLimit, rateLimitReset, err = j.GetRocketchatMessages(ctx, sDateFrom, offset, rateLimit, rateLimitReset, thrN)
 			if err != nil {
 				return
 			}
@@ -851,7 +902,7 @@ func (j *DSRocketchat) AffsItems(ctx *Ctx, message map[string]interface{}, roles
 		if len(identity) == 0 {
 			continue
 		}
-		affsIdentity, empty := IdenityAffsData(ctx, j, identity, nil, dt, role)
+		affsIdentity, empty := IdentityAffsData(ctx, j, identity, nil, dt, role)
 		if empty {
 			Printf("no identity affiliation data for identity %+v\n", identity)
 			continue

@@ -202,6 +202,118 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 			identsAry = append(identsAry, ident)
 		}
 		nIdents := len(identsAry)
+		source := ds.Name()
+		runOneByOne := func() (err error) {
+			Printf("falling back to one-by-one mode for %d items\n", nIdents)
+			var (
+				er   error
+				errs []error
+				itx  *sql.Tx
+			)
+			defer func() {
+				nErrs := len(errs)
+				if nErrs == 0 {
+					Printf("one-by-one mode for %d items - all succeeded\n", nIdents)
+					return
+				}
+				s := fmt.Sprintf("%d errors: ", nErrs)
+				for _, er := range errs {
+					s += er.Error() + ", "
+				}
+				s = s[:len(s)-2]
+				err = fmt.Errorf("%s", s)
+				Printf("one-by-one mode for %d items: %d errors\n", nIdents, nErrs)
+			}()
+			for i := 0; i < nIdents; i++ {
+				ident := identsAry[i]
+				queryU := "insert ignore into uidentities(uuid,last_modified) values"
+				queryI := "insert ignore into identities(id,source,name,email,username,uuid,last_modified) values"
+				queryP := "insert ignore into profiles(uuid,name,email) values"
+				argsU := []interface{}{}
+				argsI := []interface{}{}
+				argsP := []interface{}{}
+				name := ident[0]
+				username := ident[1]
+				email := ident[2]
+				var (
+					pname     *string
+					pemail    *string
+					pusername *string
+					profname  *string
+				)
+				if name != Nil {
+					pname = &name
+					profname = &name
+				}
+				if email != Nil {
+					pemail = &email
+				}
+				if username != Nil {
+					pusername = &username
+					if profname == nil {
+						profname = &username
+					}
+				}
+				if pname == nil && pemail == nil && pusername == nil {
+					continue
+				}
+				// if username matches a real email and there is no email set, assume email=username
+				if pemail == nil && pusername != nil && IsValidEmail(username) {
+					pemail = &username
+					email = username
+				}
+				// if name matches a real email and there is no email set, assume email=name
+				if pemail == nil && pname != nil && IsValidEmail(name) {
+					pemail = &name
+					email = name
+				}
+				// uuid(source, email, name, username)
+				uuid := UUIDAffs(ctx, source, email, name, username)
+				if uuid == "" {
+					er := fmt.Errorf("error: uploadToDB: failed to generate uuid for (%s,%s,%s,%s)", source, email, name, username)
+					Printf("one-by-one(%d/%d): %v\n", i+1, nIdents, er)
+					errs = append(errs, er)
+					continue
+				}
+				queryU += fmt.Sprintf("(?,now())")
+				queryI += fmt.Sprintf("(?,?,?,?,?,?,now())")
+				queryP += fmt.Sprintf("(?,?,?)")
+				argsU = append(argsU, uuid)
+				argsI = append(argsI, uuid, source, pname, pemail, pusername, uuid)
+				argsP = append(argsP, uuid, profname, pemail)
+				itx, err = ctx.DB.Begin()
+				if err != nil {
+					return
+				}
+				_, er = ExecSQL(ctx, itx, queryU, argsU...)
+				if er != nil {
+					Printf("one-by-one(%d/%d): %s[%+v]: %v\n", i+1, nIdents, queryU, argsU, er)
+					_ = itx.Rollback()
+					errs = append(errs, er)
+					continue
+				}
+				_, er = ExecSQL(ctx, itx, queryP, argsP...)
+				if er != nil {
+					Printf("one-by-one(%d/%d): %s[%+v]: %v\n", i+1, nIdents, queryP, argsP, er)
+					_ = itx.Rollback()
+					errs = append(errs, er)
+					continue
+				}
+				_, er = ExecSQL(ctx, itx, queryI, argsI...)
+				if er != nil {
+					Printf("one-by-one(%d/%d): %s[%+v]: %v\n", i+1, nIdents, queryI, argsI, er)
+					_ = itx.Rollback()
+					errs = append(errs, er)
+					continue
+				}
+				err = itx.Commit()
+				if err != nil {
+					return
+				}
+				itx = nil
+			}
+			return
+		}
 		defer func() {
 			if tx != nil {
 				if ctx.DryRun {
@@ -210,6 +322,7 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 					Printf("rolling back %d identities insert\n", nIdents)
 				}
 				_ = tx.Rollback()
+				err = runOneByOne()
 			}
 		}()
 		if ctx.Debug > 0 {
@@ -219,7 +332,6 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 		if nIdents%bulkSize != 0 {
 			nPacks++
 		}
-		source := ds.Name()
 		for i := 0; i < nPacks; i++ {
 			from := i * bulkSize
 			to := from + bulkSize
@@ -274,6 +386,10 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				}
 				// uuid(source, email, name, username)
 				uuid := UUIDAffs(ctx, source, email, name, username)
+				if uuid == "" {
+					Printf("error: uploadToDb(bulk): failed to generate uuid for (%s,%s,%s,%s), skipping this one\n", source, email, name, username)
+					continue
+				}
 				queryU += fmt.Sprintf("(?,now()),")
 				queryI += fmt.Sprintf("(?,?,?,?,?,?,now()),")
 				queryP += fmt.Sprintf("(?,?,?),")
@@ -601,6 +717,7 @@ func ForEachESItem(
 			nil,
 			nil,                                 // Error statuses
 			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses
+			nil,                                 // Cache statuses
 			false,                               // retry request
 			nil,                                 // cacheExpire duration
 			false,                               // skip in dry-run mode
@@ -685,6 +802,7 @@ func ForEachESItem(
 			map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses
 			nil,                                 // Error statuses
 			map[[2]int]struct{}{{200, 200}: {}, {404, 404}: {}, {500, 500}: {}}, // OK statuses
+			map[[2]int]struct{}{{200, 200}: {}},                                 // Cache statuses
 			true,
 			cacheFor,
 			false,
@@ -838,6 +956,7 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 		nil,                                 // JSON statuses
 		map[[2]int]struct{}{{401, 599}: {}}, // error statuses: 401-599
 		nil,                                 // OK statuses
+		nil,                                 // Cache statuses
 		true,                                // retry
 		nil,                                 // cache duration
 		true,                                // skip in dry run
@@ -861,6 +980,7 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 		nil,
 		nil,
 		map[[2]int]struct{}{{200, 200}: {}},
+		nil,
 		true,
 		nil,
 		true,
@@ -877,6 +997,7 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 		nil,
 		nil,
 		map[[2]int]struct{}{{200, 200}: {}},
+		nil,
 		true,
 		nil,
 		true,

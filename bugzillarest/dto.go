@@ -50,7 +50,7 @@ type BugData struct {
 	Resolution          string         `json:"resolution"`
 	Priority            string         `json:"priority"`
 	Keywords            []string       `json:"keywords"`
-	DependsOn           []int       `json:"depends_on"`
+	DependsOn           []int          `json:"depends_on"`
 	Alias               []string       `json:"alias"`
 	IsCcAccessible      bool           `json:"is_cc_accessible"`
 	Duplicates          []int          `json:"duplicates"`

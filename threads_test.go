@@ -29,8 +29,10 @@ func TestGetThreadsNum(t *testing.T) {
 		{ST: true, NCPUs: 0, NCPUsScale: 1.0, expected: 1},
 		{ST: true, NCPUs: 1, NCPUsScale: 1.0, expected: 1},
 		{ST: true, NCPUs: -1, NCPUsScale: 1.0, expected: 1},
-		{ST: true, NCPUs: 2, NCPUsScale: 1.0, expected: 2},
-		{ST: true, NCPUs: nThreads + 1, NCPUsScale: 1.0, expected: nThreads},
+		{ST: true, NCPUs: 2, NCPUsScale: 1.0, expected: 1},
+		{ST: false, NCPUs: 2, NCPUsScale: 1.0, expected: 2},
+		{ST: false, NCPUs: nThreads + 1, NCPUsScale: 1.0, expected: nThreads},
+		{ST: true, NCPUs: nThreads + 1, NCPUsScale: 1.0, expected: 1},
 		{ST: false, NCPUs: 0, NCPUsScale: 2.0, expected: nThreads * 2},
 		{ST: false, NCPUs: 1, NCPUsScale: 2.0, expected: 1},
 		{ST: false, NCPUs: -1, NCPUsScale: 2.0, expected: nThreads * 2},
@@ -38,8 +40,10 @@ func TestGetThreadsNum(t *testing.T) {
 		{ST: true, NCPUs: 0, NCPUsScale: 2.0, expected: 1},
 		{ST: true, NCPUs: 1, NCPUsScale: 2.0, expected: 1},
 		{ST: true, NCPUs: -1, NCPUsScale: 2.0, expected: 1},
-		{ST: true, NCPUs: 2, NCPUsScale: 2.0, expected: 2},
-		{ST: true, NCPUs: nThreads + 1, NCPUsScale: 2.0, expected: nThreads + 1},
+		{ST: false, NCPUs: 2, NCPUsScale: 2.0, expected: 2},
+		{ST: false, NCPUs: nThreads + 1, NCPUsScale: 2.0, expected: nThreads + 1},
+		{ST: true, NCPUs: 2, NCPUsScale: 2.0, expected: 1},
+		{ST: true, NCPUs: nThreads + 1, NCPUsScale: 2.0, expected: 1},
 	}
 	// Execute test cases
 	for index, test := range testCases {
