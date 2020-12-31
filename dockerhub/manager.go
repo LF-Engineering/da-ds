@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
+	"time"
+
 	"github.com/LF-Engineering/da-ds/utils"
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
 	"github.com/LF-Engineering/dev-analytics-libraries/http"
-	"log"
-	"time"
 )
 
 // Manager describes dockerhub manager
@@ -28,9 +29,9 @@ type Manager struct {
 	FromDate               *time.Time
 	NoIncremental          bool
 
-	Retries                uint
-	Delay                  time.Duration
-	GabURL                 string
+	Retries uint
+	Delay   time.Duration
+	GapURL  string
 }
 
 // Repository represents dockerhub repository data
@@ -71,7 +72,7 @@ func NewManager(username string,
 		NoIncremental:          noIncremental,
 		Retries:                retries,
 		Delay:                  delay,
-		GabURL:                 gapURL,
+		GapURL:                 gapURL,
 	}
 
 	return mng
@@ -119,13 +120,13 @@ func (m *Manager) Sync() error {
 					return err
 				}
 				dataEnc := b64.StdEncoding.EncodeToString(byteData)
-				gabBody := map[string]string{"payload": dataEnc}
-				bData, err := json.Marshal(gabBody)
+				gapBody := map[string]string{"payload": dataEnc}
+				bData, err := json.Marshal(gapBody)
 				if err != nil {
 					return err
 				}
 
-				c, e, err := fetcher.HTTPClientProvider.Request(m.GabURL, "POST", nil, bData, nil)
+				c, e, err := fetcher.HTTPClientProvider.Request(m.GapURL, "POST", nil, bData, nil)
 				if err != nil {
 					return err
 				}

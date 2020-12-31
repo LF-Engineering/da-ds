@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/LF-Engineering/da-ds/bugzillarest"
 	"math/rand"
 	"time"
+
+	"github.com/LF-Engineering/da-ds/bugzillarest"
 
 	"github.com/LF-Engineering/da-ds/bugzilla"
 
@@ -112,7 +113,7 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	noIncremental := ctx.BoolEnv("NO_INCREMENTAL")
 	retries := uint(ctx.Retry)
 	delay := 2 * time.Second
-	gabURL := ctx.GapURL
+	gapURL := ctx.GapURL
 
 	var repositories []*dockerhub.Repository
 	if err := jsoniter.Unmarshal([]byte(repositoriesJSON), &repositories); err != nil {
@@ -125,28 +126,32 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	}
 
 	return dockerhub.NewManager(username, password, fetcherBackendVersion, enricherBackendVersion,
-		enrichOnly, enrich, esURL, timeout, repositories, fromDate, noIncremental, retries, delay, gabURL), nil
+		enrichOnly, enrich, esURL, timeout, repositories, fromDate, noIncremental, retries, delay, gapURL), nil
 }
 
 func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 
-	origin := ctx.BugZilla.Origin.String()
-	fetcherBackendVersion := "0.1.0"
-	enricherBackendVersion := "0.1.0"
-	doFetch := ctx.BugZilla.DoFetch.Bool()
-	doEnrich := ctx.BugZilla.DoEnrich.Bool()
-	fromDate := ctx.BugZilla.FromDate.Date()
-	fetchSize := ctx.BugZilla.FetchSize.Int()
-	enrichSize := ctx.BugZilla.EnrichSize.Int()
-	project := ctx.BugZilla.Project.String()
-	esIndex := ctx.BugZilla.EsIndex.String()
+	var params bugzilla.Param
+	params.EndPoint = ctx.BugZilla.Origin.String()
+	params.ShConnStr = fmt.Sprintf("%s:%s@%s:%s/%s", ctx.DBUser, ctx.DBPass, ctx.DBHost, ctx.DBPort, ctx.DBName)
+	params.FetcherBackendVersion = "0.1.0"
+	params.EnricherBackendVersion = "0.1.0"
+	params.ESUrl = ctx.ESURL
+	params.EsUser = ""
+	params.EsPassword = ""
+	params.Fetch = ctx.BugZilla.DoFetch.Bool()
+	params.Enrich = ctx.BugZilla.DoEnrich.Bool()
+	params.FromDate = ctx.BugZilla.FromDate.Date()
+	params.FetchSize = ctx.BugZilla.FetchSize.Int()
+	params.EnrichSize = ctx.BugZilla.EnrichSize.Int()
+	params.Project = ctx.BugZilla.Project.String()
+	params.EsIndex = ctx.BugZilla.EsIndex.String()
 
-	retries := uint(ctx.Retry)
-	delay := 2 * time.Second
-	gabURL := ctx.GapURL
-	mgr, err := bugzilla.NewManager(origin, ctx.DBConn, fetcherBackendVersion, enricherBackendVersion,
-		doFetch, doEnrich, ctx.ESURL, "", "", esIndex, fromDate, project,
-		fetchSize, enrichSize, retries, delay, gabURL)
+	params.Retries = uint(ctx.Retry)
+	params.Delay = ctx.Delay
+	params.GapURL = ctx.GapURL
+
+	mgr, err := bugzilla.NewManager(params)
 	if err != nil {
 		return nil, err
 	}
@@ -156,26 +161,30 @@ func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 
 func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
 
-	origin := ctx.BugZilla.Origin.String()
-	fetcherBackendVersion := "0.1.0"
-	enricherBackendVersion := "0.1.0"
-	doFetch := ctx.BugZilla.DoFetch.Bool()
-	doEnrich := ctx.BugZilla.DoEnrich.Bool()
-	fromDate := ctx.BugZilla.FromDate.Date()
-	fetchSize := ctx.BugZilla.FetchSize.Int()
-	enrichSize := ctx.BugZilla.EnrichSize.Int()
-	project := ctx.BugZilla.Project.String()
-	//esIndex := ctx.BugZilla.EsIndex.String()
-	retries := ctx.Retries
-	delay := ctx.Delay
-	gabURL := ctx.GapURL
-	affConn := fmt.Sprintf("%s:%s@%s:%s/%s", ctx.DBUser, ctx.DBPass, ctx.DBHost,ctx.DBPort,ctx.DBName  )
+	var params bugzillarest.Param
+	params.EndPoint = ctx.BugZilla.Origin.String()
+	params.ShConnStr = fmt.Sprintf("%s:%s@%s:%s/%s", ctx.DBUser, ctx.DBPass, ctx.DBHost, ctx.DBPort, ctx.DBName)
+	params.FetcherBackendVersion = "0.1.0"
+	params.EnricherBackendVersion = "0.1.0"
+	params.ESUrl = ctx.ESURL
+	params.EsUser = ""
+	params.EsPassword = ""
+	params.Fetch = ctx.BugZilla.DoFetch.Bool()
+	params.Enrich = ctx.BugZilla.DoEnrich.Bool()
+	params.FromDate = ctx.BugZilla.FromDate.Date()
+	params.FetchSize = ctx.BugZilla.FetchSize.Int()
+	params.EnrichSize = ctx.BugZilla.EnrichSize.Int()
+	params.Project = ctx.BugZilla.Project.String()
+	params.EsIndex = ctx.BugZilla.EsIndex.String()
 
-	mgr, err := bugzillarest.NewManager(origin, affConn, fetcherBackendVersion, enricherBackendVersion,
-		doFetch, doEnrich, ctx.ESURL, "", "", ctx.RichIndex, fromDate, project,
-		fetchSize, enrichSize, retries, delay, gabURL)
+	params.Retries = uint(ctx.Retry)
+	params.Delay = ctx.Delay
+	params.GapURL = ctx.GapURL
+
+	mgr, err := bugzillarest.NewManager(params)
 	if err != nil {
 		return nil, err
 	}
+
 	return mgr, nil
 }

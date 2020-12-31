@@ -54,28 +54,49 @@ type Manager struct {
 	GabURL  string
 }
 
+// Param required for creating a new instance of Bugzillarest manager
+type Param struct {
+	EndPoint               string
+	ShConnStr              string
+	FetcherBackendVersion  string
+	EnricherBackendVersion string
+	Fetch                  bool
+	Enrich                 bool
+	ESUrl                  string
+	EsUser                 string
+	EsPassword             string
+	EsIndex                string
+	FromDate               *time.Time
+	Project                string
+	FetchSize              int
+	EnrichSize             int
+	Retries                uint
+	Delay                  time.Duration
+	GapURL                 string
+}
+
 // NewManager initiates bugzilla manager instance
-func NewManager(endPoint string, shConnStr string, fetcherBackendVersion string, enricherBackendVersion string, fetch bool, enrich bool, eSUrl string, esUser string, esPassword string, esIndex string, fromDate *time.Time, project string, fetchSize int, enrichSize int, retries uint, delay time.Duration, gapURL string) (*Manager, error) {
+func NewManager(param Param) (*Manager, error) {
 
 	mgr := &Manager{
-		Endpoint:               endPoint,
-		SHConnString:           shConnStr,
-		FetcherBackendVersion:  fetcherBackendVersion,
-		EnricherBackendVersion: enricherBackendVersion,
-		Fetch:                  fetch,
-		Enrich:                 enrich,
-		ESUrl:                  eSUrl,
-		ESUsername:             esUser,
-		ESPassword:             esPassword,
-		ESIndex:                esIndex,
-		FromDate:               fromDate,
+		Endpoint:               param.EndPoint,
+		SHConnString:           param.ShConnStr,
+		FetcherBackendVersion:  param.FetcherBackendVersion,
+		EnricherBackendVersion: param.EnricherBackendVersion,
+		Fetch:                  param.Fetch,
+		Enrich:                 param.Enrich,
+		ESUrl:                  param.ESUrl,
+		ESUsername:             param.EsUser,
+		ESPassword:             param.EsPassword,
+		ESIndex:                param.EsIndex,
+		FromDate:               param.FromDate,
 		HTTPTimeout:            60 * time.Second,
-		Project:                project,
-		FetchSize:              fetchSize,
-		EnrichSize:             enrichSize,
-		Retries:                retries,
-		Delay:                  delay,
-		GabURL:                 gapURL,
+		Project:                param.Project,
+		FetchSize:              param.FetchSize,
+		EnrichSize:             param.EnrichSize,
+		Retries:                param.Retries,
+		Delay:                  param.Delay,
+		GabURL:                 param.GapURL,
 	}
 
 	fetcher, enricher, esClientProvider, err := buildServices(mgr)
@@ -193,12 +214,13 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 			lastFetch = &val.Hits.Hits[0].Source.ChangedAt
 		}
 
-		from := timeLib.GetOldestDate(m.FromDate, lastFetch).Format("2006-01-02T15:04:05")
+		from := timeLib.GetOldestDate(m.FromDate, lastFetch)
+		fromStr := from.Format("2006-01-02T15:04:05")
 
 		offset := 0
 		for result == m.FetchSize {
 			data := make([]elastic.BulkData, 0)
-			bugs, lastChange, err := fetcher.FetchAll(m.Endpoint, from, strconv.Itoa(m.FetchSize), strconv.Itoa(offset), now)
+			bugs, lastChange, err := fetcher.FetchAll(m.Endpoint, fromStr, strconv.Itoa(m.FetchSize), strconv.Itoa(offset), now)
 			if err != nil {
 				ch <- err
 				return
