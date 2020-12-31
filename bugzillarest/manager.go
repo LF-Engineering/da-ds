@@ -4,12 +4,13 @@ import (
 	b64 "encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"time"
+
 	"github.com/LF-Engineering/da-ds/utils"
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
 	"github.com/LF-Engineering/dev-analytics-libraries/http"
 	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
-	"strconv"
-	"time"
 
 	"github.com/LF-Engineering/da-ds/affiliation"
 	"github.com/LF-Engineering/da-ds/db"
@@ -48,9 +49,9 @@ type Manager struct {
 	fetcher          *Fetcher
 	enricher         *Enricher
 
-	Retries                uint
-	Delay                  time.Duration
-	GabURL                 string
+	Retries uint
+	Delay   time.Duration
+	GabURL  string
 }
 
 // NewManager initiates bugzilla manager instance
@@ -192,13 +193,12 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 			lastFetch = &val.Hits.Hits[0].Source.ChangedAt
 		}
 
-		from := timeLib.GetOldestDate(m.FromDate, lastFetch)
-		date := from.Format("2006-01-02T15:04:05")
+		from := timeLib.GetOldestDate(m.FromDate, lastFetch).Format("2006-01-02T15:04:05")
 
 		offset := 0
 		for result == m.FetchSize {
 			data := make([]elastic.BulkData, 0)
-			bugs, lastChange, err := fetcher.FetchAll(m.Endpoint, date, strconv.Itoa(m.FetchSize), strconv.Itoa(offset), now)
+			bugs, lastChange, err := fetcher.FetchAll(m.Endpoint, from, strconv.Itoa(m.FetchSize), strconv.Itoa(offset), now)
 			if err != nil {
 				ch <- err
 				return
@@ -213,7 +213,6 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 			for _, bug := range bugs {
 				data = append(data, elastic.BulkData{IndexName: fmt.Sprintf("%s-raw", m.ESIndex), ID: bug.UUID, Data: bug})
 			}
-
 
 			if len(data) > 0 {
 				// Update changed at in elastic cache index

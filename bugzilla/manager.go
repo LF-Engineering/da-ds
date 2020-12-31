@@ -4,13 +4,15 @@ import (
 	b64 "encoding/base64"
 	"encoding/json"
 	"fmt"
+
+	"time"
+
 	"github.com/LF-Engineering/da-ds/affiliation"
 	"github.com/LF-Engineering/da-ds/db"
 	"github.com/LF-Engineering/da-ds/utils"
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
 	"github.com/LF-Engineering/dev-analytics-libraries/http"
 	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
-	"time"
 )
 
 // Manager describes bugzilla manager
@@ -39,28 +41,49 @@ type Manager struct {
 	enricher         *Enricher
 }
 
+// Param required for creating a new instance of Bugzilla manager
+type Param struct {
+	endPoint               string
+	shConnStr              string
+	fetcherBackendVersion  string
+	enricherBackendVersion string
+	fetch                  bool
+	enrich                 bool
+	eSUrl                  string
+	esUser                 string
+	esPassword             string
+	esIndex                string
+	fromDate               *time.Time
+	project                string
+	fetchSize              int
+	enrichSize             int
+	retries                uint
+	delay                  time.Duration
+	gapURL                 string
+}
+
 // NewManager initiates bugzilla manager instance
-func NewManager(endPoint string, shConnStr string, fetcherBackendVersion string, enricherBackendVersion string, fetch bool, enrich bool, eSUrl string, esUser string, esPassword string, esIndex string, fromDate *time.Time, project string, fetchSize int, enrichSize int, retries uint, delay time.Duration, gapURL string) (*Manager, error) {
+func NewManager(param Param) (*Manager, error) {
 
 	mgr := &Manager{
-		Endpoint:               endPoint,
-		SHConnString:           shConnStr,
-		FetcherBackendVersion:  fetcherBackendVersion,
-		EnricherBackendVersion: enricherBackendVersion,
-		Fetch:                  fetch,
-		Enrich:                 enrich,
-		ESUrl:                  eSUrl,
-		ESUsername:             esUser,
-		ESPassword:             esPassword,
-		ESIndex:                esIndex,
-		FromDate:               fromDate,
+		Endpoint:               param.endPoint,
+		SHConnString:           param.shConnStr,
+		FetcherBackendVersion:  param.fetcherBackendVersion,
+		EnricherBackendVersion: param.enricherBackendVersion,
+		Fetch:                  param.fetch,
+		Enrich:                 param.enrich,
+		ESUrl:                  param.eSUrl,
+		ESUsername:             param.esUser,
+		ESPassword:             param.esPassword,
+		ESIndex:                param.esIndex,
+		FromDate:               param.fromDate,
 		HTTPTimeout:            60 * time.Second,
-		Project:                project,
-		FetchSize:              fetchSize,
-		EnrichSize:             enrichSize,
-		Retries:                retries,
-		Delay:                  delay,
-		GabURL:                 gapURL,
+		Project:                param.project,
+		FetchSize:              param.fetchSize,
+		EnrichSize:             param.enrichSize,
+		Retries:                param.retries,
+		Delay:                  param.delay,
+		GabURL:                 param.gapURL,
 	}
 
 	fetcher, enricher, esClientProvider, err := buildServices(mgr)
