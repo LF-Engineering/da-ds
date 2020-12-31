@@ -130,10 +130,9 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 }
 
 func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
-
 	var params bugzilla.Param
 	params.EndPoint = ctx.BugZilla.Origin.String()
-	params.ShConnStr = fmt.Sprintf("%s:%s@%s:%s/%s", ctx.DBUser, ctx.DBPass, ctx.DBHost, ctx.DBPort, ctx.DBName)
+	params.ShConnStr = fmt.Sprintf("%s:%s@%s/%s", ctx.DBUser, ctx.DBPass, ctx.DBHost, ctx.DBName)
 	params.FetcherBackendVersion = "0.1.0"
 	params.EnricherBackendVersion = "0.1.0"
 	params.ESUrl = ctx.ESURL
@@ -145,7 +144,7 @@ func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 	params.FetchSize = ctx.BugZilla.FetchSize.Int()
 	params.EnrichSize = ctx.BugZilla.EnrichSize.Int()
 	params.Project = ctx.BugZilla.Project.String()
-	params.EsIndex = ctx.BugZilla.EsIndex.String()
+	params.EsIndex = ctx.RichIndex
 
 	params.Retries = uint(ctx.Retry)
 	params.Delay = ctx.Delay
@@ -163,7 +162,7 @@ func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
 
 	var params bugzillarest.Param
 	params.EndPoint = ctx.BugZilla.Origin.String()
-	params.ShConnStr = fmt.Sprintf("%s:%s@%s:%s/%s", ctx.DBUser, ctx.DBPass, ctx.DBHost, ctx.DBPort, ctx.DBName)
+	params.ShConnStr = fmt.Sprintf("%s:%s@%s/%s", ctx.DBUser, ctx.DBPass, ctx.DBHost, ctx.DBName)
 	params.FetcherBackendVersion = "0.1.0"
 	params.EnricherBackendVersion = "0.1.0"
 	params.ESUrl = ctx.ESURL
