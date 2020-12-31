@@ -9,7 +9,6 @@ import (
 
 	"github.com/LF-Engineering/da-ds/affiliation"
 	"github.com/LF-Engineering/da-ds/db"
-	"github.com/LF-Engineering/da-ds/utils"
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
 	"github.com/LF-Engineering/dev-analytics-libraries/http"
 	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
@@ -149,7 +148,7 @@ func (m *Manager) Sync() error {
 }
 
 func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
-	httpClientProvider := http.NewHTTPClientProvider(m.HTTPTimeout)
+	httpClientProvider := http.NewClientProvider(m.HTTPTimeout)
 	params := &Params{
 		Endpoint:       m.Endpoint,
 		BackendVersion: m.FetcherBackendVersion,
@@ -205,7 +204,6 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 
 		from := timeLib.GetOldestDate(m.FromDate, lastFetch)
 
-		round := false
 		for result == m.FetchSize {
 			data := make([]elastic.BulkData, 0)
 			bugs, err := fetcher.FetchItem(*from, m.FetchSize, now)
@@ -219,18 +217,8 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 				from = &bugs[len(bugs)-1].ChangedAt
 			}
 
-			if result < 2 {
-				bugs = nil
-			} else if round {
-				for _, bug := range bugs {
-					data = append(data, elastic.BulkData{IndexName: fmt.Sprintf("%s-raw", m.ESIndex), ID: bug.UUID, Data: bug})
-				}
-				round = true
-			} else {
-				bugs = bugs[1:result]
-				for _, bug := range bugs {
-					data = append(data, elastic.BulkData{IndexName: fmt.Sprintf("%s-raw", m.ESIndex), ID: bug.UUID, Data: bug})
-				}
+			for _, bug := range bugs {
+				data = append(data, elastic.BulkData{IndexName: fmt.Sprintf("%s-raw", m.ESIndex), ID: bug.UUID, Data: bug})
 			}
 
 			if len(data) > 0 {
@@ -239,7 +227,7 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 				updateChan := HitSource{ID: fetchID, ChangedAt: cacheDoc.ChangedAt}
 				data = append(data, elastic.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: fetchID, Data: updateChan})
 
-				err := utils.DelayOfCreateIndex(m.esClientProvider.CreateIndex, m.Retries, m.Delay, fmt.Sprintf("%s-raw", m.ESIndex), BugzillaRawMapping)
+				err := m.esClientProvider.DelayOfCreateIndex(m.esClientProvider.CreateIndex, m.Retries, m.Delay, fmt.Sprintf("%s-raw", m.ESIndex), BugzillaRawMapping)
 				if err != nil {
 					ch <- err
 

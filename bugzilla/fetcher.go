@@ -3,6 +3,7 @@ package bugzilla
 import (
 	"encoding/xml"
 	"fmt"
+
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
 	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
 
@@ -38,6 +39,7 @@ type ESClientProvider interface {
 	Get(index string, query map[string]interface{}, result interface{}) (err error)
 	GetStat(index string, field string, aggType string, mustConditions []map[string]interface{}, mustNotConditions []map[string]interface{}) (result time.Time, err error)
 	BulkInsert(data []elastic.BulkData) ([]byte, error)
+	DelayOfCreateIndex(ex func(str string, b []byte) ([]byte, error), uin uint, du time.Duration, index string, data []byte) error
 }
 
 // Params required parameters for bugzilla fetcher

@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/LF-Engineering/da-ds/utils"
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
 	"github.com/LF-Engineering/dev-analytics-libraries/http"
 	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
@@ -25,6 +24,7 @@ type ESClientProvider interface {
 	Get(index string, query map[string]interface{}, result interface{}) (err error)
 	GetStat(index string, field string, aggType string, mustConditions []map[string]interface{}, mustNotConditions []map[string]interface{}) (result time.Time, err error)
 	BulkInsert(data []elastic.BulkData) ([]byte, error)
+	DelayOfCreateIndex(ex func(str string, b []byte) ([]byte, error), uin uint, du time.Duration, index string, data []byte) error
 }
 
 // Manager describes bugzilla manager
@@ -160,7 +160,7 @@ func (m *Manager) Sync() error {
 }
 
 func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
-	httpClientProvider := http.NewHTTPClientProvider(m.HTTPTimeout)
+	httpClientProvider := http.NewClientProvider(m.HTTPTimeout)
 	params := &Params{
 		Endpoint:       m.Endpoint,
 		BackendVersion: m.FetcherBackendVersion,
@@ -242,7 +242,7 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 				data = append(data, elastic.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: fetchID, Data: updateChan})
 
 				//set mapping and create index if not exists
-				err := utils.DelayOfCreateIndex(m.esClientProvider.CreateIndex, m.Retries, m.Delay, fmt.Sprintf("%s-raw", m.ESIndex), BugzillaRestRawMapping)
+				err := m.esClientProvider.DelayOfCreateIndex(m.esClientProvider.CreateIndex, m.Retries, m.Delay, fmt.Sprintf("%s-raw", m.ESIndex), BugzillaRestRawMapping)
 				if err != nil {
 					ch <- err
 

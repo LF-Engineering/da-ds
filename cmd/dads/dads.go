@@ -159,7 +159,6 @@ func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 }
 
 func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
-
 	var params bugzillarest.Param
 	params.EndPoint = ctx.BugZilla.Origin.String()
 	params.ShConnStr = fmt.Sprintf("%s:%s@%s/%s", ctx.DBUser, ctx.DBPass, ctx.DBHost, ctx.DBName)

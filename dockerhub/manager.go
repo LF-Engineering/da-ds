@@ -8,7 +8,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/LF-Engineering/da-ds/utils"
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
 	"github.com/LF-Engineering/dev-analytics-libraries/http"
 )
@@ -112,7 +111,7 @@ func (m *Manager) Sync() error {
 			data = append(data, elastic.BulkData{IndexName: fmt.Sprintf("%s-raw", repo.ESIndex), ID: raw.UUID, Data: raw})
 
 			// set mapping and create index if not exists
-			err = utils.DelayOfCreateIndex(fetcher.ElasticSearchProvider.CreateIndex, m.Retries, m.Delay, fmt.Sprintf("%s-raw", repo.ESIndex), DockerhubRawMapping)
+			err = fetcher.ElasticSearchProvider.DelayOfCreateIndex(fetcher.ElasticSearchProvider.CreateIndex, m.Retries, m.Delay, fmt.Sprintf("%s-raw", repo.ESIndex), DockerhubRawMapping)
 			if err != nil {
 
 				byteData, err := json.Marshal(data)
@@ -205,7 +204,7 @@ func (m *Manager) Sync() error {
 }
 
 func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
-	httpClientProvider := http.NewHTTPClientProvider(m.HTTPTimeout)
+	httpClientProvider := http.NewClientProvider(m.HTTPTimeout)
 	params := &Params{
 		Username:       m.Username,
 		Password:       m.Password,
