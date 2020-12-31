@@ -7,6 +7,7 @@ import (
 	"github.com/LF-Engineering/da-ds/affiliation"
 	"github.com/LF-Engineering/da-ds/db"
 	"github.com/LF-Engineering/da-ds/utils"
+	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
 	"github.com/LF-Engineering/dev-analytics-libraries/http"
 	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
 	"time"
@@ -130,7 +131,7 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 		Endpoint:       m.Endpoint,
 		BackendVersion: m.FetcherBackendVersion,
 	}
-	esClientProvider, err := utils.NewClientProvider(&utils.Params{
+	esClientProvider, err := elastic.NewClientProvider(&elastic.Params{
 		URL:      m.ESUrl,
 		Username: m.ESUsername,
 		Password: m.ESPassword,
@@ -183,7 +184,7 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 
 		round := false
 		for result == m.FetchSize {
-			data := make([]utils.BulkData, 0)
+			data := make([]elastic.BulkData, 0)
 			bugs, err := fetcher.FetchItem(*from, m.FetchSize, now)
 			if err != nil {
 				ch <- err
@@ -199,13 +200,13 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 				bugs = nil
 			} else if round {
 				for _, bug := range bugs {
-					data = append(data, utils.BulkData{IndexName: fmt.Sprintf("%s-raw", m.ESIndex), ID: bug.UUID, Data: bug})
+					data = append(data, elastic.BulkData{IndexName: fmt.Sprintf("%s-raw", m.ESIndex), ID: bug.UUID, Data: bug})
 				}
 				round = true
 			} else {
 				bugs = bugs[1:result]
 				for _, bug := range bugs {
-					data = append(data, utils.BulkData{IndexName: fmt.Sprintf("%s-raw", m.ESIndex), ID: bug.UUID, Data: bug})
+					data = append(data, elastic.BulkData{IndexName: fmt.Sprintf("%s-raw", m.ESIndex), ID: bug.UUID, Data: bug})
 				}
 			}
 
@@ -213,7 +214,7 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 				// Update changed at in elastic cache index
 				cacheDoc, _ := data[len(data)-1].Data.(*BugRaw)
 				updateChan := HitSource{ID: fetchID, ChangedAt: cacheDoc.ChangedAt}
-				data = append(data, utils.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: fetchID, Data: updateChan})
+				data = append(data, elastic.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: fetchID, Data: updateChan})
 
 				err := utils.DelayOfCreateIndex(m.esClientProvider.CreateIndex, m.Retries, m.Delay, fmt.Sprintf("%s-raw", m.ESIndex), BugzillaRawMapping)
 				if err != nil {
@@ -323,14 +324,14 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 				return
 			}
 
-			data := make([]utils.BulkData, 0)
+			data := make([]elastic.BulkData, 0)
 			for _, hit := range topHits.Hits.Hits {
 				enrichedItem, err := enricher.EnrichItem(hit.Source, time.Now().UTC())
 				if err != nil {
 					ch <- err
 					return
 				}
-				data = append(data, utils.BulkData{IndexName: m.ESIndex, ID: enrichedItem.UUID, Data: enrichedItem})
+				data = append(data, elastic.BulkData{IndexName: m.ESIndex, ID: enrichedItem.UUID, Data: enrichedItem})
 			}
 
 			results = len(data)
@@ -340,7 +341,7 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 				// Update changed at in elastic cache index
 				cacheDoc, _ := data[len(data)-1].Data.(*BugEnrich)
 				updateChan := HitSource{ID: enrichID, ChangedAt: cacheDoc.ChangedDate}
-				data = append(data, utils.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: enrichID, Data: updateChan})
+				data = append(data, elastic.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: enrichID, Data: updateChan})
 
 				// setting mapping and create index if not exists
 				if offset == 0 {

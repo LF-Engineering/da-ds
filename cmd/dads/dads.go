@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/LF-Engineering/da-ds/bugzillarest"
 	"math/rand"
 	"time"
 
@@ -31,6 +32,12 @@ func runDS(ctx *lib.Ctx) (err error) {
 		return manager.Sync()
 	case bugzilla.Bugzilla:
 		manager, err := buildBugzillaManager(ctx)
+		if err != nil {
+			return err
+		}
+		return manager.Sync()
+	case bugzillarest.BugzillaRest:
+		manager, err := buildBugzillaRestManager(ctx)
 		if err != nil {
 			return err
 		}
@@ -105,7 +112,7 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	noIncremental := ctx.BoolEnv("NO_INCREMENTAL")
 	retries := uint(ctx.Retry)
 	delay := 2 * time.Second
-	gabURL := ctx.GabURL
+	gabURL := ctx.GapURL
 
 	var repositories []*dockerhub.Repository
 	if err := jsoniter.Unmarshal([]byte(repositoriesJSON), &repositories); err != nil {
@@ -136,13 +143,39 @@ func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 
 	retries := uint(ctx.Retry)
 	delay := 2 * time.Second
-	gabURL := ctx.GabURL
+	gabURL := ctx.GapURL
 	mgr, err := bugzilla.NewManager(origin, ctx.DBConn, fetcherBackendVersion, enricherBackendVersion,
 		doFetch, doEnrich, ctx.ESURL, "", "", esIndex, fromDate, project,
-		fetchSize, enrichSize,retries, delay, gabURL)
+		fetchSize, enrichSize, retries, delay, gabURL)
 	if err != nil {
 		return nil, err
 	}
 
+	return mgr, nil
+}
+
+func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
+
+	origin := ctx.BugZilla.Origin.String()
+	fetcherBackendVersion := "0.1.0"
+	enricherBackendVersion := "0.1.0"
+	doFetch := ctx.BugZilla.DoFetch.Bool()
+	doEnrich := ctx.BugZilla.DoEnrich.Bool()
+	fromDate := ctx.BugZilla.FromDate.Date()
+	fetchSize := ctx.BugZilla.FetchSize.Int()
+	enrichSize := ctx.BugZilla.EnrichSize.Int()
+	project := ctx.BugZilla.Project.String()
+	//esIndex := ctx.BugZilla.EsIndex.String()
+	retries := ctx.Retries
+	delay := ctx.Delay
+	gabURL := ctx.GapURL
+	affConn := fmt.Sprintf("%s:%s@%s:%s/%s", ctx.DBUser, ctx.DBPass, ctx.DBHost,ctx.DBPort,ctx.DBName  )
+
+	mgr, err := bugzillarest.NewManager(origin, affConn, fetcherBackendVersion, enricherBackendVersion,
+		doFetch, doEnrich, ctx.ESURL, "", "", ctx.RichIndex, fromDate, project,
+		fetchSize, enrichSize, retries, delay, gabURL)
+	if err != nil {
+		return nil, err
+	}
 	return mgr, nil
 }

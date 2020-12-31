@@ -516,7 +516,7 @@ func prepareObject() (*Fetcher, ESClientProvider, error) {
 		Password:       "",
 		BackendVersion: "0.0.1",
 	}
-	esClientProvider, err := utils.NewClientProvider(&utils.Params{
+	esClientProvider, err := elastic.NewClientProvider(&elastic.Params{
 		URL:      "http://localhost:9200",
 		Username: "elastic",
 		Password: "changeme",

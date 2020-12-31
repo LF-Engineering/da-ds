@@ -57,7 +57,9 @@ type Ctx struct {
 	OffsetFromDetected bool
 	DB                 *sqlx.DB
 	ESScrollWaitSecs   float64
-	GabURL             string
+	GapURL             string
+	Retries            uint
+	Delay              time.Duration
 
 	// Bugzilla contains all bugzilla params
 	BugZilla *BugZilla
@@ -208,6 +210,19 @@ func (ctx *Ctx) Init() {
 		FatalOnError(err)
 		ctx.ESScrollWaitSecs = dur.Seconds()
 	}
+
+	if ctx.Env("GAP_URL") != "" {
+		ctx.GapURL = ctx.Env("GAP_URL")
+	}
+	if ctx.Env("RETRIES") != "" {
+		r,_ := strconv.ParseUint(ctx.Env("RETRIES"), 10, 2 )
+		ctx.Retries = uint(r)
+	}
+	if ctx.Env("DELAY") != "" {
+		delay, _ := time.ParseDuration( ctx.Env("DELAY") )
+		ctx.Delay = delay
+	}
+
 
 	// Affiliation DB params
 	ctx.DBHost = ctx.Env("DB_HOST")
