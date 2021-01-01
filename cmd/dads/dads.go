@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
+	"os"
 	"time"
 
 	"github.com/LF-Engineering/da-ds/bugzillarest"
@@ -114,6 +116,16 @@ func main() {
 	lib.Printf("Took: %v\n", dtEnd.Sub(dtStart))
 }
 
+func writemsg(msg string) {
+
+	f, _ := os.OpenFile("/usr/local/bin/text.log",
+		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	defer f.Close()
+	if _, err := f.WriteString("\n" + msg); err != nil {
+		log.Println(err)
+	}
+}
+
 func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	// Dockerhub credentials
 	username := ctx.Env("USERNAME")
@@ -140,7 +152,7 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	writemsg(fmt.Sprintf("%v", ctx))
 	return dockerhub.NewManager(username, password, fetcherBackendVersion, enricherBackendVersion,
 		enrichOnly, enrich, esURL, timeout, repositories, fromDate, noIncremental, retries, delay, gapURL), nil
 }

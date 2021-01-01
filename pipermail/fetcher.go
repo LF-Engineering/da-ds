@@ -16,13 +16,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
+
 	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
 
 	"github.com/LF-Engineering/da-ds/mbox"
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 
 	lib "github.com/LF-Engineering/da-ds"
-	"github.com/LF-Engineering/da-ds/utils"
 )
 
 // Fetcher contains piper mail datasource fetch logic
@@ -59,7 +60,7 @@ type ESClientProvider interface {
 	Bulk(body []byte) ([]byte, error)
 	Get(index string, query map[string]interface{}, result interface{}) (err error)
 	GetStat(index string, field string, aggType string, mustConditions []map[string]interface{}, mustNotConditions []map[string]interface{}) (result time.Time, err error)
-	BulkInsert(data []*utils.BulkData) ([]byte, error)
+	BulkInsert(data []elastic.BulkData) ([]byte, error)
 }
 
 // NewFetcher initiates a new pipermail fetcher
