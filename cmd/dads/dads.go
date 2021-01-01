@@ -197,26 +197,6 @@ func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 	return mgr, nil
 }
 
-	origin := ctx.BugZilla.Origin.String()
-	fetcherBackendVersion := "0.1.0"
-	enricherBackendVersion := "0.1.0"
-	doFetch := ctx.BugZilla.DoFetch.Bool()
-	doEnrich := ctx.BugZilla.DoEnrich.Bool()
-	fromDate := ctx.BugZilla.FromDate.Date()
-	fetchSize := ctx.BugZilla.FetchSize.Int()
-	enrichSize := ctx.BugZilla.EnrichSize.Int()
-	project := ctx.BugZilla.Project.String()
-	esIndex := ctx.BugZilla.EsIndex.String()
-	mgr, err := bugzilla.NewManager(origin, ctx.DBConn, fetcherBackendVersion, enricherBackendVersion,
-		doFetch, doEnrich, ctx.ESURL, "", "", esIndex, fromDate, project,
-		fetchSize, enrichSize)
-	if err != nil {
-		return nil, err
-	}
-
-	return mgr, nil
-}
-
 func buildPipermailManager(ctx *lib.Ctx) (*pipermail.Manager, error) {
 	origin := ctx.PiperMail.Origin.String()
 	slug := ctx.PiperMail.ProjectSlug.String()
@@ -234,6 +214,10 @@ func buildPipermailManager(ctx *lib.Ctx) (*pipermail.Manager, error) {
 	mgr, err := pipermail.NewManager(origin, slug, groupName, ctx.DBConn, fetcherBackendVersion, enricherBackendVersion,
 		doFetch, doEnrich, ctx.ESURL, "", "", esIndex, fromDate, project,
 		fetchSize, enrichSize)
+
+	return mgr, err
+}
+
 func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
 	var params bugzillarest.Param
 	params.EndPoint = ctx.BugZilla.Origin.String()

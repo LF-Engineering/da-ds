@@ -4,6 +4,10 @@ import (
 	"fmt"
 	"time"
 
+	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
+
+	"github.com/LF-Engineering/dev-analytics-libraries/http"
+
 	"github.com/LF-Engineering/da-ds/affiliation"
 	"github.com/LF-Engineering/da-ds/db"
 	"github.com/LF-Engineering/da-ds/utils"
@@ -147,7 +151,7 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 			fromDate = &DefaultDateTime
 		}
 
-		from := utils.GetOldestDate(fromDate, lastFetch)
+		from := timeLib.GetOldestDate(fromDate, lastFetch)
 
 		round := false
 		for result == m.FetchSize {
@@ -287,7 +291,7 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 			lastEnrich = val.Hits.Hits[0].Source.ChangedAt
 		}
 
-		from := utils.GetOldestDate(m.FromDate, &lastEnrich)
+		from := timeLib.GetOldestDate(m.FromDate, &lastEnrich)
 
 		conditions := map[string]interface{}{
 			"range": map[string]interface{}{
@@ -359,7 +363,7 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 }
 
 func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
-	httpClientProvider := utils.NewHTTPClientProvider(m.HTTPTimeout)
+	httpClientProvider := http.NewClientProvider(m.HTTPTimeout)
 	params := &Params{
 		BackendVersion: m.FetcherBackendVersion,
 	}

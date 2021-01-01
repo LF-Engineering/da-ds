@@ -5,8 +5,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
-
 	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 

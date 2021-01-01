@@ -159,9 +159,9 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 			enriched.AuthorUserName = creator.Username.String
 			enriched.AuthorDomain = creator.Domain.String
 
-			if creator.Gender != nil {
-				enriched.CreatorDetailGender = *creator.Gender
-				enriched.AuthorGender = *creator.Gender
+			if creator.Gender.Valid {
+				enriched.CreatorDetailGender = creator.Gender.String
+				enriched.AuthorGender = creator.Gender.String
 			} else {
 				enriched.CreatorDetailGender = unknown
 				enriched.AuthorGender = unknown

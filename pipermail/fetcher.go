@@ -16,6 +16,8 @@ import (
 	"sync"
 	"time"
 
+	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
+
 	"github.com/LF-Engineering/da-ds/mbox"
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 
@@ -340,10 +342,10 @@ func (f *Fetcher) AddMetadata(msg interface{}, endpoint, slug, groupName string)
 
 	rawMessage.BackendName = f.DSName
 	rawMessage.BackendVersion = PiperBackendVersion
-	rawMessage.Timestamp = utils.ConvertTimeToFloat(timestamp)
+	rawMessage.Timestamp = timeLib.ConvertTimeToFloat(timestamp)
 	rawMessage.Origin = endpoint
 	rawMessage.Tag = endpoint
-	rawMessage.UpdatedOn = utils.ConvertTimeToFloat(timestamp)
+	rawMessage.UpdatedOn = timeLib.ConvertTimeToFloat(timestamp)
 	rawMessage.Category = f.ItemCategory(msg)
 	rawMessage.SearchFields = &MessageSearchFields{
 		Name:   groupName,
@@ -367,7 +369,7 @@ func (f *Fetcher) AddMetadata(msg interface{}, endpoint, slug, groupName string)
 	rawMessage.Data = &mData
 
 	// generate UUID
-	uid, err := uuid.Generate(endpoint, strconv.FormatFloat(utils.ConvertTimeToFloat(timestamp), 'f', -1, 64))
+	uid, err := uuid.Generate(endpoint, strconv.FormatFloat(timeLib.ConvertTimeToFloat(timestamp), 'f', -1, 64))
 	if err != nil {
 		fmt.Println(err)
 	}

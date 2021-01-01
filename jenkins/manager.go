@@ -6,6 +6,8 @@ import (
 	"log"
 	"time"
 
+	"github.com/LF-Engineering/dev-analytics-libraries/http"
+
 	"github.com/LF-Engineering/da-ds/utils"
 )
 
@@ -149,7 +151,7 @@ func (m *Manager) Sync() error {
 }
 
 func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
-	httpClientProvider := utils.NewHTTPClientProvider(m.HTTPTimeout)
+	httpClientProvider := http.NewClientProvider(m.HTTPTimeout)
 	params := &Params{
 		BackendVersion: m.FetcherBackendVersion,
 	}

@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/LF-Engineering/da-ds/affiliation"
-	db "github.com/LF-Engineering/da-ds/db"
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
 	"github.com/LF-Engineering/dev-analytics-libraries/http"
 	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
