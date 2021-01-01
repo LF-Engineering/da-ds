@@ -8,7 +8,6 @@ import (
 
 	"github.com/LF-Engineering/dev-analytics-libraries/http"
 
-	"github.com/LF-Engineering/da-ds/utils"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/h2non/gock.v1"
@@ -229,7 +228,7 @@ func TestFetchItem(t *testing.T) {
 	type args struct {
 		params *Params
 	}
-	httpClientProvider := utils.NewHTTPClientProvider(time.Second * 600)
+	httpClientProvider := http.NewClientProvider(time.Second * 600)
 	tests := []struct {
 		name    string
 		fields  fields
