@@ -51,7 +51,7 @@ type Manager struct {
 
 	Retries uint
 	Delay   time.Duration
-	GabURL  string
+	GapURL  string
 }
 
 // Param required for creating a new instance of Bugzillarest manager
@@ -96,7 +96,7 @@ func NewManager(param Param) (*Manager, error) {
 		EnrichSize:             param.EnrichSize,
 		Retries:                param.Retries,
 		Delay:                  param.Delay,
-		GabURL:                 param.GapURL,
+		GapURL:                 param.GapURL,
 	}
 
 	fetcher, enricher, esClientProvider, err := buildServices(mgr)
@@ -252,14 +252,14 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 						return
 					}
 					dataEnc := b64.StdEncoding.EncodeToString(byteData)
-					gabBody := map[string]string{"payload": dataEnc}
-					bData, err := json.Marshal(gabBody)
+					gapBody := map[string]string{"payload": dataEnc}
+					bData, err := json.Marshal(gapBody)
 					if err != nil {
 						ch <- err
 						return
 					}
 
-					c, e, err := m.fetcher.HTTPClientProvider.Request(m.GabURL, "POST", nil, bData, nil)
+					c, e, err := m.fetcher.HTTPClientProvider.Request(m.GapURL, "POST", nil, bData, nil)
 					if err != nil {
 						ch <- err
 						return

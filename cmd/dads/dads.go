@@ -128,7 +128,7 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	fromDate := ctx.DateFrom
 	noIncremental := ctx.BoolEnv("NO_INCREMENTAL")
 	retries := uint(ctx.Retry)
-	delay := 2 * time.Second
+	delay := ctx.Delay
 	gapURL := ctx.GapURL
 
 	var repositories []*dockerhub.Repository
