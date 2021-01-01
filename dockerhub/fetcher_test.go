@@ -2,12 +2,13 @@ package dockerhub
 
 import (
 	"fmt"
-	"github.com/LF-Engineering/dev-analytics-libraries/http"
 	"testing"
 	"time"
 
+	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
+	"github.com/LF-Engineering/dev-analytics-libraries/http"
+
 	"github.com/LF-Engineering/da-ds/dockerhub/mocks"
-	"github.com/LF-Engineering/da-ds/utils"
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
@@ -509,7 +510,7 @@ func toRepositoryRaw(b string) (RepositoryRaw, error) {
 }
 
 func prepareObject() (*Fetcher, ESClientProvider, error) {
-	httpClientProvider := http.NewHTTPClientProvider(5 * time.Second)
+	httpClientProvider := http.NewClientProvider(5 * time.Second)
 
 	params := &Params{
 		Username:       "",
