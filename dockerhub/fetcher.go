@@ -8,7 +8,6 @@ import (
 	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
 
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -135,7 +134,7 @@ func (f *Fetcher) FetchItem(owner string, repository string, now time.Time) (*Re
 	raw.MetadataUpdatedOn = now
 
 	// generate UUID
-	uid, err := uuid.Generate(raw.Origin, strconv.FormatFloat(raw.Data.FetchedOn, 'f', -1, 64))
+	uid, err := uuid.Generate(raw.Origin)
 	if err != nil {
 		return nil, err
 	}

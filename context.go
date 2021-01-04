@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	jsoniter "github.com/json-iterator/go"
 )
 
 // Ctx - environment context packed in structure
@@ -60,11 +61,19 @@ type Ctx struct {
 	GapURL             string
 	Retries            uint
 	Delay              time.Duration
+	Repository         []Repository
 
 	// Bugzilla contains all bugzilla params
 	BugZilla *BugZilla
 
 	PiperMail *PiperMail
+}
+
+type Repository struct {
+	Owner      string
+	Repository string
+	Project    string
+	ESIndex    string
 }
 
 // BugZilla parameter context contains all required parameters to run Bugzilla fetch and enrich
@@ -242,14 +251,22 @@ func (ctx *Ctx) Init() {
 		ctx.GapURL = ctx.Env("GAP_URL")
 	}
 	if ctx.Env("RETRIES") != "" {
-		r,_ := strconv.ParseUint(ctx.Env("RETRIES"), 10, 2 )
+		r, _ := strconv.ParseUint(ctx.Env("RETRIES"), 10, 2)
 		ctx.Retries = uint(r)
 	}
 	if ctx.Env("DELAY") != "" {
-		delay, _ := time.ParseDuration( ctx.Env("DELAY") )
+		delay, _ := time.ParseDuration(ctx.Env("DELAY"))
 		ctx.Delay = delay
 	}
+	var repo []Repository
 
+	b := []byte(ctx.Env("REPOSITORIES_JSON"))
+	err := jsoniter.Unmarshal(b, &repo)
+	if err != nil {
+		panic(err)
+	}
+
+	ctx.Repository = repo
 
 	// Affiliation DB params
 	ctx.DBHost = ctx.Env("DB_HOST")
