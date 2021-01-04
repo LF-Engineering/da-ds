@@ -69,6 +69,7 @@ type Ctx struct {
 	PiperMail *PiperMail
 }
 
+// Repository dockerhub repository data
 type Repository struct {
 	Owner      string
 	Repository string
