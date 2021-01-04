@@ -259,15 +259,17 @@ func (ctx *Ctx) Init() {
 		delay, _ := time.ParseDuration(ctx.Env("DELAY"))
 		ctx.Delay = delay
 	}
-	var repo []Repository
 
-	b := []byte(ctx.Env("REPOSITORIES_JSON"))
-	err := jsoniter.Unmarshal(b, &repo)
-	if err != nil {
-		panic(err)
+	if ctx.Env("REPOSITORIES_JSON") != "" {
+		var repo []Repository
+		b := []byte(ctx.Env("REPOSITORIES_JSON"))
+		err := jsoniter.Unmarshal(b, &repo)
+		if err != nil {
+			Fatalf("unmarshaling dockerhub repositories failed")
+		}
+
+		ctx.Repository = repo
 	}
-
-	ctx.Repository = repo
 
 	// Affiliation DB params
 	ctx.DBHost = ctx.Env("DB_HOST")
