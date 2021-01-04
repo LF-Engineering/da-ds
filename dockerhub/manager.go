@@ -1,12 +1,15 @@
 package dockerhub
 
 import (
+	b64 "encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"time"
 
-	"github.com/LF-Engineering/da-ds/utils"
+	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
+	"github.com/LF-Engineering/dev-analytics-libraries/http"
 )
 
 // Manager describes dockerhub manager
@@ -24,6 +27,10 @@ type Manager struct {
 	Repositories           []*Repository
 	FromDate               *time.Time
 	NoIncremental          bool
+
+	Retries uint
+	Delay   time.Duration
+	GapURL  string
 }
 
 // Repository represents dockerhub repository data
@@ -46,6 +53,9 @@ func NewManager(username string,
 	repositories []*Repository,
 	fromDate *time.Time,
 	noIncremental bool,
+	retries uint,
+	delay time.Duration,
+	gapURL string,
 ) *Manager {
 	mng := &Manager{
 		Username:               username,
@@ -59,6 +69,9 @@ func NewManager(username string,
 		Repositories:           repositories,
 		FromDate:               fromDate,
 		NoIncremental:          noIncremental,
+		Retries:                retries,
+		Delay:                  delay,
+		GapURL:                 gapURL,
 	}
 
 	return mng
@@ -85,7 +98,7 @@ func (m *Manager) Sync() error {
 	}
 
 	if !m.EnrichOnly {
-		data := make([]*utils.BulkData, 0)
+		data := make([]elastic.BulkData, 0)
 
 		// fetch data
 		for _, repo := range m.Repositories {
@@ -95,10 +108,30 @@ func (m *Manager) Sync() error {
 			if err != nil {
 				return fmt.Errorf("could not fetch data from repository: %s-%s", repo.Owner, repo.Repository)
 			}
-			data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s-raw", repo.ESIndex), ID: raw.UUID, Data: raw})
+			data = append(data, elastic.BulkData{IndexName: fmt.Sprintf("%s-raw", repo.ESIndex), ID: raw.UUID, Data: raw})
 
 			// set mapping and create index if not exists
-			_ = fetcher.HandleMapping(fmt.Sprintf("%s-raw", repo.ESIndex))
+			err = fetcher.ElasticSearchProvider.DelayOfCreateIndex(fetcher.ElasticSearchProvider.CreateIndex, m.Retries, m.Delay, fmt.Sprintf("%s-raw", repo.ESIndex), DockerhubRawMapping)
+			if err != nil {
+
+				byteData, err := json.Marshal(data)
+				if err != nil {
+					return err
+				}
+				dataEnc := b64.StdEncoding.EncodeToString(byteData)
+				gapBody := map[string]string{"payload": dataEnc}
+				bData, err := json.Marshal(gapBody)
+				if err != nil {
+					return err
+				}
+
+				c, e, err := fetcher.HTTPClientProvider.Request(m.GapURL, "POST", nil, bData, nil)
+				if err != nil {
+					return err
+				}
+				fmt.Println(c, string(e))
+				continue
+			}
 		}
 
 		if len(data) > 0 {
@@ -111,7 +144,7 @@ func (m *Manager) Sync() error {
 	}
 
 	if m.Enrich || m.EnrichOnly {
-		data := make([]*utils.BulkData, 0)
+		data := make([]elastic.BulkData, 0)
 
 		for _, repo := range m.Repositories {
 			var fromDate *time.Time
@@ -136,7 +169,7 @@ func (m *Manager) Sync() error {
 				if err != nil {
 					return fmt.Errorf("could not enrich data from repository: %s-%s", repo.Owner, repo.Repository)
 				}
-				data = append(data, &utils.BulkData{IndexName: repo.ESIndex, ID: enriched.UUID, Data: enriched})
+				data = append(data, elastic.BulkData{IndexName: repo.ESIndex, ID: enriched.UUID, Data: enriched})
 				_ = enricher.HandleMapping(repo.ESIndex)
 
 			}
@@ -171,13 +204,13 @@ func (m *Manager) Sync() error {
 }
 
 func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
-	httpClientProvider := utils.NewHTTPClientProvider(m.HTTPTimeout)
+	httpClientProvider := http.NewClientProvider(m.HTTPTimeout)
 	params := &Params{
 		Username:       m.Username,
 		Password:       m.Password,
 		BackendVersion: m.FetcherBackendVersion,
 	}
-	esClientProvider, err := utils.NewESClientProvider(&utils.ESParams{
+	esClientProvider, err := elastic.NewClientProvider(&elastic.Params{
 		URL:      m.ESUrl,
 		Username: m.ESUsername,
 		Password: m.ESPassword,

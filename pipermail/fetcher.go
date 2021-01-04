@@ -16,11 +16,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
+
+	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
+
 	"github.com/LF-Engineering/da-ds/mbox"
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 
 	lib "github.com/LF-Engineering/da-ds"
-	"github.com/LF-Engineering/da-ds/utils"
 )
 
 // Fetcher contains piper mail datasource fetch logic
@@ -57,7 +60,7 @@ type ESClientProvider interface {
 	Bulk(body []byte) ([]byte, error)
 	Get(index string, query map[string]interface{}, result interface{}) (err error)
 	GetStat(index string, field string, aggType string, mustConditions []map[string]interface{}, mustNotConditions []map[string]interface{}) (result time.Time, err error)
-	BulkInsert(data []*utils.BulkData) ([]byte, error)
+	BulkInsert(data []elastic.BulkData) ([]byte, error)
 }
 
 // NewFetcher initiates a new pipermail fetcher
@@ -340,10 +343,10 @@ func (f *Fetcher) AddMetadata(msg interface{}, endpoint, slug, groupName string)
 
 	rawMessage.BackendName = f.DSName
 	rawMessage.BackendVersion = PiperBackendVersion
-	rawMessage.Timestamp = utils.ConvertTimeToFloat(timestamp)
+	rawMessage.Timestamp = timeLib.ConvertTimeToFloat(timestamp)
 	rawMessage.Origin = endpoint
 	rawMessage.Tag = endpoint
-	rawMessage.UpdatedOn = utils.ConvertTimeToFloat(timestamp)
+	rawMessage.UpdatedOn = timeLib.ConvertTimeToFloat(timestamp)
 	rawMessage.Category = f.ItemCategory(msg)
 	rawMessage.SearchFields = &MessageSearchFields{
 		Name:   groupName,
@@ -367,7 +370,7 @@ func (f *Fetcher) AddMetadata(msg interface{}, endpoint, slug, groupName string)
 	rawMessage.Data = &mData
 
 	// generate UUID
-	uid, err := uuid.Generate(endpoint, strconv.FormatFloat(utils.ConvertTimeToFloat(timestamp), 'f', -1, 64))
+	uid, err := uuid.Generate(endpoint, strconv.FormatFloat(timeLib.ConvertTimeToFloat(timestamp), 'f', -1, 64))
 	if err != nil {
 		fmt.Println(err)
 	}

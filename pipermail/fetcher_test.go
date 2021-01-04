@@ -5,8 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LF-Engineering/dev-analytics-libraries/http"
+
 	"github.com/LF-Engineering/da-ds/pipermail/mocks"
-	"github.com/LF-Engineering/da-ds/utils"
 	"github.com/stretchr/testify/mock"
 
 	jsoniter "github.com/json-iterator/go"
@@ -22,7 +23,7 @@ func TestFetchAll(t *testing.T) {
 
 	url := "https://www.openembedded.org/pipermail/openembedded-architecture/"
 
-	httpClient := utils.NewHTTPClientProvider(time.Second * 600)
+	httpClient := http.NewClientProvider(time.Second * 600)
 	httpClientProviderMock.On("Request", url, "GET",
 		mock.Anything, mock.Anything, mock.Anything).Return(
 		200, rawMessageBytes, nil)

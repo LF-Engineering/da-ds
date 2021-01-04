@@ -7,7 +7,7 @@ import (
 
 	"github.com/LF-Engineering/da-ds/affiliation"
 
-	"github.com/LF-Engineering/da-ds/utils"
+	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
 )
 
 // Enricher enrich Bugzilla raw
@@ -63,7 +63,7 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 	enriched.URL = rawItem.Origin + "/show_bug.cgi?id=" + fmt.Sprint(rawItem.BugID)
 	enriched.CreationDate = rawItem.CreationTS
 
-	enriched.ResolutionDays = utils.GetDaysbetweenDates(enriched.DeltaTs, enriched.CreationDate)
+	enriched.ResolutionDays = timeLib.GetDaysBetweenDates(enriched.DeltaTs, enriched.CreationDate)
 	if rawItem.StatusWhiteboard != "" {
 		enriched.Whiteboard = rawItem.StatusWhiteboard
 	}

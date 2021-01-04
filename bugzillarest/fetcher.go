@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/LF-Engineering/da-ds/utils"
+	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 
 	jsoniter "github.com/json-iterator/go"
@@ -16,7 +16,7 @@ type HTTPClientProvider interface {
 	Request(url string, method string, header map[string]string, body []byte, params map[string]string) (statusCode int, resBody []byte, err error)
 }
 
-// Fetcher contains BugzillaRest fetch logic
+// Fetcher contains fetch functionalities
 type Fetcher struct {
 	dSName                string
 	HTTPClientProvider    HTTPClientProvider
@@ -48,7 +48,7 @@ func NewFetcher(params Params, httpClientProvider HTTPClientProvider, esClientPr
 	}
 }
 
-// FetchAll fetches bug item including all nested fetches
+// FetchAll fetches all bugs
 func (f *Fetcher) FetchAll(origin string, date string, limit string, offset string, now time.Time) ([]Raw, *time.Time, error) {
 
 	url := fmt.Sprintf("%s", origin)
@@ -163,7 +163,7 @@ func (f *Fetcher) FetchItem(origin string, bugID int, fetchedBug BugData, now ti
 
 	bugRaw.MetadataUpdatedOn = fetchedBug.LastChangeTime
 	bugRaw.ClassifiedFieldsFiltered = nil
-	bugRaw.UpdatedOn = utils.ConvertTimeToFloat(fetchedBug.LastChangeTime)
+	bugRaw.UpdatedOn = timeLib.ConvertTimeToFloat(fetchedBug.LastChangeTime)
 	bugRaw.Category = Category
 
 	bugRaw.BackendName = f.dSName
@@ -176,7 +176,7 @@ func (f *Fetcher) FetchItem(origin string, bugID int, fetchedBug BugData, now ti
 	bugRaw.Data.AssignedToDetail = fetchedBug.AssignedToDetail
 
 	bugRaw.MetadataTimestamp = now.UTC()
-	bugRaw.Timestamp = utils.ConvertTimeToFloat(bugRaw.MetadataTimestamp)
+	bugRaw.Timestamp = timeLib.ConvertTimeToFloat(bugRaw.MetadataTimestamp)
 	return &bugRaw, nil
 }
 

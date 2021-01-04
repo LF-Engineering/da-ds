@@ -5,8 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
+	"github.com/LF-Engineering/dev-analytics-libraries/http"
+
 	"github.com/LF-Engineering/da-ds/dockerhub/mocks"
-	"github.com/LF-Engineering/da-ds/utils"
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
@@ -159,7 +161,7 @@ func TestFetchItem(t *testing.T) {
           "backend_name" : "Dockerhub",
           "perceval_version" : "0.17.0",
           "backend_version" : "0.6.0",
-          "uuid" : "974255f715035c22521d3324cff47968eb31a7d9",
+          "uuid" : "30be4202611736ddd973be7ca2a97da187d54bfe",
           "timestamp" : 1.596210705585596E9,
           "metadata__updated_on" : "2020-07-31T15:51:45.585596Z",
           "data" : {
@@ -237,7 +239,7 @@ func TestFetchItem(t *testing.T) {
           "updated_on" : 1.606743763620021E9,
           "metadata__updated_on" : "2020-11-30T13:42:43.620021Z",
           "tag" : "https://hub.docker.com/hyperledger/fabric-zookeeper",
-          "uuid" : "6cd1f5d3faed10cbc9de853c372f06c036460a5e",
+          "uuid" : "9d134d61ec1b5d94344c9ac42e5c8fcb5c966cec",
           "origin" : "https://hub.docker.com/hyperledger/fabric-zookeeper",
           "search_fields" : {
             "name" : "fabric-zookeeper",
@@ -295,7 +297,7 @@ func TestFetchItem(t *testing.T) {
           "metadata__timestamp" : "2020-11-30T14:08:44.657876Z",
           "updated_on" : 1.606745324657876E9,
           "metadata__updated_on" : "2020-11-30T14:08:44.657876Z",
-          "uuid" : "37e85829947b85fb216a668810dea6b20aa6c365",
+          "uuid" : "fa3d8435822bf92681bbc95639d780b3f86615d8",
           "origin" : "https://hub.docker.com/hyperledger/sawtooth-xo-tp-rust",
           "backend_version" : "0.6.0"
         }`,
@@ -349,7 +351,7 @@ func TestFetchItem(t *testing.T) {
             "item_id" : "1606771175.144550",
             "namespace" : "crops"
           },
-          "uuid" : "455e6ac81de85c7b2e8dcc54ba5bfa413f962c55"
+          "uuid" : "d2ed526d29623f28c5e9f52381c1698b34d376d6"
         }`,
 	}
 
@@ -389,7 +391,7 @@ func TestFetchItem(t *testing.T) {
          },
          "backend_version" : "0.6.0",
          "classified_fields_filtered" : null,
-         "uuid" : "9067eabc9b8d3ec0fc72054f0e90feff2201c14d",
+         "uuid" : "db792693a3b151fba46bfc3e643e5e301854c6a0",
          "metadata__timestamp" : "2020-09-08T02:06:59.256249Z",
          "metadata__updated_on" : "2020-09-08T02:06:59.256249Z",
          "tag" : "https://hub.docker.com/prom/pushprox",
@@ -417,7 +419,7 @@ func TestFetchItem(t *testing.T) {
           "metadata__updated_on" : "2020-11-30T15:23:26.036942Z",
           "metadata__timestamp" : "2020-11-30T15:23:26.036942Z",
           "perceval_version" : "0.17.1",
-          "uuid" : "ee42deebb7b927d5e43be7a708f5608670db8599",
+          "uuid" : "737a1c01f993061aa42ada999940b9936dadf84b",
           "search_fields" : {
             "item_id" : "1606749806.036942",
             "namespace" : "edgexfoundry",
@@ -508,14 +510,14 @@ func toRepositoryRaw(b string) (RepositoryRaw, error) {
 }
 
 func prepareObject() (*Fetcher, ESClientProvider, error) {
-	httpClientProvider := utils.NewHTTPClientProvider(5 * time.Second)
+	httpClientProvider := http.NewClientProvider(5 * time.Second)
 
 	params := &Params{
 		Username:       "",
 		Password:       "",
 		BackendVersion: "0.0.1",
 	}
-	esClientProvider, err := utils.NewESClientProvider(&utils.ESParams{
+	esClientProvider, err := elastic.NewClientProvider(&elastic.Params{
 		URL:      "http://localhost:9200",
 		Username: "elastic",
 		Password: "changeme",

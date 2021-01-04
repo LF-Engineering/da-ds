@@ -6,7 +6,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/LF-Engineering/da-ds/utils"
+	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
+
+	"github.com/LF-Engineering/dev-analytics-libraries/http"
 )
 
 // Manager describes Jenkins manager
@@ -73,7 +75,7 @@ func (m *Manager) Sync() error {
 		return err
 	}
 	if !m.EnrichOnly {
-		data := make([]*utils.BulkData, 0)
+		data := make([]elastic.BulkData, 0)
 		// fetch data
 		for _, buildServer := range m.BuildServers {
 			var raw []BuildsRaw
@@ -88,7 +90,7 @@ func (m *Manager) Sync() error {
 				return fmt.Errorf("could not fetch data from repository: %s-%s", buildServer.URL, buildServer.Project)
 			}
 			for _, builds := range raw {
-				data = append(data, &utils.BulkData{IndexName: fmt.Sprintf("%s-raw", buildServer.Index), ID: builds.UUID, Data: builds})
+				data = append(data, elastic.BulkData{IndexName: fmt.Sprintf("%s-raw", buildServer.Index), ID: builds.UUID, Data: builds})
 			}
 
 			// set mapping and create index if not exists
@@ -105,7 +107,7 @@ func (m *Manager) Sync() error {
 	}
 
 	if m.Enrich || m.EnrichOnly {
-		data := make([]*utils.BulkData, 0)
+		data := make([]elastic.BulkData, 0)
 
 		for _, buildServer := range m.BuildServers {
 			var fromDate *time.Time
@@ -130,7 +132,7 @@ func (m *Manager) Sync() error {
 						log.Printf("could not enrich data from repository: %s-%s", buildServer.Project, buildServer.URL)
 						continue
 					}
-					data = append(data, &utils.BulkData{IndexName: buildServer.Index, ID: enriched.UUID, Data: *enriched})
+					data = append(data, elastic.BulkData{IndexName: buildServer.Index, ID: enriched.UUID, Data: *enriched})
 				}
 				_ = enricher.HandleMapping(buildServer.Index)
 			}
@@ -149,11 +151,11 @@ func (m *Manager) Sync() error {
 }
 
 func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
-	httpClientProvider := utils.NewHTTPClientProvider(m.HTTPTimeout)
+	httpClientProvider := http.NewClientProvider(m.HTTPTimeout)
 	params := &Params{
 		BackendVersion: m.FetcherBackendVersion,
 	}
-	esClientProvider, err := utils.NewESClientProvider(&utils.ESParams{
+	esClientProvider, err := elastic.NewClientProvider(&elastic.Params{
 		URL:      m.ESUrl,
 		Username: m.ESUsername,
 		Password: m.ESPassword,

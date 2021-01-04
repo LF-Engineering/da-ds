@@ -50,7 +50,7 @@ type BugData struct {
 	Resolution          string         `json:"resolution"`
 	Priority            string         `json:"priority"`
 	Keywords            []string       `json:"keywords"`
-	DependsOn           []string       `json:"depends_on"`
+	DependsOn           []int          `json:"depends_on"`
 	Alias               []string       `json:"alias"`
 	IsCcAccessible      bool           `json:"is_cc_accessible"`
 	Duplicates          []int          `json:"duplicates"`
@@ -76,7 +76,7 @@ type BugData struct {
 	IsCreatorAccessible bool           `json:"is_creator_accessible"`
 	ActualTime          int            `json:"actual_time"`
 	AssignedTo          string         `json:"assigned_to"`
-	DupeOf              *string        `json:"dupe_of"`
+	DupeOf              *int           `json:"dupe_of"`
 	Attachments         []Attachment   `json:"attachments"`
 	Tags                []string       `json:"tags"`
 	CreationTime        time.Time      `json:"creation_time"`

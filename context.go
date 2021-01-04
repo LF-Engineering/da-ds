@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	jsoniter "github.com/json-iterator/go"
 )
 
 // Ctx - environment context packed in structure
@@ -57,11 +58,23 @@ type Ctx struct {
 	OffsetFromDetected bool
 	DB                 *sqlx.DB
 	ESScrollWaitSecs   float64
+	GapURL             string
+	Retries            uint
+	Delay              time.Duration
+	Repository         []Repository
 
 	// Bugzilla contains all bugzilla params
 	BugZilla *BugZilla
 
 	PiperMail *PiperMail
+}
+
+// Repository dockerhub repository data
+type Repository struct {
+	Owner      string
+	Repository string
+	Project    string
+	ESIndex    string
 }
 
 // BugZilla parameter context contains all required parameters to run Bugzilla fetch and enrich
@@ -233,6 +246,29 @@ func (ctx *Ctx) Init() {
 		dur, err := time.ParseDuration(ctx.ESScrollWait)
 		FatalOnError(err)
 		ctx.ESScrollWaitSecs = dur.Seconds()
+	}
+
+	if ctx.Env("GAP_URL") != "" {
+		ctx.GapURL = ctx.Env("GAP_URL")
+	}
+	if ctx.Env("RETRIES") != "" {
+		r, _ := strconv.ParseUint(ctx.Env("RETRIES"), 10, 2)
+		ctx.Retries = uint(r)
+	}
+	if ctx.Env("DELAY") != "" {
+		delay, _ := time.ParseDuration(ctx.Env("DELAY"))
+		ctx.Delay = delay
+	}
+
+	if ctx.Env("REPOSITORIES_JSON") != "" {
+		var repo []Repository
+		b := []byte(ctx.Env("REPOSITORIES_JSON"))
+		err := jsoniter.Unmarshal(b, &repo)
+		if err != nil {
+			Fatalf("unmarshaling dockerhub repositories failed")
+		}
+
+		ctx.Repository = repo
 	}
 
 	// Affiliation DB params

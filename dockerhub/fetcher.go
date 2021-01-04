@@ -3,13 +3,15 @@ package dockerhub
 import (
 	"errors"
 	"fmt"
+
+	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
+	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
+
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
 	dads "github.com/LF-Engineering/da-ds"
-	"github.com/LF-Engineering/da-ds/utils"
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 	jsoniter "github.com/json-iterator/go"
 )
@@ -47,7 +49,8 @@ type ESClientProvider interface {
 	Bulk(body []byte) ([]byte, error)
 	Get(index string, query map[string]interface{}, result interface{}) (err error)
 	GetStat(index string, field string, aggType string, mustConditions []map[string]interface{}, mustNotConditions []map[string]interface{}) (result time.Time, err error)
-	BulkInsert(data []*utils.BulkData) ([]byte, error)
+	BulkInsert(data []elastic.BulkData) ([]byte, error)
+	DelayOfCreateIndex(ex func(str string, b []byte) ([]byte, error), uin uint, du time.Duration, index string, data []byte) error
 }
 
 // NewFetcher initiates a new dockerhub fetcher
@@ -121,7 +124,7 @@ func (f *Fetcher) FetchItem(owner string, repository string, now time.Time) (*Re
 	raw.Category = Category
 	raw.ClassifiedFieldsFiltered = nil
 	now = now.UTC()
-	raw.Timestamp = utils.ConvertTimeToFloat(now)
+	raw.Timestamp = timeLib.ConvertTimeToFloat(now)
 	raw.Data.FetchedOn = raw.Timestamp
 	raw.MetadataTimestamp = now
 	raw.Origin = url
@@ -131,7 +134,7 @@ func (f *Fetcher) FetchItem(owner string, repository string, now time.Time) (*Re
 	raw.MetadataUpdatedOn = now
 
 	// generate UUID
-	uid, err := uuid.Generate(raw.Origin, strconv.FormatFloat(raw.Data.FetchedOn, 'f', -1, 64))
+	uid, err := uuid.Generate(raw.Origin)
 	if err != nil {
 		return nil, err
 	}

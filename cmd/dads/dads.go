@@ -5,6 +5,8 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/LF-Engineering/da-ds/bugzillarest"
+
 	"github.com/LF-Engineering/da-ds/jenkins"
 	"github.com/LF-Engineering/da-ds/pipermail"
 
@@ -40,6 +42,12 @@ func runDS(ctx *lib.Ctx) (err error) {
 		return manager.Sync()
 	case bugzilla.Bugzilla:
 		manager, err := buildBugzillaManager(ctx)
+		if err != nil {
+			return err
+		}
+		return manager.Sync()
+	case bugzillarest.BugzillaRest:
+		manager, err := buildBugzillaRestManager(ctx)
 		if err != nil {
 			return err
 		}
@@ -119,6 +127,9 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	enrich := ctx.Enrich
 	fromDate := ctx.DateFrom
 	noIncremental := ctx.BoolEnv("NO_INCREMENTAL")
+	retries := uint(ctx.Retry)
+	delay := ctx.Delay
+	gapURL := ctx.GapURL
 
 	var repositories []*dockerhub.Repository
 	if err := jsoniter.Unmarshal([]byte(repositoriesJSON), &repositories); err != nil {
@@ -129,9 +140,8 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return dockerhub.NewManager(username, password, fetcherBackendVersion, enricherBackendVersion,
-		enrichOnly, enrich, esURL, timeout, repositories, fromDate, noIncremental), nil
+		enrichOnly, enrich, esURL, timeout, repositories, fromDate, noIncremental, retries, delay, gapURL), nil
 }
 
 func buildJenkinsManager(ctx *lib.Ctx) (*jenkins.Manager, error) {
@@ -158,20 +168,27 @@ func buildJenkinsManager(ctx *lib.Ctx) (*jenkins.Manager, error) {
 }
 
 func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
+	var params bugzilla.Param
+	params.EndPoint = ctx.BugZilla.Origin.String()
+	params.ShConnStr = fmt.Sprintf("%s:%s@%s/%s", ctx.DBUser, ctx.DBPass, ctx.DBHost, ctx.DBName)
+	params.FetcherBackendVersion = "0.1.0"
+	params.EnricherBackendVersion = "0.1.0"
+	params.ESUrl = ctx.ESURL
+	params.EsUser = ""
+	params.EsPassword = ""
+	params.Fetch = ctx.BugZilla.DoFetch.Bool()
+	params.Enrich = ctx.BugZilla.DoEnrich.Bool()
+	params.FromDate = ctx.BugZilla.FromDate.Date()
+	params.FetchSize = ctx.BugZilla.FetchSize.Int()
+	params.EnrichSize = ctx.BugZilla.EnrichSize.Int()
+	params.Project = ctx.BugZilla.Project.String()
+	params.EsIndex = ctx.RichIndex
 
-	origin := ctx.BugZilla.Origin.String()
-	fetcherBackendVersion := "0.1.0"
-	enricherBackendVersion := "0.1.0"
-	doFetch := ctx.BugZilla.DoFetch.Bool()
-	doEnrich := ctx.BugZilla.DoEnrich.Bool()
-	fromDate := ctx.BugZilla.FromDate.Date()
-	fetchSize := ctx.BugZilla.FetchSize.Int()
-	enrichSize := ctx.BugZilla.EnrichSize.Int()
-	project := ctx.BugZilla.Project.String()
-	esIndex := ctx.BugZilla.EsIndex.String()
-	mgr, err := bugzilla.NewManager(origin, ctx.DBConn, fetcherBackendVersion, enricherBackendVersion,
-		doFetch, doEnrich, ctx.ESURL, "", "", esIndex, fromDate, project,
-		fetchSize, enrichSize)
+	params.Retries = uint(ctx.Retry)
+	params.Delay = ctx.Delay
+	params.GapURL = ctx.GapURL
+
+	mgr, err := bugzilla.NewManager(params)
 	if err != nil {
 		return nil, err
 	}
@@ -196,6 +213,32 @@ func buildPipermailManager(ctx *lib.Ctx) (*pipermail.Manager, error) {
 	mgr, err := pipermail.NewManager(origin, slug, groupName, ctx.DBConn, fetcherBackendVersion, enricherBackendVersion,
 		doFetch, doEnrich, ctx.ESURL, "", "", esIndex, fromDate, project,
 		fetchSize, enrichSize)
+
+	return mgr, err
+}
+
+func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
+	var params bugzillarest.Param
+	params.EndPoint = ctx.BugZilla.Origin.String()
+	params.ShConnStr = fmt.Sprintf("%s:%s@%s/%s", ctx.DBUser, ctx.DBPass, ctx.DBHost, ctx.DBName)
+	params.FetcherBackendVersion = "0.1.0"
+	params.EnricherBackendVersion = "0.1.0"
+	params.ESUrl = ctx.ESURL
+	params.EsUser = ""
+	params.EsPassword = ""
+	params.Fetch = ctx.BugZilla.DoFetch.Bool()
+	params.Enrich = ctx.BugZilla.DoEnrich.Bool()
+	params.FromDate = ctx.BugZilla.FromDate.Date()
+	params.FetchSize = ctx.BugZilla.FetchSize.Int()
+	params.EnrichSize = ctx.BugZilla.EnrichSize.Int()
+	params.Project = ctx.BugZilla.Project.String()
+	params.EsIndex = ctx.BugZilla.EsIndex.String()
+
+	params.Retries = uint(ctx.Retry)
+	params.Delay = ctx.Delay
+	params.GapURL = ctx.GapURL
+
+	mgr, err := bugzillarest.NewManager(params)
 	if err != nil {
 		return nil, err
 	}
