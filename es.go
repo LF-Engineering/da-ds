@@ -2,6 +2,7 @@ package dads
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -487,13 +488,18 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 			Printf("SendToElastic: error: %+v for %+v\n", err, item)
 			switch ctx.AllowFail {
 			case 0:
+				err = SendToGAP(ctx, doc)
+				if err != nil {
+					return
+				}
+			case 1:
 				// return error
 				return
-			case 1:
+			case 2:
 				// ignore (do not continue)
 				err = nil
 				return
-			case 2:
+			case 3:
 				// continue, but do not attempt to retry on next items
 				retry = false
 				err = nil
@@ -506,6 +512,48 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 	if ctx.Debug > 0 {
 		Printf("%s(raw=%v,key=%s) ES bulk upload saved %d items (in non-bulk mode)\n", ds.Name(), raw, key, len(items))
 	}
+	return
+}
+
+func prettyPrint(data interface{}) string {
+	pretty, err := jsoniter.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return fmt.Sprintf("%T: %+v", data, data)
+	}
+	return string(pretty)
+}
+
+// SendToGAP - send failed ES item to GAP API
+func SendToGAP(ctx *Ctx, doc []byte) (err error) {
+	if ctx.GapURL == "" {
+		return
+	}
+	dataEnc := base64.StdEncoding.EncodeToString(doc)
+	Printf("Sending item (%d bytes) to the GAP API\n", len(dataEnc))
+	gapBody := map[string]string{"payload": dataEnc}
+	var bData []byte
+	bData, err = jsoniter.Marshal(gapBody)
+	if err != nil {
+		Printf("Cannot marshal GAP body: %v: %v\n", gapBody, err)
+		return
+	}
+	payloadBody := bytes.NewReader(bData)
+	method := "POST"
+	url := ctx.GapURL
+	var req *http.Request
+	req, err = http.NewRequest(method, url, payloadBody)
+	if err != nil {
+		Printf("new request error: %+v for %s url: %s, body: %s\n", err, method, url, prettyPrint(bData))
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	var resp *http.Response
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		Printf("do request error: %+v for %s url: %s, doc: %s\n", err, method, url, prettyPrint(bData))
+		return
+	}
+	Printf("Sent item (%d bytes) to the GAP API: status: %d\n", len(dataEnc), resp.StatusCode)
 	return
 }
 

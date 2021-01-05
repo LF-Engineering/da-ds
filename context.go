@@ -53,7 +53,7 @@ type Ctx struct {
 	OffsetFrom         float64    // From DA_DS_OFFSET_FROM
 	OffsetTo           float64    // From DA_DS_OFFSET_TO
 	LegacyUUID         bool       // From DA_DS_LEGACY_UUID - use python code for generating uuids
-	AllowFail          int        // From DA_DS_ALLOW_FAIL - allow fail uploading single documents to elastic: 0 - don allow, 1-allow fail, if failed, skip entire pack (ignore), 2-allow fail, but each next document without retries, else-allow fail and retry each individual document
+	AllowFail          int        // From DA_DS_ALLOW_FAIL - allow fail uploading single documents to elastic: 0 - send to GAP handler and continue, 1 - don't allow, 2-allow fail, if failed, skip entire pack (ignore), 3-allow fail, but each next document without retries, else-allow fail and retry each individual document
 	DateFromDetected   bool
 	OffsetFromDetected bool
 	DB                 *sqlx.DB
@@ -374,6 +374,14 @@ func (ctx *Ctx) Init() {
 		EnrichSize:  NewFlag(),
 	}
 
+	// Redacted data
+	AddRedacted(ctx.ESURL, false)
+	AddRedacted(ctx.DBHost, false)
+	AddRedacted(ctx.DBName, false)
+	AddRedacted(ctx.DBUser, false)
+	AddRedacted(ctx.DBPass, false)
+	AddRedacted(ctx.DBConn, false)
+	AddRedacted(ctx.GapURL, false)
 }
 
 // Validate - check if config is correct
