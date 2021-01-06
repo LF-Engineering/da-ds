@@ -2,7 +2,13 @@ package affiliation
 
 import (
 	"fmt"
+	"net"
+	"strings"
 	"time"
+
+	"github.com/jmoiron/sqlx"
+
+	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 )
 
 // IdentityProvider manages user identities
@@ -14,6 +20,7 @@ type IdentityProvider struct {
 type DBConnector interface {
 	Get(dest interface{}, query string, args ...interface{}) error
 	Select(dest interface{}, query string, args ...interface{}) error
+	MustBegin() *sqlx.Tx
 }
 
 // NewIdentityProvider initiates a new IdentityProvider instance
@@ -63,4 +70,81 @@ func (i *IdentityProvider) GetOrganizations(uuid string, date time.Time) ([]stri
 	}
 
 	return multiOrg, nil
+}
+
+// CreateIdentity insert new identity to affiliations
+func (i *IdentityProvider) CreateIdentity(ident Identity, source string) {
+	if !ident.Name.Valid && !ident.Email.Valid && !ident.Username.Valid {
+		return
+	}
+
+	// if username matches a real email and there is no email set, assume email=username
+	if !ident.Email.Valid && ident.Username.Valid && IsValidEmail(ident.Username.String) {
+		ident.Email = ident.Username
+	}
+
+	// if name matches a real email and there is no email set, assume email=name
+	if !ident.Email.Valid && ident.Name.Valid && IsValidEmail(ident.Name.String) {
+		ident.Email = ident.Name
+	}
+	// generate identity uuid
+	uid, err := uuid.GenerateIdentity(&source, &ident.Email.String, &ident.Name.String, &ident.Username.String)
+	if err != nil {
+		return
+	}
+	ident.UUID.String = uid
+	i.insertIdentity(ident, source)
+
+}
+
+func (i *IdentityProvider) insertIdentity(identity Identity, source string) {
+	now := time.Now()
+	uuid := identity.UUID.String
+	name := identity.Name.String
+	userName := identity.Username.String
+	email := identity.Email.String
+	tx := i.db.MustBegin()
+	fmt.Println("from insert ...")
+	res := tx.MustExec("insert ignore into uidentities(uuid,last_modified) values(?, ?)", uuid, now)
+	affected, err := res.RowsAffected()
+	if affected == 0 || err != nil {
+		fmt.Println("from ui err")
+		tx.Rollback()
+		return
+	}
+
+	res = tx.MustExec("insert ignore into identities(id,source,name,email,username,uuid,last_modified) values (?, ?, ?, ?, ?, ?, ?)", uuid, source, name, email, userName, uuid, now)
+	affected, err = res.RowsAffected()
+	if affected == 0 || err != nil {
+		tx.Rollback()
+		return
+	}
+
+	tx.MustExec("insert ignore into profiles(uuid,name,email) values (?, ?, ?)", uuid, name, email)
+	affected, err = res.RowsAffected()
+	if affected == 0 || err != nil {
+		tx.Rollback()
+		return
+	}
+	tx.Commit()
+
+}
+
+func IsValidEmail(email string) (valid bool) {
+
+	emailLen := len(email)
+	if emailLen < 3 && emailLen > 254 {
+		return
+	}
+
+	if !EmailRegex.MatchString(email) {
+		return
+	}
+	parts := strings.Split(email, "@")
+	mx, err := net.LookupMX(parts[1])
+	if err != nil || len(mx) == 0 {
+		return
+	}
+	valid = true
+	return
 }
