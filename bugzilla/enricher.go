@@ -22,6 +22,7 @@ type Enricher struct {
 type IdentityProvider interface {
 	GetIdentity(key string, val string) (*affiliation.Identity, error)
 	GetOrganizations(uuid string, date time.Time) ([]string, error)
+	CreateIdentity(ident affiliation.Identity, source string)
 }
 
 // NewEnricher intiate a new enricher instance
@@ -69,8 +70,9 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 	}
 	unknown := "Unknown"
 	multiOrgs := []string{unknown}
-	if rawItem.AssignedTo != "" {
-		enriched.Assigned = rawItem.AssignedTo
+
+	if rawItem.Assignee.Username != "" && rawItem.Assignee.Name != "" {
+		enriched.Assigned = rawItem.Assignee.Username
 
 		// Enrich assigned to
 		assignedToFieldName := "username"
@@ -78,7 +80,7 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 			assignedToFieldName = "email"
 		}
 
-		assignedTo, err := e.identityProvider.GetIdentity(assignedToFieldName, enriched.Assigned)
+		assignedTo, err := e.identityProvider.GetIdentity(assignedToFieldName, rawItem.Assignee.Username)
 		if err == nil {
 			enriched.AssignedToID = assignedTo.ID.String
 			enriched.AssignedToUUID = assignedTo.UUID.String
@@ -113,12 +115,14 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 					enriched.AssignedToMultiOrgName = assignedToMultiOrg
 				}
 			}
+		} else {
+			e.createNewIdentity(&rawItem.Assignee)
 		}
 	}
 
-	if rawItem.Reporter != "" {
-		enriched.ReporterUserName = rawItem.Reporter
-		enriched.AuthorName = rawItem.Reporter
+	if rawItem.Reporter.Username != "" {
+		enriched.ReporterUserName = rawItem.Reporter.Username
+		enriched.AuthorName = rawItem.Reporter.Username
 
 		// Enrich reporter
 		reporterFieldName := "username"
@@ -176,6 +180,8 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 					enriched.AuthorMultiOrgName = reporterMultiOrg
 				}
 			}
+		} else {
+			e.createNewIdentity(&rawItem.Reporter)
 		}
 
 	}
@@ -205,4 +211,23 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 // EnrichAffiliation gets author SH identity data
 func (e *Enricher) EnrichAffiliation(key string, val string) (*affiliation.Identity, error) {
 	return e.identityProvider.GetIdentity(key, val)
+}
+
+func (e *Enricher) createNewIdentity(data *Person) {
+	// add new identity to affiliation DB
+	var identity affiliation.Identity
+	if data != nil {
+		if data.Name != "" {
+			identity.Name.String = data.Name
+			identity.Name.Valid = true
+		}
+		if data.Username != "" {
+			identity.Username.String = data.Username
+			identity.Username.Valid = true
+		} else {
+			identity.Name.String = data.Name
+			identity.Name.Valid = true
+		}
+		e.identityProvider.CreateIdentity(identity, Bugzilla)
+	}
 }

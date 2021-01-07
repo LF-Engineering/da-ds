@@ -15,6 +15,11 @@ type IdentityProvider struct {
 	mock.Mock
 }
 
+// CreateIdentity provides a mock function with given fields: ident, source
+func (_m *IdentityProvider) CreateIdentity(ident affiliation.Identity, source string) {
+	_m.Called(ident, source)
+}
+
 // GetIdentity provides a mock function with given fields: key, val
 func (_m *IdentityProvider) GetIdentity(key string, val string) (*affiliation.Identity, error) {
 	ret := _m.Called(key, val)

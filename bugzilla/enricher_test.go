@@ -32,8 +32,8 @@ func TestEnrichItem(t *testing.T) {
           "product" : "OE-Core",
           "component" : "oe-core other",
           "Assignee" : {
-            "name" : "akuster808",
-            "email" : ""
+            "name" : "akuster",
+            "username" : "akuster808"
           },
           "short_description" : "If u-boot defconfig is incomplete, 'bitbake u-boot -c configure' hangs and eats all memory",
           "bug_status" : "ACCEPTED",
@@ -52,7 +52,7 @@ func TestEnrichItem(t *testing.T) {
           "rep_platform" : "PC",
           "status_whiteboard" : "",
           "resolution" : "",
-          "reporter" : "vvavrychuk",
+          "reporter" : {"name":"vvavrychuk", "username":"vvavrychuk"},
           "assigned_to" : "akuster808",
           "summary" : ""
         }`,

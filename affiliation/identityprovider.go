@@ -104,11 +104,9 @@ func (i *IdentityProvider) insertIdentity(identity Identity, source string) {
 	userName := identity.Username.String
 	email := identity.Email.String
 	tx := i.db.MustBegin()
-	fmt.Println("from insert ...")
 	res := tx.MustExec("insert ignore into uidentities(uuid,last_modified) values(?, ?)", uuid, now)
 	affected, err := res.RowsAffected()
 	if affected == 0 || err != nil {
-		fmt.Println("from ui err")
 		tx.Rollback()
 		return
 	}
@@ -130,6 +128,7 @@ func (i *IdentityProvider) insertIdentity(identity Identity, source string) {
 
 }
 
+// IsValidEmail check if email is a valid email
 func IsValidEmail(email string) (valid bool) {
 
 	emailLen := len(email)

@@ -22,6 +22,7 @@ type Enricher struct {
 type IdentityProvider interface {
 	GetIdentity(key string, val string) (*affiliation.Identity, error)
 	GetOrganizations(uuid string, date time.Time) ([]string, error)
+	CreateIdentity(ident affiliation.Identity, source string)
 }
 
 // NewEnricher intiate a new enricher instance
@@ -131,6 +132,8 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 					enriched.AssignedToDetailMultiOrgName = assignedToMultiOrg
 				}
 			}
+		} else {
+			e.createNewIdentity(rawItem.Data.AssignedToDetail)
 		}
 	}
 
@@ -196,6 +199,8 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 					enriched.AuthorMultiOrgNames = reporterMultiOrg
 				}
 			}
+		} else {
+			e.createNewIdentity(rawItem.Data.CreatorDetail)
 		}
 
 	}
@@ -217,4 +222,23 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 // EnrichAffiliation gets author SH identity data
 func (e *Enricher) EnrichAffiliation(key string, val string) (*affiliation.Identity, error) {
 	return e.identityProvider.GetIdentity(key, val)
+}
+
+func (e *Enricher) createNewIdentity(data *PersonDetail) {
+	// add new identity to affiliation DB
+	var identity affiliation.Identity
+	if data != nil {
+		if data.Name != "" {
+			identity.Username.String = data.Name
+			identity.Username.Valid = true
+		}
+		if data.RealName != "" {
+			identity.Name.String = data.RealName
+			identity.Name.Valid = true
+		} else {
+			identity.Name.String = data.Name
+			identity.Name.Valid = true
+		}
+		e.identityProvider.CreateIdentity(identity, BugzillaRest)
+	}
 }
