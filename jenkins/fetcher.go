@@ -118,6 +118,8 @@ func (f *Fetcher) FetchItem(params *Params) ([]BuildsRaw, error) {
 		return raw, err
 	}
 	for _, job := range jobResponse.Jobs {
+		// Check the class of jobs if the class
+		// belongs to the category of nested jobs
 		if _, ok := JOB_CLASS[job.Class]; ok {
 			nestedJobs, err := f.FetchJobs(&Params{
 				JenkinsURL: job.URL,
