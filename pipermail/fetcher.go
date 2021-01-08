@@ -171,7 +171,7 @@ func (f *Fetcher) FetchItem(slug, groupName, project, endpoint string, fromDate 
 				return nil, err
 			}
 		} else {
-			content, err = ioutil.ReadFile("thermopylae.txt")
+			content, err = ioutil.ReadFile(filePath)
 			if err != nil {
 				lib.Printf("content ioutil.ReadFile: %+v", err)
 				continue

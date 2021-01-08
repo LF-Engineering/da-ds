@@ -64,7 +64,7 @@ func TestEnrichAll(t *testing.T) {
 			identityProviderMock.On("GetOrganizations", "50ffba4dfbedc6dc4390fc8bde7aeec0a7191056", d).Return(nil, nil)
 
 			// Act
-			srv := NewEnricher(identityProviderMock, "0.0.1", nil)
+			srv := NewEnricher(identityProviderMock, "0.0.1", nil, nil)
 
 			enrich, err := srv.EnrichMessage(&raw, expectedEnrich.MetadataEnrichedOn.UTC())
 			if err != nil {

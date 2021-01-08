@@ -2,19 +2,22 @@ package pipermail
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
 	lib "github.com/LF-Engineering/da-ds"
 	"github.com/LF-Engineering/da-ds/affiliation"
+	libAffiliations "github.com/LF-Engineering/dev-analytics-libraries/affiliation"
 )
 
 // Enricher contains pipermail datasource enrich logic
 type Enricher struct {
-	identityProvider      IdentityProvider
-	DSName                string // Datasource will be used as key for ES
-	ElasticSearchProvider ESClientProvider
-	BackendVersion        string
+	identityProvider           IdentityProvider
+	DSName                     string // Datasource will be used as key for ES
+	ElasticSearchProvider      ESClientProvider
+	BackendVersion             string
+	affiliationsClientProvider *libAffiliations.Affiliation
 }
 
 // IdentityProvider manages user identity
@@ -24,12 +27,13 @@ type IdentityProvider interface {
 }
 
 // NewEnricher initiates a new Enricher
-func NewEnricher(identProvider IdentityProvider, backendVersion string, esClientProvider ESClientProvider) *Enricher {
+func NewEnricher(identProvider IdentityProvider, backendVersion string, esClientProvider ESClientProvider, affiliationsClientProvider *libAffiliations.Affiliation) *Enricher {
 	return &Enricher{
-		identityProvider:      identProvider,
-		DSName:                Pipermail,
-		ElasticSearchProvider: esClientProvider,
-		BackendVersion:        backendVersion,
+		identityProvider:           identProvider,
+		DSName:                     Pipermail,
+		ElasticSearchProvider:      esClientProvider,
+		BackendVersion:             backendVersion,
+		affiliationsClientProvider: affiliationsClientProvider,
 	}
 }
 
@@ -120,7 +124,23 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 				enriched.AuthorMultiOrgNames = assignedToMultiOrg
 			}
 		}
+
 		enriched.FromBot = userData.IsBot
+	} else {
+		name := e.GetUserName(rawMessage.Data.From)
+		userIdentity := libAffiliations.Identity{
+			LastModified: time.Time{},
+			Name:         name,
+			Source:       Pipermail,
+			Username:     "",
+			Email:        userAffiliationsEmail,
+			UUID:         rawMessage.UUID,
+		}
+		if ok := e.affiliationsClientProvider.AddIdentity(&userIdentity); !ok {
+			log.Printf("failed to add identity for [%+v]", userAffiliationsEmail)
+		} else {
+			log.Printf("add identity for [%+v]", name)
+		}
 	}
 
 	if rawMessage.Data.InReplyTo != "" {

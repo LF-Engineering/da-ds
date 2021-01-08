@@ -209,10 +209,20 @@ func buildPipermailManager(ctx *lib.Ctx) (*pipermail.Manager, error) {
 	enrichSize := ctx.PiperMail.EnrichSize.Int()
 	project := ctx.PiperMail.Project.String()
 	esIndex := ctx.PiperMail.EsIndex.String()
+	affBaseURL := ctx.Env("AFFILIATIONS_API_BASE_URL")
+	esCacheURL := ctx.Env("ES_CACHE_URL")
+	esCacheUsername := ctx.Env("ES_CACHE_USERNAME")
+	esCachePassword := ctx.Env("ES_CACHE_PASSWORD")
+	authGrantType := ctx.Env("AUTH0_GRANT_TYPE")
+	authClientID := ctx.Env("AUTH0_CLIENT_ID")
+	authClientSecret := ctx.Env("AUTH0_CLIENT_SECRET")
+	authAudience := ctx.Env("AUTH0_AUDIENCE")
+	authURL := ctx.Env("AUTH0_BASE_URL")
+	env := ctx.Env("ENVIRONMENT")
 
 	mgr, err := pipermail.NewManager(origin, slug, groupName, ctx.DBConn, fetcherBackendVersion, enricherBackendVersion,
 		doFetch, doEnrich, ctx.ESURL, "", "", esIndex, fromDate, project,
-		fetchSize, enrichSize)
+		fetchSize, enrichSize, affBaseURL, esCacheURL, esCacheUsername, esCachePassword, authGrantType, authClientID, authClientSecret, authAudience, authURL, env)
 
 	return mgr, err
 }
