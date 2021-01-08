@@ -13,6 +13,7 @@ import (
 	jsoniter "github.com/json-iterator/go"
 )
 
+// NestedJobClasses is the map of the JOBS that might have nested jobs
 var NestedJobClasses map[string]string = map[string]string{
 	"org.jenkinsci.plugins.workflow.multibranch.WorkflowMultiBranchProject": "CLASS_JOB_WORKFLOW_MULTIBRANCH",
 	"com.cloudbees.hudson.plugins.folder.Folder":                            "CLASS_JOB_PLUGINS_FOLDER",
