@@ -2,7 +2,6 @@ package affiliation
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"strings"
 	"time"
@@ -74,9 +73,9 @@ func (i *IdentityProvider) GetOrganizations(uuid string, date time.Time) ([]stri
 }
 
 // CreateIdentity insert new identity to affiliations
-func (i *IdentityProvider) CreateIdentity(ident Identity, source string) {
+func (i *IdentityProvider) CreateIdentity(ident Identity, source string) error {
 	if !ident.Name.Valid && !ident.Email.Valid && !ident.Username.Valid {
-		return
+		return fmt.Errorf("name, email and username are all empty")
 	}
 
 	// if username matches a real email and there is no email set, assume email=username
@@ -91,15 +90,11 @@ func (i *IdentityProvider) CreateIdentity(ident Identity, source string) {
 	// generate identity uuid
 	uid, err := uuid.GenerateIdentity(&source, &ident.Email.String, &ident.Name.String, &ident.Username.String)
 	if err != nil {
-		log.Printf("Err: %s\n", err.Error())
-		return
+		return err
 	}
+
 	ident.UUID.String = uid
-	err = i.insertIdentity(ident, source)
-	if err != nil {
-		log.Printf("Err: %s\n", err.Error())
-		return
-	}
+	return i.insertIdentity(ident, source)
 }
 
 func (i *IdentityProvider) insertIdentity(identity Identity, source string) error {

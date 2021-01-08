@@ -2,6 +2,7 @@ package bugzilla
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -22,7 +23,7 @@ type Enricher struct {
 type IdentityProvider interface {
 	GetIdentity(key string, val string) (*affiliation.Identity, error)
 	GetOrganizations(uuid string, date time.Time) ([]string, error)
-	CreateIdentity(ident affiliation.Identity, source string)
+	CreateIdentity(ident affiliation.Identity, source string) error
 }
 
 // NewEnricher intiate a new enricher instance
@@ -224,10 +225,15 @@ func (e *Enricher) createNewIdentity(data *Person) {
 		if data.Username != "" {
 			identity.Username.String = data.Username
 			identity.Username.Valid = true
-		} else {
-			identity.Name.String = data.Name
+		}
+		if data.Username != "" && data.Name == "" {
+			identity.Name.String = data.Username
 			identity.Name.Valid = true
 		}
-		e.identityProvider.CreateIdentity(identity, Bugzilla)
+
+		err := e.identityProvider.CreateIdentity(identity, Bugzilla)
+		if err != nil {
+			log.Printf("Err : %s", err.Error())
+		}
 	}
 }

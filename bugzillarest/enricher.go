@@ -2,6 +2,7 @@ package bugzillarest
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -22,7 +23,7 @@ type Enricher struct {
 type IdentityProvider interface {
 	GetIdentity(key string, val string) (*affiliation.Identity, error)
 	GetOrganizations(uuid string, date time.Time) ([]string, error)
-	CreateIdentity(ident affiliation.Identity, source string)
+	CreateIdentity(ident affiliation.Identity, source string) error
 }
 
 // NewEnricher intiate a new enricher instance
@@ -239,6 +240,9 @@ func (e *Enricher) createNewIdentity(data *PersonDetail) {
 			identity.Name.String = data.Name
 			identity.Name.Valid = true
 		}
-		e.identityProvider.CreateIdentity(identity, BugzillaRest)
+		err := e.identityProvider.CreateIdentity(identity, BugzillaRest)
+		if err != nil {
+			log.Printf("Err : %s", err.Error())
+		}
 	}
 }
