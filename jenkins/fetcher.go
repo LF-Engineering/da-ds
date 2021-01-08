@@ -13,9 +13,11 @@ import (
 	jsoniter "github.com/json-iterator/go"
 )
 
-const (
-	CLASS_JOB_WORKFLOW_MULTIBRANCH = "org.jenkinsci.plugins.workflow.multibranch.WorkflowMultiBranchProject"
-)
+var JOB_CLASS map[string]string = map[string]string{
+	"org.jenkinsci.plugins.workflow.multibranch.WorkflowMultiBranchProject": "CLASS_JOB_WORKFLOW_MULTIBRANCH",
+	"com.cloudbees.hudson.plugins.folder.Folder":                            "CLASS_JOB_PLUGINS_FOLDER",
+	"jenkins.branch.OrganizationFolder":                                     "CLASS_JOB_ORG_FOLDER",
+}
 
 // DefaultTime represents the default time used when the time is not given and index does not exist
 var DefaultTime = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -116,9 +118,9 @@ func (f *Fetcher) FetchItem(params *Params) ([]BuildsRaw, error) {
 		return raw, err
 	}
 	for _, job := range jobResponse.Jobs {
-		if job.Class == CLASS_JOB_WORKFLOW_MULTIBRANCH {
+		if _, ok := JOB_CLASS[job.Class]; ok {
 			nestedJobs, err := f.FetchJobs(&Params{
-				JenkinsURL:     job.URL,
+				JenkinsURL: job.URL,
 			})
 			if err != nil {
 				continue

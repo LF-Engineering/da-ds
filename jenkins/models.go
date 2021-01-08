@@ -153,7 +153,8 @@ type BuildsEnrich struct {
 	IsJenkinsJob            int         `json:"is_jenkins_job"`
 	RepositoryLabels        interface{} `json:"repository_labels"`
 	MetadataFilterRaw       interface{} `json:"metadata__filter_raw"`
-	MetadataGelkVersion     string      `json:"metadata__gelk_version"`
-	MetadataGelkBackendName string      `json:"metadata__gelk_backend_name"`
+	MetadataBackendVersion  string      `json:"metadata__backend_version"`
+	MetadataBackendName     string      `json:"metadata__backend_name"`
+	Project                 string      `json:"project"`
 	MetadataEnrichedOn      time.Time   `json:"metadata__enriched_on"`
 }
