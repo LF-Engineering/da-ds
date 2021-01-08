@@ -13,6 +13,10 @@ import (
 	jsoniter "github.com/json-iterator/go"
 )
 
+const (
+	CLASS_JOB_WORKFLOW_MULTIBRANCH = "org.jenkinsci.plugins.workflow.multibranch.WorkflowMultiBranchProject"
+)
+
 // DefaultTime represents the default time used when the time is not given and index does not exist
 var DefaultTime = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
 
@@ -112,14 +116,31 @@ func (f *Fetcher) FetchItem(params *Params) ([]BuildsRaw, error) {
 		return raw, err
 	}
 	for _, job := range jobResponse.Jobs {
-		// For every job fetch all the builds
-		builds, err := f.FetchBuilds(params, job.URL)
-		if err != nil {
-			continue
+		if job.Class == CLASS_JOB_WORKFLOW_MULTIBRANCH {
+			nestedJobs, err := f.FetchJobs(&Params{
+				JenkinsURL:     job.URL,
+			})
+			if err != nil {
+				continue
+			}
+			for _, nestedJob := range nestedJobs.Jobs {
+				builds, err := f.FetchBuilds(params, nestedJob.URL)
+				if err != nil {
+					continue
+				}
+				data := f.MapToJenkinsRaw(builds, params)
+				raw = append(raw, data...)
+			}
+		} else {
+			// For every job fetch all the builds
+			builds, err := f.FetchBuilds(params, job.URL)
+			if err != nil {
+				continue
+			}
+			// append the fetched builds to the BuildsRaw slice
+			data := f.MapToJenkinsRaw(builds, params)
+			raw = append(raw, data...)
 		}
-		// append the fetched builds to the BuildsRaw slice
-		data := f.MapToJenkinsRaw(builds, params)
-		raw = append(raw, data...)
 	}
 	return raw, nil
 }
