@@ -85,7 +85,6 @@ func (e *Enricher) EnrichItem(rawItem BuildsRaw, project string, now time.Time) 
 	enriched.MetadataEnrichedOn = time.Now()
 	enriched.MetadataBackendName = fmt.Sprintf("%sEnrich", strings.Title(e.DSName))
 	enriched.MetadataBackendVersion = e.BackendVersion
-	enriched.ProjectTS = rawItem.Data.Timestamp
 	enriched.BuildDate = time.Unix(0, rawItem.Data.Timestamp*int64(time.Millisecond))
 	enriched.Build = rawItem.Data.Number
 	parts := strings.Split(rawItem.Data.DisplayName, " ")

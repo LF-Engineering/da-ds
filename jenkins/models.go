@@ -123,7 +123,6 @@ type Build struct {
 // BuildsEnrich represents the schema for the
 // enriched documents in ES
 type BuildsEnrich struct {
-	ProjectTS               int64       `json:"project_ts"`
 	MetadataUpdatedOn       time.Time   `json:"metadata__updated_on"`
 	MetadataTimestamp       time.Time   `json:"metadata__timestamp"`
 	Offset                  interface{} `json:"offset"`
