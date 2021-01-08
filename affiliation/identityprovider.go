@@ -2,6 +2,7 @@ package affiliation
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"strings"
 	"time"
@@ -90,14 +91,18 @@ func (i *IdentityProvider) CreateIdentity(ident Identity, source string) {
 	// generate identity uuid
 	uid, err := uuid.GenerateIdentity(&source, &ident.Email.String, &ident.Name.String, &ident.Username.String)
 	if err != nil {
+		log.Printf("Err: %s\n", err.Error())
 		return
 	}
 	ident.UUID.String = uid
-	i.insertIdentity(ident, source)
-
+	err = i.insertIdentity(ident, source)
+	if err != nil {
+		log.Printf("Err: %s\n", err.Error())
+		return
+	}
 }
 
-func (i *IdentityProvider) insertIdentity(identity Identity, source string) {
+func (i *IdentityProvider) insertIdentity(identity Identity, source string) error {
 	now := time.Now()
 	uuid := identity.UUID.String
 	name := identity.Name.String
@@ -107,24 +112,21 @@ func (i *IdentityProvider) insertIdentity(identity Identity, source string) {
 	res := tx.MustExec("insert ignore into uidentities(uuid,last_modified) values(?, ?)", uuid, now)
 	affected, err := res.RowsAffected()
 	if affected == 0 || err != nil {
-		tx.Rollback()
-		return
+		return tx.Rollback()
 	}
 
 	res = tx.MustExec("insert ignore into identities(id,source,name,email,username,uuid,last_modified) values (?, ?, ?, ?, ?, ?, ?)", uuid, source, name, email, userName, uuid, now)
 	affected, err = res.RowsAffected()
 	if affected == 0 || err != nil {
-		tx.Rollback()
-		return
+		return tx.Rollback()
 	}
 
 	tx.MustExec("insert ignore into profiles(uuid,name,email) values (?, ?, ?)", uuid, name, email)
 	affected, err = res.RowsAffected()
 	if affected == 0 || err != nil {
-		tx.Rollback()
-		return
+		return tx.Rollback()
 	}
-	tx.Commit()
+	return tx.Commit()
 
 }
 
