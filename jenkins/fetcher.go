@@ -13,7 +13,7 @@ import (
 	jsoniter "github.com/json-iterator/go"
 )
 
-var JOB_CLASS map[string]string = map[string]string{
+var NestedJobClasses map[string]string = map[string]string{
 	"org.jenkinsci.plugins.workflow.multibranch.WorkflowMultiBranchProject": "CLASS_JOB_WORKFLOW_MULTIBRANCH",
 	"com.cloudbees.hudson.plugins.folder.Folder":                            "CLASS_JOB_PLUGINS_FOLDER",
 	"jenkins.branch.OrganizationFolder":                                     "CLASS_JOB_ORG_FOLDER",
@@ -120,7 +120,7 @@ func (f *Fetcher) FetchItem(params *Params) ([]BuildsRaw, error) {
 	for _, job := range jobResponse.Jobs {
 		// Check the class of jobs if the class
 		// belongs to the category of nested jobs
-		if _, ok := JOB_CLASS[job.Class]; ok {
+		if _, ok := NestedJobClasses[job.Class]; ok {
 			nestedJobs, err := f.FetchJobs(&Params{
 				JenkinsURL: job.URL,
 			})
