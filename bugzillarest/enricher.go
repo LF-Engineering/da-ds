@@ -228,21 +228,24 @@ func (e *Enricher) EnrichAffiliation(key string, val string) (*affiliation.Ident
 func (e *Enricher) createNewIdentity(data *PersonDetail) {
 	// add new identity to affiliation DB
 	var identity affiliation.Identity
-	if data != nil {
-		if data.Name != "" {
-			identity.Username.String = data.Name
-			identity.Username.Valid = true
-		}
-		if data.RealName != "" {
-			identity.Name.String = data.RealName
-			identity.Name.Valid = true
-		} else {
-			identity.Name.String = data.Name
-			identity.Name.Valid = true
-		}
-		err := e.identityProvider.CreateIdentity(identity, BugzillaRest)
-		if err != nil {
-			log.Printf("Err : %s", err.Error())
-		}
+	if data == nil {
+		log.Print("Err : identity data is empty")
+		return
 	}
+	if data.Name != "" {
+		identity.Username.String = data.Name
+		identity.Username.Valid = true
+	}
+	if data.RealName != "" {
+		identity.Name.String = data.RealName
+		identity.Name.Valid = true
+	} else {
+		identity.Name.String = data.Name
+		identity.Name.Valid = true
+	}
+	err := e.identityProvider.CreateIdentity(identity, BugzillaRest)
+	if err != nil {
+		log.Printf("Err : %s", err.Error())
+	}
+
 }
