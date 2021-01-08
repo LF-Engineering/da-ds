@@ -229,6 +229,7 @@ func (e *Enricher) createNewIdentity(data *Person) {
 		identity.Username.String = data.Username
 		identity.Username.Valid = true
 	}
+	// if username exist and there is no name assume name = username
 	if data.Username != "" && data.Name == "" {
 		identity.Name.String = data.Username
 		identity.Name.Valid = true
