@@ -2,6 +2,7 @@ package pipermail
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
@@ -221,14 +222,21 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 
 				// Insert raw data to elasticsearch
 				sizeOfData := len(data)
-				limit := m.EnrichSize
+
+				limit := 1000
+				if m.EnrichSize <= 1000 {
+					limit = m.EnrichSize
+				}
+
 				lastIndex := 0
 				remainingItemsLength := 0
+				log.Println("LEN DATA: ", len(data))
+				log.Println("LEN EN SIZE: ", m.EnrichSize)
 				// rate limit items to push to es to avoid the 413 error
 				if len(data) > m.EnrichSize {
 					for lastIndex < sizeOfData {
 						if lastIndex == 0 && limit <= len(data) {
-							_, err = m.esClientProvider.BulkInsert(data[:lastIndex])
+							_, err = m.esClientProvider.BulkInsert(data[:limit])
 							if err != nil {
 								ch <- err
 								return
@@ -273,6 +281,7 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 						}
 					}
 				}
+				log.Println("DONE WITH RAW ENRICHMENT")
 			}
 		}
 		ch <- nil
@@ -363,13 +372,12 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 			// setting mapping and create index if not exists
 			if offset == 0 {
 				_, err := m.esClientProvider.CreateIndex(m.ESIndex, PiperRichMapping)
-
 				if err != nil {
 					ch <- err
 					return
 				}
 			}
-			fmt.Println("GOT to en richer")
+
 			if len(data) > 0 {
 				// Update changed at in elastic cache index
 				cacheDoc, _ := data[len(data)-1].Data.(*EnrichMessage)
