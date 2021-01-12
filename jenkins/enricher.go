@@ -67,7 +67,7 @@ func NewEnricher(backendVersion string, esClientProvider ESClientProvider) *Enri
 func (e *Enricher) EnrichItem(rawItem BuildsRaw, project string, now time.Time) (*BuildsEnrich, error) {
 
 	enriched := BuildsEnrich{}
-
+	enriched.Project = project
 	enriched.UUID = rawItem.UUID
 	enriched.FullDisplayName = rawItem.Data.FullDisplayName
 	enriched.FullDisplayNameAnalyzed = enriched.FullDisplayName
@@ -83,7 +83,8 @@ func (e *Enricher) EnrichItem(rawItem BuildsRaw, project string, now time.Time) 
 	enriched.MetadataTimestamp = rawItem.MetadataTimestamp
 	enriched.MetadataUpdatedOn = rawItem.MetadataUpdatedOn
 	enriched.MetadataEnrichedOn = time.Now()
-	enriched.ProjectTS = rawItem.Data.Timestamp
+	enriched.MetadataBackendName = fmt.Sprintf("%sEnrich", strings.Title(e.DSName))
+	enriched.MetadataBackendVersion = e.BackendVersion
 	enriched.BuildDate = time.Unix(0, rawItem.Data.Timestamp*int64(time.Millisecond))
 	enriched.Build = rawItem.Data.Number
 	parts := strings.Split(rawItem.Data.DisplayName, " ")
