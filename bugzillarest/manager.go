@@ -136,7 +136,6 @@ type HitSource struct {
 // Sync starts fetch and enrich processes
 func (m *Manager) Sync() error {
 	lastActionCachePostfix := "-last-action-date-cache"
-
 	// register disabled job as done
 	doneJobs := make(map[string]bool)
 	doneJobs["doneFetch"] = !m.Fetch
@@ -240,7 +239,6 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 				// Update changed at in elastic cache index
 				updateChan := HitSource{ID: fetchID, ChangedAt: *lastChange}
 				data = append(data, elastic.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: fetchID, Data: updateChan})
-
 				//set mapping and create index if not exists
 				err := m.esClientProvider.DelayOfCreateIndex(m.esClientProvider.CreateIndex, m.Retries, m.Delay, fmt.Sprintf("%s-raw", m.ESIndex), BugzillaRestRawMapping)
 				if err != nil {
@@ -267,7 +265,6 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 					fmt.Println(c, string(e))
 					continue
 				}
-
 				// Insert raw data to elasticsearch
 				_, err = m.esClientProvider.BulkInsert(data)
 				if err != nil {

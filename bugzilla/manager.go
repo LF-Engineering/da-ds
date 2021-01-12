@@ -4,7 +4,6 @@ import (
 	b64 "encoding/base64"
 	"encoding/json"
 	"fmt"
-
 	"time"
 
 	"github.com/LF-Engineering/da-ds/affiliation"
@@ -34,6 +33,8 @@ type Manager struct {
 	Retries                uint
 	Delay                  time.Duration
 	GapURL                 string
+	AffAPI                 string
+	ProjectSlug            string
 
 	esClientProvider ESClientProvider
 	fetcher          *Fetcher
@@ -59,6 +60,8 @@ type Param struct {
 	Retries                uint
 	Delay                  time.Duration
 	GapURL                 string
+	AffAPI                 string
+	ProjectSlug            string
 }
 
 // NewManager initiates bugzilla manager instance
@@ -83,6 +86,8 @@ func NewManager(param Param) (*Manager, error) {
 		Retries:                param.Retries,
 		Delay:                  param.Delay,
 		GapURL:                 param.GapURL,
+		AffAPI:                 param.AffAPI,
+		ProjectSlug:            param.ProjectSlug,
 	}
 
 	fetcher, enricher, esClientProvider, err := buildServices(mgr)
@@ -378,3 +383,165 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 
 	return ch
 }
+
+// CreateNewIdentity ...
+//func (m *Manager) CreateNewIdentity(data *Person, source string) {
+//	// add new identity to affiliation DB
+//	var identity affiliation.Identity
+//	if data == nil {
+//		log.Print("Err : identity data is empty")
+//		return
+//	}
+//	if data.Name != "" {
+//		identity.Name.String = data.Name
+//		identity.Name.Valid = true
+//	}
+//	if data.Username != "" {
+//		identity.Username.String = data.Username
+//		identity.Username.Valid = true
+//	}
+//	// if username exist and there is no name assume name = username
+//	if data.Username != "" && data.Name == "" {
+//		identity.Name.String = data.Username
+//		identity.Name.Valid = true
+//	}
+//
+//	authProvider, err := auth.NewAuth0Client(m.ESUrl, m.ESUsername, m.ESPassword, "",
+//		"", "", "", "", "")
+//	if err != nil {
+//		log.Printf("Err : %s", err.Error())
+//		return
+//	}
+//
+//	token := authProvider.GenerateToken()
+//	header := make(map[string]string)
+//	header["Authorization"] = token
+//
+//	bData, err := json.Marshal(identity)
+//	if err != nil {
+//		log.Printf("Err : %s", err.Error())
+//		return
+//	}
+//
+//	createIdentityAPI := fmt.Sprintf("%s/v1/affiliation/%s/add_identity/%s", m.AffAPI, m.ProjectSlug, source)
+//	_, _, err = m.fetcher.HTTPClientProvider.Request(createIdentityAPI, "Post", header, bData, nil)
+//	if err != nil {
+//		log.Printf("Err : %s", err.Error())
+//		return
+//	}
+//	return
+//
+//}
+
+// GetAffiliationIdentity gets author SH identity data
+//func (m *Manager) GetAffiliationIdentity(key string, value string) (*AffIdentity, error) {
+//	authProvider, err := auth.NewAuth0Client(m.ESUrl, m.ESUsername, m.ESPassword, "",
+//		"", "", "", "", "")
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	token := authProvider.GenerateToken()
+//	header := make(map[string]string)
+//	header["Authorization"] = token
+//	var bData []byte
+//	getIdentityAPI := fmt.Sprintf("%s/v1/affiliation/identity/%s/%s", m.AffAPI, key, value)
+//	_, identityRes, err := m.fetcher.HTTPClientProvider.Request(getIdentityAPI, "GET", header, bData, nil)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	var ident IdentityData
+//	err = json.Unmarshal(identityRes, &ident)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	getProfileAPI := fmt.Sprintf("%s/v1/affiliation/%s/get_profile/%v", m.AffAPI, m.ProjectSlug, ident.UUID)
+//	_, profileRes, err := m.fetcher.HTTPClientProvider.Request(getProfileAPI, "GET", header, bData, nil)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	var profile UniqueIdentityFullProfile
+//	err = json.Unmarshal(profileRes, &profile)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	var identity AffIdentity
+//	identity.UUID = ident.UUID
+//	identity.Name = *ident.Name
+//	identity.Username = *ident.Username
+//	identity.Email = *ident.Email
+//	identity.ID = &ident.ID
+//
+//	identity.IsBot = profile.Profile.IsBot
+//	identity.Gender = profile.Profile.Gender
+//	identity.GenderACC = profile.Profile.GenderAcc
+//
+//	if len(profile.Enrollments) > 1 {
+//		identity.OrgName = &profile.Enrollments[0].Organization.Name
+//		for _, org := range profile.Enrollments {
+//			identity.MultiOrgNames = append(identity.MultiOrgNames, org.Organization.Name)
+//		}
+//	} else if len(profile.Enrollments) == 1 {
+//		identity.OrgName = &profile.Enrollments[0].Organization.Name
+//		identity.MultiOrgNames = append(identity.MultiOrgNames, profile.Enrollments[0].Organization.Name)
+//	}
+//
+//	return &identity, nil
+//}
+
+// IdentityData ...
+//type IdentityData struct {
+//	Email        *string    `json:"email,omitempty"`
+//	ID           string     `json:"id,omitempty"`
+//	LastModified *time.Time `json:"last_modified,omitempty"`
+//	Name         *string    `json:"name,omitempty"`
+//	Source       string     `json:"source,omitempty"`
+//	Username     *string    `json:"username,omitempty"`
+//	UUID         *string    `json:"uuid,omitempty"`
+//}
+
+//type UniqueIdentityFullProfile struct {
+//	Enrollments []*Enrollments  `json:"enrollments"`
+//	Identities  []*IdentityData `json:"identities"`
+//	Profile     *Profile        `json:"profile,omitempty"`
+//	UUID        string          `json:"uuid,omitempty"`
+//}
+
+// Enrollments ...
+//type Enrollments struct {
+//	Organization *Organization `json:"organization,omitempty"`
+//}
+
+//  Organization ...
+//type Organization struct {
+//	Name string `json:"name,omitempty"`
+//}
+
+// Profile ...
+//type Profile struct {
+//	Email     *string `json:"email,omitempty"`
+//	Gender    *string `json:"gender,omitempty"`
+//	GenderAcc *int64  `json:"gender_acc,omitempty"`
+//	IsBot     *int64  `json:"is_bot,omitempty"`
+//	Name      *string `json:"name,omitempty"`
+//	UUID      string  `json:"uuid,omitempty"`
+//}
+
+// Identity contains affiliation user Identity
+//type AffIdentity struct {
+//	ID            *string `json:"id"`
+//	UUID          *string
+//	Name          string
+//	Username      string
+//	Email         string
+//	Domain        string
+//	Gender        *string  `json:"gender"`
+//	GenderACC     *int64   `json:"gender_acc"`
+//	OrgName       *string  `json:"org_name"`
+//	IsBot         *int64   `json:"is_bot"`
+//	MultiOrgNames []string `json:"multi_org_names"`
+//}

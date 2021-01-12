@@ -62,6 +62,7 @@ type Ctx struct {
 	Retries            uint
 	Delay              time.Duration
 	Repository         []Repository
+	AffAPI             string
 
 	// Bugzilla contains all bugzilla params
 	BugZilla *BugZilla

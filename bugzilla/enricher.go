@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/LF-Engineering/da-ds/affiliation"
-
 	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
 )
 
@@ -210,9 +209,12 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 }
 
 // EnrichAffiliation gets author SH identity data
-func (e *Enricher) EnrichAffiliation(key string, val string) (*affiliation.Identity, error) {
-	return e.identityProvider.GetIdentity(key, val)
-}
+//func (e *Enricher) EnrichAffiliation(key string, val string) (*affiliation.Identity, error) {
+//authProvider, err := auth.NewAuth0Client(e.,"", "", "",
+//	"", "", "", "", "")
+//
+//	return e.identityProvider.GetIdentity(key, val)
+//}
 
 func (e *Enricher) createNewIdentity(data *Person) {
 	// add new identity to affiliation DB
