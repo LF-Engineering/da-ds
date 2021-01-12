@@ -17,7 +17,8 @@ const (
 	Message = "message"
 	// MessageIDField ...
 	MessageIDField = "Message-ID"
-	Unknown        = "Unknown"
+	// Unknown ...
+	Unknown = "Unknown"
 )
 
 var (
