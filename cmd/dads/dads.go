@@ -195,10 +195,7 @@ func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 
 	}
 
-	params.GapURL = "localhost:8200"
-	if ctx.GapURL != "" {
-		params.GapURL = ctx.GapURL
-	}
+	params.GapURL = ctx.GapURL
 
 	mgr, err := bugzilla.NewManager(params)
 	if err != nil {
@@ -258,10 +255,7 @@ func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
 
 	}
 
-	params.GapURL = "localhost:8200"
-	if ctx.GapURL != "" {
-		params.GapURL = ctx.GapURL
-	}
+	params.GapURL = ctx.GapURL
 
 	mgr, err := bugzillarest.NewManager(params)
 	if err != nil {

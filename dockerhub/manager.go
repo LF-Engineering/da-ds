@@ -125,11 +125,12 @@ func (m *Manager) Sync() error {
 					return err
 				}
 
-				c, e, err := fetcher.HTTPClientProvider.Request(m.GapURL, "POST", nil, bData, nil)
-				if err != nil {
-					return err
+				if m.GapURL != "" {
+					_, _, err = fetcher.HTTPClientProvider.Request(m.GapURL, "POST", nil, bData, nil)
+					if err != nil {
+						return err
+					}
 				}
-				fmt.Println(c, string(e))
 				continue
 			}
 		}

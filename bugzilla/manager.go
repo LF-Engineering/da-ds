@@ -244,11 +244,14 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 						return
 					}
 
-					_, _, err = m.fetcher.HTTPClientProvider.Request(m.GapURL, "POST", nil, bData, nil)
-					if err != nil {
-						ch <- err
-						return
+					if m.GapURL != "" {
+						_, _, err = m.fetcher.HTTPClientProvider.Request(m.GapURL, "POST", nil, bData, nil)
+						if err != nil {
+							ch <- err
+							return
+						}
 					}
+
 					continue
 				}
 
