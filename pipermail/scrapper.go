@@ -80,6 +80,11 @@ func (f *Fetcher) ParseArchiveLinks(archivesURL string, fromDate *time.Time) ([]
 			if fromDate.Year() == mboxDT.Year() && fromDate.Month() == mboxDT.Month() || fromDate.After(mboxDT) {
 				sortedLinks = append(sortedLinks, link)
 			}
+
+			// all time
+			if fromDate.Year() == 1970 {
+				sortedLinks = append(sortedLinks, link)
+			}
 		}
 	}
 	return sortedLinks, nil

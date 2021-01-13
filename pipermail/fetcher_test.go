@@ -119,7 +119,7 @@ var rawMessageBytes = []byte(`
       "date_tz":0
    },
    "tag":"https://www.openembedded.org/pipermail/openembedded-architecture/",
-   "uuid":"88c9c0b26e5d4dc64c7ee379e8e636fbe56b308b",
+   "uuid":"acb13ade6f1540ceb6b72b085c94c32c7a6a540b",
    "search_fields":{
       "name":"openembedded-architecture",
       "item_id":"<CAE4k23_0=nw4caHLXPDCygvFd47dJ2s9muxDFGPEibb2yQKh2Q@mail.gmail.com>"

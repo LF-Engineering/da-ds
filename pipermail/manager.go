@@ -2,6 +2,7 @@ package pipermail
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/LF-Engineering/da-ds/affiliation"
 	"github.com/LF-Engineering/da-ds/db"
+	libAffiliations "github.com/LF-Engineering/dev-analytics-libraries/affiliation"
 )
 
 // TopHits result
@@ -36,7 +38,7 @@ type HitSource struct {
 	ChangedAt time.Time `json:"changed_at"`
 }
 
-// Manager describes pipermail manager
+// Manager describes piper mail manager
 type Manager struct {
 	Endpoint               string
 	Slug                   string
@@ -55,6 +57,16 @@ type Manager struct {
 	Project                string
 	FetchSize              int
 	EnrichSize             int
+	AffBaseURL             string
+	ESCacheURL             string
+	ESCacheUsername        string
+	ESCachePassword        string
+	AuthGrantType          string
+	AuthClientID           string
+	AuthClientSecret       string
+	AuthAudience           string
+	AuthURL                string
+	Environment            string
 
 	esClientProvider ESClientProvider
 	fetcher          *Fetcher
@@ -62,7 +74,7 @@ type Manager struct {
 }
 
 // NewManager initiates piper mail manager instance
-func NewManager(endPoint, slug, groupName, shConnStr, fetcherBackendVersion, enricherBackendVersion string, fetch bool, enrich bool, eSUrl string, esUser string, esPassword string, esIndex string, fromDate *time.Time, project string, fetchSize int, enrichSize int) (*Manager, error) {
+func NewManager(endPoint, slug, groupName, shConnStr, fetcherBackendVersion, enricherBackendVersion string, fetch bool, enrich bool, eSUrl string, esUser string, esPassword string, esIndex string, fromDate *time.Time, project string, fetchSize int, enrichSize int, affBaseURL, esCacheURL, esCacheUsername, esCachePassword, authGrantType, authClientID, authClientSecret, authAudience, authURL, env string) (*Manager, error) {
 	mng := &Manager{
 		Endpoint:               endPoint,
 		Slug:                   slug,
@@ -81,6 +93,19 @@ func NewManager(endPoint, slug, groupName, shConnStr, fetcherBackendVersion, enr
 		Project:                project,
 		FetchSize:              fetchSize,
 		EnrichSize:             enrichSize,
+		AffBaseURL:             affBaseURL,
+		ESCacheURL:             esCacheURL,
+		ESCacheUsername:        esCacheUsername,
+		ESCachePassword:        esCachePassword,
+		AuthGrantType:          authGrantType,
+		AuthClientID:           authClientID,
+		AuthClientSecret:       authClientSecret,
+		AuthAudience:           authAudience,
+		AuthURL:                authURL,
+		Environment:            env,
+		esClientProvider:       nil,
+		fetcher:                nil,
+		enricher:               nil,
 	}
 
 	fetcher, enricher, esClientProvider, err := buildServices(mng)
@@ -95,7 +120,7 @@ func NewManager(endPoint, slug, groupName, shConnStr, fetcherBackendVersion, enr
 	return mng, nil
 }
 
-// Sync runs pipermail fetch and enrich according to passed parameters
+// Sync runs piper mail fetch and enrich according to passed parameters
 func (m *Manager) Sync() error {
 	lastActionCachePostfix := "-last-action-date-cache"
 
@@ -197,13 +222,25 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 
 				// Insert raw data to elasticsearch
 				sizeOfData := len(data)
-				limit := m.EnrichSize
+
+				limit := 1000
+				if m.EnrichSize <= 1000 {
+					limit = m.EnrichSize
+				}
+
 				lastIndex := 0
 				remainingItemsLength := 0
+				log.Println("LEN DATA: ", len(data))
+				log.Println("LEN EN SIZE: ", m.EnrichSize)
 				// rate limit items to push to es to avoid the 413 error
 				if len(data) > m.EnrichSize {
 					for lastIndex < sizeOfData {
-						if lastIndex == 0 {
+						if lastIndex == 0 && limit <= len(data) {
+							_, err = m.esClientProvider.BulkInsert(data[:limit])
+							if err != nil {
+								ch <- err
+								return
+							}
 							lastIndex = limit
 							continue
 						}
@@ -244,6 +281,7 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 						}
 					}
 				}
+				log.Println("DONE WITH RAW ENRICHMENT")
 			}
 		}
 		ch <- nil
@@ -334,7 +372,6 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 			// setting mapping and create index if not exists
 			if offset == 0 {
 				_, err := m.esClientProvider.CreateIndex(m.ESIndex, PiperRichMapping)
-
 				if err != nil {
 					ch <- err
 					return
@@ -377,7 +414,7 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 		return nil, nil, nil, err
 	}
 
-	// Initialize fetcher object to get data from pipermail archive link
+	// Initialize fetcher object to get data from piper mail archive link
 	fetcher := NewFetcher(params, httpClientProvider, esClientProvider)
 
 	dataBase, err := db.NewConnector("mysql", m.SHConnString)
@@ -386,8 +423,13 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 	}
 	identityProvider := affiliation.NewIdentityProvider(dataBase)
 
+	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(m.AffBaseURL, m.Slug, m.ESCacheURL, m.ESCacheUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.AuthURL)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
 	//Initialize enrich object to enrich raw data
-	enricher := NewEnricher(identityProvider, m.EnricherBackendVersion, esClientProvider)
+	enricher := NewEnricher(identityProvider, m.EnricherBackendVersion, esClientProvider, affiliationsClientProvider)
 
 	return fetcher, enricher, esClientProvider, err
 }
