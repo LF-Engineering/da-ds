@@ -285,7 +285,7 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 
 func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-chan error {
 	ch := make(chan error)
-
+	fmt.Println("enricheeee")
 	go func() {
 		enrichID := "enrich"
 
