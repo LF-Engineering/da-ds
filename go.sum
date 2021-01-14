@@ -8,6 +8,8 @@ github.com/LF-Engineering/dev-analytics-libraries v0.3.0 h1:euYRqpKkW661mlCLBzMj
 github.com/LF-Engineering/dev-analytics-libraries v0.3.0/go.mod h1:UbQW9wNRaX7VKk/LX3v1888g0CgqnOf9emhDknoq5Us=
 github.com/LF-Engineering/dev-analytics-libraries v0.3.1 h1:6EbnVsEPwkLYa1KXsJk7YQzv9rYvuPdy4DAJPqr/qOs=
 github.com/LF-Engineering/dev-analytics-libraries v0.3.1/go.mod h1:UbQW9wNRaX7VKk/LX3v1888g0CgqnOf9emhDknoq5Us=
+github.com/LF-Engineering/dev-analytics-libraries v0.3.3 h1:wctxzel/69hZUly07M8E4ydiAN+MH7ItkZBD6+3pGAY=
+github.com/LF-Engineering/dev-analytics-libraries v0.3.3/go.mod h1:UbQW9wNRaX7VKk/LX3v1888g0CgqnOf9emhDknoq5Us=
 github.com/PuerkitoBio/goquery v1.6.0 h1:j7taAbelrdcsOlGeMenZxc2AWXD5fieT1/znArdnx94=
 github.com/PuerkitoBio/goquery v1.6.0/go.mod h1:GsLWisAFVj4WgDibEWF4pvYnkVQBpKBKeU+7zCJoLcc=
 github.com/andybalholm/cascadia v1.1.0 h1:BuuO6sSfQNFRu1LppgbD25Hr2vLYW25JvxHs5zzsLTo=

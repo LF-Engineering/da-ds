@@ -3,6 +3,7 @@ package dads
 import (
 	"database/sql"
 	"fmt"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -242,13 +243,14 @@ func QueryToStringIntArrays(ctx *Ctx, query string, args ...interface{}) (sa []s
 }
 
 // GetEnrollments - returns enrollments for a given uuid in a given date, possibly multiple
-// uses cache with date resolution (uuid,dt.YYYYMMDD)
+// uses cache with date resolution (pslug,uuid,dt.YYYYMMDD)
 func GetEnrollments(ctx *Ctx, ds DS, uuid string, dt time.Time, single bool) (orgs []string) {
+	pSlug := ctx.ProjectSlug
 	sSep := "m"
 	if single {
 		sSep = "s"
 	}
-	k := uuid + sSep + ToYMDDate(dt)
+	k := pSlug + uuid + sSep + ToYMDDate(dt)
 	if MT {
 		rollsCacheMtx.RLock()
 	}
@@ -268,147 +270,97 @@ func GetEnrollments(ctx *Ctx, ds DS, uuid string, dt time.Time, single bool) (or
 			rollsCacheMtx.Unlock()
 		}
 	}()
+	if pSlug == "" {
+		pSlug = "(empty)"
+	}
+	pSlug = url.QueryEscape(pSlug)
+	api := "single"
+	if !single {
+		api = "multi"
+	}
+	sdt := url.QueryEscape(ToYMDTHMSZDate(dt))
+	data, err := ExecuteAffiliationsAPICall(ctx, "GET", fmt.Sprintf("/v1/affiliation/%s/%s/%s/%s", pSlug, api, uuid, sdt))
+	if err != nil {
+		Printf("GetEnrollments(%s,%s,%s,%s) error: %v\n", pSlug, api, uuid, sdt, err)
+		return
+	}
+	if single {
+		orgs = []string{data["org"].(string)}
+		return
+	}
+	orgsI, _ := data["orgs"].([]interface{})
+	for _, orgI := range orgsI {
+		orgs = append(orgs, orgI.(string))
+	}
+	return
+}
+
+// GetEnrollmentsBoth - returns org name(s) for given uuid and name
+// returns data returned by bot GetEnrollmentsSingle and GetEnrollmentsMulti
+// by using a single HTTP request when both were not yet called for a given key
+func GetEnrollmentsBoth(ctx *Ctx, ds DS, uuid string, dt time.Time) (org string, orgs []string) {
 	pSlug := ctx.ProjectSlug
-	// Step 1: Try project slug first
-	// in single mode, if multiple companies are found, return the most recent
-	// in multiple mode this can return many different companies and this is ok
-	if pSlug != "" {
-		rows := QueryToStringArray(
-			ctx,
-			"select distinct o.name from enrollments e, organizations o where e.organization_id = o.id and e.uuid = ? and e.project_slug = ? and e.start <= ? and e.end > ? order by e.id desc",
-			uuid,
-			pSlug,
-			dt,
-			dt,
-		)
-		if single {
-			if len(rows) > 0 {
-				orgs = []string{rows[0]}
-				return
-			}
+	kS := pSlug + uuid + "s" + ToYMDDate(dt)
+	kM := pSlug + uuid + "m" + ToYMDDate(dt)
+	if MT {
+		rollsCacheMtx.RLock()
+	}
+	orgsS, okS := rollsCache[kS]
+	orgsM, okM := rollsCache[kM]
+	if MT {
+		rollsCacheMtx.RUnlock()
+	}
+	if okS {
+		if len(orgsS) == 0 {
+			org = Unknown
 		} else {
-			orgs = append(orgs, rows...)
+			org = orgsS[0]
 		}
 	}
-	// Step 2: Try foundation-f (for example cncf/* --> cncf-f)
-	// in single mode, if multiple companies are found, return the most recent
-	// in multiple mode this can return many different companies and this is ok
-	if pSlug != "" && len(orgs) == 0 {
-		ary := strings.Split(pSlug, "/")
-		if len(ary) > 1 {
-			slugF := ary[0] + "-f"
-			rows, ids := QueryToStringIntArrays(
-				ctx,
-				"select o.name, max(e.id) from enrollments e, organizations o where e.organization_id = o.id and e.uuid = ? and e.project_slug = ? and e.start <= ? and e.end > ? group by o.name order by e.id desc",
-				uuid,
-				slugF,
-				dt,
-				dt,
-			)
-			if single {
-				if len(rows) > 0 {
-					orgs = []string{rows[0]}
-					_ = SetDBSessionOrigin(ctx)
-					_, _ = ExecSQL(
-						ctx,
-						nil,
-						"insert ignore into enrollments(start, end, uuid, organization_id, project_slug, role) select start, end, uuid, organization_id, ?, ? from enrollments where id = ?",
-						pSlug,
-						"Contributor",
-						ids[0],
-					)
-					return
-				}
-			} else {
-				orgs = append(orgs, rows...)
-			}
+	if okM {
+		orgs = orgsM
+		if len(orgs) == 0 {
+			orgs = append(orgs, Unknown)
 		}
 	}
-	// Step 3: try global second, only if no project specific were found
-	// in single mode, if multiple companies are found, return the most recent
-	// in multiple mode this can return many different companies and this is ok
-	if len(orgs) == 0 {
-		rows := QueryToStringArray(
-			ctx,
-			"select distinct o.name from enrollments e, organizations o where e.organization_id = o.id and e.uuid = ? and e.project_slug is null and e.start <= ? and e.end > ? order by e.id desc",
-			uuid,
-			dt,
-			dt,
-		)
-		if single {
-			if len(rows) > 0 {
-				orgs = []string{rows[0]}
-				return
-			}
-		} else {
-			orgs = append(orgs, rows...)
-		}
+	if okS && okM {
+		return
 	}
-	// Step 4: try anything from the same foundation, only if nothing is found so far
-	// in single mode, if multiple companies are found, return the most recent
-	// in multiple mode this can return many different companies and this is ok
-	if pSlug != "" && len(orgs) == 0 {
-		ary := strings.Split(pSlug, "/")
-		if len(ary) > 1 {
-			slugLike := ary[0] + "/%"
-			rows, ids := QueryToStringIntArrays(
-				ctx,
-				"select o.name, max(e.id) from enrollments e, organizations o where e.organization_id = o.id and e.uuid = ? and e.project_slug like ? and e.start <= ? and e.end > ? group by o.name order by e.id desc",
-				uuid,
-				slugLike,
-				dt,
-				dt,
-			)
-			if single {
-				if len(rows) > 0 {
-					orgs = []string{rows[0]}
-					_ = SetDBSessionOrigin(ctx)
-					_, _ = ExecSQL(
-						ctx,
-						nil,
-						"insert ignore into enrollments(start, end, uuid, organization_id, project_slug, role) select start, end, uuid, organization_id, ?, ? from enrollments where id = ?",
-						pSlug,
-						"Contributor",
-						ids[0],
-					)
-					return
-				}
-			} else {
-				orgs = append(orgs, rows...)
-			}
-		}
+	if okS && !okM {
+		orgs = GetEnrollmentsMulti(ctx, ds, uuid, dt)
+		return
 	}
-	// Step 5: try anything else, only if nothing is found so far
-	// in single mode, if multiple companies are found, return the most recent
-	// in multiple mode this can return many different companies and this is ok
-	if len(orgs) == 0 {
-		rows, ids := QueryToStringIntArrays(
-			ctx,
-			"select o.name, max(e.id) from enrollments e, organizations o where e.organization_id = o.id and e.uuid = ? and e.start <= ? and e.end > ? group by o.name order by e.id desc",
-			uuid,
-			dt,
-			dt,
-		)
-		if single {
-			if len(rows) > 0 {
-				orgs = []string{rows[0]}
-				if pSlug != "" {
-					_ = SetDBSessionOrigin(ctx)
-					_, _ = ExecSQL(
-						ctx,
-						nil,
-						"insert ignore into enrollments(start, end, uuid, organization_id, project_slug, role) select start, end, uuid, organization_id, ?, ? from enrollments where id = ?",
-						pSlug,
-						"Contributor",
-						ids[0],
-					)
-				}
-				return
-			}
-		} else {
-			orgs = append(orgs, rows...)
-		}
+	if !okS && okM {
+		org = GetEnrollmentsSingle(ctx, ds, uuid, dt)
+		return
 	}
+	defer func() {
+		if MT {
+			rollsCacheMtx.Lock()
+		}
+		rollsCache[kS] = orgsS
+		rollsCache[kM] = orgsM
+		if MT {
+			rollsCacheMtx.Unlock()
+		}
+	}()
+	if pSlug == "" {
+		pSlug = "(empty)"
+	}
+	pSlug = url.QueryEscape(pSlug)
+	sdt := url.QueryEscape(ToYMDTHMSZDate(dt))
+	data, err := ExecuteAffiliationsAPICall(ctx, "GET", fmt.Sprintf("/v1/affiliation/%s/both/%s/%s", pSlug, uuid, sdt))
+	if err != nil {
+		Printf("GetEnrollmentsBoth(%s,%s,%s) error: %v\n", pSlug, uuid, sdt, err)
+		return
+	}
+	org, _ = data["org"].(string)
+	orgsS = []string{org}
+	orgsI, _ := data["orgs"].([]interface{})
+	for _, orgI := range orgsI {
+		orgsM = append(orgsM, orgI.(string))
+	}
+	orgs = orgsM
 	return
 }
 
@@ -526,8 +478,9 @@ func IdentityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, aid inte
 	} else {
 		outItem[role+"_bot"] = true
 	}
-	outItem[role+"_org_name"] = GetEnrollmentsSingle(ctx, ds, suuid, dt)
-	outItem[role+MultiOrgNames] = GetEnrollmentsMulti(ctx, ds, suuid, dt)
+	//outItem[role+"_org_name"] = GetEnrollmentsSingle(ctx, ds, suuid, dt)
+	//outItem[role+MultiOrgNames] = GetEnrollmentsMulti(ctx, ds, suuid, dt)
+	outItem[role+"_org_name"], outItem[role+MultiOrgNames] = GetEnrollmentsBoth(ctx, ds, suuid, dt)
 	return
 }
 
