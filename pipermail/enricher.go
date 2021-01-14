@@ -2,10 +2,11 @@ package pipermail
 
 import (
 	"fmt"
-	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 	"log"
 	"strings"
 	"time"
+
+	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 
 	"github.com/LF-Engineering/da-ds/affiliation"
 	libAffiliations "github.com/LF-Engineering/dev-analytics-libraries/affiliation"

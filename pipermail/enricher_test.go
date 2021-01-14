@@ -2,9 +2,10 @@ package pipermail
 
 import (
 	"database/sql"
-	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 	"testing"
 	"time"
+
+	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 
 	"github.com/LF-Engineering/da-ds/affiliation"
 	"github.com/LF-Engineering/da-ds/pipermail/mocks"
