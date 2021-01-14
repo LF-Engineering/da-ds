@@ -17,9 +17,9 @@ type RawMessage struct {
 	SearchFields      *MessageSearchFields `json:"search_fields"`
 	Origin            string               `json:"origin"`
 	UpdatedOn         float64              `json:"updated_on"`
-	MetadataUpdatedOn string               `json:"metadata__updated_on"`
+	MetadataUpdatedOn time.Time            `json:"metadata__updated_on"`
 	BackendName       string               `json:"backend_name"`
-	MetadataTimestamp string               `json:"metadata__timestamp"`
+	MetadataTimestamp time.Time            `json:"metadata__timestamp"`
 	Timestamp         float64              `json:"timestamp"`
 	Category          string               `json:"category"`
 	ProjectSlug       string               `json:"project_slug"`
@@ -50,8 +50,8 @@ type RawMessageData struct {
 			} `json:"plain"`
 		} `json:"text"`
 	} `json:"data"`
-	DateInTZ string `json:"date_in_tz"`
-	DateTZ   int    `json:"date_tz"`
+	DateInTZ string  `json:"date_in_tz"`
+	DateTZ   float64 `json:"date_tz"`
 }
 
 // EnrichMessage represents piper mail enriched message
@@ -59,7 +59,7 @@ type EnrichMessage struct {
 	ID                   string    `json:"id"`
 	ProjectTS            int64     `json:"project_ts"`
 	FromUserName         string    `json:"from_user_name"`
-	TZ                   int       `json:"tz"`
+	TZ                   float64   `json:"tz"`
 	MessageID            string    `json:"Message-ID"`
 	UUID                 string    `json:"uuid"`
 	AuthorName           string    `json:"author_name"`
@@ -91,11 +91,11 @@ type EnrichMessage struct {
 	Subject              string    `json:"subject"`
 	FromID               string    `json:"from_id"`
 	AuthorGender         string    `json:"author_gender"`
-	FromGenderAcc        string    `json:"from_gender_acc"`
+	FromGenderAcc        int       `json:"from_gender_acc"`
 	EmailDate            string    `json:"email_date"`
-	MetadataTimestamp    string    `json:"metadata__timestamp"`
+	MetadataTimestamp    time.Time `json:"metadata__timestamp"`
 	MetadataBackendName  string    `json:"metadata__backend_name"`
-	MetadataUpdatedOn    string    `json:"metadata__updated_on"`
+	MetadataUpdatedOn    time.Time `json:"metadata__updated_on"`
 	MetadataEnrichedOn   time.Time `json:"metadata__enriched_on"`
 	BackendVersion       string    `json:"backend_version"`
 	ProjectSlug          string    `json:"project_slug"`

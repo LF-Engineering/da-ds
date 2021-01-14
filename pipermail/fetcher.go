@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -171,7 +170,7 @@ func (f *Fetcher) FetchItem(slug, groupName, project, endpoint string, fromDate 
 				return nil, err
 			}
 		} else {
-			content, err = ioutil.ReadFile("thermopylae.txt")
+			content, err = ioutil.ReadFile(filePath)
 			if err != nil {
 				lib.Printf("content ioutil.ReadFile: %+v", err)
 				continue
@@ -349,13 +348,13 @@ func (f *Fetcher) AddMetadata(msg interface{}, endpoint, slug, groupName string)
 	rawMessage.UpdatedOn = timeLib.ConvertTimeToFloat(timestamp)
 	rawMessage.Category = f.ItemCategory(msg)
 	rawMessage.SearchFields = &MessageSearchFields{
-		Name:   groupName,
 		ItemID: f.ItemID(msg),
 	}
 	rawMessage.GroupName = groupName
-	rawMessage.MetadataUpdatedOn = lib.ToESDate(timestamp)
-	rawMessage.MetadataTimestamp = lib.ToESDate(timestamp)
+	rawMessage.MetadataUpdatedOn = timestamp
+	rawMessage.MetadataTimestamp = timestamp
 	rawMessage.ProjectSlug = slug
+	rawMessage.ChangedAt = timestamp
 
 	// handle message data
 	var mData RawMessageData
@@ -370,11 +369,11 @@ func (f *Fetcher) AddMetadata(msg interface{}, endpoint, slug, groupName string)
 	rawMessage.Data = &mData
 
 	// generate UUID
-	uid, err := uuid.Generate(endpoint, strconv.FormatFloat(timeLib.ConvertTimeToFloat(timestamp), 'f', -1, 64))
+	uuID, err := uuid.Generate(Pipermail, rawMessage.Data.MessageID)
 	if err != nil {
 		fmt.Println(err)
 	}
-	rawMessage.UUID = uid
+	rawMessage.UUID = uuID
 	return rawMessage
 }
 

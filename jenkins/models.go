@@ -123,7 +123,6 @@ type Build struct {
 // BuildsEnrich represents the schema for the
 // enriched documents in ES
 type BuildsEnrich struct {
-	ProjectTS               int64       `json:"project_ts"`
 	MetadataUpdatedOn       time.Time   `json:"metadata__updated_on"`
 	MetadataTimestamp       time.Time   `json:"metadata__timestamp"`
 	Offset                  interface{} `json:"offset"`
@@ -153,7 +152,8 @@ type BuildsEnrich struct {
 	IsJenkinsJob            int         `json:"is_jenkins_job"`
 	RepositoryLabels        interface{} `json:"repository_labels"`
 	MetadataFilterRaw       interface{} `json:"metadata__filter_raw"`
-	MetadataGelkVersion     string      `json:"metadata__gelk_version"`
-	MetadataGelkBackendName string      `json:"metadata__gelk_backend_name"`
+	MetadataBackendVersion  string      `json:"metadata__backend_version"`
+	MetadataBackendName     string      `json:"metadata__backend_name"`
+	Project                 string      `json:"project"`
 	MetadataEnrichedOn      time.Time   `json:"metadata__enriched_on"`
 }

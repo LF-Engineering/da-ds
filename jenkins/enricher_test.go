@@ -101,7 +101,6 @@ func TestEnrichItem(t *testing.T) {
 			assert.Equal(t, tt.want.Build, got.Build)
 			assert.Equal(t, tt.want.Result, got.Result)
 			assert.Equal(t, tt.want.Tag, got.Tag)
-			assert.Equal(t, tt.want.ProjectTS, got.ProjectTS)
 		})
 	}
 }
