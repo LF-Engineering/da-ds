@@ -1,13 +1,11 @@
 package bugzilla
 
 import (
-	"database/sql"
 	"testing"
-	"time"
 
-	"github.com/LF-Engineering/da-ds/affiliation"
 	"github.com/LF-Engineering/da-ds/bugzilla/mocks"
 
+	libAffiliations "github.com/LF-Engineering/dev-analytics-libraries/affiliation"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
 )
@@ -146,32 +144,30 @@ func TestEnrichItem(t *testing.T) {
 			t.Error(err)
 		}
 
-		identityProviderMock := &mocks.IdentityProvider{}
+		affProviderMock := &mocks.Affiliation{}
 		unknown := "Unknown"
-		zero := 0
-		fakeAff1 := &affiliation.Identity{ID: sql.NullString{String: "50ffba4dfbedc6dc4390fc8bde7aeec0a7191056", Valid: true},
-			UUID: sql.NullString{String: "50ffba4dfbedc6dc4390fc8bde7aeec0a7191056", Valid: true}, Name: sql.NullString{String: "Vasyl", Valid: true}, IsBot: false,
-			Domain: sql.NullString{String: "gmail.com", Valid: true}, OrgName: sql.NullString{}, Username: sql.NullString{String: "", Valid: false}, GenderACC: &zero,
-			MultiOrgNames: []string{}, Gender: sql.NullString{String: unknown, Valid: true},
+		zero := int64(0)
+
+		aff1UUID := "50ffba4dfbedc6dc4390fc8bde7aeec0a7191056"
+		fakeAff1 := &libAffiliations.AffIdentity{ID: &aff1UUID,
+			UUID: &aff1UUID, Name: "Vasyl", IsBot: &zero,
+			Domain: "gmail.com", OrgName: nil, Username: "", GenderACC: &zero,
+			MultiOrgNames: []string{}, Gender: &unknown,
 		}
 
 		dd := "MontaVista Software, LLC"
-		fakeAff2 := &affiliation.Identity{ID: sql.NullString{String: "a89364af9818412b8c59193ca83b30dd67b20e35", Valid: true},
-			UUID: sql.NullString{String: "5d408e590365763c3927084d746071fa84dc8e52", Valid: true}, Name: sql.NullString{String: "akuster", Valid: true}, IsBot: false,
-			Domain: sql.NullString{String: "gmail.com", Valid: true}, OrgName: sql.NullString{String: dd, Valid: true}, Username: sql.NullString{String: "", Valid: false}, GenderACC: &zero,
-			MultiOrgNames: []string{"MontaVista Software, LLC"}, Gender: sql.NullString{String: unknown, Valid: true},
+		aff2UUID := "a89364af9818412b8c59193ca83b30dd67b20e35"
+		aff2ID := "5d408e590365763c3927084d746071fa84dc8e52"
+		fakeAff2 := &libAffiliations.AffIdentity{ID: &aff2UUID,
+			UUID: &aff2ID, Name: "akuster", IsBot: &zero,
+			Domain: "gmail.com", OrgName: &dd, Username: "", GenderACC: &zero,
+			MultiOrgNames: []string{"MontaVista Software, LLC"}, Gender: &unknown,
 		}
-		rmultiorg1 := []string{"MontaVista Software, LLC"}
-		rmultiorg2 := []string{unknown}
-		identityProviderMock.On("GetIdentity", "username", "vvavrychuk").Return(fakeAff1, nil)
-		identityProviderMock.On("GetIdentity", "username", "akuster808").Return(fakeAff2, nil)
-
-		d, err := time.Parse(time.RFC3339, "2020-12-07T14:38:23.895437Z")
-		identityProviderMock.On("GetOrganizations", "5d408e590365763c3927084d746071fa84dc8e52", d).Return(rmultiorg1, nil)
-		identityProviderMock.On("GetOrganizations", "50ffba4dfbedc6dc4390fc8bde7aeec0a7191056", d).Return(rmultiorg2, nil)
+		affProviderMock.On("GetIdentityByUser", "username", "vvavrychuk").Return(fakeAff1, nil)
+		affProviderMock.On("GetIdentityByUser", "username", "akuster808").Return(fakeAff2, nil)
 
 		// Act
-		srv := NewEnricher(identityProviderMock, "0.18", "yocto", nil)
+		srv := NewEnricher("0.18", "yocto", affProviderMock)
 
 		enrich, err := srv.EnrichItem(raw, expectedEnrich.MetadataEnrichedOn.UTC())
 		if err != nil {

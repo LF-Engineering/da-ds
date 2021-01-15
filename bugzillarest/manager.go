@@ -13,9 +13,6 @@ import (
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
 	"github.com/LF-Engineering/dev-analytics-libraries/http"
 	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
-
-	"github.com/LF-Engineering/da-ds/affiliation"
-	"github.com/LF-Engineering/da-ds/db"
 )
 
 // ESClientProvider used in connecting to ES server
@@ -215,19 +212,13 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 	// Initialize fetcher object to get data from bugzilla rest api
 	fetcher := NewFetcher(*params, httpClientProvider, esClientProvider)
 
-	dataBase, err := db.NewConnector("mysql", m.SHConnString)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	identityProvider := affiliation.NewIdentityProvider(dataBase)
-
 	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(m.AffBaseURL, m.Slug, m.ESCacheURL, m.ESCacheUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.AuthURL)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
 	// Initialize enrich object to enrich raw data
-	enricher := NewEnricher(identityProvider, m.EnricherBackendVersion, m.Project, affiliationsClientProvider)
+	enricher := NewEnricher(m.EnricherBackendVersion, m.Project, affiliationsClientProvider)
 
 	return fetcher, enricher, esClientProvider, err
 }
