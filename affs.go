@@ -244,7 +244,7 @@ func QueryToStringIntArrays(ctx *Ctx, query string, args ...interface{}) (sa []s
 
 // GetEnrollments - returns enrollments for a given uuid in a given date, possibly multiple
 // uses cache with date resolution (pslug,uuid,dt.YYYYMMDD)
-func GetEnrollments(ctx *Ctx, ds DS, uuid string, dt time.Time, single bool) (orgs []string) {
+func GetEnrollments(ctx *Ctx, ds DS, uuid string, dt time.Time, single bool) (orgs []string, e error) {
 	pSlug := ctx.ProjectSlug
 	sSep := "m"
 	if single {
@@ -273,6 +273,7 @@ func GetEnrollments(ctx *Ctx, ds DS, uuid string, dt time.Time, single bool) (or
 	data, err := ExecuteAffiliationsAPICall(ctx, "GET", fmt.Sprintf("/v1/affiliation/%s/%s/%s/%s", pSlug, api, uuid, sdt), true)
 	if err != nil {
 		Printf("GetEnrollments(%s,%s,%s,%s) error: %v\n", pSlug, api, uuid, sdt, err)
+		e = err
 		return
 	}
 	defer func() {
@@ -298,7 +299,7 @@ func GetEnrollments(ctx *Ctx, ds DS, uuid string, dt time.Time, single bool) (or
 // GetEnrollmentsBoth - returns org name(s) for given uuid and name
 // returns data returned by bot GetEnrollmentsSingle and GetEnrollmentsMulti
 // by using a single HTTP request when both were not yet called for a given key
-func GetEnrollmentsBoth(ctx *Ctx, ds DS, uuid string, dt time.Time) (org string, orgs []string) {
+func GetEnrollmentsBoth(ctx *Ctx, ds DS, uuid string, dt time.Time) (org string, orgs []string, e error) {
 	pSlug := ctx.ProjectSlug
 	kS := pSlug + uuid + "s" + ToYMDDate(dt)
 	kM := pSlug + uuid + "m" + ToYMDDate(dt)
@@ -327,11 +328,11 @@ func GetEnrollmentsBoth(ctx *Ctx, ds DS, uuid string, dt time.Time) (org string,
 		return
 	}
 	if okS && !okM {
-		orgs = GetEnrollmentsMulti(ctx, ds, uuid, dt)
+		orgs, e = GetEnrollmentsMulti(ctx, ds, uuid, dt)
 		return
 	}
 	if !okS && okM {
-		org = GetEnrollmentsSingle(ctx, ds, uuid, dt)
+		org, e = GetEnrollmentsSingle(ctx, ds, uuid, dt)
 		return
 	}
 	if pSlug == "" {
@@ -342,6 +343,7 @@ func GetEnrollmentsBoth(ctx *Ctx, ds DS, uuid string, dt time.Time) (org string,
 	data, err := ExecuteAffiliationsAPICall(ctx, "GET", fmt.Sprintf("/v1/affiliation/%s/both/%s/%s", pSlug, uuid, sdt), true)
 	if err != nil {
 		Printf("GetEnrollmentsBoth(%s,%s,%s) error: %v\n", pSlug, uuid, sdt, err)
+		e = err
 		return
 	}
 	defer func() {
@@ -365,8 +367,9 @@ func GetEnrollmentsBoth(ctx *Ctx, ds DS, uuid string, dt time.Time) (org string,
 }
 
 // GetEnrollmentsSingle - returns org name (or Unknown) for given uuid and date
-func GetEnrollmentsSingle(ctx *Ctx, ds DS, uuid string, dt time.Time) (org string) {
-	orgs := GetEnrollments(ctx, ds, uuid, dt, true)
+func GetEnrollmentsSingle(ctx *Ctx, ds DS, uuid string, dt time.Time) (org string, e error) {
+	var orgs []string
+	orgs, e = GetEnrollments(ctx, ds, uuid, dt, true)
 	if len(orgs) == 0 {
 		org = Unknown
 		return
@@ -378,8 +381,8 @@ func GetEnrollmentsSingle(ctx *Ctx, ds DS, uuid string, dt time.Time) (org strin
 // GetEnrollmentsMulti - returns org name(s) for given uuid and name
 // Returns 1 or more organizations (all that matches the current date)
 // If none matches it returns array [Unknown]
-func GetEnrollmentsMulti(ctx *Ctx, ds DS, uuid string, dt time.Time) (orgs []string) {
-	orgs = GetEnrollments(ctx, ds, uuid, dt, false)
+func GetEnrollmentsMulti(ctx *Ctx, ds DS, uuid string, dt time.Time) (orgs []string, e error) {
+	orgs, e = GetEnrollments(ctx, ds, uuid, dt, false)
 	if len(orgs) == 0 {
 		orgs = append(orgs, Unknown)
 	}
@@ -398,7 +401,7 @@ func CopyAffsRoleData(dst, src map[string]interface{}, dstRole, srcRole string) 
 // identity - full identity
 // aid identity ID value (which is uuid), for example from "author_id", "creator_id" etc.
 // either identity or aid must be specified
-func IdentityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, aid interface{}, dt time.Time, role string) (outItem map[string]interface{}, empty bool) {
+func IdentityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, aid interface{}, dt time.Time, role string) (outItem map[string]interface{}, empty bool, e error) {
 	outItem = EmptyAffsItem(role, false)
 	var uuid interface{}
 	if identity != nil {
@@ -478,17 +481,17 @@ func IdentityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, aid inte
 	} else {
 		outItem[role+"_bot"] = true
 	}
-	//outItem[role+"_org_name"] = GetEnrollmentsSingle(ctx, ds, suuid, dt)
-	//outItem[role+MultiOrgNames] = GetEnrollmentsMulti(ctx, ds, suuid, dt)
-	outItem[role+"_org_name"], outItem[role+MultiOrgNames] = GetEnrollmentsBoth(ctx, ds, suuid, dt)
+	//outItem[role+"_org_name"], e = GetEnrollmentsSingle(ctx, ds, suuid, dt)
+	//outItem[role+MultiOrgNames], e = GetEnrollmentsMulti(ctx, ds, suuid, dt)
+	outItem[role+"_org_name"], outItem[role+MultiOrgNames], e = GetEnrollmentsBoth(ctx, ds, suuid, dt)
 	return
 }
 
 // AffsDataForRoles - return affs data for given roles
-func AffsDataForRoles(ctx *Ctx, ds DS, rich map[string]interface{}, roles []string) (data map[string]interface{}) {
+func AffsDataForRoles(ctx *Ctx, ds DS, rich map[string]interface{}, roles []string) (data map[string]interface{}, e error) {
 	/*
 		defer func() {
-			Printf("AffsDataForRoles: %+v --> %+v\n", roles, data)
+			Printf("AffsDataForRoles: %+v --> %+v,%v\n", roles, data, e)
 		}()
 	*/
 	data = make(map[string]interface{})
@@ -520,7 +523,10 @@ func AffsDataForRoles(ctx *Ctx, ds DS, rich map[string]interface{}, roles []stri
 		if role == authorField {
 			idAuthor = id
 		}
-		affsIdentity, empty := IdentityAffsData(ctx, ds, nil, id, date, role)
+		affsIdentity, empty, e := IdentityAffsData(ctx, ds, nil, id, date, role)
+		if e != nil {
+			Printf("AffsDataForRoles: IdentityAffsData error: %v for %s id %d\n", role, id)
+		}
 		if empty {
 			Printf("no identity affiliation data for %s id %+v\n", role, id)
 			continue
@@ -530,7 +536,10 @@ func AffsDataForRoles(ctx *Ctx, ds DS, rich map[string]interface{}, roles []stri
 		}
 	}
 	if idAuthor != nil && authorField != Author {
-		affsIdentity, empty := IdentityAffsData(ctx, ds, nil, idAuthor, date, Author)
+		affsIdentity, empty, e := IdentityAffsData(ctx, ds, nil, idAuthor, date, Author)
+		if e != nil {
+			Printf("AffsDataForRoles: IdentityAffsData error: %v\n")
+		}
 		if !empty {
 			for prop, value := range affsIdentity {
 				data[prop] = value

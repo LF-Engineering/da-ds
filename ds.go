@@ -606,7 +606,11 @@ func ItemsRefreshIdentitiesFunc(ctx *Ctx, ds DS, thrN int, richItems []interface
 		} else {
 			rols, _ = ds.AllRoles(ctx, rich)
 		}
-		values = AffsDataForRoles(ctx, ds, rich, rols)
+		var er error
+		values, er = AffsDataForRoles(ctx, ds, rich, rols)
+		if er != nil {
+			Printf("ItemsRefreshIdentitiesFunc/AffsDataForRoles: error: %v for %v %v\n", er, DumpKeys(rich), rols)
+		}
 		for prop, val := range values {
 			rich[prop] = val
 		}
