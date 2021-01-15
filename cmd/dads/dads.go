@@ -170,7 +170,7 @@ func buildJenkinsManager(ctx *lib.Ctx) (*jenkins.Manager, error) {
 func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 	var params bugzilla.Param
 	params.EndPoint = ctx.BugZilla.Origin.String()
-	params.ShConnStr = fmt.Sprintf("%s:%s@%s/%s", ctx.DBUser, ctx.DBPass, ctx.DBHost, ctx.DBName)
+	params.ShConnStr = fmt.Sprintf("%s:%s@tcp(%s)/%s", ctx.DBUser, ctx.DBPass, ctx.DBHost, ctx.DBName)
 	params.FetcherBackendVersion = "0.1.0"
 	params.EnricherBackendVersion = "0.1.0"
 	params.ESUrl = ctx.ESURL
@@ -184,8 +184,17 @@ func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 	params.Project = ctx.BugZilla.Project.String()
 	params.EsIndex = ctx.RichIndex
 
-	params.Retries = uint(ctx.Retry)
-	params.Delay = ctx.Delay
+	params.Retries = uint(3)
+	if ctx.Retry != 0 {
+		params.Retries = uint(ctx.Retry)
+	}
+
+	params.Delay = 2 * time.Second
+	if ctx.Delay != 0*time.Second {
+		params.Delay = ctx.Delay
+
+	}
+
 	params.GapURL = ctx.GapURL
 
 	params.AffBaseURL = ctx.Env("AFFILIATIONS_API_BASE_URL")
@@ -243,7 +252,7 @@ func buildPipermailManager(ctx *lib.Ctx) (*pipermail.Manager, error) {
 func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
 	var params bugzillarest.Param
 	params.EndPoint = ctx.BugZilla.Origin.String()
-	params.ShConnStr = fmt.Sprintf("%s:%s@%s/%s", ctx.DBUser, ctx.DBPass, ctx.DBHost, ctx.DBName)
+	params.ShConnStr = fmt.Sprintf("%s:%s@tcp(%s)/%s", ctx.DBUser, ctx.DBPass, ctx.DBHost, ctx.DBName)
 	params.FetcherBackendVersion = "0.1.0"
 	params.EnricherBackendVersion = "0.1.0"
 	params.ESUrl = ctx.ESURL
@@ -255,9 +264,19 @@ func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
 	params.FetchSize = ctx.BugZilla.FetchSize.Int()
 	params.EnrichSize = ctx.BugZilla.EnrichSize.Int()
 	params.Project = ctx.BugZilla.Project.String()
-	params.EsIndex = ctx.BugZilla.EsIndex.String()
-	params.Retries = uint(ctx.Retry)
-	params.Delay = ctx.Delay
+	params.EsIndex = ctx.RichIndex
+
+	params.Retries = uint(3)
+	if ctx.Retry != 0 {
+		params.Retries = uint(ctx.Retry)
+	}
+
+	params.Delay = 2 * time.Second
+	if ctx.Delay != 0*time.Second {
+		params.Delay = ctx.Delay
+
+	}
+
 	params.GapURL = ctx.GapURL
 	params.Slug = ctx.BugZilla.ProjectSlug.String()
 
