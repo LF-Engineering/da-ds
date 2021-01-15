@@ -325,6 +325,7 @@ func GetEnrollmentsBoth(ctx *Ctx, ds DS, uuid string, dt time.Time) (org string,
 		}
 	}
 	if okS && okM {
+		//fmt.Printf("cached %s,%s -> %s,%v\n", kS, kM, org, orgs)
 		return
 	}
 	if okS && !okM {
@@ -338,6 +339,7 @@ func GetEnrollmentsBoth(ctx *Ctx, ds DS, uuid string, dt time.Time) (org string,
 	if pSlug == "" {
 		pSlug = "(empty)"
 	}
+	//fmt.Printf("missed %s,%s -> %s,%v\n", kS, kM, org, orgs)
 	pSlug = url.QueryEscape(pSlug)
 	sdt := url.QueryEscape(ToYMDTHMSZDate(dt))
 	data, err := ExecuteAffiliationsAPICall(ctx, "GET", fmt.Sprintf("/v1/affiliation/%s/both/%s/%s", pSlug, uuid, sdt), true)

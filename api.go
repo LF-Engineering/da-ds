@@ -69,15 +69,11 @@ func ExecuteAffiliationsAPICall(ctx *Ctx, method, path string, cacheToken bool) 
 				fmt.Printf("GetAPIToken error: %v\n", err)
 				return
 			}
+			lock()
 			if cacheToken {
-				if gTokenMtx != nil {
-					gTokenMtx.Lock()
-				}
 				gToken = token
-				if gTokenMtx != nil {
-					gTokenMtx.Unlock()
-				}
 			}
+			unlock()
 			continue
 		}
 		body, e := ioutil.ReadAll(resp.Body)
