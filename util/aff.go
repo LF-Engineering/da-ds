@@ -1,9 +1,10 @@
 package util
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
+
+	jsoniter "github.com/json-iterator/go"
 )
 
 type AuthProvider interface {
@@ -49,7 +50,7 @@ func CreateNewIdentity(params Params) {
 	header := make(map[string]string)
 	header["Authorization"] = token
 
-	bData, err := json.Marshal(identity)
+	bData, err := jsoniter.Marshal(identity)
 	if err != nil {
 		log.Printf("Err : %s", err.Error())
 		return
@@ -79,7 +80,7 @@ func GetAffiliationIdentity(params Params) (*AffIdentity, error) {
 	}
 
 	var ident IdentityData
-	err = json.Unmarshal(identityRes, &ident)
+	err = jsoniter.Unmarshal(identityRes, &ident)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +92,7 @@ func GetAffiliationIdentity(params Params) (*AffIdentity, error) {
 	}
 
 	var profile UniqueIdentityFullProfile
-	err = json.Unmarshal(profileRes, &profile)
+	err = jsoniter.Unmarshal(profileRes, &profile)
 	if err != nil {
 		return nil, err
 	}

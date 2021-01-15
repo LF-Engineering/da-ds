@@ -6,16 +6,20 @@ import (
 	"strings"
 	"time"
 
+	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
+
 	"github.com/LF-Engineering/da-ds/affiliation"
+	libAffiliations "github.com/LF-Engineering/dev-analytics-libraries/affiliation"
 	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
 )
 
 // Enricher enrich Bugzilla raw
 type Enricher struct {
-	identityProvider IdentityProvider
-	DSName           string
-	BackendVersion   string
-	Project          string
+	identityProvider           IdentityProvider
+	DSName                     string
+	BackendVersion             string
+	Project                    string
+	affiliationsClientProvider *libAffiliations.Affiliation
 }
 
 // IdentityProvider manages user identity
@@ -26,12 +30,13 @@ type IdentityProvider interface {
 }
 
 // NewEnricher intiate a new enricher instance
-func NewEnricher(identProvider IdentityProvider, backendVersion string, project string) *Enricher {
+func NewEnricher(identProvider IdentityProvider, backendVersion string, project string, affiliationsClientProvider *libAffiliations.Affiliation) *Enricher {
 	return &Enricher{
-		identityProvider: identProvider,
-		DSName:           Bugzilla,
-		BackendVersion:   backendVersion,
-		Project:          project,
+		identityProvider:           identProvider,
+		DSName:                     Bugzilla,
+		BackendVersion:             backendVersion,
+		Project:                    project,
+		affiliationsClientProvider: affiliationsClientProvider,
 	}
 }
 
@@ -116,7 +121,36 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 				}
 			}
 		} else {
-			e.createNewIdentity(&rawItem.Assignee)
+			assignee := rawItem.Assignee
+			source := Bugzilla
+			authorUUID, err := uuid.GenerateIdentity(&source, &assignee.Username, &assignee.Name, nil)
+			if err != nil {
+				fmt.Println(err)
+				return nil, err
+			}
+
+			userIdentity := libAffiliations.Identity{
+				LastModified: time.Now(),
+				Name:         assignee.Name,
+				Source:       Bugzilla,
+				Email:        assignee.Username,
+				UUID:         authorUUID,
+			}
+
+			ok := e.affiliationsClientProvider.AddIdentity(&userIdentity)
+			if !ok {
+				log.Printf("failed to add identity for [%+v]", assignee.Username)
+			} else {
+				log.Printf("added identity for [%+v]", assignee.Username)
+				// add enriched data
+				enriched.AssignedToID = authorUUID
+				enriched.AssignedToUUID = authorUUID
+				enriched.AssignedToName = assignee.Name
+				enriched.AssignedToUserName = assignee.Username
+				enriched.AssignedToOrgName = unknown
+				enriched.AssignedToMultiOrgName = multiOrgs
+
+			}
 		}
 	}
 
@@ -181,7 +215,44 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 				}
 			}
 		} else {
-			e.createNewIdentity(&rawItem.Reporter)
+			reporter := rawItem.Reporter
+			source := Bugzilla
+			authorUUID, err := uuid.GenerateIdentity(&source, &reporter.Name, &reporter.Username, nil)
+			if err != nil {
+				return nil, err
+			}
+
+			userIdentity := libAffiliations.Identity{
+				LastModified: time.Now(),
+				Name:         reporter.Name,
+				Source:       Bugzilla,
+				Email:        reporter.Name,
+				UUID:         authorUUID,
+			}
+
+			ok := e.affiliationsClientProvider.AddIdentity(&userIdentity)
+			if !ok {
+				log.Printf("failed to add identity for [%+v]", reporter.Username)
+			} else {
+				log.Printf("added identity for [%+v]", reporter.Name)
+				// add enriched data
+				enriched.ReporterID = authorUUID
+				enriched.ReporterUUID = authorUUID
+				enriched.ReporterName = reporter.Name
+				enriched.ReporterUserName = reporter.Username
+
+				enriched.AuthorID = authorUUID
+				enriched.AuthorUUID = authorUUID
+				enriched.AuthorName = reporter.Name
+				enriched.AuthorUserName = reporter.Username
+
+				enriched.ReporterOrgName = unknown
+				enriched.ReporterMultiOrgName = multiOrgs
+
+				enriched.AuthorOrgName = unknown
+				enriched.AuthorMultiOrgName = multiOrgs
+
+			}
 		}
 
 	}
@@ -206,40 +277,4 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 	enriched.RepositoryLabels = nil
 
 	return enriched, nil
-}
-
-// EnrichAffiliation gets author SH identity data
-//func (e *Enricher) EnrichAffiliation(key string, val string) (*affiliation.Identity, error) {
-//authProvider, err := auth.NewAuth0Client(e.,"", "", "",
-//	"", "", "", "", "")
-//
-//	return e.identityProvider.GetIdentity(key, val)
-//}
-
-func (e *Enricher) createNewIdentity(data *Person) {
-	// add new identity to affiliation DB
-	var identity affiliation.Identity
-	if data == nil {
-		log.Print("Err : identity data is empty")
-		return
-	}
-	if data.Name != "" {
-		identity.Name.String = data.Name
-		identity.Name.Valid = true
-	}
-	if data.Username != "" {
-		identity.Username.String = data.Username
-		identity.Username.Valid = true
-	}
-	// if username exist and there is no name assume name = username
-	if data.Username != "" && data.Name == "" {
-		identity.Name.String = data.Username
-		identity.Name.Valid = true
-	}
-
-	err := e.identityProvider.CreateIdentity(identity, Bugzilla)
-	if err != nil {
-		log.Printf("Err : %s", err.Error())
-	}
-
 }

@@ -338,7 +338,7 @@ func TestEnrichItem(t *testing.T) {
 		identityProviderMock.On("GetOrganizations", "50ffba4dfbedc6dc4390fc8bde7aeec0a7191056", d).Return(rmultiorg2, nil)
 
 		// Act
-		srv := NewEnricher(identityProviderMock, "0.18", "dpdk-common")
+		srv := NewEnricher(identityProviderMock, "0.18", "dpdk-common", nil)
 
 		enrich, err := srv.EnrichItem(raw, expectedEnrich.MetadataEnrichedOn.UTC())
 		if err != nil {

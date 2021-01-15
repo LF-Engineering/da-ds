@@ -6,6 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
+
+	libAffiliations "github.com/LF-Engineering/dev-analytics-libraries/affiliation"
 	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
 
 	"github.com/LF-Engineering/da-ds/affiliation"
@@ -13,10 +16,11 @@ import (
 
 // Enricher enrich Bugzilla raw
 type Enricher struct {
-	identityProvider IdentityProvider
-	DSName           string
-	BackendVersion   string
-	Project          string
+	identityProvider           IdentityProvider
+	DSName                     string
+	BackendVersion             string
+	Project                    string
+	affiliationsClientProvider *libAffiliations.Affiliation
 }
 
 // IdentityProvider manages user identity
@@ -27,12 +31,13 @@ type IdentityProvider interface {
 }
 
 // NewEnricher intiate a new enricher instance
-func NewEnricher(identProvider IdentityProvider, backendVersion string, project string) *Enricher {
+func NewEnricher(identProvider IdentityProvider, backendVersion string, project string, affiliationsClientProvider *libAffiliations.Affiliation) *Enricher {
 	return &Enricher{
-		identityProvider: identProvider,
-		DSName:           BugzillaRest,
-		BackendVersion:   backendVersion,
-		Project:          project,
+		identityProvider:           identProvider,
+		DSName:                     BugzillaRest,
+		BackendVersion:             backendVersion,
+		Project:                    project,
+		affiliationsClientProvider: affiliationsClientProvider,
 	}
 }
 
@@ -134,7 +139,38 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 				}
 			}
 		} else {
-			e.createNewIdentity(rawItem.Data.AssignedToDetail)
+			assignedToDetail := rawItem.Data.AssignedToDetail
+			source := BugzillaRest
+			authorUUID, err := uuid.GenerateIdentity(&source, &assignedToDetail.Name, &assignedToDetail.RealName, nil)
+			if err != nil {
+				fmt.Println(err)
+				return nil, err
+			}
+
+			userIdentity := libAffiliations.Identity{
+				LastModified: time.Now(),
+				Name:         assignedToDetail.RealName,
+				Source:       BugzillaRest,
+				Email:        assignedToDetail.Name,
+				UUID:         authorUUID,
+			}
+
+			ok := e.affiliationsClientProvider.AddIdentity(&userIdentity)
+			if !ok {
+				log.Printf("failed to add identity for [%+v]", assignedToDetail.Name)
+			} else {
+				log.Printf("added identity for [%+v]", assignedToDetail.RealName)
+				// add enriched data
+				enriched.AssignedToDetailID = authorUUID
+				enriched.AssignedToDetailUUID = authorUUID
+				enriched.AssignedToDetailName = assignedToDetail.RealName
+				enriched.AssignedToDetailUserName = assignedToDetail.Name
+				enriched.AssignedToUUID = authorUUID
+				enriched.AssignedToDetailOrgName = unknown
+				enriched.AssignedToOrgName = unknown
+				enriched.AssignedToDetailMultiOrgName = multiOrgs
+
+			}
 		}
 	}
 
@@ -201,7 +237,45 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 				}
 			}
 		} else {
-			e.createNewIdentity(rawItem.Data.CreatorDetail)
+			creatorDetail := rawItem.Data.CreatorDetail
+			source := BugzillaRest
+			authorUUID, err := uuid.GenerateIdentity(&source, &creatorDetail.Name, &creatorDetail.RealName, nil)
+			if err != nil {
+				return nil, err
+			}
+
+			userIdentity := libAffiliations.Identity{
+				LastModified: time.Now(),
+				Name:         creatorDetail.RealName,
+				Source:       BugzillaRest,
+				Email:        creatorDetail.Name,
+				UUID:         authorUUID,
+			}
+
+			ok := e.affiliationsClientProvider.AddIdentity(&userIdentity)
+			if !ok {
+				log.Printf("failed to add identity for [%+v]", creatorDetail.Name)
+			} else {
+				log.Printf("added identity for [%+v]", creatorDetail.RealName)
+				// add enriched data
+				enriched.CreatorDetailID = authorUUID
+				enriched.CreatorDetailUUID = authorUUID
+				enriched.CreatorDetailName = creatorDetail.RealName
+				enriched.CreatorDetailUserName = creatorDetail.Name
+
+				enriched.AuthorID = authorUUID
+				enriched.AuthorUUID = authorUUID
+				enriched.AuthorName = creatorDetail.RealName
+				enriched.AuthorUserName = creatorDetail.Name
+
+				enriched.CreatorDetailOrgName = unknown
+				enriched.CreatorDetailMultiOrgName = multiOrgs
+
+				enriched.AuthorOrgName = unknown
+				enriched.AuthorMultiOrgNames = multiOrgs
+
+			}
+
 		}
 
 	}
@@ -223,29 +297,4 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 // EnrichAffiliation gets author SH identity data
 func (e *Enricher) EnrichAffiliation(key string, val string) (*affiliation.Identity, error) {
 	return e.identityProvider.GetIdentity(key, val)
-}
-
-func (e *Enricher) createNewIdentity(data *PersonDetail) {
-	// add new identity to affiliation DB
-	var identity affiliation.Identity
-	if data == nil {
-		log.Print("Err : identity data is empty")
-		return
-	}
-	if data.Name != "" {
-		identity.Username.String = data.Name
-		identity.Username.Valid = true
-	}
-	if data.RealName != "" {
-		identity.Name.String = data.RealName
-		identity.Name.Valid = true
-	} else {
-		identity.Name.String = data.Name
-		identity.Name.Valid = true
-	}
-	err := e.identityProvider.CreateIdentity(identity, BugzillaRest)
-	if err != nil {
-		log.Printf("Err : %s", err.Error())
-	}
-
 }

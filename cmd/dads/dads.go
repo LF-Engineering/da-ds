@@ -188,6 +188,19 @@ func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 	params.Delay = ctx.Delay
 	params.GapURL = ctx.GapURL
 
+	params.AffBaseURL = ctx.Env("AFFILIATIONS_API_BASE_URL")
+	params.ESCacheURL = ctx.Env("ES_CACHE_URL")
+	params.ESCacheUsername = ctx.Env("ES_CACHE_USERNAME")
+	params.ESCachePassword = ctx.Env("ES_CACHE_PASSWORD")
+	params.AuthGrantType = ctx.Env("AUTH0_GRANT_TYPE")
+
+	params.AuthClientID = ctx.Env("AUTH0_CLIENT_ID")
+	params.AuthClientSecret = ctx.Env("AUTH0_CLIENT_SECRET")
+	params.AuthAudience = ctx.Env("AUTH0_AUDIENCE")
+
+	params.AuthURL = ctx.Env("AUTH0_BASE_URL")
+	params.Environment = ctx.Env("ENVIRONMENT")
+
 	mgr, err := bugzilla.NewManager(params)
 	if err != nil {
 		return nil, err
@@ -243,10 +256,21 @@ func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
 	params.EnrichSize = ctx.BugZilla.EnrichSize.Int()
 	params.Project = ctx.BugZilla.Project.String()
 	params.EsIndex = ctx.BugZilla.EsIndex.String()
-
 	params.Retries = uint(ctx.Retry)
 	params.Delay = ctx.Delay
 	params.GapURL = ctx.GapURL
+	params.Slug = ctx.BugZilla.ProjectSlug.String()
+
+	params.AffBaseURL = ctx.Env("AFFILIATIONS_API_BASE_URL")
+	params.ESCacheURL = ctx.Env("ES_CACHE_URL")
+	params.ESCacheUsername = ctx.Env("ES_CACHE_USERNAME")
+	params.ESCachePassword = ctx.Env("ES_CACHE_PASSWORD")
+	params.AuthGrantType = ctx.Env("AUTH0_GRANT_TYPE")
+	params.AuthClientID = ctx.Env("AUTH0_CLIENT_ID")
+	params.AuthClientSecret = ctx.Env("AUTH0_CLIENT_SECRET")
+	params.AuthAudience = ctx.Env("AUTH0_AUDIENCE")
+	params.AuthURL = ctx.Env("AUTH0_BASE_URL")
+	params.Environment = ctx.Env("ENVIRONMENT")
 
 	mgr, err := bugzillarest.NewManager(params)
 	if err != nil {

@@ -2,10 +2,13 @@ package bugzillarest
 
 import (
 	b64 "encoding/base64"
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"time"
+
+	jsoniter "github.com/json-iterator/go"
+
+	libAffiliations "github.com/LF-Engineering/dev-analytics-libraries/affiliation"
 
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
 	"github.com/LF-Engineering/dev-analytics-libraries/http"
@@ -44,6 +47,18 @@ type Manager struct {
 	Project                string
 	FetchSize              int
 	EnrichSize             int
+	ProjectSlug            string
+	AffBaseURL             string
+	ESCacheURL             string
+	ESCacheUsername        string
+	ESCachePassword        string
+	AuthGrantType          string
+	AuthClientID           string
+	AuthClientSecret       string
+	AuthAudience           string
+	AuthURL                string
+	Environment            string
+	Slug                   string
 
 	esClientProvider ESClientProvider
 	fetcher          *Fetcher
@@ -73,6 +88,18 @@ type Param struct {
 	Retries                uint
 	Delay                  time.Duration
 	GapURL                 string
+	ProjectSlug            string
+	AffBaseURL             string
+	ESCacheURL             string
+	ESCacheUsername        string
+	ESCachePassword        string
+	AuthGrantType          string
+	AuthClientID           string
+	AuthClientSecret       string
+	AuthAudience           string
+	AuthURL                string
+	Environment            string
+	Slug                   string
 }
 
 // NewManager initiates bugzilla manager instance
@@ -97,6 +124,18 @@ func NewManager(param Param) (*Manager, error) {
 		Retries:                param.Retries,
 		Delay:                  param.Delay,
 		GapURL:                 param.GapURL,
+		ProjectSlug:            param.ProjectSlug,
+		AffBaseURL:             param.AffBaseURL,
+		ESCacheURL:             param.ESCacheURL,
+		ESCacheUsername:        param.ESCacheUsername,
+		ESCachePassword:        param.ESCachePassword,
+		AuthGrantType:          param.AuthGrantType,
+		AuthClientID:           param.AuthClientID,
+		AuthClientSecret:       param.AuthClientSecret,
+		AuthAudience:           param.AuthAudience,
+		AuthURL:                param.AuthURL,
+		Environment:            param.Environment,
+		Slug:                   param.Slug,
 	}
 
 	fetcher, enricher, esClientProvider, err := buildServices(mgr)
@@ -182,8 +221,13 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 	}
 	identityProvider := affiliation.NewIdentityProvider(dataBase)
 
+	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(m.AffBaseURL, m.Slug, m.ESCacheURL, m.ESCacheUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.AuthURL)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
 	// Initialize enrich object to enrich raw data
-	enricher := NewEnricher(identityProvider, m.EnricherBackendVersion, m.Project)
+	enricher := NewEnricher(identityProvider, m.EnricherBackendVersion, m.Project, affiliationsClientProvider)
 
 	return fetcher, enricher, esClientProvider, err
 }
@@ -244,14 +288,14 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 				if err != nil {
 					ch <- err
 
-					byteData, err := json.Marshal(data)
+					byteData, err := jsoniter.Marshal(data)
 					if err != nil {
 						ch <- err
 						return
 					}
 					dataEnc := b64.StdEncoding.EncodeToString(byteData)
 					gapBody := map[string]string{"payload": dataEnc}
-					bData, err := json.Marshal(gapBody)
+					bData, err := jsoniter.Marshal(gapBody)
 					if err != nil {
 						ch <- err
 						return
