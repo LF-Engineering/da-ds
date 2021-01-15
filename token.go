@@ -43,7 +43,6 @@ func InitializeAuth0() error {
 	AddRedacted(data["client_secret"], false)
 	AddRedacted(data["audience"], false)
 	AddRedacted(data["url"], false)
-	gTokenEnv = data["env"]
 	gAuth0Client, err = auth0.NewAuth0Client(
 		data["es_url"],
 		data["es_user"],
@@ -55,6 +54,9 @@ func InitializeAuth0() error {
 		data["audience"],
 		data["url"],
 	)
+	if err == nil {
+		gTokenEnv = data["env"]
+	}
 	return err
 }
 
@@ -68,6 +70,7 @@ func GetAPIToken() (string, error) {
 	}
 	if gTokenMtx != nil {
 		gTokenMtx.Lock()
+		defer gTokenMtx.Unlock()
 	}
 	if gTokenEnv == "" {
 		err := InitializeAuth0()
@@ -76,8 +79,5 @@ func GetAPIToken() (string, error) {
 		}
 	}
 	token, err := gAuth0Client.ValidateToken(gTokenEnv)
-	if gTokenMtx != nil {
-		gTokenMtx.Unlock()
-	}
 	return token, err
 }

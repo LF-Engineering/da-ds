@@ -261,15 +261,6 @@ func GetEnrollments(ctx *Ctx, ds DS, uuid string, dt time.Time, single bool) (or
 	if ok {
 		return
 	}
-	defer func() {
-		if MT {
-			rollsCacheMtx.Lock()
-		}
-		rollsCache[k] = orgs
-		if MT {
-			rollsCacheMtx.Unlock()
-		}
-	}()
 	if pSlug == "" {
 		pSlug = "(empty)"
 	}
@@ -284,6 +275,15 @@ func GetEnrollments(ctx *Ctx, ds DS, uuid string, dt time.Time, single bool) (or
 		Printf("GetEnrollments(%s,%s,%s,%s) error: %v\n", pSlug, api, uuid, sdt, err)
 		return
 	}
+	defer func() {
+		if MT {
+			rollsCacheMtx.Lock()
+		}
+		rollsCache[k] = orgs
+		if MT {
+			rollsCacheMtx.Unlock()
+		}
+	}()
 	if single {
 		orgs = []string{data["org"].(string)}
 		return
@@ -334,16 +334,6 @@ func GetEnrollmentsBoth(ctx *Ctx, ds DS, uuid string, dt time.Time) (org string,
 		org = GetEnrollmentsSingle(ctx, ds, uuid, dt)
 		return
 	}
-	defer func() {
-		if MT {
-			rollsCacheMtx.Lock()
-		}
-		rollsCache[kS] = orgsS
-		rollsCache[kM] = orgsM
-		if MT {
-			rollsCacheMtx.Unlock()
-		}
-	}()
 	if pSlug == "" {
 		pSlug = "(empty)"
 	}
@@ -354,6 +344,16 @@ func GetEnrollmentsBoth(ctx *Ctx, ds DS, uuid string, dt time.Time) (org string,
 		Printf("GetEnrollmentsBoth(%s,%s,%s) error: %v\n", pSlug, uuid, sdt, err)
 		return
 	}
+	defer func() {
+		if MT {
+			rollsCacheMtx.Lock()
+		}
+		rollsCache[kS] = orgsS
+		rollsCache[kM] = orgsM
+		if MT {
+			rollsCacheMtx.Unlock()
+		}
+	}()
 	org, _ = data["org"].(string)
 	orgsS = []string{org}
 	orgsI, _ := data["orgs"].([]interface{})

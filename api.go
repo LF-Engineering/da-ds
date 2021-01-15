@@ -17,6 +17,7 @@ func ExecuteAffiliationsAPICall(ctx *Ctx, method, path string) (data map[string]
 	var token string
 	token, err = GetAPIToken()
 	if err != nil {
+		fmt.Printf("GetAPIToken error: %v\n", err)
 		return
 	}
 	rurl := path
@@ -38,6 +39,7 @@ func ExecuteAffiliationsAPICall(ctx *Ctx, method, path string) (data map[string]
 			Printf("token is invalid, trying to generate another one\n")
 			token, err = GetAPIToken()
 			if err != nil {
+				fmt.Printf("GetAPIToken error: %v\n", err)
 				return
 			}
 			continue
