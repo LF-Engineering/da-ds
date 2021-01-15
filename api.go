@@ -4,21 +4,47 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"sync"
 
 	jsoniter "github.com/json-iterator/go"
 )
 
+var (
+	gToken    string
+	gTokenMtx *sync.Mutex
+)
+
 // ExecuteAffiliationsAPICall - execute a call to Affiliations API
-func ExecuteAffiliationsAPICall(ctx *Ctx, method, path string) (data map[string]interface{}, err error) {
+func ExecuteAffiliationsAPICall(ctx *Ctx, method, path string, cacheToken bool) (data map[string]interface{}, err error) {
 	if ctx.AffiliationAPIURL == "" {
 		err = fmt.Errorf("cannot execute DA affiliation API calls, no API URL specified")
 		return
 	}
 	var token string
-	token, err = GetAPIToken()
-	if err != nil {
-		fmt.Printf("GetAPIToken error: %v\n", err)
-		return
+	if cacheToken {
+		if gTokenMtx != nil {
+			gTokenMtx.Lock()
+		}
+		token = gToken
+		if gTokenMtx != nil {
+			gTokenMtx.Unlock()
+		}
+	}
+	if token == "" {
+		token, err = GetAPIToken()
+		if err != nil {
+			fmt.Printf("GetAPIToken error: %v\n", err)
+			return
+		}
+		if cacheToken {
+			if gTokenMtx != nil {
+				gTokenMtx.Lock()
+			}
+			gToken = token
+			if gTokenMtx != nil {
+				gTokenMtx.Unlock()
+			}
+		}
 	}
 	rurl := path
 	url := ctx.AffiliationAPIURL + rurl
@@ -41,6 +67,15 @@ func ExecuteAffiliationsAPICall(ctx *Ctx, method, path string) (data map[string]
 			if err != nil {
 				fmt.Printf("GetAPIToken error: %v\n", err)
 				return
+			}
+			if cacheToken {
+				if gTokenMtx != nil {
+					gTokenMtx.Lock()
+				}
+				gToken = token
+				if gTokenMtx != nil {
+					gTokenMtx.Unlock()
+				}
 			}
 			continue
 		}

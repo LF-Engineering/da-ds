@@ -41,6 +41,9 @@ func SetMT() {
 	if parseDateCacheMtx == nil {
 		parseDateCacheMtx = &sync.RWMutex{}
 	}
+	if gTokenEnvMtx == nil {
+		gTokenEnvMtx = &sync.Mutex{}
+	}
 	if gTokenMtx == nil {
 		gTokenMtx = &sync.Mutex{}
 	}
@@ -62,6 +65,7 @@ func ResetThreadsNum(ctx *Ctx) {
 	esCacheMtx = nil
 	memCacheMtx = nil
 	parseDateCacheMtx = nil
+	gTokenEnvMtx = nil
 	gTokenMtx = nil
 }
 

@@ -270,7 +270,7 @@ func GetEnrollments(ctx *Ctx, ds DS, uuid string, dt time.Time, single bool) (or
 		api = "multi"
 	}
 	sdt := url.QueryEscape(ToYMDTHMSZDate(dt))
-	data, err := ExecuteAffiliationsAPICall(ctx, "GET", fmt.Sprintf("/v1/affiliation/%s/%s/%s/%s", pSlug, api, uuid, sdt))
+	data, err := ExecuteAffiliationsAPICall(ctx, "GET", fmt.Sprintf("/v1/affiliation/%s/%s/%s/%s", pSlug, api, uuid, sdt), true)
 	if err != nil {
 		Printf("GetEnrollments(%s,%s,%s,%s) error: %v\n", pSlug, api, uuid, sdt, err)
 		return
@@ -339,7 +339,7 @@ func GetEnrollmentsBoth(ctx *Ctx, ds DS, uuid string, dt time.Time) (org string,
 	}
 	pSlug = url.QueryEscape(pSlug)
 	sdt := url.QueryEscape(ToYMDTHMSZDate(dt))
-	data, err := ExecuteAffiliationsAPICall(ctx, "GET", fmt.Sprintf("/v1/affiliation/%s/both/%s/%s", pSlug, uuid, sdt))
+	data, err := ExecuteAffiliationsAPICall(ctx, "GET", fmt.Sprintf("/v1/affiliation/%s/both/%s/%s", pSlug, uuid, sdt), true)
 	if err != nil {
 		Printf("GetEnrollmentsBoth(%s,%s,%s) error: %v\n", pSlug, uuid, sdt, err)
 		return

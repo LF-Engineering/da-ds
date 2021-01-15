@@ -13,7 +13,7 @@ import (
 var (
 	gAuth0Client *auth0.ClientProvider
 	gTokenEnv    string
-	gTokenMtx    *sync.Mutex
+	gTokenEnvMtx *sync.Mutex
 )
 
 // InitializeAuth0 - initializes Auth0 client using data stored in AUTH0_DATA
@@ -68,9 +68,9 @@ func GetAPIToken() (string, error) {
 	if envToken != "" {
 		return envToken, nil
 	}
-	if gTokenMtx != nil {
-		gTokenMtx.Lock()
-		defer gTokenMtx.Unlock()
+	if gTokenEnvMtx != nil {
+		gTokenEnvMtx.Lock()
+		defer gTokenEnvMtx.Unlock()
 	}
 	if gTokenEnv == "" {
 		err := InitializeAuth0()
