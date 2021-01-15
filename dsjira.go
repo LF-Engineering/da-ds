@@ -1361,7 +1361,10 @@ func (j *DSJira) AffsItems(ctx *Ctx, item map[string]interface{}, roles []string
 		if len(identity) == 0 {
 			continue
 		}
-		affsIdentity, empty := IdentityAffsData(ctx, j, identity, nil, dt, role)
+		affsIdentity, empty, e := IdentityAffsData(ctx, j, identity, nil, dt, role)
+		if e != nil {
+			Printf("AffsItems/IdentityAffsData: error: %v for %v,%v,%v\n", e, identity, dt, role)
+		}
 		if empty {
 			Printf("no identity affiliation data for identity %+v\n", identity)
 			continue

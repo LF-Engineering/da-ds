@@ -33,6 +33,18 @@ cloud.google.com/go/storage v1.10.0/go.mod h1:FLPqc6j+Ki4BU591ie1oL6qBQGu2Bl/tZ9
 dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7gZCb22OMCxBHrMx7a5I7Hp++hsVxbQ4BYO7hU=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
+github.com/LF-Engineering/dev-analytics-libraries v0.2.2 h1:2gJZTmWp/2X/tniuLS89C7JAcAlWsAcOpQC5LwICmY0=
+github.com/LF-Engineering/dev-analytics-libraries v0.2.2/go.mod h1:UbQW9wNRaX7VKk/LX3v1888g0CgqnOf9emhDknoq5Us=
+github.com/LF-Engineering/dev-analytics-libraries v0.2.3-0.20210107174925-c63ca56c6799 h1:1LrJ3Zqul5Hn2aEbXGZsFRG9sQvflfAFbTG2Sine2Ek=
+github.com/LF-Engineering/dev-analytics-libraries v0.2.3-0.20210107174925-c63ca56c6799/go.mod h1:UbQW9wNRaX7VKk/LX3v1888g0CgqnOf9emhDknoq5Us=
+github.com/LF-Engineering/dev-analytics-libraries v0.2.3-0.20210108130305-e1de5954767c h1:HqTfhxcPehvQIO8QuVLsgPHO9UgSA+gcpFHtZfzLvhQ=
+github.com/LF-Engineering/dev-analytics-libraries v0.2.3-0.20210108130305-e1de5954767c/go.mod h1:UbQW9wNRaX7VKk/LX3v1888g0CgqnOf9emhDknoq5Us=
+github.com/LF-Engineering/dev-analytics-libraries v0.3.0 h1:euYRqpKkW661mlCLBzMjyowVksbK5jC1GMJjs4r6OP8=
+github.com/LF-Engineering/dev-analytics-libraries v0.3.0/go.mod h1:UbQW9wNRaX7VKk/LX3v1888g0CgqnOf9emhDknoq5Us=
+github.com/LF-Engineering/dev-analytics-libraries v0.3.1 h1:6EbnVsEPwkLYa1KXsJk7YQzv9rYvuPdy4DAJPqr/qOs=
+github.com/LF-Engineering/dev-analytics-libraries v0.3.1/go.mod h1:UbQW9wNRaX7VKk/LX3v1888g0CgqnOf9emhDknoq5Us=
+github.com/LF-Engineering/dev-analytics-libraries v0.3.3 h1:wctxzel/69hZUly07M8E4ydiAN+MH7ItkZBD6+3pGAY=
+github.com/LF-Engineering/dev-analytics-libraries v0.3.3/go.mod h1:UbQW9wNRaX7VKk/LX3v1888g0CgqnOf9emhDknoq5Us=
 github.com/LF-Engineering/dev-analytics-libraries v0.4.0 h1:4wPJHhCVrw4Ws84HYyOiPiGnkBQtf5JI1E9apXloxdQ=
 github.com/LF-Engineering/dev-analytics-libraries v0.4.0/go.mod h1:borB/JUQ1+eCIIeKunV5GuzjcrG0lOK4h3vGDz0iAWw=
 github.com/PuerkitoBio/goquery v1.6.0 h1:j7taAbelrdcsOlGeMenZxc2AWXD5fieT1/znArdnx94=
@@ -57,6 +69,7 @@ github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ3
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/dgrijalva/jwt-go v1.0.2 h1:KPldsxuKGsS2FPWsNeg9ZO18aCrGKujPoWXn2yo+KQM=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible h1:7qlOGliEKZXTDg6OTjfoBKDXWrumCAMpl/TFQ4/5kLM=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/elastic/go-elasticsearch/v7 v7.10.0 h1:vYRwqgFM46ZUHFMRdvKr+y1WA4ehJO6WqAGV9Btbl2o=

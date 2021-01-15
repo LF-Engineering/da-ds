@@ -27,6 +27,7 @@ type Ctx struct {
 	RichIndex          string     // From DA_DS_RICH_INDEX - rich index name
 	Tag                string     // From DA_DS_TAG - tag
 	ESURL              string     // From DA_DS_ES_URL - ElasticSearch URL
+	AffiliationAPIURL  string     // From DA_DS_AFFILIATION_API_URL - Affiliation API URL
 	ESBulkSize         int        // From DA_DS_ES_BULK_SIZE - ElasticSearch bulk size
 	ESScrollSize       int        // From DA_DS_ES_SCROLL_SIZE - ElasticSearch scroll size
 	ESScrollWait       string     // From DA_DS_ES_SCROLL_WAIT - ElasticSearch scroll wait
@@ -263,6 +264,9 @@ func (ctx *Ctx) Init() {
 		ctx.Delay = delay
 	}
 
+	// Affiliation API URL
+	ctx.AffiliationAPIURL = ctx.Env("AFFILIATION_API_URL")
+
 	if ctx.Env("REPOSITORIES_JSON") != "" {
 		var repo []Repository
 		b := []byte(ctx.Env("REPOSITORIES_JSON"))
@@ -385,6 +389,7 @@ func (ctx *Ctx) Init() {
 	AddRedacted(ctx.DBPass, false)
 	AddRedacted(ctx.DBConn, false)
 	AddRedacted(ctx.GapURL, false)
+	AddRedacted(ctx.AffiliationAPIURL, false)
 }
 
 // Validate - check if config is correct

@@ -41,6 +41,12 @@ func SetMT() {
 	if parseDateCacheMtx == nil {
 		parseDateCacheMtx = &sync.RWMutex{}
 	}
+	if gTokenEnvMtx == nil {
+		gTokenEnvMtx = &sync.Mutex{}
+	}
+	if gTokenMtx == nil {
+		gTokenMtx = &sync.Mutex{}
+	}
 	MT = true
 }
 
@@ -59,6 +65,8 @@ func ResetThreadsNum(ctx *Ctx) {
 	esCacheMtx = nil
 	memCacheMtx = nil
 	parseDateCacheMtx = nil
+	gTokenEnvMtx = nil
+	gTokenMtx = nil
 }
 
 // GetThreadsNum returns the number of available CPUs
