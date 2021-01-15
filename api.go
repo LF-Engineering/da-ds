@@ -21,31 +21,32 @@ func ExecuteAffiliationsAPICall(ctx *Ctx, method, path string, cacheToken bool) 
 		return
 	}
 	var token string
-	if cacheToken {
-		if gTokenMtx != nil {
+	lock := func() {
+		if cacheToken && gTokenMtx != nil {
 			gTokenMtx.Lock()
 		}
-		token = gToken
-		if gTokenMtx != nil {
+	}
+	unlock := func() {
+		if cacheToken && gTokenMtx != nil {
 			gTokenMtx.Unlock()
 		}
+	}
+	lock()
+	if cacheToken {
+		token = gToken
 	}
 	if token == "" {
 		token, err = GetAPIToken()
 		if err != nil {
+			unlock()
 			fmt.Printf("GetAPIToken error: %v\n", err)
 			return
 		}
 		if cacheToken {
-			if gTokenMtx != nil {
-				gTokenMtx.Lock()
-			}
 			gToken = token
-			if gTokenMtx != nil {
-				gTokenMtx.Unlock()
-			}
 		}
 	}
+	unlock()
 	rurl := path
 	url := ctx.AffiliationAPIURL + rurl
 	for i := 0; i < 2; i++ {
