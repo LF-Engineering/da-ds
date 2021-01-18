@@ -135,6 +135,7 @@ func (m *Manager) Sync() error {
 				lastDate, err = fetcher.GetLastDate(*buildServer, time.Now())
 				if err != nil {
 					log.Println("[GetLastDate] could not get last date")
+					lastDate = DefaultDateTime
 				}
 			} else {
 				fromDate = m.FromDate
