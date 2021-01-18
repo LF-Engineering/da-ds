@@ -11,6 +11,7 @@ import (
 	"github.com/LF-Engineering/da-ds/pipermail"
 
 	"github.com/LF-Engineering/da-ds/bugzilla"
+	"github.com/LF-Engineering/da-ds/circleci"
 
 	jsoniter "github.com/json-iterator/go"
 
@@ -62,6 +63,13 @@ func runDS(ctx *lib.Ctx) (err error) {
 		ds = &lib.DSRocketchat{}
 	case pipermail.Pipermail:
 		manager, err := buildPipermailManager(ctx)
+		if err != nil {
+			fmt.Println(err)
+			return err
+		}
+		return manager.Sync()
+	case circleci.CircleCI:
+		manager, err := buildCircleCIManager(ctx)
 		if err != nil {
 			fmt.Println(err)
 			return err
@@ -296,6 +304,33 @@ func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
 	params.Environment = ctx.Env("ENVIRONMENT")
 
 	mgr, err := bugzillarest.NewManager(params)
+	if err != nil {
+		return nil, err
+	}
+
+	return mgr, nil
+}
+
+func buildCircleCIManager(ctx *lib.Ctx) (*circleci.Manager, error) {
+	var params circleci.Param
+	params.EndPoint = ctx.CircleCI.Origin.String()
+	params.ShConnStr = fmt.Sprintf("%s:%s@%s/%s", ctx.DBUser, ctx.DBPass, ctx.DBHost, ctx.DBName)
+	params.FetcherBackendVersion = "0.1.0"
+	params.EnricherBackendVersion = "0.1.0"
+	params.ESUrl = ctx.ESURL
+	params.EsUser = ""
+	params.EsPassword = ""
+	params.Fetch = ctx.CircleCI.DoFetch.Bool()
+	params.FetchSize = ctx.CircleCI.FetchSize.Int()
+	params.Project = ctx.CircleCI.Project.String()
+	params.EsIndex = ctx.CircleCI.EsIndex.String()
+
+	params.Retries = uint(ctx.Retry)
+	params.Delay = ctx.Delay
+	params.GapURL = ctx.GapURL
+	params.Token = ctx.CircleCI.Token.String()
+
+	mgr, err := circleci.NewManager(params)
 	if err != nil {
 		return nil, err
 	}

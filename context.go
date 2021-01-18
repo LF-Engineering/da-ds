@@ -69,6 +69,8 @@ type Ctx struct {
 	BugZilla *BugZilla
 
 	PiperMail *PiperMail
+
+	CircleCI *CircleCI
 }
 
 // Repository dockerhub repository data
@@ -106,6 +108,17 @@ type PiperMail struct {
 	EnrichSize  *Flag
 }
 
+// CircleCI parameter context contains all required parameters to run Circleci fetch and enrich
+type CircleCI struct {
+	Origin      *Flag
+	Project     *Flag
+	ProjectSlug *Flag
+	DoFetch     *Flag
+	FetchSize   *Flag
+	EsIndex     *Flag
+	Token       *Flag
+}
+
 // Env - get env value using current DS prefix
 func (ctx *Ctx) Env(v string) string {
 	return os.Getenv(ctx.DSPrefix + v)
@@ -133,6 +146,14 @@ func (ctx *Ctx) ParseFlags() {
 	flag.Var(ctx.PiperMail.DoEnrich, "pipermail-do-enrich", "To decide whether will do enrich raw data or not.")
 	flag.Var(ctx.PiperMail.FetchSize, "pipermail-fetch-size", "Total number of fetched items per request.")
 	flag.Var(ctx.PiperMail.EnrichSize, "pipermail-enrich-size", "Total number of enriched items per request.")
+
+	flag.Var(ctx.CircleCI.Origin, "circleci-origin", "Circle ci pproject slug")
+	flag.Var(ctx.CircleCI.ProjectSlug, "circleci-slug", "DA project slug")
+	flag.Var(ctx.CircleCI.Project, "circleci-project", "Slug name of a project e.g. yocto")
+	flag.Var(ctx.CircleCI.DoFetch, "circleci-do-fetch", "To decide whether will fetch raw data or not")
+	flag.Var(ctx.CircleCI.FetchSize, "circleci-fetch-size", "Total number of fetched items per request.")
+	flag.Var(ctx.CircleCI.EsIndex, "circleci-es-index", "Circle es index base name")
+	flag.Var(ctx.CircleCI.Token, "circleci-token", "Circle Token")
 
 	flag.Parse()
 }
@@ -379,6 +400,16 @@ func (ctx *Ctx) Init() {
 		DoEnrich:    NewFlag(),
 		FetchSize:   NewFlag(),
 		EnrichSize:  NewFlag(),
+	}
+
+	ctx.CircleCI = &CircleCI{
+		Origin:      NewFlag(),
+		DoFetch:     NewFlag(),
+		FetchSize:   NewFlag(),
+		Project:     NewFlag(),
+		ProjectSlug: NewFlag(),
+		EsIndex:     NewFlag(),
+		Token:       NewFlag(),
 	}
 
 	// Redacted data
