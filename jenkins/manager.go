@@ -24,6 +24,7 @@ type Manager struct {
 	BuildServers           []*BuildServer
 	FromDate               *time.Time
 	NoIncremental          bool
+	BulkSize               int
 }
 
 // BuildServer is a single Jenkins
@@ -47,6 +48,7 @@ func NewManager(
 	buildServers []*BuildServer,
 	fromDate *time.Time,
 	noIncremental bool,
+	bulkSize int,
 ) *Manager {
 	mng := &Manager{
 		FetcherBackendVersion:  fetcherBackendVersion,
@@ -58,6 +60,7 @@ func NewManager(
 		BuildServers:           buildServers,
 		FromDate:               fromDate,
 		NoIncremental:          noIncremental,
+		BulkSize:               bulkSize,
 	}
 
 	return mng
@@ -75,9 +78,11 @@ func (m *Manager) Sync() error {
 		return err
 	}
 	if !m.EnrichOnly {
+		log.Printf("Jenkins: Fetching data for %v\n", m.BuildServers)
 		data := make([]elastic.BulkData, 0)
 		// fetch data
 		for _, buildServer := range m.BuildServers {
+			log.Printf("Fetching data for %s project: %s endpoint", buildServer.Project, buildServer.Project)
 			var raw []BuildsRaw
 			// Fetch data for single build
 			raw, err = fetcher.FetchItem(&Params{
@@ -93,23 +98,37 @@ func (m *Manager) Sync() error {
 				data = append(data, elastic.BulkData{IndexName: fmt.Sprintf("%s-raw", buildServer.Index), ID: builds.UUID, Data: builds})
 			}
 
+			log.Printf("Successfully fetched %d documents for %s project : %s endpoint\n", len(raw), buildServer.Project, buildServer.URL)
 			// set mapping and create index if not exists
 			_ = fetcher.HandleMapping(fmt.Sprintf("%s-raw", buildServer.Index))
 		}
 
 		if len(data) > 0 {
 			// Insert raw data to elasticsearch
-			_, err = esClientProvider.BulkInsert(data)
-			if err != nil {
-				return err
+			// Process in bulk
+			log.Println("Exporting fetched builds to raw indices")
+			for start:=0; start<len(data); start+=m.BulkSize {
+				end := start + m.BulkSize
+				if end > len(data) {
+					end = len(data)
+				}
+				batch := data[start:end]
+				_, err := esClientProvider.BulkInsert(batch)
+				if err != nil {
+					log.Println("Error while BulkInsert in Jenkins enrich index: ", err)
+					return err
+				}
+				log.Printf("Jenkins: Exported %d documents to raw index\n", len(batch))
 			}
+			log.Println("Completed the export for jenkins raw builds.")
 		}
 	}
 
 	if m.Enrich || m.EnrichOnly {
+		log.Printf("Jenkins: Enriching data for %v\n", m.BuildServers)
 		data := make([]elastic.BulkData, 0)
-
 		for _, buildServer := range m.BuildServers {
+			log.Printf("Enriching data for %s project: %s endpoint\n", buildServer.Project, buildServer.URL)
 			var fromDate *time.Time
 			var lastDate time.Time
 			if m.FromDate == nil || (*m.FromDate).IsZero() {
@@ -136,14 +155,28 @@ func (m *Manager) Sync() error {
 				}
 				_ = enricher.HandleMapping(buildServer.Index)
 			}
+			log.Printf("Successfully enriched %d documents for %s project : %s endpoint\n", len(data), buildServer.Project, buildServer.URL)
 		}
 
 		if len(data) > 0 {
 			// Insert enriched data to elasticsearch
-			_, err = esClientProvider.BulkInsert(data)
-			if err != nil {
-				return err
+			log.Println("Exporting enriched builds to enriched indices")
+
+			// Process in bulk
+			for start:=0; start<len(data); start+=m.BulkSize {
+				end := start + m.BulkSize
+				if end > len(data) {
+					end = len(data)
+				}
+				batch := data[start:end]
+				_, err := esClientProvider.BulkInsert(batch)
+				if err != nil {
+					log.Println("Error while BulkInsert in Jenkins enrich index: ", err)
+					return err
+				}
+				log.Printf("Exported %d documents", len(batch))
 			}
+			log.Println("Completed the export for jenkins enriched builds.")
 		}
 	}
 
