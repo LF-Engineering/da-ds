@@ -155,6 +155,10 @@ func buildJenkinsManager(ctx *lib.Ctx) (*jenkins.Manager, error) {
 	enrichOnly := ctx.NoRaw
 	enrich := ctx.Enrich
 	fromDate := ctx.DateFrom
+	bulkSize := ctx.ESBulkSize
+	if bulkSize == 0 {
+		bulkSize = 1000
+	}
 	var buildServers []*jenkins.BuildServer
 	if err := jsoniter.Unmarshal([]byte(jenkinsJSON), &buildServers); err != nil {
 		return nil, err
@@ -164,7 +168,7 @@ func buildJenkinsManager(ctx *lib.Ctx) (*jenkins.Manager, error) {
 		return nil, err
 	}
 	return jenkins.NewManager(fetcherBackendVersion, enricherBackendVersion,
-		enrichOnly, enrich, esURL, timeout, buildServers, fromDate, noIncremental), nil
+		enrichOnly, enrich, esURL, timeout, buildServers, fromDate, noIncremental, bulkSize), nil
 }
 
 func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
