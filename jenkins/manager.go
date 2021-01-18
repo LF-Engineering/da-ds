@@ -82,7 +82,7 @@ func (m *Manager) Sync() error {
 		data := make([]elastic.BulkData, 0)
 		// fetch data
 		for _, buildServer := range m.BuildServers {
-			log.Printf("Fetching data for %s project: %s endpoint", buildServer.Project, buildServer.Project)
+			log.Printf("Fetching data for %s project: %s endpoint", buildServer.Project, buildServer.URL)
 			var raw []BuildsRaw
 			// Fetch data for single build
 			raw, err = fetcher.FetchItem(&Params{
