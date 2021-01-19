@@ -81,14 +81,32 @@ func (e *Enricher) EnrichItem(rawItem RepositoryRaw, project string, now time.Ti
 	} else {
 		enriched.FullDescriptionAnalyzed = rawItem.Data.FullDescription
 	}
+
 	enriched.Affiliation = rawItem.Data.Affiliation
-	enriched.IsPrivate = rawItem.Data.IsPrivate
 	enriched.IsAutomated = rawItem.Data.IsAutomated
-	enriched.PullCount = rawItem.Data.PullCount
 	enriched.RepositoryType = rawItem.Data.RepositoryType
 	enriched.User = rawItem.Data.User
-	enriched.Status = rawItem.Data.Status
-	enriched.StarCount = rawItem.Data.StarCount
+
+	enriched.IsPrivate = *rawItem.Data.IsPrivate
+	if rawItem.Data.IsPrivate == nil {
+		enriched.IsPrivate = false
+	}
+
+	enriched.PullCount = *rawItem.Data.PullCount
+	if rawItem.Data.PullCount == nil {
+		enriched.PullCount = 0
+	}
+
+	enriched.Status = *rawItem.Data.Status
+	if rawItem.Data.Status == nil {
+		enriched.Status = 0
+	}
+
+	enriched.StarCount = *rawItem.Data.StarCount
+	if rawItem.Data.StarCount == nil {
+		enriched.StarCount = 0
+	}
+
 	enriched.LastUpdated = rawItem.Data.LastUpdated
 	enriched.Project = project
 
@@ -98,6 +116,10 @@ func (e *Enricher) EnrichItem(rawItem RepositoryRaw, project string, now time.Ti
 	enriched.MetadataEnrichedOn = now
 
 	enriched.MetadataTimestamp = rawItem.MetadataTimestamp
+	if rawItem.MetadataTimestamp.IsZero() {
+		enriched.MetadataTimestamp = rawItem.MetadataUpdatedOn.UTC()
+	}
+
 	enriched.MetadataUpdatedOn = rawItem.MetadataUpdatedOn.UTC()
 	enriched.CreationDate = rawItem.MetadataUpdatedOn
 

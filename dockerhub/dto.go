@@ -8,13 +8,13 @@ type RepositoryResponse struct {
 	Name            string      `json:"name"`
 	Namespace       string      `json:"namespace"`
 	RepositoryType  string      `json:"repository_type"`
-	Status          int         `json:"status"`
+	Status          *int        `json:"status"`
 	Description     string      `json:"description"`
-	IsPrivate       bool        `json:"is_private"`
+	IsPrivate       *bool       `json:"is_private"`
 	IsAutomated     bool        `json:"is_automated"`
 	CanEdit         bool        `json:"can_edit"`
-	StarCount       int         `json:"star_count"`
-	PullCount       int         `json:"pull_count"`
+	StarCount       *int        `json:"star_count"`
+	PullCount       *int        `json:"pull_count"`
 	LastUpdated     time.Time   `json:"last_updated"`
 	IsMigrated      bool        `json:"is_migrated"`
 	HasStarred      bool        `json:"has_starred"`
