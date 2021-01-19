@@ -87,24 +87,28 @@ func (e *Enricher) EnrichItem(rawItem RepositoryRaw, project string, now time.Ti
 	enriched.RepositoryType = rawItem.Data.RepositoryType
 	enriched.User = rawItem.Data.User
 
-	enriched.IsPrivate = *rawItem.Data.IsPrivate
 	if rawItem.Data.IsPrivate == nil {
 		enriched.IsPrivate = false
+	} else {
+		enriched.IsPrivate = *rawItem.Data.IsPrivate
 	}
 
-	enriched.PullCount = *rawItem.Data.PullCount
 	if rawItem.Data.PullCount == nil {
 		enriched.PullCount = 0
+	} else {
+		enriched.PullCount = *rawItem.Data.PullCount
 	}
 
-	enriched.Status = *rawItem.Data.Status
 	if rawItem.Data.Status == nil {
 		enriched.Status = 0
+	} else {
+		enriched.Status = *rawItem.Data.Status
 	}
 
-	enriched.StarCount = *rawItem.Data.StarCount
 	if rawItem.Data.StarCount == nil {
 		enriched.StarCount = 0
+	} else {
+		enriched.StarCount = *rawItem.Data.StarCount
 	}
 
 	enriched.LastUpdated = rawItem.Data.LastUpdated
