@@ -65,6 +65,8 @@ func (f *Fetcher) FetchAll(origin string, token string, lastFetch *time.Time, no
 		return nil, nil, err
 	}
 
+	pipelines = append(pipelines, result.Items...)
+
 	if result.PageToken != "" {
 		for {
 			res, err := makeHttpRequest(url, nil, "GET", result.PageToken, token)
@@ -79,21 +81,19 @@ func (f *Fetcher) FetchAll(origin string, token string, lastFetch *time.Time, no
 			}
 
 			if result.PageToken == "" {
-				pipelines = append(result.Items, pipelines...)
+				pipelines = append(pipelines, result.Items...)
 				break
 			}
 
-			pipelines = append(result.Items, pipelines...)
+			pipelines = append(pipelines, result.Items...)
 
 		}
-	} else {
-		pipelines = append(pipelines, result.Items...)
 	}
 
 	data := make([]CircleCIData, 0)
 
-	for _, payload := range pipelines {
-		circleRaw, err := f.FetchWorkflows(payload, token, lastFetch, now)
+	for i := len(pipelines) - 1; i >= 0; i-- {
+		circleRaw, err := f.FetchWorkflows(pipelines[i], token, lastFetch, now)
 
 		if err != nil {
 			return nil, nil, err
