@@ -24,4 +24,7 @@ const (
 
 	// CircleCI
 	CircleCI = "circleci"
+
+	// Unknows
+	UNKNOWN = "Unknown"
 )

@@ -145,6 +145,7 @@ type CircleCIData struct {
 	UUID string `json:"uuid"`
 	//Project     string `json:"project"`
 	ProjectSlug string `json:"project_slug"`
+	ProjectName string `json:"project_name"`
 
 	PipelineID          string    `json:"pipeline_id"`
 	PipelineNumber      int       `json:"pipeline_number"`
@@ -160,7 +161,7 @@ type CircleCIData struct {
 	AuthorUserName      string   `json:"author_user_name"`
 	AuthorDomain        string   `json:"author_domain"`
 	AuthorGender        string   `json:"author_gender"`
-	AuthorGenderAcc     int      `json:"author_gender_acc"`
+	AuthorGenderAcc     int64    `json:"author_gender_acc"`
 	AuthorOrgName       string   `json:"author_org_name"`
 	AuthorMultiOrgNames []string `json:"author_multi_org_names"`
 	AuthorBot           bool     `json:"author_bot"`
@@ -171,19 +172,19 @@ type CircleCIData struct {
 	WorkflowCreatorUserName      string   `json:"workflow_creator_user_name"`
 	WorkflowCreatorDomain        string   `json:"workflow_creator_domain"`
 	WorkflowCreatorGender        string   `json:"workflow_creator_gender"`
-	WorkflowCreatorGenderAcc     int      `json:"workflow_creator_gender_acc"`
+	WorkflowCreatorGenderAcc     int64    `json:"workflow_creator_gender_acc"`
 	WorkflowCreatorOrgName       string   `json:"workflow_creator_org_name"`
 	WorkflowCreatorMultiOrgNames []string `json:"workflow_creator_multi_org_names"`
 	WorkflowCreatorBot           bool     `json:"workflow_creator_bot"`
 
-	ISApproval                    bool     `json:"is_approval"`
+	ISApproval                    int64    `json:"is_approval"`
 	WorkflowApprovalID            string   `json:"workflow_approval_id"`
 	WorkflowApprovalUUID          string   `json:"workflow_approval_uuid"`
 	WorkflowApprovalName          string   `json:"workflow_approval_name"`
 	WorkflowApprovalUserName      string   `json:"workflow_approval_user_name"`
 	WorkflowApprovalDomain        string   `json:"workflow_approval_domain"`
 	WorkflowApprovalGender        string   `json:"workflow_approval_gender"`
-	WorkflowApprovalGenderAcc     int      `json:"workflow_approval_gender_acc"`
+	WorkflowApprovalGenderAcc     int64    `json:"workflow_approval_gender_acc"`
 	WorkflowApprovalOrgName       string   `json:"workflow_approval_org_name"`
 	WorkflowApprovalMultiOrgNames []string `json:"workflow_approval_multi_org_names"`
 	WorkflowApprovalBot           bool     `json:"workflow_approval_bot"`
@@ -193,21 +194,26 @@ type CircleCIData struct {
 	Revision              string `json:"revision"`
 	Provider              string `json:"provider"`
 
-	ISRelease bool   `json:"is_release"`
+	ISRelease int64  `json:"is_release"`
 	Tag       string `json:"tag"`
 
-	IsCommit      bool   `json:"is_commit"`
+	IsCommit      int64  `json:"is_commit"`
 	CommitBody    string `json:"commit_body"`
 	CommitSubject string `json:"commit_subject"`
 	CommitBranch  string `json:"commit_branch"`
 
-	WorkflowID        string    `json:"workflow_id"`
-	WorkflowName      string    `json:"workflow_name"`
-	WorkflowStatus    string    `json:"workflow_status"`
-	WorkflowCreatedAt time.Time `json:"workflow_created_at"`
-	WorkflowStoppedAt time.Time `json:"workflow_stopped_at"`
+	WorkflowID             string    `json:"workflow_id"`
+	WorkflowName           string    `json:"workflow_name"`
+	WorkflowStatus         string    `json:"workflow_status"`
+	WorkflowCreatedAt      time.Time `json:"workflow_created_at"`
+	WorkflowStoppedAt      time.Time `json:"workflow_stopped_at"`
+	WorkflowDuration       float64   `json:"workflow_duration"`
+	WorkflowDurationSecond float64   `json:"workflow_duration_seconds"`
+	WorkflowDurationMinute float64   `json:"workflow_duration_minutes"`
+	WorkflowDurationHour   float64   `json:"workflow_duration_hours"`
 
 	WorkflowApprovalRequestID string `json:"workflow_approval_request_id"`
+	WorkflowCanceledBy        string `json:"workflow_canceled_by"`
 
 	WorkflowJobType         string    `json:"workflow_job_type"`
 	WorkflowJobID           string    `json:"workflow_job_id"`

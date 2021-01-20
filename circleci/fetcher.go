@@ -1,12 +1,10 @@
 package circleci
 
 import (
-	"bytes"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"time"
 
+	libAffiliations "github.com/LF-Engineering/dev-analytics-libraries/affiliation"
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 	jsoniter "github.com/json-iterator/go"
 )
@@ -18,12 +16,15 @@ type HTTPClientProvider interface {
 
 // Fetcher contains fetch functionalities
 type Fetcher struct {
-	dSName                string
-	HTTPClientProvider    HTTPClientProvider
-	ElasticSearchProvider ESClientProvider
-	BackendVersion        string
-	Endpoint              string
-	BackendName           string
+	dSName                     string
+	HTTPClientProvider         HTTPClientProvider
+	ElasticSearchProvider      ESClientProvider
+	BackendVersion             string
+	Endpoint                   string
+	BackendName                string
+	affiliationsClientProvider *libAffiliations.Affiliation
+	cache                      map[string]libAffiliations.AffIdentity
+	userCache                  map[string]string
 }
 
 // Params required parameters for bugzilla fetcher
@@ -38,17 +39,20 @@ type Params struct {
 }
 
 // NewFetcher initiates a new circleci fetcher
-func NewFetcher(params Params, httpClientProvider HTTPClientProvider, esClientProvider ESClientProvider) *Fetcher {
+func NewFetcher(params Params, httpClientProvider HTTPClientProvider, esClientProvider ESClientProvider, affiliationsClientProvider *libAffiliations.Affiliation, cache map[string]libAffiliations.AffIdentity, userCache map[string]string) *Fetcher {
 	return &Fetcher{
-		HTTPClientProvider:    httpClientProvider,
-		ElasticSearchProvider: esClientProvider,
-		BackendVersion:        params.BackendVersion,
-		Endpoint:              params.Endpoint,
-		dSName:                "CircleCI",
+		HTTPClientProvider:         httpClientProvider,
+		ElasticSearchProvider:      esClientProvider,
+		BackendVersion:             params.BackendVersion,
+		Endpoint:                   params.Endpoint,
+		dSName:                     "CircleCI",
+		affiliationsClientProvider: affiliationsClientProvider,
+		cache:                      cache,
+		userCache:                  userCache,
 	}
 }
 
-func (f *Fetcher) FetchAll(origin string, token string, lastFetch *time.Time, now time.Time, fromStr string) ([]CircleCIData, *time.Time, error) {
+func (f *Fetcher) FetchAll(origin string, project string, token string, lastFetch *time.Time, now time.Time, fromStr string) ([]CircleCIData, *time.Time, error) {
 	url := fmt.Sprintf("%s/%s/%s/%s/%s", APIURL, APIVersion, APIProject, origin, APIPipeline)
 
 	var pipelines []PipelineItem
@@ -69,7 +73,9 @@ func (f *Fetcher) FetchAll(origin string, token string, lastFetch *time.Time, no
 
 	if result.PageToken != "" {
 		for {
-			res, err := makeHttpRequest(url, nil, "GET", result.PageToken, token)
+			params := make(map[string]string, 0)
+			params["page-token"] = result.PageToken
+			_, res, err := f.HTTPClientProvider.Request(url, "GET", header, nil, params)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -86,14 +92,14 @@ func (f *Fetcher) FetchAll(origin string, token string, lastFetch *time.Time, no
 			}
 
 			pipelines = append(pipelines, result.Items...)
-
 		}
 	}
+	fmt.Printf("Total number of Pipelines fetched: %d\n", len(pipelines))
 
 	data := make([]CircleCIData, 0)
 
-	for i := len(pipelines) - 1; i >= 0; i-- {
-		circleRaw, err := f.FetchWorkflows(pipelines[i], token, lastFetch, now)
+	for _, pipeline := range pipelines {
+		circleRaw, err := f.FetchWorkflows(pipeline, token, lastFetch, now, project)
 
 		if err != nil {
 			return nil, nil, err
@@ -101,22 +107,25 @@ func (f *Fetcher) FetchAll(origin string, token string, lastFetch *time.Time, no
 		data = append(data, circleRaw...)
 	}
 
+	fmt.Println("Done fetching data from origin")
 	return data, nil, nil
 }
 
-func (f *Fetcher) FetchWorkflows(pipeline PipelineItem, token string, lastFetch *time.Time, now time.Time) ([]CircleCIData, error) {
+func (f *Fetcher) FetchWorkflows(pipeline PipelineItem, token string, lastFetch *time.Time, now time.Time, project string) ([]CircleCIData, error) {
 
 	// Get Workflows
 	workflows, err := f.fetchworkflow(pipeline.ID, token)
 	if err != nil {
+		fmt.Println(err)
 		return nil, err
 	}
 
 	data := make([]CircleCIData, 0)
 	for _, workflow := range workflows {
 		if lastFetch == nil || lastFetch.Before(workflow.CreatedAt) {
-			result, err := f.FetchJobs(workflow, pipeline, token, now)
+			result, err := f.FetchJobs(workflow, pipeline, token, now, project)
 			if err != nil {
+				fmt.Println(err)
 				return nil, err
 			}
 			data = append(data, result...)
@@ -129,17 +138,20 @@ func (f *Fetcher) FetchWorkflows(pipeline PipelineItem, token string, lastFetch 
 	return data, nil
 }
 
-func (f *Fetcher) FetchJobs(workflow WorkflowItem, pipeline PipelineItem, token string, now time.Time) ([]CircleCIData, error) {
+func (f *Fetcher) FetchJobs(workflow WorkflowItem, pipeline PipelineItem, token string, now time.Time, project string) ([]CircleCIData, error) {
 	// Get Jobs
 	jobs, err := f.fetchworkflowjobs(workflow.ID, token)
 	if err != nil {
+		fmt.Println(err)
 		return nil, err
 	}
+	workflowDuration := f.calculateWorkflowDuration(jobs, token)
 
 	data := make([]CircleCIData, 0)
 	for _, job := range jobs {
-		result, err := f.FetchItem(workflow, pipeline, job, token, now)
+		result, err := f.FetchItem(workflow, pipeline, job, token, now, project, workflowDuration)
 		if err != nil {
+			fmt.Println(err)
 			return nil, err
 		}
 		data = append(data, *result)
@@ -148,14 +160,15 @@ func (f *Fetcher) FetchJobs(workflow WorkflowItem, pipeline PipelineItem, token 
 	return data, nil
 }
 
-func (f *Fetcher) FetchItem(workflow WorkflowItem, pipeline PipelineItem, job JobItem, token string, now time.Time) (*CircleCIData, error) {
+func (f *Fetcher) FetchItem(workflow WorkflowItem, pipeline PipelineItem, job JobItem, token string, now time.Time, project string, workflowDuration float64) (*CircleCIData, error) {
 	var circleCI CircleCIData
 	var err error
 	var jobDetails *JobDetails
 	// Get Job Details
-	if job.Type != "approval" && job.Status != "blocked" {
+	if job.Type != "approval" && job.Status != "blocked" && job.JobNumber > 0 {
 		jobDetails, err = f.fetchjobdetails(job.ProjectSlug, job.JobNumber, token)
 		if err != nil {
+			fmt.Println(err)
 			return nil, err
 		}
 	}
@@ -167,6 +180,7 @@ func (f *Fetcher) FetchItem(workflow WorkflowItem, pipeline PipelineItem, job Jo
 	}
 
 	circleCI.UUID = uid
+	circleCI.ProjectName = project
 	circleCI.ProjectSlug = pipeline.ProjectSlug
 	circleCI.PipelineID = pipeline.ID
 	circleCI.PipelineNumber = pipeline.Number
@@ -176,43 +190,156 @@ func (f *Fetcher) FetchItem(workflow WorkflowItem, pipeline PipelineItem, job Jo
 	circleCI.PipelineTriggerType = pipeline.PipelineTrigger.Type
 	circleCI.PipelineTriggerDate = pipeline.PipelineTrigger.ReceivedAt
 
-	circleCI.AuthorUserName = pipeline.PipelineTrigger.Actor.Login
-
-	workflowstartedby, err := f.fetchuser(workflow.StartedBy, token)
-	if err != nil {
-		circleCI.WorkflowCreatorUserName = pipeline.PipelineTrigger.Actor.Login
+	if pipeline.PipelineTrigger.Type == "schedule" {
+		circleCI.AuthorUserName = pipeline.PipelineTrigger.Actor.Login
+		circleCI.AuthorBot = true
+		circleCI.AuthorUUID = UNKNOWN
+		circleCI.AuthorID = UNKNOWN
+		circleCI.AuthorName = UNKNOWN
+		circleCI.AuthorDomain = UNKNOWN
+		circleCI.AuthorGender = UNKNOWN
+		circleCI.AuthorOrgName = UNKNOWN
+		circleCI.AuthorMultiOrgNames = make([]string, 0)
+		circleCI.AuthorGenderAcc = 0
 		circleCI.WorkflowCreatorBot = true
+		circleCI.WorkflowCreatorUUID = UNKNOWN
+		circleCI.WorkflowCreatorID = UNKNOWN
+		circleCI.WorkflowCreatorName = UNKNOWN
+		circleCI.WorkflowCreatorName = UNKNOWN
+		circleCI.WorkflowCreatorDomain = UNKNOWN
+		circleCI.WorkflowCreatorGender = UNKNOWN
+		circleCI.WorkflowCreatorOrgName = UNKNOWN
+		circleCI.WorkflowCreatorMultiOrgNames = make([]string, 0)
+		circleCI.WorkflowCreatorGenderAcc = 0
+		circleCI.WorkflowCreatorUserName = pipeline.PipelineTrigger.Actor.Login
 	} else {
-		circleCI.WorkflowCreatorUserName = workflowstartedby
-	}
-
-	if job.Type == "approval" {
-		approvalname, err := f.fetchuser(job.ApprovedBy, token)
-		if err != nil {
-			return nil, err
+		var author *libAffiliations.AffIdentity
+		circleCI.AuthorUserName = pipeline.PipelineTrigger.Actor.Login
+		if val, ok := f.cache[circleCI.AuthorUserName]; ok {
+			author = &val
+			circleCI.AuthorName = author.Name
+			circleCI.AuthorID = *author.ID
+			circleCI.AuthorUUID = *author.UUID
+			circleCI.AuthorBot = false
+			circleCI.AuthorDomain = author.Domain
+			circleCI.AuthorGender = *author.Gender
+			circleCI.AuthorOrgName = *author.OrgName
+			circleCI.AuthorMultiOrgNames = author.MultiOrgNames
+			circleCI.AuthorGenderAcc = *author.GenderACC
+		} else {
+			author, err = f.affiliationsClientProvider.GetProfileByUsername(circleCI.AuthorUserName, project)
+			if err != nil {
+				circleCI.AuthorUUID = UNKNOWN
+				circleCI.AuthorID = UNKNOWN
+				circleCI.AuthorName = UNKNOWN
+				circleCI.AuthorDomain = UNKNOWN
+				circleCI.AuthorGender = UNKNOWN
+				circleCI.AuthorOrgName = UNKNOWN
+				circleCI.AuthorMultiOrgNames = make([]string, 0)
+				circleCI.AuthorGenderAcc = 0
+			} else {
+				circleCI.AuthorName = author.Name
+				circleCI.AuthorID = *author.ID
+				circleCI.AuthorUUID = *author.UUID
+				circleCI.AuthorBot = false
+				circleCI.AuthorDomain = author.Domain
+				circleCI.AuthorGender = *author.Gender
+				circleCI.AuthorOrgName = *author.OrgName
+				circleCI.AuthorMultiOrgNames = author.MultiOrgNames
+				circleCI.AuthorGenderAcc = *author.GenderACC
+				f.cache[circleCI.AuthorUserName] = *author
+			}
 		}
-		circleCI.WorkflowApprovalUserName = approvalname
-		circleCI.WorkflowApprovalRequestID = job.ApprovedRequestID
-		circleCI.ISApproval = true
-		circleCI.WorkflowJobType = job.Type
-		circleCI.WorkflowJobID = job.ID
-		circleCI.WorkflowJobStatus = job.Status
-		circleCI.WorkflowJobName = job.Name
-		circleCI.WorkflowJobDependencies = job.Dependencies
-	} else if job.Status == "blocked" {
-		circleCI.WorkflowJobDependencies = job.Dependencies
-		circleCI.WorkflowJobType = job.Type
-		circleCI.WorkflowJobID = job.ID
-		circleCI.WorkflowJobStatus = job.Status
-		circleCI.WorkflowJobName = job.Name
-	} else {
-		circleCI.WorkflowJobDependencies = job.Dependencies
-		circleCI.WorkflowJobType = job.Type
-		circleCI.WorkflowJobID = job.ID
-		circleCI.WorkflowJobStartedAt = job.StartedAt
-		circleCI.WorkflowJobStoppedAt = job.StoppedAt
-		circleCI.WorkflowJobStatus = job.Status
-		circleCI.WorkflowJobName = job.Name
+		var workflowstartedby string
+		if val, ok := f.userCache[workflow.StartedBy]; ok {
+			workflowstartedby = val
+		} else {
+			workflowstartedby, err = f.fetchuser(workflow.StartedBy, token)
+		}
+		if err != nil {
+			circleCI.WorkflowCreatorUserName = pipeline.PipelineTrigger.Actor.Login
+			circleCI.WorkflowCreatorBot = true
+			circleCI.WorkflowCreatorUUID = UNKNOWN
+			circleCI.WorkflowCreatorID = UNKNOWN
+			circleCI.WorkflowCreatorName = UNKNOWN
+			circleCI.WorkflowCreatorName = UNKNOWN
+			circleCI.WorkflowCreatorDomain = UNKNOWN
+			circleCI.WorkflowCreatorGender = UNKNOWN
+			circleCI.WorkflowCreatorOrgName = UNKNOWN
+			circleCI.WorkflowCreatorMultiOrgNames = make([]string, 0)
+			circleCI.WorkflowCreatorGenderAcc = 0
+		} else {
+			var workflowauthor *libAffiliations.AffIdentity
+			circleCI.WorkflowCreatorUserName = workflowstartedby
+			if workflowval, ok := f.cache[workflowstartedby]; ok {
+				workflowauthor = &workflowval
+				circleCI.WorkflowCreatorName = workflowauthor.Name
+				circleCI.WorkflowCreatorID = *workflowauthor.ID
+				circleCI.WorkflowCreatorUUID = *workflowauthor.UUID
+				circleCI.WorkflowCreatorBot = false
+				circleCI.WorkflowCreatorDomain = workflowauthor.Domain
+				circleCI.WorkflowCreatorGender = *workflowauthor.Gender
+				circleCI.WorkflowCreatorOrgName = *workflowauthor.OrgName
+				circleCI.WorkflowCreatorMultiOrgNames = workflowauthor.MultiOrgNames
+				circleCI.WorkflowCreatorGenderAcc = *workflowauthor.GenderACC
+			} else {
+				workflowauthor, err = f.affiliationsClientProvider.GetProfileByUsername(workflowstartedby, project)
+				if err != nil {
+					circleCI.WorkflowCreatorUUID = UNKNOWN
+					circleCI.WorkflowCreatorID = UNKNOWN
+					circleCI.WorkflowCreatorName = UNKNOWN
+					circleCI.WorkflowCreatorDomain = UNKNOWN
+					circleCI.WorkflowCreatorGender = UNKNOWN
+					circleCI.WorkflowCreatorOrgName = UNKNOWN
+					circleCI.WorkflowCreatorMultiOrgNames = make([]string, 0)
+					circleCI.WorkflowCreatorGenderAcc = 0
+				} else {
+					circleCI.WorkflowCreatorName = workflowauthor.Name
+					circleCI.WorkflowCreatorID = *workflowauthor.ID
+					circleCI.WorkflowCreatorUUID = *workflowauthor.UUID
+					circleCI.WorkflowCreatorBot = false
+					circleCI.WorkflowCreatorDomain = workflowauthor.Domain
+					circleCI.WorkflowCreatorGender = *workflowauthor.Gender
+					circleCI.WorkflowCreatorOrgName = *workflowauthor.OrgName
+					circleCI.WorkflowCreatorMultiOrgNames = workflowauthor.MultiOrgNames
+					circleCI.WorkflowCreatorGenderAcc = *workflowauthor.GenderACC
+					f.cache[workflowstartedby] = *workflowauthor
+				}
+			}
+		}
+		if job.Type == "approval" {
+			var approvalname string
+			if val, ok := f.userCache[job.ApprovedBy]; ok {
+				approvalname = val
+			} else {
+				approvalname, err = f.fetchuser(job.ApprovedBy, token)
+				if err != nil {
+					return nil, err
+				}
+			}
+			circleCI.WorkflowApprovalUserName = approvalname
+			circleCI.WorkflowApprovalRequestID = job.ApprovedRequestID
+			circleCI.ISApproval = 1
+			circleCI.WorkflowJobType = job.Type
+			circleCI.WorkflowJobID = job.ID
+			circleCI.WorkflowJobStatus = job.Status
+			circleCI.WorkflowJobName = job.Name
+			circleCI.WorkflowJobDependencies = job.Dependencies
+		} else if job.Status == "blocked" {
+			circleCI.WorkflowJobDependencies = job.Dependencies
+			circleCI.WorkflowJobType = job.Type
+			circleCI.WorkflowJobID = job.ID
+			circleCI.WorkflowJobStatus = job.Status
+			circleCI.WorkflowJobName = job.Name
+		} else {
+			circleCI.WorkflowJobDependencies = job.Dependencies
+			circleCI.WorkflowJobType = job.Type
+			circleCI.WorkflowJobID = job.ID
+			circleCI.WorkflowJobStartedAt = job.StartedAt
+			circleCI.WorkflowJobStoppedAt = job.StoppedAt
+			circleCI.WorkflowJobStatus = job.Status
+			circleCI.WorkflowJobName = job.Name
+		}
 	}
 
 	circleCI.OriginalRepositoryURL = pipeline.SourceVCS.OriginURL
@@ -222,11 +349,11 @@ func (f *Fetcher) FetchItem(workflow WorkflowItem, pipeline PipelineItem, job Jo
 
 	if pipeline.SourceVCS.Tag != "" {
 		circleCI.Tag = pipeline.SourceVCS.Tag
-		circleCI.ISRelease = true
+		circleCI.ISRelease = 1
 	}
 
 	if pipeline.SourceVCS.Branch != "" {
-		circleCI.IsCommit = true
+		circleCI.IsCommit = 1
 		circleCI.CommitBranch = pipeline.SourceVCS.Branch
 		circleCI.CommitBody = pipeline.SourceVCS.VCSCommit.Body
 		circleCI.CommitSubject = pipeline.SourceVCS.VCSCommit.Subject
@@ -237,8 +364,12 @@ func (f *Fetcher) FetchItem(workflow WorkflowItem, pipeline PipelineItem, job Jo
 	circleCI.WorkflowStatus = workflow.Status
 	circleCI.WorkflowCreatedAt = workflow.CreatedAt
 	circleCI.WorkflowStoppedAt = workflow.StoppedAt
+	circleCI.WorkflowDuration = workflowDuration
+	circleCI.WorkflowDurationSecond = workflowDuration / 1000
+	circleCI.WorkflowDurationMinute = circleCI.WorkflowDurationSecond / 60
+	circleCI.WorkflowDurationHour = circleCI.WorkflowDurationMinute / 60
 
-	if job.Type != "approval" && job.Status != "blocked" {
+	if job.Type != "approval" && job.Status != "blocked" && job.JobNumber > 0 {
 		circleCI.JobNumber = jobDetails.Number
 		circleCI.JobStartedAt = jobDetails.StartedAt
 		circleCI.JobQueuedAt = jobDetails.QueuedAt
@@ -330,25 +461,19 @@ func (f *Fetcher) fetchuser(id string, token string) (string, error) {
 	return result.Login, nil
 }
 
-func makeHttpRequest(url string, payload []byte, method string, pageToken string, token string) ([]byte, error) {
-	var response *http.Response
-	var err error
-	client := &http.Client{}
+func (f *Fetcher) calculateWorkflowDuration(jobs []JobItem, token string) float64 {
+	var total float64
 
-	url = fmt.Sprintf("%s?page-token=%s", url, pageToken)
-	request, err := http.NewRequest(method, url, bytes.NewBuffer(payload))
-	request.Header.Set("Content-type", "application/json")
-	request.Header.Set("Circle-Token", token)
-
-	response, err = client.Do(request)
-	if err != nil {
-		return nil, err
+	for _, job := range jobs {
+		if job.Type != "approval" && job.Status != "blocked" {
+			jobDetails, err := f.fetchjobdetails(job.ProjectSlug, job.JobNumber, token)
+			if err != nil {
+				continue
+			} else {
+				total += float64(jobDetails.Duration)
+			}
+		}
 	}
 
-	data, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	return data, nil
+	return total
 }

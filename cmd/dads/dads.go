@@ -324,6 +324,19 @@ func buildCircleCIManager(ctx *lib.Ctx) (*circleci.Manager, error) {
 	params.FetchSize = ctx.CircleCI.FetchSize.Int()
 	params.Project = ctx.CircleCI.Project.String()
 	params.EsIndex = ctx.CircleCI.EsIndex.String()
+	params.Project = ctx.CircleCI.Project.String()
+	params.ProjectSlug = ctx.CircleCI.ProjectSlug.String()
+
+	params.AffBaseURL = ctx.Env("AFFILIATIONS_API_BASE_URL")
+	params.ESCacheURL = ctx.Env("ES_CACHE_URL")
+	params.ESCacheUsername = ctx.Env("ES_CACHE_USERNAME")
+	params.ESCachePassword = ctx.Env("ES_CACHE_PASSWORD")
+	params.AuthGrantType = ctx.Env("AUTH0_GRANT_TYPE")
+	params.AuthClientID = ctx.Env("AUTH0_CLIENT_ID")
+	params.AuthClientSecret = ctx.Env("AUTH0_CLIENT_SECRET")
+	params.AuthAudience = ctx.Env("AUTH0_AUDIENCE")
+	params.AuthURL = ctx.Env("AUTH0_BASE_URL")
+	params.Environment = ctx.Env("ENVIRONMENT")
 
 	params.Retries = uint(ctx.Retry)
 	params.Delay = ctx.Delay

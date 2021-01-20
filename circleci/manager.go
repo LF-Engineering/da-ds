@@ -7,6 +7,8 @@ import (
 
 	"encoding/json"
 
+	libAffiliations "github.com/LF-Engineering/dev-analytics-libraries/affiliation"
+
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
 	"github.com/LF-Engineering/dev-analytics-libraries/http"
 	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
@@ -39,8 +41,19 @@ type Manager struct {
 	FromDate               *time.Time
 	HTTPTimeout            time.Duration
 	Project                string
+	ProjectSlug            string
 	FetchSize              int
 	EnrichSize             int
+	AffBaseURL             string
+	ESCacheURL             string
+	ESCacheUsername        string
+	ESCachePassword        string
+	AuthGrantType          string
+	AuthClientID           string
+	AuthClientSecret       string
+	AuthAudience           string
+	AuthURL                string
+	Environment            string
 
 	esClientProvider ESClientProvider
 	fetcher          *Fetcher
@@ -66,12 +79,23 @@ type Param struct {
 	EsIndex                string
 	FromDate               *time.Time
 	Project                string
+	ProjectSlug            string
 	FetchSize              int
 	EnrichSize             int
 	Retries                uint
 	Delay                  time.Duration
 	GapURL                 string
 	Token                  string
+	AffBaseURL             string
+	ESCacheURL             string
+	ESCacheUsername        string
+	ESCachePassword        string
+	AuthGrantType          string
+	AuthClientID           string
+	AuthClientSecret       string
+	AuthAudience           string
+	AuthURL                string
+	Environment            string
 }
 
 // NewManager initiates bugzilla manager instance
@@ -91,12 +115,23 @@ func NewManager(param Param) (*Manager, error) {
 		FromDate:               param.FromDate,
 		HTTPTimeout:            60 * time.Second,
 		Project:                param.Project,
+		ProjectSlug:            param.ProjectSlug,
 		FetchSize:              param.FetchSize,
 		EnrichSize:             param.EnrichSize,
 		Retries:                param.Retries,
 		Delay:                  param.Delay,
 		GapURL:                 param.GapURL,
 		Token:                  param.Token,
+		AffBaseURL:             param.AffBaseURL,
+		ESCacheURL:             param.ESCacheURL,
+		ESCacheUsername:        param.ESCacheUsername,
+		ESCachePassword:        param.ESCachePassword,
+		AuthGrantType:          param.AuthGrantType,
+		AuthClientID:           param.AuthClientID,
+		AuthClientSecret:       param.AuthClientSecret,
+		AuthAudience:           param.AuthAudience,
+		AuthURL:                param.AuthURL,
+		Environment:            param.Environment,
 	}
 
 	fetcher, esClientProvider, err := buildServices(mgr)
@@ -173,8 +208,15 @@ func buildServices(m *Manager) (*Fetcher, ESClientProvider, error) {
 		return nil, nil, err
 	}
 
+	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(m.AffBaseURL, m.ProjectSlug, m.ESCacheURL, m.ESCacheUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.AuthURL)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	// Initialize fetcher object to get data from bugzilla rest api
-	fetcher := NewFetcher(*params, httpClientProvider, esClientProvider)
+	cache := make(map[string]libAffiliations.AffIdentity)
+	userCache := make(map[string]string)
+	fetcher := NewFetcher(*params, httpClientProvider, esClientProvider, affiliationsClientProvider, cache, userCache)
 
 	return fetcher, esClientProvider, err
 }
@@ -210,7 +252,7 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 		offset := 0
 		for result == m.FetchSize {
 			data := make([]elastic.BulkData, 0)
-			circleci, _, err := fetcher.FetchAll(m.Endpoint, m.Token, lastFetch, now, fromStr)
+			circleci, _, err := fetcher.FetchAll(m.Endpoint, m.Project, m.Token, lastFetch, now, fromStr)
 			if err != nil {
 				ch <- err
 				return
@@ -219,20 +261,20 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 			result = len(circleci)
 			offset += result
 			if result != 0 {
-				from = &circleci[len(circleci)-1].WorkflowCreatedAt
+				from = &circleci[len(circleci)-1].WorkflowStoppedAt
 			}
 
 			for _, payload := range circleci {
-				data = append(data, elastic.BulkData{IndexName: fmt.Sprintf("%s-raw", m.ESIndex), ID: payload.UUID, Data: payload})
+				data = append(data, elastic.BulkData{IndexName: fmt.Sprintf("%s", m.ESIndex), ID: payload.UUID, Data: payload})
 			}
 
 			if len(data) > 0 {
 				// Update changed at in elastic cache index
-				updateChan := HitSource{ID: fetchID, ChangedAt: circleci[len(circleci)-1].WorkflowCreatedAt}
+				updateChan := HitSource{ID: fetchID, ChangedAt: circleci[len(circleci)-1].WorkflowStoppedAt}
 				data = append(data, elastic.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: fetchID, Data: updateChan})
 
 				//set mapping and create index if not exists
-				err := m.esClientProvider.DelayOfCreateIndex(m.esClientProvider.CreateIndex, m.Retries, m.Delay, fmt.Sprintf("%s-raw", m.ESIndex), CircleCIRawMapping)
+				err := m.esClientProvider.DelayOfCreateIndex(m.esClientProvider.CreateIndex, m.Retries, m.Delay, fmt.Sprintf("%s", m.ESIndex), CircleCIRawMapping)
 				if err != nil {
 					ch <- err
 
