@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/LF-Engineering/da-ds/googlegroups"
 	"math/rand"
 	"time"
 
@@ -62,6 +63,13 @@ func runDS(ctx *lib.Ctx) (err error) {
 		ds = &lib.DSRocketchat{}
 	case pipermail.Pipermail:
 		manager, err := buildPipermailManager(ctx)
+		if err != nil {
+			fmt.Println(err)
+			return err
+		}
+		return manager.Sync()
+	case googlegroups.GoogleGroups:
+		manager, err := buildGoogleGroupsManager(ctx)
 		if err != nil {
 			fmt.Println(err)
 			return err
@@ -277,4 +285,35 @@ func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
 	}
 
 	return mgr, nil
+}
+
+func buildGoogleGroupsManager(ctx *lib.Ctx) (*googlegroups.Manager, error) {
+	origin := ctx.GoogleGroups.Origin.String()
+	slug := ctx.GoogleGroups.ProjectSlug.String()
+	groupName := ctx.GoogleGroups.GroupName.String()
+	fetcherBackendVersion := "0.0.1"
+	enricherBackendVersion := "0.0.1"
+	doFetch := ctx.GoogleGroups.DoFetch.Bool()
+	doEnrich := ctx.GoogleGroups.DoEnrich.Bool()
+	fromDate := ctx.GoogleGroups.FromDate.Date()
+	fetchSize := ctx.GoogleGroups.FetchSize.Int()
+	enrichSize := ctx.GoogleGroups.EnrichSize.Int()
+	project := ctx.GoogleGroups.Project.String()
+	esIndex := ctx.GoogleGroups.EsIndex.String()
+	affBaseURL := ctx.Env("AFFILIATIONS_API_BASE_URL")
+	esCacheURL := ctx.Env("ES_CACHE_URL")
+	esCacheUsername := ctx.Env("ES_CACHE_USERNAME")
+	esCachePassword := ctx.Env("ES_CACHE_PASSWORD")
+	authGrantType := ctx.Env("AUTH0_GRANT_TYPE")
+	authClientID := ctx.Env("AUTH0_CLIENT_ID")
+	authClientSecret := ctx.Env("AUTH0_CLIENT_SECRET")
+	authAudience := ctx.Env("AUTH0_AUDIENCE")
+	authURL := ctx.Env("AUTH0_BASE_URL")
+	env := ctx.Env("ENVIRONMENT")
+
+	mgr, err := googlegroups.NewManager(origin, slug, groupName, ctx.DBConn, fetcherBackendVersion, enricherBackendVersion,
+		doFetch, doEnrich, ctx.ESURL, "", "", esIndex, fromDate, project,
+		fetchSize, enrichSize, affBaseURL, esCacheURL, esCacheUsername, esCachePassword, authGrantType, authClientID, authClientSecret, authAudience, authURL, env)
+
+	return mgr, err
 }
