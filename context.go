@@ -68,6 +68,8 @@ type Ctx struct {
 	BugZilla *BugZilla
 
 	PiperMail *PiperMail
+
+	GoogleGroups *GoogleGroups
 }
 
 // Repository dockerhub repository data
@@ -92,6 +94,20 @@ type BugZilla struct {
 
 // PiperMail parameter context contains all required parameters to run Piper mail fetch and enrich
 type PiperMail struct {
+	Origin      *Flag
+	Project     *Flag
+	ProjectSlug *Flag
+	GroupName   *Flag
+	EsIndex     *Flag
+	FromDate    *Flag
+	DoFetch     *Flag
+	DoEnrich    *Flag
+	FetchSize   *Flag
+	EnrichSize  *Flag
+}
+
+// GoogleGroups parameter context contains all required parameters to run google groups fetch and enrich
+type GoogleGroups struct {
 	Origin      *Flag
 	Project     *Flag
 	ProjectSlug *Flag
@@ -130,6 +146,17 @@ func (ctx *Ctx) ParseFlags() {
 	flag.Var(ctx.PiperMail.DoEnrich, "pipermail-do-enrich", "To decide whether will do enrich raw data or not.")
 	flag.Var(ctx.PiperMail.FetchSize, "pipermail-fetch-size", "Total number of fetched items per request.")
 	flag.Var(ctx.PiperMail.EnrichSize, "pipermail-enrich-size", "Total number of enriched items per request.")
+
+	flag.Var(ctx.GoogleGroups.Origin, "googlegroups-origin", "GoogleGroups origin url")
+	flag.Var(ctx.GoogleGroups.ProjectSlug, "googlegroups-slug", "GoogleGroups project slug")
+	flag.Var(ctx.GoogleGroups.GroupName, "googlegroups-groupname", "GoogleGroups group name")
+	flag.Var(ctx.GoogleGroups.EsIndex, "googlegroups-es-index", "GoogleGroups es index base name")
+	flag.Var(ctx.GoogleGroups.FromDate, "googlegroups-from-date", "Optional, date to start syncing from")
+	flag.Var(ctx.GoogleGroups.Project, "googlegroups-project", "Slug name of a project e.g. yocto")
+	flag.Var(ctx.GoogleGroups.DoFetch, "googlegroups-do-fetch", "To decide whether will fetch raw data or not")
+	flag.Var(ctx.GoogleGroups.DoEnrich, "googlegroups-do-enrich", "To decide whether will do enrich raw data or not.")
+	flag.Var(ctx.GoogleGroups.FetchSize, "googlegroups-fetch-size", "Total number of fetched items per request.")
+	flag.Var(ctx.GoogleGroups.EnrichSize, "googlegroups-enrich-size", "Total number of enriched items per request.")
 
 	flag.Parse()
 }
