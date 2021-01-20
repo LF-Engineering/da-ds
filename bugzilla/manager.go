@@ -1,11 +1,10 @@
 package bugzilla
 
 import (
-	b64 "encoding/base64"
 	"fmt"
 	"time"
 
-	jsoniter "github.com/json-iterator/go"
+	"github.com/LF-Engineering/da-ds/util"
 
 	libAffiliations "github.com/LF-Engineering/dev-analytics-libraries/affiliation"
 
@@ -266,34 +265,24 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 				if err != nil {
 					ch <- err
 
-					byteData, err := jsoniter.Marshal(data)
+					err = util.HandleGapData(m.GapURL, m.fetcher.HTTPClientProvider, data)
 					if err != nil {
-						ch <- err
 						return
-					}
-					dataEnc := b64.StdEncoding.EncodeToString(byteData)
-					gapBody := map[string]string{"payload": dataEnc}
-					bData, err := jsoniter.Marshal(gapBody)
-					if err != nil {
-						ch <- err
-						return
-					}
-
-					if m.GapURL != "" {
-						_, _, err = m.fetcher.HTTPClientProvider.Request(m.GapURL, "POST", nil, bData, nil)
-						if err != nil {
-							ch <- err
-							return
-						}
 					}
 
 					continue
 				}
 
-				_, err = m.esClientProvider.BulkInsert(data)
+				ESRes, err := m.esClientProvider.BulkInsert(data)
 				if err != nil {
 					ch <- err
+					err = util.HandleGapData(m.GapURL, m.fetcher.HTTPClientProvider, data)
 					return
+				}
+
+				failedData, err := util.HandleFailedData(data, ESRes)
+				if len(failedData) != 0 {
+					err = util.HandleGapData(m.GapURL, m.fetcher.HTTPClientProvider, failedData)
 				}
 
 			}
@@ -394,18 +383,24 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 				// setting mapping and create index if not exists
 				if offset == 0 {
 					_, err := m.esClientProvider.CreateIndex(m.ESIndex, BugzillaEnrichMapping)
-
 					if err != nil {
 						ch <- err
+						err = util.HandleGapData(m.GapURL, m.fetcher.HTTPClientProvider, data)
 						return
 					}
 				}
 
 				// Insert enriched data to elasticsearch
-				_, err = m.esClientProvider.BulkInsert(data)
+				ESRes, err := m.esClientProvider.BulkInsert(data)
 				if err != nil {
 					ch <- err
+					err = util.HandleGapData(m.GapURL, m.fetcher.HTTPClientProvider, data)
 					return
+				}
+
+				failedData, err := util.HandleFailedData(data, ESRes)
+				if len(failedData) != 0 {
+					err = util.HandleGapData(m.GapURL, m.fetcher.HTTPClientProvider, failedData)
 				}
 			}
 

@@ -1,13 +1,12 @@
 package dockerhub
 
 import (
-	b64 "encoding/base64"
 	"errors"
 	"fmt"
 	"log"
 	"time"
 
-	jsoniter "github.com/json-iterator/go"
+	"github.com/LF-Engineering/da-ds/util"
 
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
 	"github.com/LF-Engineering/dev-analytics-libraries/http"
@@ -114,22 +113,9 @@ func (m *Manager) Sync() error {
 			// set mapping and create index if not exists
 			err = fetcher.ElasticSearchProvider.DelayOfCreateIndex(fetcher.ElasticSearchProvider.CreateIndex, m.Retries, m.Delay, fmt.Sprintf("%s-raw", repo.ESIndex), DockerhubRawMapping)
 			if err != nil {
-				byteData, err := jsoniter.Marshal(data)
+				err = util.HandleGapData(m.GapURL, fetcher.HTTPClientProvider, data)
 				if err != nil {
 					return err
-				}
-				dataEnc := b64.StdEncoding.EncodeToString(byteData)
-				gapBody := map[string]string{"payload": dataEnc}
-				bData, err := jsoniter.Marshal(gapBody)
-				if err != nil {
-					return err
-				}
-
-				if m.GapURL != "" {
-					_, _, err = fetcher.HTTPClientProvider.Request(m.GapURL, "POST", nil, bData, nil)
-					if err != nil {
-						return err
-					}
 				}
 				continue
 			}
@@ -137,9 +123,15 @@ func (m *Manager) Sync() error {
 
 		if len(data) > 0 {
 			// Insert raw data to elasticsearch
-			_, err = esClientProvider.BulkInsert(data)
+			ESRes, err := esClientProvider.BulkInsert(data)
 			if err != nil {
+				err = util.HandleGapData(m.GapURL, fetcher.HTTPClientProvider, data)
 				return err
+			}
+
+			failedData, err := util.HandleFailedData(data, ESRes)
+			if len(failedData) != 0 {
+				err = util.HandleGapData(m.GapURL, fetcher.HTTPClientProvider, failedData)
 			}
 		}
 	}
@@ -178,15 +170,15 @@ func (m *Manager) Sync() error {
 
 		if len(data) > 0 {
 			// Insert enriched data to elasticsearch
-			_, err = esClientProvider.BulkInsert(data)
+			ESRes, err := esClientProvider.BulkInsert(data)
 			if err != nil {
+				err = util.HandleGapData(m.GapURL, fetcher.HTTPClientProvider, data)
 				return err
 			}
 
-			// Insert enriched data to elasticsearch
-			_, err = esClientProvider.BulkInsert(data)
-			if err != nil {
-				return err
+			failedData, err := util.HandleFailedData(data, ESRes)
+			if len(failedData) != 0 {
+				err = util.HandleGapData(m.GapURL, fetcher.HTTPClientProvider, failedData)
 			}
 
 		}
