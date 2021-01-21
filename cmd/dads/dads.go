@@ -115,33 +115,47 @@ func main() {
 }
 
 func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
-	// Dockerhub credentials
-	username := ctx.Env("USERNAME")
-	password := ctx.Env("PASSWORD")
-	fetcherBackendVersion := "0.0.1"  //ctx.Env("FETCHER_BACKEND_VERSION")
-	enricherBackendVersion := "0.0.1" //ctx.Env("ENRICHER_BACKEND_VERSION")
-	esURL := ctx.ESURL
-	httpTimeout := ctx.Env("HTTP_TIMEOUT") // "60s" 60 seconds...
-	repositoriesJSON := ctx.Env("REPOSITORIES_JSON")
-	enrichOnly := ctx.NoRaw
-	enrich := ctx.Enrich
-	fromDate := ctx.DateFrom
-	noIncremental := ctx.BoolEnv("NO_INCREMENTAL")
-	retries := uint(ctx.Retry)
-	delay := ctx.Delay
-	gapURL := ctx.GapURL
 
-	var repositories []*dockerhub.Repository
-	if err := jsoniter.Unmarshal([]byte(repositoriesJSON), &repositories); err != nil {
+	var params dockerhub.Param
+
+	// Dockerhub credentials
+	params.Username = ctx.Env("USERNAME")
+	params.Password = ctx.Env("PASSWORD")
+	params.FetcherBackendVersion = "0.0.1"  //ctx.Env("FETCHER_BACKEND_VERSION")
+	params.EnricherBackendVersion = "0.0.1" //ctx.Env("ENRICHER_BACKEND_VERSION")
+	params.ESUrl = ctx.ESURL
+	params.EnrichOnly = ctx.NoRaw
+	params.Enrich = ctx.Enrich
+	params.FromDate = ctx.DateFrom
+	params.NoIncremental = ctx.BoolEnv("NO_INCREMENTAL")
+	params.Retries = uint(ctx.Retry)
+	params.Delay = ctx.Delay
+	params.GapURL = ctx.GapURL
+
+	params.AffBaseURL = ctx.Env("AFFILIATIONS_API_BASE_URL")
+	params.ESCacheURL = ctx.Env("ES_CACHE_URL")
+	params.ESCacheUsername = ctx.Env("ES_CACHE_USERNAME")
+	params.ESCachePassword = ctx.Env("ES_CACHE_PASSWORD")
+	params.AuthGrantType = ctx.Env("AUTH0_GRANT_TYPE")
+	params.AuthClientID = ctx.Env("AUTH0_CLIENT_ID")
+	params.AuthClientSecret = ctx.Env("AUTH0_CLIENT_SECRET")
+	params.AuthAudience = ctx.Env("AUTH0_AUDIENCE")
+	params.AuthURL = ctx.Env("AUTH0_BASE_URL")
+	params.Environment = ctx.Env("ENVIRONMENT")
+
+	repositoriesJSON := ctx.Env("REPOSITORIES_JSON")
+	if err := jsoniter.Unmarshal([]byte(repositoriesJSON), &params.Repositories); err != nil {
 		return nil, err
 	}
 
+	httpTimeout := ctx.Env("HTTP_TIMEOUT") // "60s" 60 seconds...
 	timeout, err := time.ParseDuration(httpTimeout)
 	if err != nil {
 		return nil, err
 	}
-	return dockerhub.NewManager(username, password, fetcherBackendVersion, enricherBackendVersion,
-		enrichOnly, enrich, esURL, timeout, repositories, fromDate, noIncremental, retries, delay, gapURL), nil
+	params.HTTPTimeout = timeout
+
+	return dockerhub.NewManager(params), nil
 }
 
 func buildJenkinsManager(ctx *lib.Ctx) (*jenkins.Manager, error) {

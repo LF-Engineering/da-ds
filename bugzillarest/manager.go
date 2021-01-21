@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/LF-Engineering/dev-analytics-libraries/auth0"
+
 	"github.com/LF-Engineering/da-ds/util"
 
 	libAffiliations "github.com/LF-Engineering/dev-analytics-libraries/affiliation"
@@ -59,6 +61,7 @@ type Manager struct {
 	esClientProvider ESClientProvider
 	fetcher          *Fetcher
 	enricher         *Enricher
+	Auth0            Auth0Client
 
 	Retries uint
 	Delay   time.Duration
@@ -134,7 +137,7 @@ func NewManager(param Param) (*Manager, error) {
 		Slug:                   param.Slug,
 	}
 
-	fetcher, enricher, esClientProvider, err := buildServices(mgr)
+	fetcher, enricher, esClientProvider, auth0Client, err := buildServices(mgr)
 	if err != nil {
 		return nil, err
 	}
@@ -142,6 +145,7 @@ func NewManager(param Param) (*Manager, error) {
 	mgr.fetcher = fetcher
 	mgr.enricher = enricher
 	mgr.esClientProvider = esClientProvider
+	mgr.Auth0 = auth0Client
 
 	return mgr, nil
 }
@@ -166,6 +170,11 @@ type NestedHits struct {
 type HitSource struct {
 	ID        string    `json:"id"`
 	ChangedAt time.Time `json:"changed_at"`
+}
+
+// Auth0Client ...
+type Auth0Client interface {
+	ValidateToken(env string) (string, error)
 }
 
 // Sync starts fetch and enrich processes
@@ -193,7 +202,7 @@ func (m *Manager) Sync() error {
 	return nil
 }
 
-func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
+func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, Auth0Client, error) {
 	httpClientProvider := http.NewClientProvider(m.HTTPTimeout)
 	params := &Params{
 		Endpoint:       m.Endpoint,
@@ -205,7 +214,7 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 		Password: m.ESPassword,
 	})
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	// Initialize fetcher object to get data from bugzilla rest api
@@ -213,13 +222,17 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 
 	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(m.AffBaseURL, m.Slug, m.ESCacheURL, m.ESCacheUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.AuthURL)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	// Initialize enrich object to enrich raw data
 	enricher := NewEnricher(m.EnricherBackendVersion, m.Project, affiliationsClientProvider)
 
-	return fetcher, enricher, esClientProvider, err
+	auth0Client, err := auth0.NewAuth0Client(m.ESCacheURL, m.ESUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.AuthURL)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	return fetcher, enricher, esClientProvider, auth0Client, err
 }
 
 func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan error {
@@ -277,8 +290,7 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 				err := m.esClientProvider.DelayOfCreateIndex(m.esClientProvider.CreateIndex, m.Retries, m.Delay, fmt.Sprintf("%s-raw", m.ESIndex), BugzillaRestRawMapping)
 				if err != nil {
 					ch <- err
-
-					err = util.HandleGapData(m.GapURL, m.fetcher.HTTPClientProvider, data)
+					err = util.HandleGapData(m.GapURL, m.fetcher.HTTPClientProvider, data, m.Auth0, m.Environment)
 					if err != nil {
 						return
 					}
@@ -289,13 +301,13 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 				ESRes, err := m.esClientProvider.BulkInsert(data)
 				if err != nil {
 					ch <- err
-					err = util.HandleGapData(m.GapURL, m.fetcher.HTTPClientProvider, data)
+					err = util.HandleGapData(m.GapURL, m.fetcher.HTTPClientProvider, data, m.Auth0, m.Environment)
 					return
 				}
 
 				failedData, err := util.HandleFailedData(data, ESRes)
 				if len(failedData) != 0 {
-					err = util.HandleGapData(m.GapURL, m.fetcher.HTTPClientProvider, failedData)
+					err = util.HandleGapData(m.GapURL, m.fetcher.HTTPClientProvider, failedData, m.Auth0, m.Environment)
 				}
 			}
 
@@ -390,7 +402,7 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 				_, err := m.esClientProvider.CreateIndex(m.ESIndex, BugzillaRestEnrichMapping)
 				if err != nil {
 					ch <- err
-					err = util.HandleGapData(m.GapURL, m.fetcher.HTTPClientProvider, data)
+					err = util.HandleGapData(m.GapURL, m.fetcher.HTTPClientProvider, data, m.Auth0, m.Environment)
 					return
 				}
 			}
@@ -405,13 +417,14 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 				ESRes, err := m.esClientProvider.BulkInsert(data)
 				if err != nil {
 					ch <- err
-					err = util.HandleGapData(m.GapURL, m.fetcher.HTTPClientProvider, data)
+
+					err = util.HandleGapData(m.GapURL, m.fetcher.HTTPClientProvider, data, m.Auth0, m.Environment)
 					return
 				}
 
 				failedData, err := util.HandleFailedData(data, ESRes)
 				if len(failedData) != 0 {
-					err = util.HandleGapData(m.GapURL, m.fetcher.HTTPClientProvider, failedData)
+					err = util.HandleGapData(m.GapURL, m.fetcher.HTTPClientProvider, data, m.Auth0, m.Environment)
 				}
 			}
 
