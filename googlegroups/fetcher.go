@@ -292,9 +292,9 @@ func (f *Fetcher) cleanupMessage(text string, output io.Writer) error {
 	return nil
 }
 
-func (f *Fetcher) formatJSONDataDate(s string) (*time.Time, error)  {
+func (f *Fetcher) formatJSONDataDate(s string) (*time.Time, error) {
 	layout := "02/01/06 03:04"
-	t, err := time.Parse(layout , s)
+	t, err := time.Parse(layout, s)
 	if err != nil {
 		return nil, err
 	}
