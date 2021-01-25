@@ -2,13 +2,11 @@ package googlegroups
 
 import (
 	"fmt"
-	"io/ioutil"
 	"strings"
 	"time"
 
 	"github.com/LF-Engineering/dev-analytics-libraries/affiliation"
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
-	jsoniter "github.com/json-iterator/go"
 )
 
 // Enricher contains google groups datasource enrich logic
@@ -28,39 +26,28 @@ func NewEnricher(esClientProvider *elastic.ClientProvider, affiliationsClientPro
 }
 
 // EnrichMessage enriches raw message
-func (e *Enricher) EnrichMessage(path string, now time.Time) ([]*EnrichedMessage, error) {
-	bites, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, err
+func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*EnrichedMessage, error) {
+
+	enrichedMessage := EnrichedMessage{
+		From:               rawMessage.From,
+		Date:               rawMessage.Date,
+		To:                 rawMessage.To,
+		MessageID:          rawMessage.MessageID,
+		InReplyTo:          rawMessage.InReplyTo,
+		References:         rawMessage.References,
+		Subject:            rawMessage.References,
+		MessageBody:        rawMessage.MessageBody,
+		TopicID:            rawMessage.TopicID,
+		BackendVersion:     rawMessage.BackendVersion,
+		UUID:               rawMessage.UUID,
+		MetadataUpdatedOn:  rawMessage.MetadataUpdatedOn,
+		BackendName:        fmt.Sprintf("%sEnrich", strings.Title(e.DSName)),
+		MetadataTimestamp:  rawMessage.MetadataTimestamp,
+		MetadataEnrichedOn: now,
+		ProjectSlug:        rawMessage.ProjectSlug,
+		GroupName:          rawMessage.GroupName,
+		Project:            rawMessage.Project,
+		ChangedAt:          rawMessage.ChangedAt,
 	}
-
-	var rawMessages GoogleGroupMessages
-	err = jsoniter.Unmarshal(bites, &rawMessages)
-	if err != nil {
-		return nil, err
-	}
-
-	var enrichedMessages []*EnrichedMessage
-	for i, message := range rawMessages.Messages {
-		messageDetails := message.Messages[i]
-		enrichedMessage := EnrichedMessage{
-			Topic:               message.Topic,
-			TopicID:             message.ID,
-			Message:             "",
-			ID:                  messageDetails.ID,
-			Author:              messageDetails.Author,
-			Date:                messageDetails.Date,
-			File:                messageDetails.File,
-			UUID:                "",
-			MetadataTimestamp:   time.Time{},
-			MetadataBackendName: fmt.Sprintf("%sEnrich", strings.Title(e.DSName)),
-			MetadataUpdatedOn:   time.Time{},
-			MetadataEnrichedOn:  time.Time{},
-			ChangedDate:         now,
-		}
-
-		enrichedMessages = append(enrichedMessages, &enrichedMessage)
-	}
-
-	return enrichedMessages, nil
+	return &enrichedMessage, nil
 }
