@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
+	jsoniter "github.com/json-iterator/go"
 	"io"
 	"io/ioutil"
 	"log"
@@ -20,7 +21,6 @@ import (
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 	"github.com/araddon/dateparse"
 	"github.com/jhillyerd/enmime"
-	jsoniter "github.com/json-iterator/go"
 )
 
 // Fetcher contains GoogleGroups datasource fetch logic
@@ -55,7 +55,7 @@ func NewFetcher(groupName, projectSlug, project string, httpClientProvider *http
 
 // Fetch ...
 func (f *Fetcher) Fetch(fromDate, now *time.Time) ([]*RawMessage, error) {
-
+	log.Println("IN Fetch")
 	cmd := exec.Command(script, f.GroupName)
 	_, err := cmd.Output()
 	if err != nil {
@@ -85,9 +85,9 @@ func (f *Fetcher) Fetch(fromDate, now *time.Time) ([]*RawMessage, error) {
 				fmt.Println("file exists: ", path)
 				continue
 			}
-
-			messageDate, err := dateparse.ParseAny(nMessage.Date)
+			messageDate, err := f.formatJSONDataDate(nMessage.Date)
 			if err != nil {
+				log.Println("date issue", err)
 				return nil, err
 			}
 
@@ -290,4 +290,13 @@ func (f *Fetcher) cleanupMessage(text string, output io.Writer) error {
 		}
 	}
 	return nil
+}
+
+func (f *Fetcher) formatJSONDataDate(s string) (*time.Time, error)  {
+	layout := "02/01/06 03:04"
+	t, err := time.Parse(layout , s)
+	if err != nil {
+		return nil, err
+	}
+	return &t, nil
 }
