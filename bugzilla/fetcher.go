@@ -96,8 +96,8 @@ func (f *Fetcher) FetchItem(fromDate time.Time, limit int, now time.Time) ([]*Bu
 		raw.BugID = bug.ID
 		raw.Product = bug.Product
 		raw.Component = bug.Component
-		raw.Assignee.Name = bug.AssignedTo.Name
-		raw.Assignee.Email = bug.AssignedTo.Email
+		raw.Assignee.Name = detail.Bug.AssignedTo.Name
+		raw.Assignee.Username = detail.Bug.AssignedTo.Value
 		raw.ShortDescription = bug.ShortDescription
 
 		deltaTS, err := time.Parse("2006-01-02 15:04:05", strings.TrimSuffix(detail.Bug.DeltaTS, " +0000"))
@@ -119,8 +119,9 @@ func (f *Fetcher) FetchItem(fromDate time.Time, limit int, now time.Time) ([]*Bu
 		raw.RepPlatform = detail.Bug.RepPlatform
 		raw.StatusWhiteboard = detail.Bug.StatusWhiteboard
 		raw.Resolution = detail.Bug.Resolution
-		raw.Reporter = detail.Bug.Reporter
-		raw.AssignedTo = detail.Bug.AssignedTo
+		raw.Reporter.Name = detail.Bug.Reporter.Name
+		raw.Reporter.Username = detail.Bug.Reporter.Value
+		raw.AssignedTo = detail.Bug.AssignedTo.Name
 		raw.Summary = detail.Bug.Summary
 		raw.LongDesc = detail.Bug.LongDesc
 

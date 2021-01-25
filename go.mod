@@ -3,7 +3,7 @@ module github.com/LF-Engineering/da-ds
 go 1.15
 
 require (
-	github.com/LF-Engineering/dev-analytics-libraries v0.3.3
+	github.com/LF-Engineering/dev-analytics-libraries v0.4.0
 	github.com/PuerkitoBio/goquery v1.6.0
 	github.com/andybalholm/cascadia v1.2.0 // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
