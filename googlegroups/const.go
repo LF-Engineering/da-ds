@@ -13,11 +13,11 @@ const (
 	// archivesBasePath ...
 	archivesBasePath = "/Users/code/da-ds/googlegroups/archives"
 	// jsonFilesBasePath ...
-	jsonFilesBasePath = "/Users/code/da-ds/googlegroups/jsonfiles"
+	jsonFilesBasePath = "/Users/code/da-ds/googlegroups/jsonfiles/"
 	// jsonExtension ...
 	jsonExtension = ".json"
 	// script ...
-	script = "./cmd.sh"
+	script = "./googlegroups/cmd.sh"
 )
 
 var (
