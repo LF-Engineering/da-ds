@@ -14,6 +14,9 @@ jsonFile=${jsonFilesDir}"/""$1".json
 current_time=$(date "+%Y.%m.%d-%H.%M.%S")
 logfile=${logsDir}"$1".${current_time}.txt
 
+# delete existing json file
+rm -rf "${jsonFile}"
+
 if [ -e "$venv" ]; then
   source $venv/bin/activate
   scrapy runspider -a name="$1" -o "${jsonFile}" -t json ${mboxScript} > "${logfile}" 2>&1
