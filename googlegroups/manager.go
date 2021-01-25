@@ -124,8 +124,14 @@ func (m *Manager) Sync() error {
 	status["doneFetch"] = !m.Fetch
 	status["doneEnrich"] = !m.Enrich
 
+	fetchCh := m.fetch(m.fetcher, lastActionCachePostfix)
+
 	for status["doneFetch"] == false || status["doneEnrich"] == false {
 		select {
+		case err := <-fetchCh:
+			if err == nil {
+				status["doneFetch"] = true
+			}
 		case err := <-m.enrich(m.enricher, lastActionCachePostfix):
 			if err == nil {
 				status["doneEnrich"] = true
