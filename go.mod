@@ -7,6 +7,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.6.0
 	github.com/andybalholm/cascadia v1.2.0 // indirect
 	github.com/araddon/dateparse v0.0.0-20201001162425-8aadafed4dc4
+	github.com/badoux/checkmail v1.2.1
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
 	github.com/elastic/go-elasticsearch/v7 v7.10.0
 	github.com/galdor/go-mbox v0.0.0-20170509063637-183f307051a6 // indirect
