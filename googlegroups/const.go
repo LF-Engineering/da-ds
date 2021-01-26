@@ -18,6 +18,8 @@ const (
 	jsonExtension = ".json"
 	// script ...
 	script = "./googlegroups/cmd.sh"
+	// Unknown ...
+	Unknown = "Unknown"
 )
 
 var (
