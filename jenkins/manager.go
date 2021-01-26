@@ -107,7 +107,7 @@ func (m *Manager) Sync() error {
 			// Insert raw data to elasticsearch
 			// Process in bulk
 			log.Println("Exporting fetched builds to raw indices")
-			for start:=0; start<len(data); start+=m.BulkSize {
+			for start := 0; start < len(data); start += m.BulkSize {
 				end := start + m.BulkSize
 				if end > len(data) {
 					end = len(data)
@@ -164,7 +164,7 @@ func (m *Manager) Sync() error {
 			log.Println("Exporting enriched builds to enriched indices")
 
 			// Process in bulk
-			for start:=0; start<len(data); start+=m.BulkSize {
+			for start := 0; start < len(data); start += m.BulkSize {
 				end := start + m.BulkSize
 				if end > len(data) {
 					end = len(data)
