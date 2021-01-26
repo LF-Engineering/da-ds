@@ -288,7 +288,6 @@ func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
 }
 
 func buildGoogleGroupsManager(ctx *lib.Ctx) (*googlegroups.Manager, error) {
-	origin := ctx.GoogleGroups.Origin.String()
 	slug := ctx.GoogleGroups.ProjectSlug.String()
 	groupName := ctx.GoogleGroups.GroupName.String()
 	fetcherBackendVersion := "0.0.1"
@@ -311,7 +310,7 @@ func buildGoogleGroupsManager(ctx *lib.Ctx) (*googlegroups.Manager, error) {
 	authURL := ctx.Env("AUTH0_BASE_URL")
 	env := ctx.Env("ENVIRONMENT")
 
-	mgr, err := googlegroups.NewManager(origin, slug, groupName, ctx.DBConn, fetcherBackendVersion, enricherBackendVersion,
+	mgr, err := googlegroups.NewManager(slug, groupName, ctx.DBConn, fetcherBackendVersion, enricherBackendVersion,
 		doFetch, doEnrich, ctx.ESURL, "", "", esIndex, fromDate, project,
 		fetchSize, enrichSize, affBaseURL, esCacheURL, esCacheUsername, esCachePassword, authGrantType, authClientID, authClientSecret, authAudience, authURL, env)
 

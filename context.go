@@ -108,7 +108,6 @@ type PiperMail struct {
 
 // GoogleGroups parameter context contains all required parameters to run google groups fetch and enrich
 type GoogleGroups struct {
-	Origin      *Flag
 	Project     *Flag
 	ProjectSlug *Flag
 	GroupName   *Flag
@@ -147,7 +146,6 @@ func (ctx *Ctx) ParseFlags() {
 	flag.Var(ctx.PiperMail.FetchSize, "pipermail-fetch-size", "Total number of fetched items per request.")
 	flag.Var(ctx.PiperMail.EnrichSize, "pipermail-enrich-size", "Total number of enriched items per request.")
 
-	flag.Var(ctx.GoogleGroups.Origin, "googlegroups-origin", "GoogleGroups origin url")
 	flag.Var(ctx.GoogleGroups.ProjectSlug, "googlegroups-slug", "GoogleGroups project slug")
 	flag.Var(ctx.GoogleGroups.GroupName, "googlegroups-groupname", "GoogleGroups group name")
 	flag.Var(ctx.GoogleGroups.EsIndex, "googlegroups-es-index", "GoogleGroups es index base name")
@@ -394,6 +392,18 @@ func (ctx *Ctx) Init() {
 
 	ctx.PiperMail = &PiperMail{
 		Origin:      NewFlag(),
+		Project:     NewFlag(),
+		ProjectSlug: NewFlag(),
+		GroupName:   NewFlag(),
+		EsIndex:     NewFlag(),
+		FromDate:    NewFlag(),
+		DoFetch:     NewFlag(),
+		DoEnrich:    NewFlag(),
+		FetchSize:   NewFlag(),
+		EnrichSize:  NewFlag(),
+	}
+
+	ctx.GoogleGroups = &GoogleGroups{
 		Project:     NewFlag(),
 		ProjectSlug: NewFlag(),
 		GroupName:   NewFlag(),
