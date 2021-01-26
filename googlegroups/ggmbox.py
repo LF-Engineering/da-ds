@@ -21,7 +21,7 @@ class GoogleGroupMBoxSpider(scrapy.Spider):
         """
         Initializes a new instance of GoogleGroupMBoxSpider class.
 
-        :param name: group name, e.g. "golang-nuts".
+        :param name: group name, e.g. "golang-nuts" or "finos.org/dav" for organization groups.
         :param template: `str.format()` raw email file name template. Supported keys: \
                          topic - topic identifier, \
                          index - message index in the thread, \
@@ -35,10 +35,24 @@ class GoogleGroupMBoxSpider(scrapy.Spider):
         self.name = name
         self.output = output.format(name=name)
         self.template = template
-        self.root = root
-        if not prefix.endswith("/"):
-            prefix += "/"
-        self.prefix = prefix + "forum"
+
+        """
+        handle organization groups
+        """
+        is_org = name.find('/')
+        if is_org == -1:
+            self.root = root
+        else:
+            split_string = name.split("/", 1)
+            org = split_string[0]
+            new_root = "%s/a/%s" % (root, org)
+            self.name = split_string[1]
+            name = split_string[1]
+            self.root = new_root
+
+        # if not prefix.endswith("/"):
+        #     prefix += "/"
+        self.prefix = "forum"
         self.start_urls = ["%s/%s/?_escaped_fragment_=forum/%s" % (self.root, self.prefix, name)]
 
     def parse(self, response: scrapy.http.response.html.HtmlResponse):
