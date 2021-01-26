@@ -258,6 +258,7 @@ func (f *Fetcher) getMessage(archive map[string][]*enmime.Envelope, now *time.Ti
 		rawMessage.ProjectSlug = f.ProjectSlug
 		rawMessage.Project = f.Project
 		rawMessage.UUID = uuID
+		rawMessage.BackendName = fmt.Sprintf("%sFetch", strings.Title(GoogleGroups))
 	}
 	return
 }
