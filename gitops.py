@@ -2,9 +2,15 @@
 # -*- coding: utf-8 -*-
 #cython: language_level=3
 
-import os, logging, datetime, json, subprocess, sys
+import os
+import logging
+import datetime
+import json
+import subprocess
+import sys
 from urllib.parse import urlparse
 from sys import argv
+
 
 class GitOps:
 
@@ -64,7 +70,11 @@ class GitOps:
 
     @staticmethod
     def __get_processed_uri(uri):
-        return uri.lstrip('/').replace('.git', '')
+        removal = '.git'
+        reverse_removal = removal[::-1]
+        replacement = ''
+        reverse_replacement = replacement[::-1]
+        return uri[::-1].replace(reverse_removal, reverse_replacement, 1)[::-1]
 
     def __get_base_path(self):
         return os.path.expanduser(self.base_path)
@@ -336,7 +346,7 @@ class GitOps:
         os.chdir(os.path.abspath(self.repo_path))
 
         cmd_fetch = ['git', 'fetch']
-        cmd_fetch_p = ['git', 'fetch']
+        cmd_fetch_p = ['git', 'fetch', '-p']
 
         env = {
             'LANG': 'C',
@@ -434,33 +444,52 @@ class GitOps:
             self.uptodate = self._pull()
 
     def get_stats(self):
-        loc = self._get_cache_item(self.repo_name, 'loc')
-        pls = self._get_cache_item(self.repo_name, 'pls')
+        loc = 0
+        pls = list()
+        try:
+            # Get the cache loc and pls for fallback
+            cache_loc = self._get_cache_item(self.repo_name, 'loc')
+            cache_pls = self._get_cache_item(self.repo_name, 'pls')
 
-        if not self.uptodate or (loc == 0 and len(pls) == 0):
+            # Calculate the loc from source
             result = self._stats(self.repo_path)
+
+            # extract new the loc and pls
             loc = self._loc(result)
             pls = self._pls(result)
-            self._update_cache_item(project_name=self.repo_name,
-                                    key='loc',
-                                    value=loc)
-            self._update_cache_item(project_name=self.repo_name,
-                                    key='pls',
-                                    value=pls)
-            utc_date = datetime.datetime.utcnow()
-            if utc_date.tzinfo is None:
-                utc_date = utc_date.replace(tzinfo=datetime.timezone.utc)
-            self._update_cache_item(project_name=self.repo_name,
-                                    key='timestamp',
-                                    value=utc_date.isoformat())
-            self._write_json_file(data=self._cache,
-                                  path=self.__get_cache_path(),
-                                  filename=self.cache_file_name)
 
-        return loc, pls
+            logger.debug("Cache loc value %s", cache_loc)
+            logger.debug("New loc value %s", loc)
 
-    def is_errored(self):
-        return self.errored
+            if loc == 0:
+                logger.debug("LOC Value set from old cache")
+                # Set cache_loc value if new extracted one will be the zero
+                loc = cache_loc
+                pls = cache_pls
+            else:
+                logger.debug("Updating LOC value in cache")
+                # update the cache with new value and timestamp
+                self._update_cache_item(project_name=self.repo_name,
+                                        key='loc',
+                                        value=loc)
+                self._update_cache_item(project_name=self.repo_name,
+                                        key='pls',
+                                        value=pls)
+                utc_date = datetime.datetime.utcnow()
+                if utc_date.tzinfo is None:
+                    utc_date = utc_date.replace(tzinfo=datetime.timezone.utc)
+                self._update_cache_item(project_name=self.repo_name,
+                                        key='timestamp',
+                                        value=utc_date.isoformat())
+                self._write_json_file(data=self._cache,
+                                      path=self.__get_cache_path(),
+                                      filename=self.cache_file_name)
+        except Exception as se:
+            logger.error("LOC error %s", str(se))
+        finally:
+            logger.debug("Final LOC value %s", loc)
+            return loc, pls
+
 
 logger = logging.getLogger(__name__)
 git_ops = GitOps(argv[1])
@@ -471,4 +500,4 @@ if os.getenv('SKIP_CLEANUP', '') == '':
     git_ops._clean()
 if git_ops.is_errored():
     sys.exit(1)
-print (json.dumps({'loc':loc,'pls':pls}))
+print(json.dumps({'loc': loc, 'pls': pls}))
