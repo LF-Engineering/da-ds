@@ -2,11 +2,12 @@ package dockerhub
 
 import (
 	b64 "encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"time"
+
+	jsoniter "github.com/json-iterator/go"
 
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
 	"github.com/LF-Engineering/dev-analytics-libraries/http"
@@ -113,14 +114,13 @@ func (m *Manager) Sync() error {
 			// set mapping and create index if not exists
 			err = fetcher.ElasticSearchProvider.DelayOfCreateIndex(fetcher.ElasticSearchProvider.CreateIndex, m.Retries, m.Delay, fmt.Sprintf("%s-raw", repo.ESIndex), DockerhubRawMapping)
 			if err != nil {
-
-				byteData, err := json.Marshal(data)
+				byteData, err := jsoniter.Marshal(data)
 				if err != nil {
 					return err
 				}
 				dataEnc := b64.StdEncoding.EncodeToString(byteData)
 				gapBody := map[string]string{"payload": dataEnc}
-				bData, err := json.Marshal(gapBody)
+				bData, err := jsoniter.Marshal(gapBody)
 				if err != nil {
 					return err
 				}
@@ -181,15 +181,6 @@ func (m *Manager) Sync() error {
 			_, err = esClientProvider.BulkInsert(data)
 			if err != nil {
 				return err
-			}
-
-			// Add/Update latest document in each origin
-			for _, repo := range data {
-				repo.ID = fmt.Sprintf("%s_%s", repo.Data.(*RepositoryEnrich).ID, repo.Data.(*RepositoryEnrich).RepositoryType)
-				repo.Data.(*RepositoryEnrich).IsDockerImage = 1
-				repo.Data.(*RepositoryEnrich).IsEvent = 0
-
-				data = append(data, repo)
 			}
 
 			// Insert enriched data to elasticsearch

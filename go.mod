@@ -17,7 +17,6 @@ require (
 	github.com/jhillyerd/enmime v0.8.4
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/json-iterator/go v1.1.10
-	github.com/kr/text v0.2.0 // indirect
 	github.com/lib/pq v1.9.0 // indirect
 	github.com/mattn/go-sqlite3 v1.14.5 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect

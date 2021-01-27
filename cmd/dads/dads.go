@@ -209,6 +209,19 @@ func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 
 	params.GapURL = ctx.GapURL
 
+	params.AffBaseURL = ctx.Env("AFFILIATIONS_API_BASE_URL")
+	params.ESCacheURL = ctx.Env("ES_CACHE_URL")
+	params.ESCacheUsername = ctx.Env("ES_CACHE_USERNAME")
+	params.ESCachePassword = ctx.Env("ES_CACHE_PASSWORD")
+	params.AuthGrantType = ctx.Env("AUTH0_GRANT_TYPE")
+
+	params.AuthClientID = ctx.Env("AUTH0_CLIENT_ID")
+	params.AuthClientSecret = ctx.Env("AUTH0_CLIENT_SECRET")
+	params.AuthAudience = ctx.Env("AUTH0_AUDIENCE")
+
+	params.AuthURL = ctx.Env("AUTH0_BASE_URL")
+	params.Environment = ctx.Env("ENVIRONMENT")
+
 	mgr, err := bugzilla.NewManager(params)
 	if err != nil {
 		return nil, err
@@ -251,7 +264,6 @@ func buildPipermailManager(ctx *lib.Ctx) (*pipermail.Manager, error) {
 func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
 	var params bugzillarest.Param
 	params.EndPoint = ctx.BugZilla.Origin.String()
-
 	params.ShConnStr = fmt.Sprintf("%s:%s@tcp(%s)/%s", ctx.DBUser, ctx.DBPass, ctx.DBHost, ctx.DBName)
 	params.FetcherBackendVersion = "0.1.0"
 	params.EnricherBackendVersion = "0.1.0"
@@ -278,6 +290,18 @@ func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
 	}
 
 	params.GapURL = ctx.GapURL
+	params.Slug = ctx.BugZilla.ProjectSlug.String()
+
+	params.AffBaseURL = ctx.Env("AFFILIATIONS_API_BASE_URL")
+	params.ESCacheURL = ctx.Env("ES_CACHE_URL")
+	params.ESCacheUsername = ctx.Env("ES_CACHE_USERNAME")
+	params.ESCachePassword = ctx.Env("ES_CACHE_PASSWORD")
+	params.AuthGrantType = ctx.Env("AUTH0_GRANT_TYPE")
+	params.AuthClientID = ctx.Env("AUTH0_CLIENT_ID")
+	params.AuthClientSecret = ctx.Env("AUTH0_CLIENT_SECRET")
+	params.AuthAudience = ctx.Env("AUTH0_AUDIENCE")
+	params.AuthURL = ctx.Env("AUTH0_BASE_URL")
+	params.Environment = ctx.Env("ENVIRONMENT")
 
 	mgr, err := bugzillarest.NewManager(params)
 	if err != nil {

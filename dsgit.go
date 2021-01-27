@@ -529,10 +529,12 @@ func (*DSGit) ExtractPrevFileName(f string) (res string) {
 	j := strings.Index(f, "}")
 	if i > -1 && j > -1 {
 		k := IndexAt(f, " => ", i)
-		prefix := f[:i]
-		inner := f[i+1 : k]
-		suffix := f[j+1:]
-		res = prefix + inner + suffix
+		if k > -1 {
+			prefix := f[:i]
+			inner := f[i+1 : k]
+			suffix := f[j+1:]
+			res = prefix + inner + suffix
+		}
 	} else if strings.Index(f, " => ") > -1 {
 		res = strings.Split(f, " => ")[0]
 	} else {
