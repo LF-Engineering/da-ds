@@ -155,6 +155,10 @@ func buildJenkinsManager(ctx *lib.Ctx) (*jenkins.Manager, error) {
 	enrichOnly := ctx.NoRaw
 	enrich := ctx.Enrich
 	fromDate := ctx.DateFrom
+	bulkSize := ctx.ESBulkSize
+	if bulkSize == 0 {
+		bulkSize = 1000
+	}
 	var buildServers []*jenkins.BuildServer
 	if err := jsoniter.Unmarshal([]byte(jenkinsJSON), &buildServers); err != nil {
 		return nil, err
@@ -164,13 +168,13 @@ func buildJenkinsManager(ctx *lib.Ctx) (*jenkins.Manager, error) {
 		return nil, err
 	}
 	return jenkins.NewManager(fetcherBackendVersion, enricherBackendVersion,
-		enrichOnly, enrich, esURL, timeout, buildServers, fromDate, noIncremental), nil
+		enrichOnly, enrich, esURL, timeout, buildServers, fromDate, noIncremental, bulkSize), nil
 }
 
 func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 	var params bugzilla.Param
 	params.EndPoint = ctx.BugZilla.Origin.String()
-	params.ShConnStr = fmt.Sprintf("%s:%s@%s/%s", ctx.DBUser, ctx.DBPass, ctx.DBHost, ctx.DBName)
+	params.ShConnStr = fmt.Sprintf("%s:%s@tcp(%s)/%s", ctx.DBUser, ctx.DBPass, ctx.DBHost, ctx.DBName)
 	params.FetcherBackendVersion = "0.1.0"
 	params.EnricherBackendVersion = "0.1.0"
 	params.ESUrl = ctx.ESURL
@@ -184,9 +188,31 @@ func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 	params.Project = ctx.BugZilla.Project.String()
 	params.EsIndex = ctx.RichIndex
 
-	params.Retries = uint(ctx.Retry)
-	params.Delay = ctx.Delay
+	params.Retries = uint(3)
+	if ctx.Retry != 0 {
+		params.Retries = uint(ctx.Retry)
+	}
+
+	params.Delay = 2 * time.Second
+	if ctx.Delay != 0*time.Second {
+		params.Delay = ctx.Delay
+
+	}
+
 	params.GapURL = ctx.GapURL
+
+	params.AffBaseURL = ctx.Env("AFFILIATIONS_API_BASE_URL")
+	params.ESCacheURL = ctx.Env("ES_CACHE_URL")
+	params.ESCacheUsername = ctx.Env("ES_CACHE_USERNAME")
+	params.ESCachePassword = ctx.Env("ES_CACHE_PASSWORD")
+	params.AuthGrantType = ctx.Env("AUTH0_GRANT_TYPE")
+
+	params.AuthClientID = ctx.Env("AUTH0_CLIENT_ID")
+	params.AuthClientSecret = ctx.Env("AUTH0_CLIENT_SECRET")
+	params.AuthAudience = ctx.Env("AUTH0_AUDIENCE")
+
+	params.AuthURL = ctx.Env("AUTH0_BASE_URL")
+	params.Environment = ctx.Env("ENVIRONMENT")
 
 	mgr, err := bugzilla.NewManager(params)
 	if err != nil {
@@ -230,7 +256,7 @@ func buildPipermailManager(ctx *lib.Ctx) (*pipermail.Manager, error) {
 func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
 	var params bugzillarest.Param
 	params.EndPoint = ctx.BugZilla.Origin.String()
-	params.ShConnStr = fmt.Sprintf("%s:%s@%s/%s", ctx.DBUser, ctx.DBPass, ctx.DBHost, ctx.DBName)
+	params.ShConnStr = fmt.Sprintf("%s:%s@tcp(%s)/%s", ctx.DBUser, ctx.DBPass, ctx.DBHost, ctx.DBName)
 	params.FetcherBackendVersion = "0.1.0"
 	params.EnricherBackendVersion = "0.1.0"
 	params.ESUrl = ctx.ESURL
@@ -242,11 +268,32 @@ func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
 	params.FetchSize = ctx.BugZilla.FetchSize.Int()
 	params.EnrichSize = ctx.BugZilla.EnrichSize.Int()
 	params.Project = ctx.BugZilla.Project.String()
-	params.EsIndex = ctx.BugZilla.EsIndex.String()
+	params.EsIndex = ctx.RichIndex
 
-	params.Retries = uint(ctx.Retry)
-	params.Delay = ctx.Delay
+	params.Retries = uint(3)
+	if ctx.Retry != 0 {
+		params.Retries = uint(ctx.Retry)
+	}
+
+	params.Delay = 2 * time.Second
+	if ctx.Delay != 0*time.Second {
+		params.Delay = ctx.Delay
+
+	}
+
 	params.GapURL = ctx.GapURL
+	params.Slug = ctx.BugZilla.ProjectSlug.String()
+
+	params.AffBaseURL = ctx.Env("AFFILIATIONS_API_BASE_URL")
+	params.ESCacheURL = ctx.Env("ES_CACHE_URL")
+	params.ESCacheUsername = ctx.Env("ES_CACHE_USERNAME")
+	params.ESCachePassword = ctx.Env("ES_CACHE_PASSWORD")
+	params.AuthGrantType = ctx.Env("AUTH0_GRANT_TYPE")
+	params.AuthClientID = ctx.Env("AUTH0_CLIENT_ID")
+	params.AuthClientSecret = ctx.Env("AUTH0_CLIENT_SECRET")
+	params.AuthAudience = ctx.Env("AUTH0_AUDIENCE")
+	params.AuthURL = ctx.Env("AUTH0_BASE_URL")
+	params.Environment = ctx.Env("ENVIRONMENT")
 
 	mgr, err := bugzillarest.NewManager(params)
 	if err != nil {

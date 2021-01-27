@@ -63,6 +63,7 @@ type Ctx struct {
 	Retries            uint
 	Delay              time.Duration
 	Repository         []Repository
+	AffAPI             string
 
 	// Bugzilla contains all bugzilla params
 	BugZilla *BugZilla
@@ -80,14 +81,15 @@ type Repository struct {
 
 // BugZilla parameter context contains all required parameters to run Bugzilla fetch and enrich
 type BugZilla struct {
-	Origin     *Flag
-	EsIndex    *Flag
-	FromDate   *Flag
-	Project    *Flag
-	DoFetch    *Flag
-	DoEnrich   *Flag
-	FetchSize  *Flag
-	EnrichSize *Flag
+	Origin      *Flag
+	EsIndex     *Flag
+	FromDate    *Flag
+	Project     *Flag
+	DoFetch     *Flag
+	DoEnrich    *Flag
+	FetchSize   *Flag
+	EnrichSize  *Flag
+	ProjectSlug *Flag
 }
 
 // PiperMail parameter context contains all required parameters to run Piper mail fetch and enrich
@@ -119,6 +121,7 @@ func (ctx *Ctx) ParseFlags() {
 	flag.Var(ctx.BugZilla.DoEnrich, "bugzilla-do-enrich", "To decide whether will do enrich raw data or not.")
 	flag.Var(ctx.BugZilla.FetchSize, "bugzilla-fetch-size", "Total number of fetched items per request.")
 	flag.Var(ctx.BugZilla.EnrichSize, "bugzilla-enrich-size", "Total number of enriched items per request.")
+	flag.Var(ctx.PiperMail.ProjectSlug, "bugzilla-slug", "Bugzilla project slug")
 
 	flag.Var(ctx.PiperMail.Origin, "pipermail-origin", "Pipermail origin url")
 	flag.Var(ctx.PiperMail.ProjectSlug, "pipermail-slug", "Pipermail project slug")

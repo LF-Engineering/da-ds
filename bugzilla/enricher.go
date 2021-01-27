@@ -2,35 +2,37 @@ package bugzilla
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
-	"github.com/LF-Engineering/da-ds/affiliation"
+	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 
+	libAffiliations "github.com/LF-Engineering/dev-analytics-libraries/affiliation"
 	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
 )
 
 // Enricher enrich Bugzilla raw
 type Enricher struct {
-	identityProvider IdentityProvider
-	DSName           string
-	BackendVersion   string
-	Project          string
+	DSName             string
+	BackendVersion     string
+	Project            string
+	affiliationsClient AffiliationClient
 }
 
-// IdentityProvider manages user identity
-type IdentityProvider interface {
-	GetIdentity(key string, val string) (*affiliation.Identity, error)
-	GetOrganizations(uuid string, date time.Time) ([]string, error)
+// AffiliationClient manages user identity
+type AffiliationClient interface {
+	GetIdentityByUser(key string, value string) (*libAffiliations.AffIdentity, error)
+	AddIdentity(identity *libAffiliations.Identity) bool
 }
 
 // NewEnricher intiate a new enricher instance
-func NewEnricher(identProvider IdentityProvider, backendVersion string, project string) *Enricher {
+func NewEnricher(backendVersion string, project string, affiliationsClient AffiliationClient) *Enricher {
 	return &Enricher{
-		identityProvider: identProvider,
-		DSName:           Bugzilla,
-		BackendVersion:   backendVersion,
-		Project:          project,
+		DSName:             Bugzilla,
+		BackendVersion:     backendVersion,
+		Project:            project,
+		affiliationsClient: affiliationsClient,
 	}
 }
 
@@ -69,56 +71,86 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 	}
 	unknown := "Unknown"
 	multiOrgs := []string{unknown}
-	if rawItem.AssignedTo != "" {
-		enriched.Assigned = rawItem.AssignedTo
+
+	if rawItem.Assignee.Username != "" && rawItem.Assignee.Name != "" {
+		enriched.Assigned = rawItem.Assignee.Username
 
 		// Enrich assigned to
 		assignedToFieldName := "username"
 		if strings.Contains(rawItem.AssignedTo, "@") {
 			assignedToFieldName = "email"
 		}
-
-		assignedTo, err := e.identityProvider.GetIdentity(assignedToFieldName, enriched.Assigned)
+		assignedTo, err := e.affiliationsClient.GetIdentityByUser(assignedToFieldName, rawItem.Assignee.Username)
 		if err == nil {
-			enriched.AssignedToID = assignedTo.ID.String
-			enriched.AssignedToUUID = assignedTo.UUID.String
-			enriched.AssignedToName = assignedTo.Name.String
-			enriched.AssignedToUserName = assignedTo.Username.String
-			enriched.AssignedToDomain = assignedTo.Domain.String
-			enriched.AssignedToBot = assignedTo.IsBot
+			enriched.AssignedToID = *assignedTo.ID
+			enriched.AssignedToUUID = *assignedTo.UUID
+			enriched.AssignedToName = assignedTo.Name
+			enriched.AssignedToUserName = assignedTo.Username
+			enriched.AssignedToDomain = assignedTo.Domain
+			if *assignedTo.IsBot != 0 {
+				enriched.AssignedToBot = true
+			}
 
-			if assignedTo.Gender.Valid {
-				enriched.AssignedToGender = assignedTo.Gender.String
+			if assignedTo.Gender != nil {
+				enriched.AssignedToGender = *assignedTo.Gender
 			} else {
 				enriched.AssignedToGender = unknown
 			}
 
 			if assignedTo.GenderACC != nil {
-				enriched.AssignedToGenderAcc = *assignedTo.GenderACC
+				enriched.AssignedToGenderAcc = int(*assignedTo.GenderACC)
 			} else {
 				enriched.AssignedToGenderAcc = 0
 			}
 
-			if assignedTo.OrgName.Valid {
-				enriched.AssignedToOrgName = assignedTo.OrgName.String
+			if assignedTo.OrgName != nil {
+				enriched.AssignedToOrgName = *assignedTo.OrgName
 			} else {
 				enriched.AssignedToOrgName = unknown
 			}
 
-			assignedToMultiOrg, err := e.identityProvider.GetOrganizations(assignedTo.UUID.String, enriched.MetadataUpdatedOn)
-			if err == nil {
+			enriched.AssignedToMultiOrgName = multiOrgs
+
+			if len(assignedTo.MultiOrgNames) != 0 {
+				enriched.AssignedToMultiOrgName = assignedTo.MultiOrgNames
+			}
+		} else {
+			assignee := rawItem.Assignee
+			source := Bugzilla
+			authorUUID, err := uuid.GenerateIdentity(&source, &assignee.Username, &assignee.Name, nil)
+			if err != nil {
+				fmt.Println(err)
+				return nil, err
+			}
+
+			userIdentity := libAffiliations.Identity{
+				LastModified: time.Now(),
+				Name:         assignee.Name,
+				Source:       Bugzilla,
+				Email:        assignee.Username,
+				UUID:         authorUUID,
+			}
+
+			ok := e.affiliationsClient.AddIdentity(&userIdentity)
+			if !ok {
+				log.Printf("failed to add identity for [%+v]", assignee.Username)
+			} else {
+				log.Printf("added identity for [%+v]", assignee.Username)
+				// add enriched data
+				enriched.AssignedToID = authorUUID
+				enriched.AssignedToUUID = authorUUID
+				enriched.AssignedToName = assignee.Name
+				enriched.AssignedToUserName = assignee.Username
+				enriched.AssignedToOrgName = unknown
 				enriched.AssignedToMultiOrgName = multiOrgs
 
-				if len(assignedToMultiOrg) != 0 {
-					enriched.AssignedToMultiOrgName = assignedToMultiOrg
-				}
 			}
 		}
 	}
 
-	if rawItem.Reporter != "" {
-		enriched.ReporterUserName = rawItem.Reporter
-		enriched.AuthorName = rawItem.Reporter
+	if rawItem.Reporter.Username != "" {
+		enriched.ReporterUserName = rawItem.Reporter.Username
+		enriched.AuthorName = rawItem.Reporter.Username
 
 		// Enrich reporter
 		reporterFieldName := "username"
@@ -126,55 +158,92 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 			reporterFieldName = "email"
 		}
 
-		reporter, err := e.identityProvider.GetIdentity(reporterFieldName, enriched.ReporterUserName)
-
+		reporter, err := e.affiliationsClient.GetIdentityByUser(reporterFieldName, enriched.ReporterUserName)
 		if err == nil {
-			enriched.ReporterID = reporter.ID.String
-			enriched.ReporterUUID = reporter.UUID.String
-			enriched.ReporterName = reporter.Name.String
-			enriched.ReporterUserName = reporter.Username.String
-			enriched.ReporterDomain = reporter.Domain.String
+			enriched.ReporterID = *reporter.ID
+			enriched.ReporterUUID = *reporter.UUID
+			enriched.ReporterName = reporter.Name
+			enriched.ReporterUserName = reporter.Username
+			enriched.ReporterDomain = reporter.Domain
 
-			enriched.AuthorID = reporter.ID.String
-			enriched.AuthorUUID = reporter.UUID.String
-			enriched.AuthorName = reporter.Name.String
-			enriched.AuthorUserName = reporter.Username.String
-			enriched.AuthorDomain = reporter.Domain.String
+			enriched.AuthorID = *reporter.ID
+			enriched.AuthorUUID = *reporter.UUID
+			enriched.AuthorName = reporter.Name
+			enriched.AuthorUserName = reporter.Username
+			enriched.AuthorDomain = reporter.Domain
 
-			if reporter.Gender.Valid {
-				enriched.ReporterGender = reporter.Gender.String
-				enriched.AuthorGender = reporter.Gender.String
+			if reporter.Gender != nil {
+				enriched.ReporterGender = *reporter.Gender
+				enriched.AuthorGender = *reporter.Gender
 			} else {
 				enriched.ReporterGender = unknown
 				enriched.AuthorGender = unknown
 			}
 			if reporter.GenderACC != nil {
-				enriched.ReporterGenderACC = *reporter.GenderACC
-				enriched.AuthorGenderAcc = *reporter.GenderACC
+				enriched.ReporterGenderACC = int(*reporter.GenderACC)
+				enriched.AuthorGenderAcc = int(*reporter.GenderACC)
 			} else {
 				enriched.ReporterGenderACC = 0
 				enriched.AuthorGenderAcc = 0
 			}
-			if reporter.OrgName.Valid {
-				enriched.ReporterOrgName = reporter.OrgName.String
-				enriched.AuthorOrgName = reporter.OrgName.String
+			if reporter.OrgName != nil {
+				enriched.ReporterOrgName = *reporter.OrgName
+				enriched.AuthorOrgName = *reporter.OrgName
 			} else {
 				enriched.ReporterOrgName = unknown
 				enriched.AuthorOrgName = unknown
 			}
 
-			enriched.ReporterBot = reporter.IsBot
-			enriched.AuthorBot = reporter.IsBot
+			if reporter.IsBot != nil {
+				enriched.ReporterBot = false
+				enriched.AuthorBot = false
+			}
 
-			reporterMultiOrg, err := e.identityProvider.GetOrganizations(reporter.UUID.String, enriched.MetadataUpdatedOn)
-			if err == nil {
+			enriched.ReporterMultiOrgName = multiOrgs
+			enriched.AuthorMultiOrgName = multiOrgs
+
+			if len(reporter.MultiOrgNames) != 0 {
+				enriched.ReporterMultiOrgName = reporter.MultiOrgNames
+				enriched.AuthorMultiOrgName = reporter.MultiOrgNames
+			}
+		} else {
+			reporter := rawItem.Reporter
+			source := Bugzilla
+			authorUUID, err := uuid.GenerateIdentity(&source, &reporter.Name, &reporter.Username, nil)
+			if err != nil {
+				return nil, err
+			}
+
+			userIdentity := libAffiliations.Identity{
+				LastModified: time.Now(),
+				Name:         reporter.Name,
+				Source:       Bugzilla,
+				Email:        reporter.Name,
+				UUID:         authorUUID,
+			}
+
+			ok := e.affiliationsClient.AddIdentity(&userIdentity)
+			if !ok {
+				log.Printf("failed to add identity for [%+v]", reporter.Username)
+			} else {
+				log.Printf("added identity for [%+v]", reporter.Name)
+				// add enriched data
+				enriched.ReporterID = authorUUID
+				enriched.ReporterUUID = authorUUID
+				enriched.ReporterName = reporter.Name
+				enriched.ReporterUserName = reporter.Username
+
+				enriched.AuthorID = authorUUID
+				enriched.AuthorUUID = authorUUID
+				enriched.AuthorName = reporter.Name
+				enriched.AuthorUserName = reporter.Username
+
+				enriched.ReporterOrgName = unknown
 				enriched.ReporterMultiOrgName = multiOrgs
+
+				enriched.AuthorOrgName = unknown
 				enriched.AuthorMultiOrgName = multiOrgs
 
-				if len(reporterMultiOrg) != 0 {
-					enriched.ReporterMultiOrgName = reporterMultiOrg
-					enriched.AuthorMultiOrgName = reporterMultiOrg
-				}
 			}
 		}
 
@@ -200,9 +269,4 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 	enriched.RepositoryLabels = nil
 
 	return enriched, nil
-}
-
-// EnrichAffiliation gets author SH identity data
-func (e *Enricher) EnrichAffiliation(key string, val string) (*affiliation.Identity, error) {
-	return e.identityProvider.GetIdentity(key, val)
 }

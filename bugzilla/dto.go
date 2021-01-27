@@ -30,20 +30,26 @@ type BugDetailResponse struct {
 
 // BugDetailXML ...
 type BugDetailXML struct {
-	ID               int       `xml:"bug_id"`
-	CreationTS       string    `xml:"creation_ts"`
-	DeltaTS          string    `xml:"delta_ts"`
-	Priority         string    `xml:"priority"`
-	Severity         string    `xml:"bug_severity"`
-	OpSys            string    `xml:"op_sys"`
-	RepPlatform      string    `xml:"rep_platform"`
-	Keywords         []string  `xml:"keywords"`
-	StatusWhiteboard string    `xml:"status_whiteboard"`
-	Resolution       string    `xml:"resolution"`
-	Reporter         string    `xml:"reporter"`
-	AssignedTo       string    `xml:"assigned_to"`
-	Summary          string    `xml:"summary"`
-	LongDesc         []Comment `xml:"long_desc"`
+	ID               int        `xml:"bug_id"`
+	CreationTS       string     `xml:"creation_ts"`
+	DeltaTS          string     `xml:"delta_ts"`
+	Priority         string     `xml:"priority"`
+	Severity         string     `xml:"bug_severity"`
+	OpSys            string     `xml:"op_sys"`
+	RepPlatform      string     `xml:"rep_platform"`
+	Keywords         []string   `xml:"keywords"`
+	StatusWhiteboard string     `xml:"status_whiteboard"`
+	Resolution       string     `xml:"resolution"`
+	Reporter         AssignedTo `xml:"reporter"`
+	AssignedTo       AssignedTo `xml:"assigned_to"`
+	Summary          string     `xml:"summary"`
+	LongDesc         []Comment  `xml:"long_desc"`
+}
+
+// AssignedTo get assigned to xml field tag name and value
+type AssignedTo struct {
+	Value string `xml:",chardata"`
+	Name  string `xml:"name,attr"`
 }
 
 // Comment of a bug
@@ -61,20 +67,23 @@ type SearchFields struct {
 	ItemID    string `json:"item_id"`
 }
 
+// Person describe affiliation person data
+type Person struct {
+	Name     string `json:"name"`
+	Username string `json:"username"`
+}
+
 // BugRaw data model represents es schema
 type BugRaw struct {
-	BackendVersion string `json:"backend_version"`
-	BackendName    string `json:"backend_name"`
-	UUID           string `json:"uuid"`
-	BugID          int    `json:"bug_id"`
-	Origin         string `json:"origin"`
-	Tag            string `json:"tag"`
-	Product        string `json:"product"`
-	Component      string `json:"component"`
-	Assignee       struct {
-		Name  string `json:"name"`
-		Email string `json:"email"`
-	}
+	BackendVersion    string `json:"backend_version"`
+	BackendName       string `json:"backend_name"`
+	UUID              string `json:"uuid"`
+	BugID             int    `json:"bug_id"`
+	Origin            string `json:"origin"`
+	Tag               string `json:"tag"`
+	Product           string `json:"product"`
+	Component         string `json:"component"`
+	Assignee          Person
 	ShortDescription  string        `json:"short_description"`
 	LongDesc          []Comment     `json:"long_desc"`
 	BugStatus         string        `json:"bug_status"`
@@ -94,7 +103,7 @@ type BugRaw struct {
 	RepPlatform       string        `json:"rep_platform"`
 	StatusWhiteboard  string        `json:"status_whiteboard"`
 	Resolution        string        `json:"resolution"`
-	Reporter          string        `json:"reporter"`
+	Reporter          Person        `json:"reporter"`
 	AssignedTo        string        `json:"assigned_to"`
 	Summary           string        `json:"summary"`
 }
