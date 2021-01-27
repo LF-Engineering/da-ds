@@ -593,6 +593,7 @@ func TestInit(t *testing.T) {
 		// FIXME: this is a hack that should be removed, once BugZilla variable is only initialized in DS=bugzilla mode.
 		gotContext.BugZilla = nil
 		gotContext.PiperMail = nil
+		gotContext.GoogleGroups = nil
 
 		// Restore original environment
 		for key := range test.environment {
