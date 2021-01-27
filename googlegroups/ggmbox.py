@@ -39,11 +39,11 @@ class GoogleGroupMBoxSpider(scrapy.Spider):
         """
         handle organization groups
         """
-        is_org = name.find('/')
+        is_org = name.find('-')
         if is_org == -1:
             self.root = root
         else:
-            split_string = name.split("/", 1)
+            split_string = name.split("-", 1)
             org = split_string[0]
             new_root = "%s/a/%s" % (root, org)
             self.name = split_string[1]
