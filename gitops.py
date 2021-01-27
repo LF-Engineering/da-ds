@@ -2,9 +2,20 @@
 # -*- coding: utf-8 -*-
 #cython: language_level=3
 
-import os, logging, datetime, json, subprocess, sys
+import os
+import datetime
+import json
+import subprocess
+import sys
+import logging
+
+from logging import handlers
 from urllib.parse import urlparse
 from sys import argv
+
+logger = None
+LOGFILE = 'gitops.log'
+
 
 class GitOps:
 
@@ -53,7 +64,7 @@ class GitOps:
         if org_name in sanitize_path:
             sanitize_path = sanitize_path.replace('{0}/'.format(self.org_name), '')
         if not self.follow_hierarchy:
-            return sanitize_path.replace('/', '-').replace('_', '-')
+            return sanitize_path.replace('/', '-').replace('_', '-').replace('/.', '').replace('.', '')
         return sanitize_path
 
     def _build_org_name(self, path, git_source):
@@ -64,7 +75,11 @@ class GitOps:
 
     @staticmethod
     def __get_processed_uri(uri):
-        return uri.lstrip('/').replace('.git', '')
+        removal = '.git'
+        reverse_removal = removal[::-1]
+        replacement = ''
+        reverse_replacement = replacement[::-1]
+        return uri[::-1].replace(reverse_removal, reverse_replacement, 1)[::-1]
 
     def __get_base_path(self):
         return os.path.expanduser(self.base_path)
@@ -291,7 +306,8 @@ class GitOps:
 
         try:
             cmd_auto = ['git', 'remote', 'set-head', 'origin', '--auto']
-            cmd_short = ['git', 'symbolic-ref', '--short', 'refs/remotes/origin/HEAD']
+            cmd_short = ['git', 'symbolic-ref',
+                         '--short', 'refs/remotes/origin/HEAD']
             self._exec(cmd_auto, env=env)
             result = self._exec(cmd_short, env=env)
             result = self.sanitize_os_output(result)
@@ -336,7 +352,7 @@ class GitOps:
         os.chdir(os.path.abspath(self.repo_path))
 
         cmd_fetch = ['git', 'fetch']
-        cmd_fetch_p = ['git', 'fetch']
+        cmd_fetch_p = ['git', 'fetch', '-p']
 
         env = {
             'LANG': 'C',
@@ -434,41 +450,89 @@ class GitOps:
             self.uptodate = self._pull()
 
     def get_stats(self):
-        loc = self._get_cache_item(self.repo_name, 'loc')
-        pls = self._get_cache_item(self.repo_name, 'pls')
+        loc = 0
+        pls = list()
+        try:
+            # Get the cache loc and pls for fallback
+            cache_loc = self._get_cache_item(self.repo_name, 'loc')
+            cache_pls = self._get_cache_item(self.repo_name, 'pls')
 
-        if not self.uptodate or (loc == 0 and len(pls) == 0):
+            # Calculate the loc from source
             result = self._stats(self.repo_path)
+
+            # extract new the loc and pls
             loc = self._loc(result)
             pls = self._pls(result)
-            self._update_cache_item(project_name=self.repo_name,
-                                    key='loc',
-                                    value=loc)
-            self._update_cache_item(project_name=self.repo_name,
-                                    key='pls',
-                                    value=pls)
-            utc_date = datetime.datetime.utcnow()
-            if utc_date.tzinfo is None:
-                utc_date = utc_date.replace(tzinfo=datetime.timezone.utc)
-            self._update_cache_item(project_name=self.repo_name,
-                                    key='timestamp',
-                                    value=utc_date.isoformat())
-            self._write_json_file(data=self._cache,
-                                  path=self.__get_cache_path(),
-                                  filename=self.cache_file_name)
 
-        return loc, pls
+            logger.debug("Cache loc value %s", cache_loc)
+            logger.debug("New loc value %s", loc)
 
-    def is_errored(self):
-        return self.errored
+            if loc == 0:
+                logger.debug("LOC Value set from old cache")
+                # Set cache_loc value if new extracted one will be the zero
+                loc = cache_loc
+                pls = cache_pls
+            else:
+                logger.debug("Updating LOC value in cache")
+                # update the cache with new value and timestamp
+                self._update_cache_item(project_name=self.repo_name,
+                                        key='loc',
+                                        value=loc)
+                self._update_cache_item(project_name=self.repo_name,
+                                        key='pls',
+                                        value=pls)
+                utc_date = datetime.datetime.utcnow()
+                if utc_date.tzinfo is None:
+                    utc_date = utc_date.replace(tzinfo=datetime.timezone.utc)
+                self._update_cache_item(project_name=self.repo_name,
+                                        key='timestamp',
+                                        value=utc_date.isoformat())
+                self._write_json_file(data=self._cache,
+                                      path=self.__get_cache_path(),
+                                      filename=self.cache_file_name)
+        except Exception as se:
+            logger.error("LOC error %s", str(se))
+        finally:
+            logger.debug("Final LOC value %s", loc)
+            return loc, pls
 
-logger = logging.getLogger(__name__)
-git_ops = GitOps(argv[1])
-git_ops._load_cache()
-git_ops.load()
-loc, pls = git_ops.get_stats()
-if os.getenv('SKIP_CLEANUP', '') == '':
-    git_ops._clean()
-if git_ops.is_errored():
-    sys.exit(1)
-print (json.dumps({'loc':loc,'pls':pls}))
+
+def main(url):
+    loc = 0
+    pls = list()
+    try:
+        git_ops = GitOps(url)
+        git_ops._load_cache()
+        git_ops.load()
+        loc, pls = git_ops.get_stats()
+        if os.getenv('SKIP_CLEANUP', '') == '':
+            git_ops._clean()
+    except Exception as e:
+        logger.error(str(e))
+    finally:
+        print(json.dumps({'loc': loc, 'pls': pls}))
+        return (loc, pls)
+
+
+def configure_logger():
+    log = logging.getLogger('gitops')
+    log.setLevel(logging.DEBUG)
+    format = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+
+    ch = logging.StreamHandler(sys.stdout)
+    ch.setFormatter(format)
+    log.addHandler(ch)
+
+    fh = handlers.RotatingFileHandler(LOGFILE, maxBytes=(1048576 * 5), backupCount=7)
+    fh.setFormatter(format)
+    log.addHandler(fh)
+    return log
+
+
+if __name__ == '__main__':
+    logger = configure_logger()
+    if len(argv) > 0:
+        main(argv[1])
+    else:
+        print('Please provide a git url as argument')
+
