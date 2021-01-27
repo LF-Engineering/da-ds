@@ -55,7 +55,6 @@ type HTTPClientProvider interface {
 type ESClientProvider interface {
 	Add(index string, documentID string, body []byte) ([]byte, error)
 	CreateIndex(index string, body []byte) ([]byte, error)
-	DeleteIndex(index string, ignoreUnavailable bool) ([]byte, error)
 	Bulk(body []byte) ([]byte, error)
 	Get(index string, query map[string]interface{}, result interface{}) (err error)
 	GetStat(index string, field string, aggType string, mustConditions []map[string]interface{}, mustNotConditions []map[string]interface{}) (result time.Time, err error)
