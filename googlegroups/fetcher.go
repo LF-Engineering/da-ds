@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
+	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
 	jsoniter "github.com/json-iterator/go"
 	"io"
 	"io/ioutil"
@@ -62,6 +63,7 @@ func (f *Fetcher) Fetch(fromDate, now *time.Time) ([]*RawMessage, error) {
 		fmt.Println(err.Error())
 		return nil, err
 	}
+	log.Println("EXECUTED SCRIPT SUCCESSFULLY")
 
 	rawMessages := make([]*RawMessage, 0)
 	var topics []GoogleGroupMessageThread
@@ -141,7 +143,7 @@ func (f *Fetcher) Fetch(fromDate, now *time.Time) ([]*RawMessage, error) {
 			close(results)
 			wgProcess.Wait()
 
-			msg, err := f.getMessage(archive, now)
+			msg, err := f.getMessage(archive, message.Topic, now)
 			if err != nil {
 				return nil, err
 			}
@@ -185,7 +187,7 @@ func (f *Fetcher) readEnvelope(path string) (*enmime.Envelope, error) {
 	return env, nil
 }
 
-func (f *Fetcher) getMessage(archive map[string][]*enmime.Envelope, now *time.Time) (rawMessage *RawMessage, err error) {
+func (f *Fetcher) getMessage(archive map[string][]*enmime.Envelope, topic string, now *time.Time) (rawMessage *RawMessage, err error) {
 	rawMessage = new(RawMessage)
 	seq := make([]string, 2)
 	keys := make([]string, len(archive))
@@ -251,6 +253,7 @@ func (f *Fetcher) getMessage(archive map[string][]*enmime.Envelope, now *time.Ti
 		rawMessage.Subject = subject
 		rawMessage.MessageBody = messageBody
 		rawMessage.TopicID = topicID
+		rawMessage.Topic = topic
 		rawMessage.MetadataUpdatedOn = *now
 		rawMessage.MetadataTimestamp = *now
 		rawMessage.ChangedAt = *now
@@ -259,6 +262,16 @@ func (f *Fetcher) getMessage(archive map[string][]*enmime.Envelope, now *time.Ti
 		rawMessage.Project = f.Project
 		rawMessage.UUID = uuID
 		rawMessage.BackendName = fmt.Sprintf("%sFetch", strings.Title(GoogleGroups))
+		rawMessage.BackendVersion = f.BackendVersion
+		rawMessage.UpdatedOn = timeLib.ConvertTimeToFloat(*now)
+		rawMessage.Timestamp = timeLib.ConvertTimeToFloat(*now)
+		rawMessage.Origin = fmt.Sprintf("https://groups.google.com/g/%+v", f.GroupName)
+		if strings.Contains(f.GroupName, "/") {
+			splitGroupName := strings.Split(f.GroupName, "/")
+			organization := strings.TrimSpace(splitGroupName[0])
+			group := strings.TrimSpace(splitGroupName[1])
+			rawMessage.Origin = fmt.Sprintf("https://groups.google.com/a/%+v/g/%+v", organization, group)
+		}
 	}
 	return
 }
@@ -294,7 +307,7 @@ func (f *Fetcher) cleanupMessage(text string, output io.Writer) error {
 }
 
 func (f *Fetcher) formatJSONDataDate(s string) (*time.Time, error) {
-	layout := "02/01/06 03:04"
+	layout := "02/01/06 15:04"
 	t, err := time.Parse(layout, s)
 	if err != nil {
 		return nil, err
