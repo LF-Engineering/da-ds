@@ -132,7 +132,7 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	params.Delay = ctx.Delay
 	params.GapURL = ctx.GapURL
 
-	params.AffBaseURL = ctx.Env("AFFILIATIONS_API_BASE_URL")
+	params.AffBaseURL = ctx.Env("AFFILIATION_API_URL")
 	params.ESCacheURL = ctx.Env("ES_CACHE_URL")
 	params.ESCacheUsername = ctx.Env("ES_CACHE_USERNAME")
 	params.ESCachePassword = ctx.Env("ES_CACHE_PASSWORD")
@@ -140,8 +140,8 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	params.AuthClientID = ctx.Env("AUTH0_CLIENT_ID")
 	params.AuthClientSecret = ctx.Env("AUTH0_CLIENT_SECRET")
 	params.AuthAudience = ctx.Env("AUTH0_AUDIENCE")
-	params.AuthURL = ctx.Env("AUTH0_BASE_URL")
-	params.Environment = ctx.Env("ENVIRONMENT")
+	params.AuthURL = ctx.Env("AUTH0_URL")
+	params.Environment = ctx.Env("BRANCH")
 
 	repositoriesJSON := ctx.Env("REPOSITORIES_JSON")
 	if err := jsoniter.Unmarshal([]byte(repositoriesJSON), &params.Repositories); err != nil {
@@ -215,7 +215,7 @@ func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 
 	params.GapURL = ctx.GapURL
 
-	params.AffBaseURL = ctx.Env("AFFILIATIONS_API_BASE_URL")
+	params.AffBaseURL = ctx.Env("AFFILIATION_API_URL")
 	params.ESCacheURL = ctx.Env("ES_CACHE_URL")
 	params.ESCacheUsername = ctx.Env("ES_CACHE_USERNAME")
 	params.ESCachePassword = ctx.Env("ES_CACHE_PASSWORD")
@@ -225,8 +225,8 @@ func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 	params.AuthClientSecret = ctx.Env("AUTH0_CLIENT_SECRET")
 	params.AuthAudience = ctx.Env("AUTH0_AUDIENCE")
 
-	params.AuthURL = ctx.Env("AUTH0_BASE_URL")
-	params.Environment = ctx.Env("ENVIRONMENT")
+	params.AuthURL = ctx.Env("AUTH0_URL")
+	params.Environment = ctx.Env("BRANCH")
 
 	mgr, err := bugzilla.NewManager(params)
 	if err != nil {
@@ -249,7 +249,7 @@ func buildPipermailManager(ctx *lib.Ctx) (*pipermail.Manager, error) {
 	enrichSize := ctx.PiperMail.EnrichSize.Int()
 	project := ctx.PiperMail.Project.String()
 	esIndex := ctx.PiperMail.EsIndex.String()
-	affBaseURL := ctx.Env("AFFILIATIONS_API_BASE_URL")
+	affBaseURL := ctx.Env("AFFILIATION_API_URL")
 	esCacheURL := ctx.Env("ES_CACHE_URL")
 	esCacheUsername := ctx.Env("ES_CACHE_USERNAME")
 	esCachePassword := ctx.Env("ES_CACHE_PASSWORD")
@@ -257,8 +257,8 @@ func buildPipermailManager(ctx *lib.Ctx) (*pipermail.Manager, error) {
 	authClientID := ctx.Env("AUTH0_CLIENT_ID")
 	authClientSecret := ctx.Env("AUTH0_CLIENT_SECRET")
 	authAudience := ctx.Env("AUTH0_AUDIENCE")
-	authURL := ctx.Env("AUTH0_BASE_URL")
-	env := ctx.Env("ENVIRONMENT")
+	authURL := ctx.Env("AUTH0_URL")
+	env := ctx.Env("BRANCH")
 
 	mgr, err := pipermail.NewManager(origin, slug, groupName, ctx.DBConn, fetcherBackendVersion, enricherBackendVersion,
 		doFetch, doEnrich, ctx.ESURL, "", "", esIndex, fromDate, project,
@@ -298,7 +298,7 @@ func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
 	params.GapURL = ctx.GapURL
 	params.Slug = ctx.BugZilla.ProjectSlug.String()
 
-	params.AffBaseURL = ctx.Env("AFFILIATIONS_API_BASE_URL")
+	params.AffBaseURL = ctx.Env("AFFILIATION_API_URL")
 	params.ESCacheURL = ctx.Env("ES_CACHE_URL")
 	params.ESCacheUsername = ctx.Env("ES_CACHE_USERNAME")
 	params.ESCachePassword = ctx.Env("ES_CACHE_PASSWORD")
@@ -306,8 +306,8 @@ func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
 	params.AuthClientID = ctx.Env("AUTH0_CLIENT_ID")
 	params.AuthClientSecret = ctx.Env("AUTH0_CLIENT_SECRET")
 	params.AuthAudience = ctx.Env("AUTH0_AUDIENCE")
-	params.AuthURL = ctx.Env("AUTH0_BASE_URL")
-	params.Environment = ctx.Env("ENVIRONMENT")
+	params.AuthURL = ctx.Env("AUTH0_URL")
+	params.Environment = ctx.Env("BRANCH")
 
 	mgr, err := bugzillarest.NewManager(params)
 	if err != nil {
