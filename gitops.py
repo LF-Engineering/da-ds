@@ -3,13 +3,18 @@
 #cython: language_level=3
 
 import os
-import logging
 import datetime
 import json
 import subprocess
 import sys
+import logging
+
+from logging import handlers
 from urllib.parse import urlparse
 from sys import argv
+
+logger = None
+LOGFILE = 'gitops.log'
 
 
 class GitOps:
@@ -59,7 +64,7 @@ class GitOps:
         if org_name in sanitize_path:
             sanitize_path = sanitize_path.replace('{0}/'.format(self.org_name), '')
         if not self.follow_hierarchy:
-            return sanitize_path.replace('/', '-').replace('_', '-')
+            return sanitize_path.replace('/', '-').replace('_', '-').replace('/.', '').replace('.', '')
         return sanitize_path
 
     def _build_org_name(self, path, git_source):
@@ -301,7 +306,8 @@ class GitOps:
 
         try:
             cmd_auto = ['git', 'remote', 'set-head', 'origin', '--auto']
-            cmd_short = ['git', 'symbolic-ref', '--short', 'refs/remotes/origin/HEAD']
+            cmd_short = ['git', 'symbolic-ref',
+                         '--short', 'refs/remotes/origin/HEAD']
             self._exec(cmd_auto, env=env)
             result = self._exec(cmd_short, env=env)
             result = self.sanitize_os_output(result)
@@ -491,13 +497,42 @@ class GitOps:
             return loc, pls
 
 
-logger = logging.getLogger(__name__)
-git_ops = GitOps(argv[1])
-git_ops._load_cache()
-git_ops.load()
-loc, pls = git_ops.get_stats()
-if os.getenv('SKIP_CLEANUP', '') == '':
-    git_ops._clean()
-if git_ops.is_errored():
-    sys.exit(1)
-print(json.dumps({'loc': loc, 'pls': pls}))
+def main(url):
+    loc = 0
+    pls = list()
+    try:
+        git_ops = GitOps(url)
+        git_ops._load_cache()
+        git_ops.load()
+        loc, pls = git_ops.get_stats()
+        if os.getenv('SKIP_CLEANUP', '') == '':
+            git_ops._clean()
+    except Exception as e:
+        logger.error(str(e))
+    finally:
+        print(json.dumps({'loc': loc, 'pls': pls}))
+        return (loc, pls)
+
+
+def configure_logger():
+    log = logging.getLogger('gitops')
+    log.setLevel(logging.DEBUG)
+    format = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+
+    ch = logging.StreamHandler(sys.stdout)
+    ch.setFormatter(format)
+    log.addHandler(ch)
+
+    fh = handlers.RotatingFileHandler(LOGFILE, maxBytes=(1048576 * 5), backupCount=7)
+    fh.setFormatter(format)
+    log.addHandler(fh)
+    return log
+
+
+if __name__ == '__main__':
+    logger = configure_logger()
+    if len(argv) > 0:
+        main(argv[1])
+    else:
+        print('Please provide a git url as argument')
+
