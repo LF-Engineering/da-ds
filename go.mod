@@ -3,16 +3,12 @@ module github.com/LF-Engineering/da-ds
 go 1.15
 
 require (
-	github.com/LF-Engineering/dev-analytics-libraries v0.4.0
+	github.com/LF-Engineering/dev-analytics-libraries v0.4.1
 	github.com/PuerkitoBio/goquery v1.6.0
 	github.com/andybalholm/cascadia v1.2.0 // indirect
-	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
-	github.com/elastic/go-elasticsearch/v7 v7.10.0
 	github.com/go-sql-driver/mysql v1.5.0
-	github.com/google/uuid v1.1.4 // indirect
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/json-iterator/go v1.1.10
-	github.com/kr/text v0.2.0 // indirect
 	github.com/lib/pq v1.9.0 // indirect
 	github.com/mattn/go-sqlite3 v1.14.5 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
