@@ -32,27 +32,34 @@ func NewEnricher(esClientProvider *elastic.ClientProvider, affiliationsClientPro
 func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*EnrichedMessage, error) {
 	log.Println("In EnrichMessage")
 	enrichedMessage := EnrichedMessage{
-		From:                   rawMessage.From,
-		Date:                   rawMessage.Date,
-		To:                     rawMessage.To,
-		MessageID:              rawMessage.MessageID,
-		InReplyTo:              rawMessage.InReplyTo,
-		References:             rawMessage.References,
-		Subject:                rawMessage.Subject,
-		MessageBody:            rawMessage.MessageBody,
-		TopicID:                rawMessage.TopicID,
-		BackendVersion:         rawMessage.BackendVersion,
-		UUID:                   rawMessage.UUID,
-		MetadataUpdatedOn:      rawMessage.MetadataUpdatedOn,
-		BackendName:            fmt.Sprintf("%sEnrich", strings.Title(e.DSName)),
-		MetadataTimestamp:      rawMessage.MetadataTimestamp,
-		MetadataEnrichedOn:     now,
-		ProjectSlug:            rawMessage.ProjectSlug,
-		GroupName:              rawMessage.GroupName,
-		Project:                rawMessage.Project,
-		ChangedAt:              rawMessage.ChangedAt,
-		IsGoogleGroupMessage:   1,
-		AuthorMultipleOrgNames: []string{Unknown},
+		From:                 rawMessage.From,
+		Date:                 rawMessage.Date,
+		To:                   rawMessage.To,
+		MessageID:            rawMessage.MessageID,
+		InReplyTo:            rawMessage.InReplyTo,
+		References:           rawMessage.References,
+		Subject:              rawMessage.Subject,
+		Topic:                rawMessage.Topic,
+		MessageBody:          rawMessage.MessageBody,
+		TopicID:              rawMessage.TopicID,
+		BackendVersion:       rawMessage.BackendVersion,
+		UUID:                 rawMessage.UUID,
+		MetadataUpdatedOn:    rawMessage.MetadataUpdatedOn,
+		MetadataTimestamp:    rawMessage.MetadataTimestamp,
+		MetadataEnrichedOn:   now,
+		UpdatedOn:            rawMessage.UpdatedOn,
+		Timestamp:            rawMessage.Timestamp,
+		BackendName:          fmt.Sprintf("%sEnrich", strings.Title(e.DSName)),
+		ProjectSlug:          rawMessage.ProjectSlug,
+		GroupName:            rawMessage.GroupName,
+		Project:              rawMessage.Project,
+		ChangedAt:            rawMessage.ChangedAt,
+		IsGoogleGroupMessage: 1,
+		Origin:               rawMessage.Origin,
+		AuthorMultiOrgNames:  []string{Unknown},
+		AuthorOrgName: Unknown,
+		AuthorGender: Unknown,
+
 	}
 
 	if rawMessage.InReplyTo == "" {
@@ -60,12 +67,13 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 	}
 
 	userAffiliationsEmail := e.GetEmailAddress(rawMessage.From)
-	enrichedMessage.EmailDomain = e.GetEmailDomain(userAffiliationsEmail)
+	enrichedMessage.MboxAuthorDomain = e.GetEmailDomain(userAffiliationsEmail)
+	enrichedMessage.From = e.GetUserName(rawMessage.From)
+	enrichedMessage.AuthorName = e.GetUserName(rawMessage.From)
 
 	userData, err := e.affiliationsClientProvider.GetIdentityByUser("email", userAffiliationsEmail)
 	if err != nil {
-		fmt.Println(err)
-		return nil, err
+		log.Println(err)
 	}
 
 	if userData != nil {
@@ -78,14 +86,13 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 		}
 
 		if userData.OrgName != nil {
-			enrichedMessage.FromOrgName = *userData.OrgName
+			enrichedMessage.AuthorOrgName = *userData.OrgName
 		}
 		if userData.UUID != nil {
 			enrichedMessage.AuthorUUID = *userData.UUID
 		}
 		if userData.Gender != nil {
 			enrichedMessage.AuthorGender = *userData.Gender
-			enrichedMessage.FromGender = *userData.Gender
 		}
 
 		if userData.GenderACC != nil {
@@ -100,7 +107,7 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 			}
 
 			if len(organizations) != 0 {
-				enrichedMessage.AuthorMultipleOrgNames = organizations
+				enrichedMessage.AuthorMultiOrgNames = organizations
 			}
 		}
 
@@ -113,33 +120,29 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 			name := e.GetUserName(rawMessage.From)
 			source := GoogleGroups
 			authorUUID, err := uuid.GenerateIdentity(&source, &userAffiliationsEmail, &name, nil)
-			if err != nil {
-				fmt.Println(err)
-				return nil, err
-			}
+			if err == nil {
+				userIdentity := affiliation.Identity{
+					LastModified: time.Now(),
+					Name:         name,
+					Source:       source,
+					Email:        userAffiliationsEmail,
+					UUID:         authorUUID,
+				}
 
-			userIdentity := affiliation.Identity{
-				LastModified: time.Now(),
-				Name:         name,
-				Source:       source,
-				Email:        userAffiliationsEmail,
-				UUID:         authorUUID,
-			}
+				if ok := e.affiliationsClientProvider.AddIdentity(&userIdentity); !ok {
+					log.Printf("failed to add identity for [%+v]", userAffiliationsEmail)
+				} else {
+					log.Printf("added identity for [%+v]", name)
+					multipleOrganizations := []string{Unknown}
 
-			if ok := e.affiliationsClientProvider.AddIdentity(&userIdentity); !ok {
-				log.Printf("failed to add identity for [%+v]", userAffiliationsEmail)
-			} else {
-				log.Printf("added identity for [%+v]", name)
-				multipleOrganizations := []string{Unknown}
-
-				// add user data to enriched object
-				enrichedMessage.AuthorID = authorUUID
-				enrichedMessage.AuthorUUID = authorUUID
-				enrichedMessage.AuthorName = name
-				enrichedMessage.FromOrgName = Unknown
-				enrichedMessage.AuthorGender = Unknown
-				enrichedMessage.AuthorMultipleOrgNames = multipleOrganizations
+					// add user data to enriched object
+					enrichedMessage.AuthorID = authorUUID
+					enrichedMessage.AuthorUUID = authorUUID
+					enrichedMessage.AuthorName = name
+					enrichedMessage.AuthorMultiOrgNames = multipleOrganizations
+				}
 			}
+			log.Println(err)
 		}
 	}
 
@@ -149,23 +152,38 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 // GetEmailAddress ...
 func (e *Enricher) GetEmailAddress(rawMailString string) (email string) {
 	trimBraces := strings.Split(rawMailString, " <")
-	email = strings.TrimSpace(trimBraces[1])
-	email = strings.TrimSpace(strings.Replace(email, ">", "", 1))
+	if len(trimBraces) > 1 {
+		email = strings.TrimSpace(trimBraces[1])
+		email = strings.TrimSpace(strings.Replace(email, ">", "", 1))
+		return
+	}
 	return
 }
 
 // GetEmailDomain ...
 func (e *Enricher) GetEmailDomain(email string) string {
 	domain := strings.Split(email, "@")
-	return domain[1]
+	if len(domain) > 1 {
+		return domain[1]
+	}
+	return ""
 }
 
 // GetUserName ...
 func (e *Enricher) GetUserName(rawMailString string) (username string) {
 	trimBraces := strings.Split(rawMailString, " <")
-	username = strings.TrimSpace(trimBraces[0])
-	username = strings.TrimSpace(strings.Replace(username, ")", "", 1))
-	return
+	if len(trimBraces) > 1 {
+		username = strings.TrimSpace(trimBraces[0])
+		username = strings.TrimSpace(strings.Replace(username, ")", "", 1))
+		// check for square braces [...]
+		if strings.Contains(username, "[") {
+			trimSquareBraces := strings.Split(username, " [")
+			username = strings.TrimSpace(trimSquareBraces[0])
+			return
+		}
+		return
+	}
+	return trimBraces[0]
 }
 
 // IsValidEmail validates email string
