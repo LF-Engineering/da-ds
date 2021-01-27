@@ -2,7 +2,7 @@ package circleci
 
 var (
 
-	// BugzillaRestRawMapping - bugzilla raw index mapping
+	// CircleCIEnrichMapping - circleci mapping
 	CircleCIRawMapping = []byte(`{
   "mappings": 
 {"dynamic":true,
@@ -23,7 +23,7 @@ var (
 }}
 }`)
 
-	// BugzillaRestEnrichMapping - bugzilla rest enriched index mapping
+	// CircleCIEnrichMapping - circleci mapping
 	CircleCIEnrichMapping = []byte(`{"mappings":
 {"properties":
 {

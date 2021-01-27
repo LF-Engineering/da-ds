@@ -195,7 +195,7 @@ func (f *Fetcher) FetchItem(workflow WorkflowItem, pipeline PipelineItem, job Jo
 		circleCI.AuthorBot = true
 		circleCI.AuthorUUID = UNKNOWN
 		circleCI.AuthorID = UNKNOWN
-		circleCI.AuthorName = UNKNOWN
+		circleCI.AuthorName = pipeline.PipelineTrigger.Actor.Login
 		circleCI.AuthorDomain = UNKNOWN
 		circleCI.AuthorGender = UNKNOWN
 		circleCI.AuthorOrgName = UNKNOWN
@@ -204,7 +204,7 @@ func (f *Fetcher) FetchItem(workflow WorkflowItem, pipeline PipelineItem, job Jo
 		circleCI.WorkflowCreatorBot = true
 		circleCI.WorkflowCreatorUUID = UNKNOWN
 		circleCI.WorkflowCreatorID = UNKNOWN
-		circleCI.WorkflowCreatorName = UNKNOWN
+		circleCI.WorkflowCreatorName = pipeline.PipelineTrigger.Actor.Login
 		circleCI.WorkflowCreatorName = UNKNOWN
 		circleCI.WorkflowCreatorDomain = UNKNOWN
 		circleCI.WorkflowCreatorGender = UNKNOWN
@@ -231,7 +231,7 @@ func (f *Fetcher) FetchItem(workflow WorkflowItem, pipeline PipelineItem, job Jo
 			if err != nil {
 				circleCI.AuthorUUID = UNKNOWN
 				circleCI.AuthorID = UNKNOWN
-				circleCI.AuthorName = UNKNOWN
+				circleCI.AuthorName = circleCI.AuthorUserName
 				circleCI.AuthorDomain = UNKNOWN
 				circleCI.AuthorGender = UNKNOWN
 				circleCI.AuthorOrgName = UNKNOWN
@@ -261,7 +261,7 @@ func (f *Fetcher) FetchItem(workflow WorkflowItem, pipeline PipelineItem, job Jo
 			circleCI.WorkflowCreatorBot = true
 			circleCI.WorkflowCreatorUUID = UNKNOWN
 			circleCI.WorkflowCreatorID = UNKNOWN
-			circleCI.WorkflowCreatorName = UNKNOWN
+			circleCI.WorkflowCreatorName = pipeline.PipelineTrigger.Actor.Login
 			circleCI.WorkflowCreatorName = UNKNOWN
 			circleCI.WorkflowCreatorDomain = UNKNOWN
 			circleCI.WorkflowCreatorGender = UNKNOWN
@@ -287,7 +287,7 @@ func (f *Fetcher) FetchItem(workflow WorkflowItem, pipeline PipelineItem, job Jo
 				if err != nil {
 					circleCI.WorkflowCreatorUUID = UNKNOWN
 					circleCI.WorkflowCreatorID = UNKNOWN
-					circleCI.WorkflowCreatorName = UNKNOWN
+					circleCI.WorkflowCreatorName = workflowstartedby
 					circleCI.WorkflowCreatorDomain = UNKNOWN
 					circleCI.WorkflowCreatorGender = UNKNOWN
 					circleCI.WorkflowCreatorOrgName = UNKNOWN
@@ -318,6 +318,42 @@ func (f *Fetcher) FetchItem(workflow WorkflowItem, pipeline PipelineItem, job Jo
 				}
 			}
 			circleCI.WorkflowApprovalUserName = approvalname
+			var approvalauthor *libAffiliations.AffIdentity
+			if approvalval, ok := f.cache[approvalname]; ok {
+				approvalauthor = &approvalval
+				circleCI.WorkflowApprovalName = approvalauthor.Name
+				circleCI.WorkflowApprovalID = *approvalauthor.ID
+				circleCI.WorkflowApprovalUUID = *approvalauthor.UUID
+				circleCI.WorkflowApprovalBot = false
+				circleCI.WorkflowApprovalDomain = approvalauthor.Domain
+				circleCI.WorkflowApprovalGender = *approvalauthor.Gender
+				circleCI.WorkflowApprovalOrgName = *approvalauthor.OrgName
+				circleCI.WorkflowApprovalMultiOrgNames = approvalauthor.MultiOrgNames
+				circleCI.WorkflowApprovalGenderAcc = *approvalauthor.GenderACC
+			} else {
+				approvalauthor, err = f.affiliationsClientProvider.GetProfileByUsername(workflowstartedby, project)
+				if err != nil {
+					circleCI.WorkflowApprovalUUID = UNKNOWN
+					circleCI.WorkflowApprovalID = UNKNOWN
+					circleCI.WorkflowApprovalName = approvalname
+					circleCI.WorkflowApprovalDomain = UNKNOWN
+					circleCI.WorkflowApprovalGender = UNKNOWN
+					circleCI.WorkflowApprovalOrgName = UNKNOWN
+					circleCI.WorkflowApprovalMultiOrgNames = make([]string, 0)
+					circleCI.WorkflowApprovalGenderAcc = 0
+				} else {
+					circleCI.WorkflowApprovalName = approvalauthor.Name
+					circleCI.WorkflowApprovalID = *approvalauthor.ID
+					circleCI.WorkflowApprovalUUID = *approvalauthor.UUID
+					circleCI.WorkflowApprovalBot = false
+					circleCI.WorkflowApprovalDomain = approvalauthor.Domain
+					circleCI.WorkflowApprovalGender = *approvalauthor.Gender
+					circleCI.WorkflowApprovalOrgName = *approvalauthor.OrgName
+					circleCI.WorkflowApprovalMultiOrgNames = approvalauthor.MultiOrgNames
+					circleCI.WorkflowApprovalGenderAcc = *approvalauthor.GenderACC
+					f.cache[workflowstartedby] = *approvalauthor
+				}
+			}
 			circleCI.WorkflowApprovalRequestID = job.ApprovedRequestID
 			circleCI.ISApproval = 1
 			circleCI.WorkflowJobType = job.Type
