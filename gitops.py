@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-#cython: language_level=3
+# cython: language_level=3
 
 import os
 import datetime
@@ -111,18 +111,18 @@ class GitOps:
         return total_size
 
     @staticmethod
-    def _get_size_format(size_bytes, factor=1024, suffix="B"):
+    def _get_size_format(size_bytes, factor=1024, suffix='B'):
         """
         Scale bytes to its proper byte format
         e.g:
             1253656 => '1.20MB'
             1253656678 => '1.17GB'
         """
-        for unit in ["", "K", "M", "G", "T", "P", "E", "Z"]:
+        for unit in ['', 'K', 'M', 'G', 'T', 'P', 'E', 'Z']:
             if size_bytes < factor:
-                return "{0:.2f} {1}{2}".format(size_bytes, unit, suffix)
+                return '{0:.2f} {1}{2}'.format(size_bytes, unit, suffix)
             size_bytes /= factor
-        return "{0:.2f} Y{1}".format(size_bytes, suffix)
+        return '{0:.2f} Y{1}'.format(size_bytes, suffix)
 
     @staticmethod
     def _should_be_delete(size_unit=None):
@@ -163,7 +163,8 @@ class GitOps:
     @staticmethod
     def _exec(cmd, cwd=None, env=None, ignored_error_codes=None,
               encoding='utf-8'):
-        """Run a command.
+        """
+        Run a command.
 
         Execute `cmd` command in the directory set by `cwd`. Environment
         variables can be set using the `env` dictionary. The output
@@ -180,7 +181,7 @@ class GitOps:
         if ignored_error_codes is None:
             ignored_error_codes = []
 
-        logger.debug("Running command %s (cwd: %s, env: %s)",
+        logger.debug('Running command %s (cwd: %s, env: %s)',
                      ' '.join(cmd), cwd, str(env))
 
         try:
@@ -193,7 +194,7 @@ class GitOps:
 
         if proc.returncode != 0 and proc.returncode not in ignored_error_codes:
             err = errs.decode(encoding, errors='surrogateescape')
-            cause = "git command - %s" % err
+            cause = 'git command - %s' % err
             raise RuntimeError(cause)
         else:
             logger.debug(errs.decode(encoding, errors='surrogateescape'))
@@ -213,7 +214,7 @@ class GitOps:
 
     def _pls(self, result):
         """
-            Get the programing language summary
+        Get the programing language summary
         """
         def extract_program_language_summary(value):
             stats = list()
@@ -250,7 +251,8 @@ class GitOps:
         return extract_lines_of_code(self.sanitize_os_output(result))
 
     def _clone(self):
-        """Clone a Git repository.
+        """
+        Clone a Git repository.
 
         Make a bare copy of the repository stored in `uri` into `dirpath`.
         The repository would be either local or remote.
@@ -271,10 +273,10 @@ class GitOps:
 
         try:
             self._exec(cmd, env=env)
-            logger.debug("Git %s repository cloned into %s",
+            logger.debug('Git %s repository cloned into %s',
                          self.git_url, self.repo_path)
         except (RuntimeError, Exception) as cloe:
-            logger.error("Git clone error %s ", str(cloe))
+            logger.error('Git clone error %s ', str(cloe))
             self.errored = True
 
     def _clean(self, force=False):
@@ -289,11 +291,11 @@ class GitOps:
             size = self._get_size_format(size_bytes)
             if self._should_be_delete(size) or force:
                 self._exec(cmd, env=env)
-                logger.debug("Git %s repository clean", self.repo_path)
+                logger.debug('Git %s repository clean', self.repo_path)
             else:
-                logger.debug("Git %s repository clean skip", self.repo_path)
+                logger.debug('Git %s repository clean skip', self.repo_path)
         except (RuntimeError, Exception) as cle:
-            logger.error("rm error %s", str(cle))
+            logger.error('rm error %s', str(cle))
 
     def _pull(self):
         os.chdir(os.path.abspath(self.repo_path))
@@ -306,27 +308,26 @@ class GitOps:
 
         try:
             cmd_auto = ['git', 'remote', 'set-head', 'origin', '--auto']
-            cmd_short = ['git', 'symbolic-ref',
-                         '--short', 'refs/remotes/origin/HEAD']
+            cmd_short = ['git', 'symbolic-ref', '--short', 'refs/remotes/origin/HEAD']
             self._exec(cmd_auto, env=env)
             result = self._exec(cmd_short, env=env)
             result = self.sanitize_os_output(result)
             branch = result.replace('origin/', '').strip()
-            logger.debug("Git %s repository active branch is: %s",
+            logger.debug('Git %s repository active branch is: %s',
                          self.repo_path, branch)
         except (RuntimeError, Exception) as be:
-            logger.error("Git find active branch error %s", str(be))
+            logger.error('Git find active branch error %s', str(be))
             self.errored = True
 
         try:
             if branch:
                 cmd = ['git', 'checkout', branch]
                 self._exec(cmd, env=env)
-                logger.debug("Git %s repository "
-                             "checkout with following branch %s",
+                logger.debug('Git %s repository '
+                             'checkout with following branch %s',
                              self.repo_path, branch)
         except (RuntimeError, Exception) as gce:
-            logger.error("Git checkout error %s", str(gce))
+            logger.error('Git checkout error %s', str(gce))
             self.errored = True
 
         try:
@@ -336,14 +337,14 @@ class GitOps:
                 result = self.sanitize_os_output(result)
                 if len(result) >= 18 and 'Already up to date.' in result:
                     status = True
-                logger.debug("Git %s repository pull updated code",
+                logger.debug('Git %s repository pull updated code',
                              self.repo_path)
             else:
-                logger.debug("Git repository active branch missing")
-                logger.debug("Git %s repository pull request skip ",
+                logger.debug('Git repository active branch missing')
+                logger.debug('Git %s repository pull request skip ',
                              self.repo_path)
         except (RuntimeError, Exception) as pe:
-            logger.error("Git pull error %s", str(pe))
+            logger.error('Git pull error %s', str(pe))
             self.errored = True
 
         return status
@@ -361,16 +362,16 @@ class GitOps:
 
         try:
             self._exec(cmd_fetch, env=env)
-            logger.debug("Git %s fetch updated code", self.repo_path)
+            logger.debug('Git %s fetch updated code', self.repo_path)
         except (RuntimeError, Exception) as fe:
-            logger.error("Git fetch purge error %s", str(fe))
+            logger.error('Git fetch purge error %s', str(fe))
             self.errored = True
 
         try:
             self._exec(cmd_fetch_p, env=env)
-            logger.debug("Git %s fetch purge code", self.repo_path)
+            logger.debug('Git %s fetch purge code', self.repo_path)
         except (RuntimeError, Exception) as fpe:
-            logger.error("Git fetch purge error %s", str(fpe))
+            logger.error('Git fetch purge error %s', str(fpe))
             self.errored = True
 
     def _build_empty_stats_data(self):
@@ -390,7 +391,7 @@ class GitOps:
                 f.write(json.dumps(data, indent=4))
             f.close()
         except Exception as je:
-            logger.error("cache file write error %s", str(je))
+            logger.error('cache file write error %s', str(je))
             self.errored = True
         finally:
             pass
@@ -404,7 +405,7 @@ class GitOps:
             f.close()
             return json.loads(data)
         except Exception as je:
-            logger.error("cache file write error %s", str(je))
+            logger.error('cache file write error %s', str(je))
             error = True
         finally:
             if error:
@@ -452,11 +453,12 @@ class GitOps:
     def get_stats(self):
         loc = 0
         pls = list()
-        try:
-            # Get the cache loc and pls for fallback
-            cache_loc = self._get_cache_item(self.repo_name, 'loc')
-            cache_pls = self._get_cache_item(self.repo_name, 'pls')
 
+        # Get the cache loc and pls for fallback
+        cache_loc = self._get_cache_item(self.repo_name, 'loc')
+        cache_pls = self._get_cache_item(self.repo_name, 'pls')
+
+        try:
             # Calculate the loc from source
             result = self._stats(self.repo_path)
 
@@ -464,16 +466,16 @@ class GitOps:
             loc = self._loc(result)
             pls = self._pls(result)
 
-            logger.debug("Cache loc value %s", cache_loc)
-            logger.debug("New loc value %s", loc)
+            logger.debug('Cache loc value %s', cache_loc)
+            logger.debug('New loc value %s', loc)
 
             if loc == 0:
-                logger.debug("LOC Value set from old cache")
+                logger.debug('LOC value set from old cache')
                 # Set cache_loc value if new extracted one will be the zero
                 loc = cache_loc
                 pls = cache_pls
             else:
-                logger.debug("Updating LOC value in cache")
+                logger.debug('Updating LOC value in cache')
                 # update the cache with new value and timestamp
                 self._update_cache_item(project_name=self.repo_name,
                                         key='loc',
@@ -491,9 +493,13 @@ class GitOps:
                                       path=self.__get_cache_path(),
                                       filename=self.cache_file_name)
         except Exception as se:
-            logger.error("LOC error %s", str(se))
+            logger.error('LOC error %s', str(se))
+            logger.debug('LOC value set from old cache')
+            # Set cache_loc value if cloc fails
+            loc = cache_loc
+            pls = cache_pls
         finally:
-            logger.debug("Final LOC value %s", loc)
+            logger.debug('Final LOC value %s', loc)
             return loc, pls
 
 
@@ -517,7 +523,7 @@ def main(url):
 def configure_logger():
     log = logging.getLogger('gitops')
     log.setLevel(logging.DEBUG)
-    format = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
     ch = logging.StreamHandler(sys.stdout)
     ch.setFormatter(format)
