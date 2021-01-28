@@ -287,14 +287,14 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 					continue
 				}
 
-				ESRes, err := m.esClientProvider.BulkInsert(data)
+				esRes, err := m.esClientProvider.BulkInsert(data)
 				if err != nil {
 					ch <- err
 					err = util.HandleGapData(m.GapURL, m.fetcher.HTTPClientProvider, data, m.Auth0, m.Environment)
 					return
 				}
 
-				failedData, err := util.HandleFailedData(data, ESRes)
+				failedData, err := util.HandleFailedData(data, esRes)
 				if len(failedData) != 0 {
 					err = util.HandleGapData(m.GapURL, m.fetcher.HTTPClientProvider, failedData, m.Auth0, m.Environment)
 				}
@@ -405,14 +405,14 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 				}
 
 				// Insert enriched data to elasticsearch
-				ESRes, err := m.esClientProvider.BulkInsert(data)
+				esRes, err := m.esClientProvider.BulkInsert(data)
 				if err != nil {
 					ch <- err
 					err = util.HandleGapData(m.GapURL, m.fetcher.HTTPClientProvider, data, m.Auth0, m.Environment)
 					return
 				}
 
-				failedData, err := util.HandleFailedData(data, ESRes)
+				failedData, err := util.HandleFailedData(data, esRes)
 				if len(failedData) != 0 {
 					err = util.HandleGapData(m.GapURL, m.fetcher.HTTPClientProvider, failedData, m.Auth0, m.Environment)
 				}

@@ -180,13 +180,13 @@ func (m *Manager) Sync() error {
 
 		if len(data) > 0 {
 			// Insert raw data to elasticsearch
-			ESRes, err := esClientProvider.BulkInsert(data)
+			esRes, err := esClientProvider.BulkInsert(data)
 			if err != nil {
 				err = util.HandleGapData(m.GapURL, fetcher.HTTPClientProvider, data, auth0Client, m.Environment)
 				return err
 			}
 
-			failedData, err := util.HandleFailedData(data, ESRes)
+			failedData, err := util.HandleFailedData(data, esRes)
 			if len(failedData) != 0 {
 				err = util.HandleGapData(m.GapURL, fetcher.HTTPClientProvider, failedData, auth0Client, m.Environment)
 			}
@@ -227,13 +227,13 @@ func (m *Manager) Sync() error {
 
 		if len(data) > 0 {
 			// Insert enriched data to elasticsearch
-			ESRes, err := esClientProvider.BulkInsert(data)
+			esRes, err := esClientProvider.BulkInsert(data)
 			if err != nil {
 				err = util.HandleGapData(m.GapURL, fetcher.HTTPClientProvider, data, auth0Client, m.Environment)
 				return err
 			}
 
-			failedData, err := util.HandleFailedData(data, ESRes)
+			failedData, err := util.HandleFailedData(data, esRes)
 			if len(failedData) != 0 {
 				err = util.HandleGapData(m.GapURL, fetcher.HTTPClientProvider, failedData, auth0Client, m.Environment)
 			}

@@ -121,8 +121,8 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	// Dockerhub credentials
 	params.Username = ctx.Env("USERNAME")
 	params.Password = ctx.Env("PASSWORD")
-	params.FetcherBackendVersion = "0.0.1"  //ctx.Env("FETCHER_BACKEND_VERSION")
-	params.EnricherBackendVersion = "0.0.1" //ctx.Env("ENRICHER_BACKEND_VERSION")
+	params.FetcherBackendVersion = "0.0.1"
+	params.EnricherBackendVersion = "0.0.1"
 	params.ESUrl = ctx.ESURL
 	params.EnrichOnly = ctx.NoRaw
 	params.Enrich = ctx.Enrich
