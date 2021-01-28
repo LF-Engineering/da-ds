@@ -1,13 +1,14 @@
 package dockerhub
 
 import (
-	b64 "encoding/base64"
 	"errors"
 	"fmt"
 	"log"
 	"time"
 
-	jsoniter "github.com/json-iterator/go"
+	"github.com/LF-Engineering/dev-analytics-libraries/auth0"
+
+	"github.com/LF-Engineering/da-ds/util"
 
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
 	"github.com/LF-Engineering/dev-analytics-libraries/http"
@@ -29,9 +30,60 @@ type Manager struct {
 	FromDate               *time.Time
 	NoIncremental          bool
 
+	AffAPI           string
+	ProjectSlug      string
+	AffBaseURL       string
+	ESCacheURL       string
+	ESCacheUsername  string
+	ESCachePassword  string
+	AuthGrantType    string
+	AuthClientID     string
+	AuthClientSecret string
+	AuthAudience     string
+	AuthURL          string
+	Environment      string
+	Slug             string
+
 	Retries uint
 	Delay   time.Duration
 	GapURL  string
+}
+
+// Param required for creating a new instance of Bugzilla manager
+type Param struct {
+	Username               string
+	Password               string
+	EndPoint               string
+	FetcherBackendVersion  string
+	EnricherBackendVersion string
+	Fetch                  bool
+	Enrich                 bool
+	ESUrl                  string
+	EsUser                 string
+	EsPassword             string
+	EsIndex                string
+	FromDate               *time.Time
+	Project                string
+	Retries                uint
+	Delay                  time.Duration
+	GapURL                 string
+	AffAPI                 string
+	ProjectSlug            string
+	AffBaseURL             string
+	ESCacheURL             string
+	ESCacheUsername        string
+	ESCachePassword        string
+	AuthGrantType          string
+	AuthClientID           string
+	AuthClientSecret       string
+	AuthAudience           string
+	AuthURL                string
+	Environment            string
+	Slug                   string
+	EnrichOnly             bool
+	HTTPTimeout            time.Duration
+	Repositories           []*Repository
+	NoIncremental          bool
 }
 
 // Repository represents dockerhub repository data
@@ -42,37 +94,41 @@ type Repository struct {
 	ESIndex    string
 }
 
+// Auth0Client ...
+type Auth0Client interface {
+	ValidateToken(env string) (string, error)
+}
+
 // NewManager initiates dockerhub manager instance
-func NewManager(username string,
-	password string,
-	fetcherBackendVersion string,
-	enricherBackendVersion string,
-	enrichOnly bool,
-	enrich bool,
-	eSUrl string,
-	httpTimeout time.Duration,
-	repositories []*Repository,
-	fromDate *time.Time,
-	noIncremental bool,
-	retries uint,
-	delay time.Duration,
-	gapURL string,
-) *Manager {
+func NewManager(param Param) *Manager {
 	mng := &Manager{
-		Username:               username,
-		Password:               password,
-		FetcherBackendVersion:  fetcherBackendVersion,
-		EnricherBackendVersion: enricherBackendVersion,
-		EnrichOnly:             enrichOnly,
-		Enrich:                 enrich,
-		ESUrl:                  eSUrl,
-		HTTPTimeout:            httpTimeout,
-		Repositories:           repositories,
-		FromDate:               fromDate,
-		NoIncremental:          noIncremental,
-		Retries:                retries,
-		Delay:                  delay,
-		GapURL:                 gapURL,
+		Username:               param.Username,
+		Password:               param.Password,
+		FetcherBackendVersion:  param.FetcherBackendVersion,
+		EnricherBackendVersion: param.EnricherBackendVersion,
+		EnrichOnly:             param.EnrichOnly,
+		Enrich:                 param.Enrich,
+		ESUrl:                  param.ESUrl,
+		HTTPTimeout:            param.HTTPTimeout,
+		Repositories:           param.Repositories,
+		FromDate:               param.FromDate,
+		NoIncremental:          param.NoIncremental,
+		Retries:                param.Retries,
+		Delay:                  param.Delay,
+		GapURL:                 param.GapURL,
+		AffAPI:                 param.AffAPI,
+		ProjectSlug:            param.ProjectSlug,
+		AffBaseURL:             param.AffBaseURL,
+		ESCacheURL:             param.ESCacheURL,
+		ESCacheUsername:        param.ESCacheUsername,
+		ESCachePassword:        param.ESCachePassword,
+		AuthGrantType:          param.AuthGrantType,
+		AuthClientID:           param.AuthClientID,
+		AuthClientSecret:       param.AuthClientSecret,
+		AuthAudience:           param.AuthAudience,
+		AuthURL:                param.AuthURL,
+		Environment:            param.Environment,
+		Slug:                   param.Slug,
 	}
 
 	return mng
@@ -85,7 +141,7 @@ func (m *Manager) Sync() error {
 		return errors.New("no repositories found")
 	}
 
-	fetcher, enricher, esClientProvider, err := buildServices(m)
+	fetcher, enricher, esClientProvider, auth0Client, err := buildServices(m)
 	if err != nil {
 		return err
 	}
@@ -114,22 +170,9 @@ func (m *Manager) Sync() error {
 			// set mapping and create index if not exists
 			err = fetcher.ElasticSearchProvider.DelayOfCreateIndex(fetcher.ElasticSearchProvider.CreateIndex, m.Retries, m.Delay, fmt.Sprintf("%s-raw", repo.ESIndex), DockerhubRawMapping)
 			if err != nil {
-				byteData, err := jsoniter.Marshal(data)
+				err = util.HandleGapData(m.GapURL, fetcher.HTTPClientProvider, data, auth0Client, m.Environment)
 				if err != nil {
 					return err
-				}
-				dataEnc := b64.StdEncoding.EncodeToString(byteData)
-				gapBody := map[string]string{"payload": dataEnc}
-				bData, err := jsoniter.Marshal(gapBody)
-				if err != nil {
-					return err
-				}
-
-				if m.GapURL != "" {
-					_, _, err = fetcher.HTTPClientProvider.Request(m.GapURL, "POST", nil, bData, nil)
-					if err != nil {
-						return err
-					}
 				}
 				continue
 			}
@@ -137,9 +180,15 @@ func (m *Manager) Sync() error {
 
 		if len(data) > 0 {
 			// Insert raw data to elasticsearch
-			_, err = esClientProvider.BulkInsert(data)
+			esRes, err := esClientProvider.BulkInsert(data)
 			if err != nil {
+				err = util.HandleGapData(m.GapURL, fetcher.HTTPClientProvider, data, auth0Client, m.Environment)
 				return err
+			}
+
+			failedData, err := util.HandleFailedData(data, esRes)
+			if len(failedData) != 0 {
+				err = util.HandleGapData(m.GapURL, fetcher.HTTPClientProvider, failedData, auth0Client, m.Environment)
 			}
 		}
 	}
@@ -178,15 +227,15 @@ func (m *Manager) Sync() error {
 
 		if len(data) > 0 {
 			// Insert enriched data to elasticsearch
-			_, err = esClientProvider.BulkInsert(data)
+			esRes, err := esClientProvider.BulkInsert(data)
 			if err != nil {
+				err = util.HandleGapData(m.GapURL, fetcher.HTTPClientProvider, data, auth0Client, m.Environment)
 				return err
 			}
 
-			// Insert enriched data to elasticsearch
-			_, err = esClientProvider.BulkInsert(data)
-			if err != nil {
-				return err
+			failedData, err := util.HandleFailedData(data, esRes)
+			if len(failedData) != 0 {
+				err = util.HandleGapData(m.GapURL, fetcher.HTTPClientProvider, failedData, auth0Client, m.Environment)
 			}
 
 		}
@@ -195,7 +244,7 @@ func (m *Manager) Sync() error {
 	return nil
 }
 
-func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
+func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, Auth0Client, error) {
 	httpClientProvider := http.NewClientProvider(m.HTTPTimeout)
 	params := &Params{
 		Username:       m.Username,
@@ -208,7 +257,7 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 		Password: m.ESPassword,
 	})
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	// Initialize fetcher object to get data from dockerhub api
@@ -217,5 +266,10 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 	// Initialize enrich object to enrich raw data
 	enricher := NewEnricher(m.EnricherBackendVersion, esClientProvider)
 
-	return fetcher, enricher, esClientProvider, err
+	auth0Client, err := auth0.NewAuth0Client(m.ESCacheURL, m.ESUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.AuthURL)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	return fetcher, enricher, esClientProvider, auth0Client, err
 }
