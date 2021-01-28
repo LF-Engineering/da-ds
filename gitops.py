@@ -13,9 +13,6 @@ from logging import handlers
 from urllib.parse import urlparse
 from sys import argv
 
-logger = None
-LOGFILE = 'gitops.log'
-
 
 class GitOps:
 
@@ -502,43 +499,17 @@ class GitOps:
             logger.debug('Final LOC value %s', loc)
             return loc, pls
 
-
-def main(url):
-    loc = 0
-    pls = list()
-    try:
-        git_ops = GitOps(url)
-        git_ops._load_cache()
-        git_ops.load()
-        loc, pls = git_ops.get_stats()
-        if os.getenv('SKIP_CLEANUP', '') == '':
-            git_ops._clean()
-    except Exception as e:
-        logger.error(str(e))
-    finally:
-        print(json.dumps({'loc': loc, 'pls': pls}))
-        return (loc, pls)
+    def is_errored(self):
+        return self.errored
 
 
-def configure_logger():
-    log = logging.getLogger('gitops')
-    log.setLevel(logging.DEBUG)
-    format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-    ch = logging.StreamHandler(sys.stdout)
-    ch.setFormatter(format)
-    log.addHandler(ch)
-
-    fh = handlers.RotatingFileHandler(LOGFILE, maxBytes=(1048576 * 5), backupCount=7)
-    fh.setFormatter(format)
-    log.addHandler(fh)
-    return log
-
-
-if __name__ == '__main__':
-    logger = configure_logger()
-    if len(argv) > 0:
-        main(argv[1])
-    else:
-        print('Please provide a git url as argument')
-
+logger = logging.getLogger(__name__)
+git_ops = GitOps(argv[1])
+git_ops._load_cache()
+git_ops.load()
+loc, pls = git_ops.get_stats()
+if os.getenv('SKIP_CLEANUP', '') == '':
+    git_ops._clean()
+if git_ops.is_errored():
+    sys.exit(1)
+print(json.dumps({'loc': loc, 'pls': pls}))
