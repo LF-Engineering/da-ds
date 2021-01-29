@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/LF-Engineering/da-ds/bugzilla"
+	"github.com/LF-Engineering/da-ds/finosmeetings"
 
 	jsoniter "github.com/json-iterator/go"
 
@@ -43,6 +44,12 @@ func runDS(ctx *lib.Ctx) (err error) {
 		ds = &lib.DSConfluence{}
 	case lib.Rocketchat:
 		ds = &lib.DSRocketchat{}
+	case lib.Finosmeetings:
+		manager, err := buildFinosmeetingsManager(ctx)
+		if err != nil {
+			return err
+		}
+		return manager.Sync()
 	default:
 		err = fmt.Errorf("unknown data source type: " + ctx.DS)
 		return
@@ -120,7 +127,6 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 
 func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 
-
 	origin := ctx.BugZilla.Origin.String()
 	fetcherBackendVersion := "0.1.0"
 	enricherBackendVersion := "0.1.0"
@@ -135,8 +141,23 @@ func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 		doFetch, doEnrich, ctx.ESURL, "", "", esIndex, fromDate, project,
 		fetchSize, enrichSize)
 	if err != nil {
-		return nil,err
+		return nil, err
 	}
 
-return mgr, nil
+	return mgr, nil
+}
+
+func buildFinosmeetingsManager(ctx *lib.Ctx) (*finosmeetings.Manager, error) {
+	fetcherBackendVersion := "0.5.0"
+	enricherBackendVersion := "0.5.0"
+	uri := ctx.Env("URI")
+	esURL := ctx.ESURL
+	enrichOnly := ctx.NoRaw
+	enrich := ctx.Enrich
+	esRawIndex := ctx.RawIndex
+	esRichIndex := ctx.RichIndex
+
+	mgr := finosmeetings.NewManager(ctx.DBConn, fetcherBackendVersion, enricherBackendVersion, enrichOnly, enrich, esURL, esRawIndex, esRichIndex, uri)
+
+	return mgr, nil
 }

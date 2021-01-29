@@ -251,6 +251,8 @@ func (p *ESClientProvider) BulkInsert(data []*BulkData) ([]byte, error) {
 	var re = regexp.MustCompile(`(}),"\\n",?`)
 	body = []byte(re.ReplaceAllString(strings.TrimSuffix(strings.TrimPrefix(string(body), "["), "]"), "$1\n"))
 
+	fmt.Println(string(body))
+
 	resData, err := p.Bulk(body)
 	if err != nil {
 		return nil, err
@@ -261,6 +263,7 @@ func (p *ESClientProvider) BulkInsert(data []*BulkData) ([]byte, error) {
 
 // Get query result
 func (p *ESClientProvider) Get(index string, query map[string]interface{}, result interface{}) (err error) {
+	fmt.Println("What is happening")
 	var buf bytes.Buffer
 	err = json.NewEncoder(&buf).Encode(query)
 	if err != nil {

@@ -50,6 +50,19 @@ type ESClientProvider interface {
 	BulkInsert(data []*utils.BulkData) ([]byte, error)
 }
 
+type FinosMeetingCSV struct {
+	CMProgram     string
+	CMTitle       string
+	CMType        string
+	Date          string
+	DateIsoFormat string
+	Email         string
+	GithubID      string
+	Name          string
+	Org           string
+	Timestamp     float64
+}
+
 // NewFetcher initiates a new dockerhub fetcher
 func NewFetcher(params *Params, httpClientProvider HTTPClientProvider, esClientProvider ESClientProvider) *Fetcher {
 	return &Fetcher{

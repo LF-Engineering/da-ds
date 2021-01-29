@@ -30,6 +30,9 @@ const Rocketchat string = "rocketchat"
 // Stub - common constant string
 const Stub string = "stub"
 
+// Finosmeetings - common constant string
+const Finosmeetings string = "finosmeetings"
+
 // Get - common constant string
 const Get string = "GET"
 
@@ -140,3 +143,6 @@ const HistoricalContent = "historical content"
 
 // ProjectSlug - common constant string
 const ProjectSlug = "project_slug"
+
+// FinosMeetingEntry - common constant string
+const FinosMeetingEntry = "finos-meeting-entry"
