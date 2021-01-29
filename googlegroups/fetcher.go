@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
-	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
-	jsoniter "github.com/json-iterator/go"
 	"io"
 	"io/ioutil"
 	"log"
@@ -19,9 +17,11 @@ import (
 
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
 	"github.com/LF-Engineering/dev-analytics-libraries/http"
+	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 	"github.com/araddon/dateparse"
 	"github.com/jhillyerd/enmime"
+	jsoniter "github.com/json-iterator/go"
 )
 
 // Fetcher contains GoogleGroups datasource fetch logic
