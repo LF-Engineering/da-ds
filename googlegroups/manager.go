@@ -3,12 +3,12 @@ package googlegroups
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/LF-Engineering/dev-analytics-libraries/http"
 	"log"
 	"time"
 
 	"github.com/LF-Engineering/dev-analytics-libraries/affiliation"
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
+	"github.com/LF-Engineering/dev-analytics-libraries/http"
 	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
 )
 

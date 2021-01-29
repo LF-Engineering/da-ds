@@ -2,14 +2,14 @@ package googlegroups
 
 import (
 	"fmt"
-	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
-	"github.com/badoux/checkmail"
 	"log"
 	"strings"
 	"time"
 
 	"github.com/LF-Engineering/dev-analytics-libraries/affiliation"
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
+	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
+	"github.com/badoux/checkmail"
 )
 
 // Enricher contains google groups datasource enrich logic

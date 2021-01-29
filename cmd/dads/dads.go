@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/LF-Engineering/da-ds/googlegroups"
 	"math/rand"
 	"time"
 
 	"github.com/LF-Engineering/da-ds/bugzillarest"
+	"github.com/LF-Engineering/da-ds/googlegroups"
 
 	"github.com/LF-Engineering/da-ds/jenkins"
 	"github.com/LF-Engineering/da-ds/pipermail"
