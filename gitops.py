@@ -76,7 +76,11 @@ class GitOps:
         reverse_removal = removal[::-1]
         replacement = ''
         reverse_replacement = replacement[::-1]
-        return uri[::-1].replace(reverse_removal, reverse_replacement, 1)[::-1]
+        end = len(uri)
+        start = end - 4
+        if uri.endswith(removal, start, end):
+            return uri[::-1].replace(reverse_removal, reverse_replacement, 1)[::-1]
+        return uri
 
     def __get_base_path(self):
         return os.path.expanduser(self.base_path)
