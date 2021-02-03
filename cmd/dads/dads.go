@@ -5,6 +5,11 @@ import (
 	"math/rand"
 	"time"
 
+	libAffiliations "github.com/LF-Engineering/dev-analytics-libraries/affiliation"
+	"github.com/LF-Engineering/dev-analytics-libraries/auth0"
+	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
+	"github.com/LF-Engineering/dev-analytics-libraries/http"
+
 	"github.com/LF-Engineering/da-ds/bugzillarest"
 
 	"github.com/LF-Engineering/da-ds/jenkins"
@@ -268,7 +273,7 @@ func buildPipermailManager(ctx *lib.Ctx) (*pipermail.Manager, error) {
 }
 
 func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
-	var params bugzillarest.Param
+	params := &bugzillarest.MgrParams{}
 	params.EndPoint = ctx.BugZilla.Origin.String()
 	params.ShConnStr = fmt.Sprintf("%s:%s@tcp(%s)/%s", ctx.DBUser, ctx.DBPass, ctx.DBHost, ctx.DBName)
 	params.FetcherBackendVersion = "0.1.0"
@@ -309,10 +314,51 @@ func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
 	params.AuthURL = ctx.Env("AUTH0_URL")
 	params.Environment = ctx.Env("BRANCH")
 
+	fetcher, enricher, esClientProvider, auth0ClientProvider, httpClientProvider, err := buildBugzillaRestMgrServices(params)
+	if err != nil {
+		return nil, err
+	}
+
+	params.Fetcher = fetcher
+	params.Enricher = enricher
+	params.ESClientProvider = esClientProvider
+	params.Auth0ClientProvider = auth0ClientProvider
+	params.HTTPClientProvider = httpClientProvider
+
 	mgr, err := bugzillarest.NewManager(params)
 	if err != nil {
 		return nil, err
 	}
 
 	return mgr, nil
+}
+
+func buildBugzillaRestMgrServices(p *bugzillarest.MgrParams) (*bugzillarest.Fetcher, *bugzillarest.Enricher, *elastic.ClientProvider, *auth0.ClientProvider, *http.ClientProvider, error) {
+	httpClientProvider := http.NewClientProvider(p.HTTPTimeout)
+
+	esClientProvider, err := elastic.NewClientProvider(&elastic.Params{
+		URL:      p.ESUrl,
+		Username: p.EsUser,
+		Password: p.EsPassword,
+	})
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+
+	// Initialize fetcher object to get data from bugzilla rest api
+	fetcher := bugzillarest.NewFetcher(&bugzillarest.FetcherParams{Endpoint: p.EndPoint, BackendVersion: p.FetcherBackendVersion}, httpClientProvider, esClientProvider)
+
+	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(p.AffBaseURL, p.Slug, p.ESCacheURL, p.ESCacheUsername, p.ESCachePassword, p.Environment, p.AuthGrantType, p.AuthClientID, p.AuthClientSecret, p.AuthAudience, p.AuthURL)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+
+	// Initialize enrich object to enrich raw data
+	enricher := bugzillarest.NewEnricher(&bugzillarest.EnricherParams{BackendVersion: p.EnricherBackendVersion, Project: p.Project}, affiliationsClientProvider)
+
+	auth0Client, err := auth0.NewAuth0Client(p.ESCacheURL, p.ESCacheUsername, p.ESCachePassword, p.Environment, p.AuthGrantType, p.AuthClientID, p.AuthClientSecret, p.AuthAudience, p.AuthURL)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+	return fetcher, enricher, esClientProvider, auth0Client, httpClientProvider, err
 }

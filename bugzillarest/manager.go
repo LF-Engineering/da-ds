@@ -5,14 +5,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/LF-Engineering/dev-analytics-libraries/auth0"
-
 	"github.com/LF-Engineering/da-ds/util"
 
-	libAffiliations "github.com/LF-Engineering/dev-analytics-libraries/affiliation"
-
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
-	"github.com/LF-Engineering/dev-analytics-libraries/http"
 	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
 )
 
@@ -25,6 +20,23 @@ type ESClientProvider interface {
 	GetStat(index string, field string, aggType string, mustConditions []map[string]interface{}, mustNotConditions []map[string]interface{}) (result time.Time, err error)
 	BulkInsert(data []elastic.BulkData) ([]byte, error)
 	DelayOfCreateIndex(ex func(str string, b []byte) ([]byte, error), uin uint, du time.Duration, index string, data []byte) error
+}
+
+// AuthClientProvider interacts with auth0 server
+type AuthClientProvider interface {
+	ValidateToken(env string) (string, error)
+}
+
+// FetchProvider contains fetch functionalities
+type FetchProvider interface {
+	FetchAll(origin string, date string, limit string, offset string, now time.Time) ([]Raw, *time.Time, error)
+	FetchItem(origin string, bugID int, fetchedBug BugData, now time.Time) (*Raw, error)
+	Query(index string, query map[string]interface{}) (*RawHits, error)
+}
+
+// EnrichProvider enrich Bugzilla raw
+type EnrichProvider interface {
+	EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error)
 }
 
 // Manager describes bugzilla manager
@@ -57,18 +69,19 @@ type Manager struct {
 	Environment            string
 	Slug                   string
 
-	esClientProvider ESClientProvider
-	fetcher          *Fetcher
-	enricher         *Enricher
-	Auth0            Auth0Client
+	EsClientProvider    ESClientProvider
+	Fetcher             FetchProvider
+	Enricher            EnrichProvider
+	Auth0ClientProvider Auth0ClientProvider
+	HTTPClientProvider  HTTPClientProvider
 
 	Retries uint
 	Delay   time.Duration
 	GapURL  string
 }
 
-// Param required for creating a new instance of Bugzillarest manager
-type Param struct {
+// MgrParams required for creating a new instance of Bugzillarest manager
+type MgrParams struct {
 	EndPoint               string
 	ShConnStr              string
 	FetcherBackendVersion  string
@@ -80,6 +93,7 @@ type Param struct {
 	EsPassword             string
 	EsIndex                string
 	FromDate               *time.Time
+	HTTPTimeout            time.Duration
 	Project                string
 	FetchSize              int
 	EnrichSize             int
@@ -98,53 +112,54 @@ type Param struct {
 	AuthURL                string
 	Environment            string
 	Slug                   string
+
+	Fetcher             FetchProvider
+	Enricher            EnrichProvider
+	ESClientProvider    ESClientProvider
+	Auth0ClientProvider Auth0ClientProvider
+	HTTPClientProvider  HTTPClientProvider
 }
 
 // NewManager initiates bugzilla manager instance
-func NewManager(param Param) (*Manager, error) {
+func NewManager(params *MgrParams) (*Manager, error) {
 
 	mgr := &Manager{
-		Endpoint:               param.EndPoint,
-		SHConnString:           param.ShConnStr,
-		FetcherBackendVersion:  param.FetcherBackendVersion,
-		EnricherBackendVersion: param.EnricherBackendVersion,
-		Fetch:                  param.Fetch,
-		Enrich:                 param.Enrich,
-		ESUrl:                  param.ESUrl,
-		ESUsername:             param.EsUser,
-		ESPassword:             param.EsPassword,
-		ESIndex:                param.EsIndex,
-		FromDate:               param.FromDate,
-		HTTPTimeout:            60 * time.Second,
-		Project:                param.Project,
-		FetchSize:              param.FetchSize,
-		EnrichSize:             param.EnrichSize,
-		Retries:                param.Retries,
-		Delay:                  param.Delay,
-		GapURL:                 param.GapURL,
-		ProjectSlug:            param.ProjectSlug,
-		AffBaseURL:             param.AffBaseURL,
-		ESCacheURL:             param.ESCacheURL,
-		ESCacheUsername:        param.ESCacheUsername,
-		ESCachePassword:        param.ESCachePassword,
-		AuthGrantType:          param.AuthGrantType,
-		AuthClientID:           param.AuthClientID,
-		AuthClientSecret:       param.AuthClientSecret,
-		AuthAudience:           param.AuthAudience,
-		AuthURL:                param.AuthURL,
-		Environment:            param.Environment,
-		Slug:                   param.Slug,
+		Endpoint:               params.EndPoint,
+		SHConnString:           params.ShConnStr,
+		FetcherBackendVersion:  params.FetcherBackendVersion,
+		EnricherBackendVersion: params.EnricherBackendVersion,
+		Fetch:                  params.Fetch,
+		Enrich:                 params.Enrich,
+		ESUrl:                  params.ESUrl,
+		ESUsername:             params.EsUser,
+		ESPassword:             params.EsPassword,
+		ESIndex:                params.EsIndex,
+		FromDate:               params.FromDate,
+		HTTPTimeout:            params.HTTPTimeout,
+		Project:                params.Project,
+		FetchSize:              params.FetchSize,
+		EnrichSize:             params.EnrichSize,
+		Retries:                params.Retries,
+		Delay:                  params.Delay,
+		GapURL:                 params.GapURL,
+		ProjectSlug:            params.ProjectSlug,
+		AffBaseURL:             params.AffBaseURL,
+		ESCacheURL:             params.ESCacheURL,
+		ESCacheUsername:        params.ESCacheUsername,
+		ESCachePassword:        params.ESCachePassword,
+		AuthGrantType:          params.AuthGrantType,
+		AuthClientID:           params.AuthClientID,
+		AuthClientSecret:       params.AuthClientSecret,
+		AuthAudience:           params.AuthAudience,
+		AuthURL:                params.AuthURL,
+		Environment:            params.Environment,
+		Slug:                   params.Slug,
+		EsClientProvider:       params.ESClientProvider,
+		Auth0ClientProvider:    params.Auth0ClientProvider,
+		HTTPClientProvider:     params.HTTPClientProvider,
+		Fetcher:                params.Fetcher,
+		Enricher:               params.Enricher,
 	}
-
-	fetcher, enricher, esClientProvider, auth0Client, err := buildServices(mgr)
-	if err != nil {
-		return nil, err
-	}
-
-	mgr.fetcher = fetcher
-	mgr.enricher = enricher
-	mgr.esClientProvider = esClientProvider
-	mgr.Auth0 = auth0Client
 
 	return mgr, nil
 }
@@ -171,8 +186,8 @@ type HitSource struct {
 	ChangedAt time.Time `json:"changed_at"`
 }
 
-// Auth0Client ...
-type Auth0Client interface {
+// Auth0ClientProvider ...
+type Auth0ClientProvider interface {
 	ValidateToken(env string) (string, error)
 }
 
@@ -183,7 +198,7 @@ func (m *Manager) Sync() error {
 	doneJobs := make(map[string]bool)
 	doneJobs["doneFetch"] = !m.Fetch
 	doneJobs["doneEnrich"] = !m.Enrich
-	fetchCh := m.fetch(m.fetcher, lastActionCachePostfix)
+	fetchCh := m.fetch(lastActionCachePostfix)
 
 	for doneJobs["doneFetch"] == false || doneJobs["doneEnrich"] == false {
 		select {
@@ -191,7 +206,7 @@ func (m *Manager) Sync() error {
 			if err == nil {
 				doneJobs["doneFetch"] = true
 			}
-		case err := <-m.enrich(m.enricher, lastActionCachePostfix):
+		case err := <-m.enrich(lastActionCachePostfix):
 			if err == nil {
 				doneJobs["doneEnrich"] = true
 			}
@@ -201,40 +216,7 @@ func (m *Manager) Sync() error {
 	return nil
 }
 
-func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, Auth0Client, error) {
-	httpClientProvider := http.NewClientProvider(m.HTTPTimeout)
-	params := &Params{
-		Endpoint:       m.Endpoint,
-		BackendVersion: m.FetcherBackendVersion,
-	}
-	esClientProvider, err := elastic.NewClientProvider(&elastic.Params{
-		URL:      m.ESUrl,
-		Username: m.ESUsername,
-		Password: m.ESPassword,
-	})
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-
-	// Initialize fetcher object to get data from bugzilla rest api
-	fetcher := NewFetcher(*params, httpClientProvider, esClientProvider)
-
-	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(m.AffBaseURL, m.Slug, m.ESCacheURL, m.ESCacheUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.AuthURL)
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-
-	// Initialize enrich object to enrich raw data
-	enricher := NewEnricher(m.EnricherBackendVersion, m.Project, affiliationsClientProvider)
-
-	auth0Client, err := auth0.NewAuth0Client(m.ESCacheURL, m.ESUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.AuthURL)
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-	return fetcher, enricher, esClientProvider, auth0Client, err
-}
-
-func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan error {
+func (m *Manager) fetch(lastActionCachePostfix string) <-chan error {
 	ch := make(chan error)
 	go func() {
 		fetchID := "fetch"
@@ -250,7 +232,7 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 		result := m.FetchSize
 
 		val := &TopHits{}
-		err := m.esClientProvider.Get(fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), query, val)
+		err := m.EsClientProvider.Get(fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), query, val)
 
 		now := time.Now().UTC()
 		var lastFetch *time.Time
@@ -265,7 +247,7 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 		offset := 0
 		for result == m.FetchSize {
 			data := make([]elastic.BulkData, 0)
-			bugs, lastChange, err := fetcher.FetchAll(m.Endpoint, fromStr, strconv.Itoa(m.FetchSize), strconv.Itoa(offset), now)
+			bugs, lastChange, err := m.Fetcher.FetchAll(m.Endpoint, fromStr, strconv.Itoa(m.FetchSize), strconv.Itoa(offset), now)
 			if err != nil {
 				ch <- err
 				return
@@ -286,10 +268,10 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 				updateChan := HitSource{ID: fetchID, ChangedAt: *lastChange}
 				data = append(data, elastic.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: fetchID, Data: updateChan})
 				//set mapping and create index if not exists
-				err := m.esClientProvider.DelayOfCreateIndex(m.esClientProvider.CreateIndex, m.Retries, m.Delay, fmt.Sprintf("%s-raw", m.ESIndex), BugzillaRestRawMapping)
+				err := m.EsClientProvider.DelayOfCreateIndex(m.EsClientProvider.CreateIndex, m.Retries, m.Delay, fmt.Sprintf("%s-raw", m.ESIndex), BugzillaRestRawMapping)
 				if err != nil {
 					ch <- err
-					err = util.HandleGapData(m.GapURL, m.fetcher.HTTPClientProvider, data, m.Auth0, m.Environment)
+					err = util.HandleGapData(m.GapURL, m.HTTPClientProvider, data, m.Auth0ClientProvider, m.Environment)
 					if err != nil {
 						return
 					}
@@ -297,16 +279,16 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 					continue
 				}
 				// Insert raw data to elasticsearch
-				esRes, err := m.esClientProvider.BulkInsert(data)
+				esRes, err := m.EsClientProvider.BulkInsert(data)
 				if err != nil {
 					ch <- err
-					err = util.HandleGapData(m.GapURL, m.fetcher.HTTPClientProvider, data, m.Auth0, m.Environment)
+					err = util.HandleGapData(m.GapURL, m.HTTPClientProvider, data, m.Auth0ClientProvider, m.Environment)
 					return
 				}
 
 				failedData, err := util.HandleFailedData(data, esRes)
 				if len(failedData) != 0 {
-					err = util.HandleGapData(m.GapURL, m.fetcher.HTTPClientProvider, failedData, m.Auth0, m.Environment)
+					err = util.HandleGapData(m.GapURL, m.HTTPClientProvider, failedData, m.Auth0ClientProvider, m.Environment)
 				}
 			}
 
@@ -317,7 +299,7 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 	return ch
 }
 
-func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-chan error {
+func (m *Manager) enrich(lastActionCachePostfix string) <-chan error {
 	ch := make(chan error)
 
 	go func() {
@@ -333,7 +315,7 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 		}
 
 		val := &TopHits{}
-		err := m.esClientProvider.Get(fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), query, val)
+		err := m.EsClientProvider.Get(fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), query, val)
 
 		query = map[string]interface{}{
 			"size": 10000,
@@ -377,7 +359,7 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 
 			// make pagination to get the specified size of documents with offset
 			query["from"] = offset
-			topHits, err = m.fetcher.Query(fmt.Sprintf("%s-raw", m.ESIndex), query)
+			topHits, err = m.Fetcher.Query(fmt.Sprintf("%s-raw", m.ESIndex), query)
 			if err != nil {
 				ch <- nil
 				return
@@ -385,7 +367,7 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 
 			data := make([]elastic.BulkData, 0)
 			for _, hit := range topHits.Hits.Hits {
-				enrichedItem, err := enricher.EnrichItem(hit.Source, time.Now().UTC())
+				enrichedItem, err := m.Enricher.EnrichItem(hit.Source, time.Now().UTC())
 				if err != nil {
 					ch <- err
 					return
@@ -398,10 +380,10 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 
 			// setting mapping and create index if not exists
 			if offset == 0 {
-				_, err := m.esClientProvider.CreateIndex(m.ESIndex, BugzillaRestEnrichMapping)
+				_, err := m.EsClientProvider.CreateIndex(m.ESIndex, BugzillaRestEnrichMapping)
 				if err != nil {
 					ch <- err
-					err = util.HandleGapData(m.GapURL, m.fetcher.HTTPClientProvider, data, m.Auth0, m.Environment)
+					err = util.HandleGapData(m.GapURL, m.HTTPClientProvider, data, m.Auth0ClientProvider, m.Environment)
 					return
 				}
 			}
@@ -413,17 +395,17 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 				data = append(data, elastic.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: enrichID, Data: updateChan})
 
 				// Insert enriched data to elasticsearch
-				esRes, err := m.esClientProvider.BulkInsert(data)
+				esRes, err := m.EsClientProvider.BulkInsert(data)
 				if err != nil {
 					ch <- err
 
-					err = util.HandleGapData(m.GapURL, m.fetcher.HTTPClientProvider, data, m.Auth0, m.Environment)
+					err = util.HandleGapData(m.GapURL, m.HTTPClientProvider, data, m.Auth0ClientProvider, m.Environment)
 					return
 				}
 
 				failedData, err := util.HandleFailedData(data, esRes)
 				if len(failedData) != 0 {
-					err = util.HandleGapData(m.GapURL, m.fetcher.HTTPClientProvider, data, m.Auth0, m.Environment)
+					err = util.HandleGapData(m.GapURL, m.HTTPClientProvider, data, m.Auth0ClientProvider, m.Environment)
 				}
 			}
 

@@ -26,19 +26,14 @@ type Fetcher struct {
 	BackendName           string
 }
 
-// Params required parameters for bugzilla fetcher
-type Params struct {
-	Name           string
+// FetcherParams required parameters for bugzilla fetcher
+type FetcherParams struct {
 	Endpoint       string
-	FromDate       time.Time
-	Order          string
-	Project        string
 	BackendVersion string
-	BackendName    string
 }
 
 // NewFetcher initiates a new bugZillaRest fetcher
-func NewFetcher(params Params, httpClientProvider HTTPClientProvider, esClientProvider ESClientProvider) *Fetcher {
+func NewFetcher(params *FetcherParams, httpClientProvider HTTPClientProvider, esClientProvider ESClientProvider) *Fetcher {
 	return &Fetcher{
 		HTTPClientProvider:    httpClientProvider,
 		ElasticSearchProvider: esClientProvider,

@@ -26,12 +26,18 @@ type AffiliationClient interface {
 	AddIdentity(identity *libAffiliations.Identity) bool
 }
 
+// EnricherParams required parameters for bugzilla enricher
+type EnricherParams struct {
+	BackendVersion string
+	Project        string
+}
+
 // NewEnricher initiate a new enricher instance
-func NewEnricher(backendVersion string, project string, affiliationsClient AffiliationClient) *Enricher {
+func NewEnricher(params *EnricherParams, affiliationsClient AffiliationClient) *Enricher {
 	return &Enricher{
 		DSName:             BugzillaRest,
-		BackendVersion:     backendVersion,
-		Project:            project,
+		BackendVersion:     params.BackendVersion,
+		Project:            params.Project,
 		affiliationsClient: affiliationsClient,
 	}
 }
