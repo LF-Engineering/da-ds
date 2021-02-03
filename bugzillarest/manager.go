@@ -27,18 +27,6 @@ type AuthClientProvider interface {
 	ValidateToken(env string) (string, error)
 }
 
-// FetchProvider contains fetch functionalities
-type FetchProvider interface {
-	FetchAll(origin string, date string, limit string, offset string, now time.Time) ([]Raw, *time.Time, error)
-	FetchItem(origin string, bugID int, fetchedBug BugData, now time.Time) (*Raw, error)
-	Query(index string, query map[string]interface{}) (*RawHits, error)
-}
-
-// EnrichProvider enrich Bugzilla raw
-type EnrichProvider interface {
-	EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error)
-}
-
 // Manager describes bugzilla manager
 type Manager struct {
 	Endpoint               string
@@ -70,8 +58,8 @@ type Manager struct {
 	Slug                   string
 
 	EsClientProvider    ESClientProvider
-	Fetcher             FetchProvider
-	Enricher            EnrichProvider
+	Fetcher             *Fetcher
+	Enricher            *Enricher
 	Auth0ClientProvider Auth0ClientProvider
 	HTTPClientProvider  HTTPClientProvider
 
@@ -113,8 +101,8 @@ type MgrParams struct {
 	Environment            string
 	Slug                   string
 
-	Fetcher             FetchProvider
-	Enricher            EnrichProvider
+	Fetcher             *Fetcher
+	Enricher            *Enricher
 	ESClientProvider    ESClientProvider
 	Auth0ClientProvider Auth0ClientProvider
 	HTTPClientProvider  HTTPClientProvider
@@ -315,6 +303,10 @@ func (m *Manager) enrich(lastActionCachePostfix string) <-chan error {
 		}
 
 		val := &TopHits{}
+		fmt.Println("aaaaaaaa")
+		fmt.Println(fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix))
+		fmt.Println(query)
+		fmt.Println(val)
 		err := m.EsClientProvider.Get(fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), query, val)
 
 		query = map[string]interface{}{
