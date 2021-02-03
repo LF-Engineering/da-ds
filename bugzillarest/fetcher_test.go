@@ -441,11 +441,11 @@ func TestFetchAll(t *testing.T) {
 		mock.Anything, mock.Anything, mock.Anything).Return(
 		200, attaByte, nil)
 
-	params := &Params{
+	params := &FetcherParams{
 		Endpoint:       "https://bugs.dpdk.org/",
 		BackendVersion: "0.0.1",
 	}
-	srv := NewFetcher(*params, httpClientProviderMock, eSClientProvider)
+	srv := NewFetcher(params, httpClientProviderMock, eSClientProvider)
 	var bugs []Raw
 	bugs, _, err = srv.FetchAll(url, date, limit, offset, expecRaw[0].MetadataTimestamp)
 	if err != nil {
