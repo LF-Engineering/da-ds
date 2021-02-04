@@ -17,7 +17,8 @@ from sys import argv
 class GitOps:
 
     def __init__(self, url):
-        self.base_path = os.getenv('DA_GIT_REPOS_PATH', '~/.perceval/repositories')
+        self.base_path = os.getenv(
+            'DA_GIT_REPOS_PATH', '~/.perceval/repositories')
         self.git_url = self.__get_processed_uri(url)
         self.uptodate = False
         self.follow_hierarchy = False
@@ -59,7 +60,8 @@ class GitOps:
     def _build_repo_name(self, path, org_name):
         sanitize_path = self.sanitize_url(path)
         if org_name in sanitize_path:
-            sanitize_path = sanitize_path.replace('{0}/'.format(self.org_name), '')
+            sanitize_path = sanitize_path.replace(
+                '{0}/'.format(self.org_name), '')
         if not self.follow_hierarchy:
             return sanitize_path.replace('/', '-').replace('_', '-').replace('/.', '').replace('.', '')
         return sanitize_path
@@ -213,14 +215,14 @@ class GitOps:
 
         return ''.encode('utf-8')
 
-    def _pls(self, result):
+    def _pls(self, result, force=False):
         """
         Get the programing language summary
         """
-        def extract_program_language_summary(value):
+        def extract_program_language_summary(value, force=False):
             stats = list()
             lan_smry_lst = value.split('\n')
-            if 'SUM:' in value and len(lan_smry_lst) > 0:
+            if len(lan_smry_lst) > 0 and ('SUM:' in value or force):
                 for smry in lan_smry_lst[::-1]:
                     if smry.startswith('---') or len(smry) == 0:
                         continue
@@ -238,18 +240,18 @@ class GitOps:
 
             return stats
 
-        return extract_program_language_summary(self.sanitize_os_output(result))
+        return extract_program_language_summary(self.sanitize_os_output(result), force)
 
-    def _loc(self, result):
+    def _loc(self, result, force=False):
         """
         Get the total lines of code from the default branch
         """
-        def extract_lines_of_code(value):
-            if len(value) > 0 and 'SUM:' in value:
+        def extract_lines_of_code(value, force=False):
+            if len(value) > 0 and ('SUM:' in value or force):
                 return int((value.split('\n')[-3]).split(' ')[-1])
             return 0
 
-        return extract_lines_of_code(self.sanitize_os_output(result))
+        return extract_lines_of_code(self.sanitize_os_output(result), force)
 
     def _clone(self):
         """
@@ -309,7 +311,8 @@ class GitOps:
 
         try:
             cmd_auto = ['git', 'remote', 'set-head', 'origin', '--auto']
-            cmd_short = ['git', 'symbolic-ref', '--short', 'refs/remotes/origin/HEAD']
+            cmd_short = ['git', 'symbolic-ref',
+                         '--short', 'refs/remotes/origin/HEAD']
             self._exec(cmd_auto, env=env)
             result = self._exec(cmd_short, env=env)
             result = self.sanitize_os_output(result)
@@ -466,6 +469,9 @@ class GitOps:
             # extract new the loc and pls
             loc = self._loc(result)
             pls = self._pls(result)
+            if loc == 0 and len(pls) == 0:
+                loc = self._loc(result, force=True)
+                pls = self._pls(result, force=True)
 
             logger.debug('Cache loc value %s', cache_loc)
             logger.debug('New loc value %s', loc)
@@ -496,7 +502,7 @@ class GitOps:
         except Exception as se:
             logger.error('LOC error %s', str(se))
             logger.debug('LOC value set from old cache')
-            # Set cache_loc value if cloc fails
+            # Set cache_loc value if loc operations failed
             loc = cache_loc
             pls = cache_pls
         finally:
