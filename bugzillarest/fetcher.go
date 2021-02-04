@@ -177,7 +177,7 @@ func (f *Fetcher) FetchItem(origin string, bugID int, fetchedBug BugData, now ti
 
 func (f *Fetcher) fetchComments(url string, id int) (Comments, error) {
 	commentsURL := fmt.Sprintf("%s/%v/%s", url, id, "comment")
-	_, res, err := f.HTTPClientProvider.Request(commentsURL, "GET", nil, nil, nil)
+	_, res, err := f.HTTPClientProvider.Request(commentsURL, "GET", map[string]string{"X-Item": "comment"}, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +196,7 @@ func (f *Fetcher) fetchComments(url string, id int) (Comments, error) {
 func (f *Fetcher) fetchHistory(url string, id int) ([]History, error) {
 
 	historyURL := fmt.Sprintf("%s/%v/%s", url, id, "history")
-	_, res, err := f.HTTPClientProvider.Request(historyURL, "GET", nil, nil, nil)
+	_, res, err := f.HTTPClientProvider.Request(historyURL, "GET", map[string]string{"X-Item": "history"}, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +213,7 @@ func (f *Fetcher) fetchHistory(url string, id int) ([]History, error) {
 func (f *Fetcher) fetchAttachments(url string, id int) ([]Attachment, error) {
 
 	attachmentURL := fmt.Sprintf("%s/%v/%s", url, id, "attachment")
-	_, res, err := f.HTTPClientProvider.Request(attachmentURL, "GET", nil, nil, nil)
+	_, res, err := f.HTTPClientProvider.Request(attachmentURL, "GET", map[string]string{"X-Item": "attachment"}, nil, nil)
 	if err != nil {
 		return nil, err
 	}

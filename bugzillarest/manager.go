@@ -274,9 +274,13 @@ func (m *Manager) fetch(lastActionCachePostfix string) <-chan error {
 					return
 				}
 
-				failedData, err := util.HandleFailedData(data, esRes)
-				if len(failedData) != 0 {
-					err = util.HandleGapData(m.GapURL, m.HTTPClientProvider, failedData, m.Auth0ClientProvider, m.Environment)
+				if len(esRes) > 0 {
+					failedData, err := util.HandleFailedData(data, esRes)
+					if len(failedData) != 0 {
+						// todo: log this error
+						err = util.HandleGapData(m.GapURL, m.HTTPClientProvider, failedData, m.Auth0ClientProvider, m.Environment)
+						fmt.Println(err)
+					}
 				}
 			}
 
@@ -372,6 +376,9 @@ func (m *Manager) enrich(lastActionCachePostfix string) <-chan error {
 
 			// setting mapping and create index if not exists
 			if offset == 0 {
+				fmt.Println("kkkkkkkk")
+				fmt.Println(m.ESIndex)
+				fmt.Println(string(BugzillaRestEnrichMapping))
 				_, err := m.EsClientProvider.CreateIndex(m.ESIndex, BugzillaRestEnrichMapping)
 				if err != nil {
 					ch <- err
