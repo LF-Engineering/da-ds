@@ -57,7 +57,7 @@ func TestEnrichItem(t *testing.T) {
 		`{
           "metadata__backend_name" : "BugzillaEnrich",
           "metadata__backend_version" : "0.18",
-          "labels" : null,
+          "labels" : [],
 		  "bug_id" : 14136,
           "priority" : "Medium+",
 		  "category":"bug",
