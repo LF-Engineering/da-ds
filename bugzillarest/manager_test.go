@@ -190,7 +190,6 @@ func TestSync(t *testing.T) {
 	params.Auth0ClientProvider = auth0ClientMock
 	mgr, err := NewManager(params)
 	if err != nil {
-		fmt.Println(err)
 		t.Error(err)
 	}
 

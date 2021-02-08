@@ -278,11 +278,10 @@ func (m *Manager) fetch(lastActionCachePostfix string) <-chan error {
 				}
 
 				if len(esRes) > 0 {
-					failedData, err := util.HandleFailedData(data, esRes)
+					failedData, _ := util.HandleFailedData(data, esRes)
 					if len(failedData) != 0 {
 						// todo: log this error
 						err = util.HandleGapData(m.GapURL, m.HTTPClientProvider, failedData, m.Auth0ClientProvider, m.Environment)
-						fmt.Println(err)
 					}
 				}
 			}
@@ -310,10 +309,6 @@ func (m *Manager) enrich(lastActionCachePostfix string) <-chan error {
 		}
 
 		val := &TopHits{}
-		fmt.Println("aaaaaaaa")
-		fmt.Println(fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix))
-		fmt.Println(query)
-		fmt.Println(val)
 		err := m.EsClientProvider.Get(fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), query, val)
 
 		query = map[string]interface{}{
