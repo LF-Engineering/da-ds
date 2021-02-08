@@ -94,7 +94,6 @@ func NewManager(param Param) (*Manager, error) {
 
 	mgr := &Manager{
 		Endpoint:               param.EndPoint,
-		SHConnString:           param.ShConnStr,
 		FetcherBackendVersion:  param.FetcherBackendVersion,
 		EnricherBackendVersion: param.EnricherBackendVersion,
 		Fetch:                  param.Fetch,
@@ -336,8 +335,8 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 			},
 			"sort": []map[string]interface{}{
 				{
-					"metadata__updated_on": map[string]string{
-						"order": "desc",
+					"changed_at": map[string]string{
+						"order": "asc",
 					},
 				},
 			},
@@ -353,7 +352,7 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 
 		conditions := map[string]interface{}{
 			"range": map[string]interface{}{
-				"metadata__updated_on": map[string]interface{}{
+				"changed_at": map[string]interface{}{
 					"gte": (from).Format(time.RFC3339),
 				},
 			},

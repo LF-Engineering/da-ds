@@ -47,7 +47,7 @@ func NewFetcher(params *FetcherParams, httpClientProvider HTTPClientProvider, es
 func (f *Fetcher) FetchAll(origin string, date string, limit string, offset string, now time.Time) ([]Raw, *time.Time, error) {
 
 	url := fmt.Sprintf("%s", origin)
-	bugsURL := fmt.Sprintf("%srest/bug?include_fields=_extra,_default&last_change_time=%s&limit=%s&offset=%s&", url, date, limit, offset)
+	bugsURL := fmt.Sprintf("%srest/bug?include_fields=_extra,_default&last_change_time=%s&limit=%s&offset=%s&order=%s&", url, date, limit, offset, "changeddate%20ASC")
 
 	// fetch all bugs from a specific date
 	_, res, err := f.HTTPClientProvider.Request(bugsURL, "GET", nil, nil, nil)

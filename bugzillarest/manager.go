@@ -113,7 +113,6 @@ func NewManager(params *MgrParams) (*Manager, error) {
 
 	mgr := &Manager{
 		Endpoint:               params.EndPoint,
-		SHConnString:           params.ShConnStr,
 		FetcherBackendVersion:  params.FetcherBackendVersion,
 		EnricherBackendVersion: params.EnricherBackendVersion,
 		Fetch:                  params.Fetch,
@@ -193,6 +192,10 @@ func (m *Manager) Sync() error {
 		case err := <-fetchCh:
 			if err == nil {
 				doneJobs["doneFetch"] = true
+				if doneJobs["doneEnrich"] {
+					m.enrich(lastActionCachePostfix)
+					doneJobs["doneEnrich"] = false
+				}
 			}
 		case err := <-m.enrich(lastActionCachePostfix):
 			if err == nil {
@@ -322,8 +325,8 @@ func (m *Manager) enrich(lastActionCachePostfix string) <-chan error {
 			},
 			"sort": []map[string]interface{}{
 				{
-					"metadata__updated_on": map[string]string{
-						"order": "desc",
+					"data.last_change_time": map[string]string{
+						"order": "asc",
 					},
 				},
 			},
@@ -339,7 +342,7 @@ func (m *Manager) enrich(lastActionCachePostfix string) <-chan error {
 
 		conditions := map[string]interface{}{
 			"range": map[string]interface{}{
-				"metadata__updated_on": map[string]interface{}{
+				"data.last_change_time": map[string]interface{}{
 					"gte": (from).Format(time.RFC3339),
 				},
 			},
@@ -376,9 +379,6 @@ func (m *Manager) enrich(lastActionCachePostfix string) <-chan error {
 
 			// setting mapping and create index if not exists
 			if offset == 0 {
-				fmt.Println("kkkkkkkk")
-				fmt.Println(m.ESIndex)
-				fmt.Println(string(BugzillaRestEnrichMapping))
 				_, err := m.EsClientProvider.CreateIndex(m.ESIndex, BugzillaRestEnrichMapping)
 				if err != nil {
 					ch <- err

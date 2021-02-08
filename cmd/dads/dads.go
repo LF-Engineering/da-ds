@@ -193,7 +193,6 @@ func buildJenkinsManager(ctx *lib.Ctx) (*jenkins.Manager, error) {
 func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 	var params bugzilla.Param
 	params.EndPoint = ctx.BugZilla.Origin.String()
-	params.ShConnStr = fmt.Sprintf("%s:%s@tcp(%s)/%s", ctx.DBUser, ctx.DBPass, ctx.DBHost, ctx.DBName)
 	params.FetcherBackendVersion = "0.1.0"
 	params.EnricherBackendVersion = "0.1.0"
 	params.ESUrl = ctx.ESURL
@@ -220,7 +219,7 @@ func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 
 	params.GapURL = ctx.GapURL
 
-	params.AffBaseURL = ctx.Env("AFFILIATION_API_URL")
+	params.AffBaseURL = ctx.Env("AFFILIATION_API_URL") + "v1/"
 	params.ESCacheURL = ctx.Env("ES_CACHE_URL")
 	params.ESCacheUsername = ctx.Env("ES_CACHE_USERNAME")
 	params.ESCachePassword = ctx.Env("ES_CACHE_PASSWORD")
@@ -275,7 +274,6 @@ func buildPipermailManager(ctx *lib.Ctx) (*pipermail.Manager, error) {
 func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
 	params := &bugzillarest.MgrParams{}
 	params.EndPoint = ctx.BugZilla.Origin.String()
-	params.ShConnStr = fmt.Sprintf("%s:%s@tcp(%s)/%s", ctx.DBUser, ctx.DBPass, ctx.DBHost, ctx.DBName)
 	params.FetcherBackendVersion = "0.1.0"
 	params.EnricherBackendVersion = "0.1.0"
 	params.ESUrl = ctx.ESURL
@@ -303,7 +301,7 @@ func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
 	params.GapURL = ctx.GapURL
 	params.Slug = ctx.BugZilla.ProjectSlug.String()
 
-	params.AffBaseURL = ctx.Env("AFFILIATION_API_URL")
+	params.AffBaseURL = ctx.Env("AFFILIATION_API_URL") + "v1/"
 	params.ESCacheURL = ctx.Env("ES_CACHE_URL")
 	params.ESCacheUsername = ctx.Env("ES_CACHE_USERNAME")
 	params.ESCachePassword = ctx.Env("ES_CACHE_PASSWORD")

@@ -24,7 +24,7 @@ func TestFetchAll(t *testing.T) {
 	}
 	date := from.Format("2006-01-02T15:04:05")
 
-	bugsURL := fmt.Sprintf("%srest/bug?include_fields=_extra,_default&last_change_time=%s&limit=%s&offset=%s&", url, date, limit, offset)
+	bugsURL := fmt.Sprintf("%srest/bug?include_fields=_extra,_default&last_change_time=%s&limit=%s&offset=%s&order=%s&", url, date, limit, offset, "changeddate%20ASC")
 
 	httpClientProviderMock := &mocks.HTTPClientProvider{}
 	eSClientProvider := &mocks.ESClientProvider{}

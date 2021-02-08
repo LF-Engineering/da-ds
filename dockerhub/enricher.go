@@ -5,6 +5,8 @@ import (
 	"log"
 	"strings"
 	"time"
+
+	dads "github.com/LF-Engineering/da-ds"
 )
 
 // Enricher contains dockerhub datasource enrich logic
@@ -69,8 +71,8 @@ func (e *Enricher) EnrichItem(rawItem RepositoryRaw, project string, now time.Ti
 	enriched := RepositoryEnrich{}
 
 	enriched.ID = fmt.Sprintf("%s-%s", rawItem.Data.Name, rawItem.Data.Namespace)
-	enriched.IsEvent = 1
-	enriched.IsDockerImage = 0
+	enriched.IsEvent = 0
+	enriched.IsDockerImage = 1
 	enriched.IsDockerhubDockerhub = 1
 	enriched.Description = rawItem.Data.Description
 	enriched.DescriptionAnalyzed = rawItem.Data.Description
@@ -215,6 +217,7 @@ func (e *Enricher) GetFetchedDataItem(repo *Repository, cmdLastDate *time.Time, 
 
 	err = e.ElasticSearchProvider.Get(rawIndex, query, hits)
 	if err != nil {
+		dads.Printf("[dads-dockerhub] GetFetchedDataItem get elastic data error : %+v\n", err)
 		return nil, err
 	}
 

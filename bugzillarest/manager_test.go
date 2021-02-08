@@ -2,6 +2,9 @@ package bugzillarest
 
 import (
 	"fmt"
+	"io/ioutil"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,7 +28,7 @@ func TestSync(t *testing.T) {
 	}
 
 	httpClientMock.On("Request",
-		fmt.Sprintf("%srest/bug?include_fields=_extra,_default&last_change_time=1970-01-01T00:00:00&limit=1000&offset=0&", origin),
+		fmt.Sprintf("%srest/bug?include_fields=_extra,_default&last_change_time=1970-01-01T00:00:00&limit=1000&offset=0&order=%s&", origin, "changeddate%20ASC"),
 		"GET",
 		map[string]string(nil),
 		[]byte(nil),
@@ -66,11 +69,8 @@ func TestSync(t *testing.T) {
 
 	}).Return(nil)
 
-	rawQuery := map[string]interface{}{"from": 0, "query": map[string]interface{}{"bool": map[string]interface{}{"must": map[string]interface{}{"range": map[string]interface{}{"metadata__updated_on": map[string]interface{}{"gte": "1970-01-01T00:00:00Z"}}}}}, "size": 1000, "sort": []map[string]interface{}{{"metadata__updated_on": map[string]string{"order": "desc"}}}}
+	rawQuery := map[string]interface{}{"from": 0, "query": map[string]interface{}{"bool": map[string]interface{}{"must": map[string]interface{}{"range": map[string]interface{}{"data.last_change_time": map[string]interface{}{"gte": "1970-01-01T00:00:00Z"}}}}}, "size": 1000, "sort": []map[string]interface{}{{"data.last_change_time": map[string]string{"order": "asc"}}}}
 	rawVal := &RawHits{Hits: NHits{Hits: []NestedRawHits(nil)}}
-	esClientMock.On("Get", "sds-data-plane-development-kit-dpdk-bugzillarest-raw", rawQuery, rawVal).Run(func(args mock.Arguments) {
-
-	}).Return(nil)
 
 	fakeMapping := `{"mappings":
 {"properties":
@@ -110,13 +110,46 @@ func TestSync(t *testing.T) {
 	esClientMock.On("DelayOfCreateIndex", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 
 	}).Return(nil)
-
 	savedRawCount := 0
+	savedEnrichedCount := 0
 	esClientMock.On("BulkInsert", mock.Anything).Run(func(args mock.Arguments) {
 		bulkInserted := args[0].([]elastic.BulkData)
-		savedRawCount = len(bulkInserted)
+		isFetching := strings.HasSuffix(bulkInserted[0].IndexName, "-raw")
+		if isFetching {
+			savedRawCount = len(bulkInserted)
+			if len(bulkInserted) > 0 {
+				lines := make([]interface{}, 0)
+				for _, item := range bulkInserted {
+					lines = append(lines, item.Data)
+				}
+
+				file, _ := jsoniter.MarshalIndent(lines[:len(bulkInserted)-2], "", " ")
+				_ = ioutil.WriteFile("fetched.json", file, 0644)
+			}
+		} else {
+			if len(bulkInserted) > 0 {
+				savedEnrichedCount = len(bulkInserted)
+				enrichFile, _ := jsoniter.MarshalIndent(bulkInserted, "", " ")
+				_ = ioutil.WriteFile("enriched.json", enrichFile, 0644)
+			}
+		}
 
 	}).Return(nil, nil)
+
+	esClientMock.On("Get", "sds-data-plane-development-kit-dpdk-bugzillarest-raw", rawQuery, rawVal).Run(func(args mock.Arguments) {
+		fetchFile, _ := ioutil.ReadFile("fetched.json")
+
+		var hits RawHits
+		var rawData []Raw
+		err = jsoniter.Unmarshal(fetchFile, &rawData)
+		if len(rawData) > 0 {
+			for _, raw := range rawData {
+				hits.Hits.Hits = append(hits.Hits.Hits, NestedRawHits{ID: "xxx", Source: raw})
+			}
+		}
+		reflect.ValueOf(args.Get(2)).Elem().Set(reflect.ValueOf(hits))
+
+	}).Return(nil)
 
 	params := &MgrParams{
 		EndPoint:               origin,
@@ -143,7 +176,12 @@ func TestSync(t *testing.T) {
 	params.Fetcher = fetcher
 
 	affiliationsClientMock := &mocks.AffiliationClient{}
+	affiliationsClientMock.On("GetIdentityByUser", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 
+	}).Return(nil, fmt.Errorf("error adding affilliation"))
+	affiliationsClientMock.On("AddIdentity", mock.Anything).Run(func(args mock.Arguments) {
+
+	}).Return(false)
 	enricher := NewEnricher(&EnricherParams{BackendVersion: params.EnricherBackendVersion, Project: params.Project}, affiliationsClientMock)
 
 	params.Enricher = enricher
@@ -162,6 +200,7 @@ func TestSync(t *testing.T) {
 	// Assert
 	assert.NoError(t, err)
 	assert.Equal(t, 5001, savedRawCount)
+	assert.Equal(t, 5000, savedEnrichedCount)
 
 }
 
