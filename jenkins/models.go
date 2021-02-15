@@ -104,7 +104,7 @@ type Build struct {
 	KeepLog           bool        `json:"keepLog"`
 	Number            int         `json:"number"`
 	QueueID           int         `json:"queueId"`
-	Result            string      `json:"result"`
+	Result            *string     `json:"result"`
 	Timestamp         int64       `json:"timestamp"`
 	URL               string      `json:"url"`
 	BuiltOn           string      `json:"builtOn"`
@@ -131,7 +131,7 @@ type BuildsEnrich struct {
 	UUID                    string      `json:"uuid"`
 	FullDisplayName         string      `json:"fullDisplayName"`
 	URL                     string      `json:"url"`
-	Result                  string      `json:"result"`
+	Result                  *string     `json:"result"`
 	Duration                int         `json:"duration"`
 	BuiltOn                 string      `json:"builtOn"`
 	FullDisplayNameAnalyzed string      `json:"fullDisplayName_analyzed"`
