@@ -333,8 +333,12 @@ func TestEnrichItem(t *testing.T) {
 		affProviderMock.On("GetIdentityByUser", "username", "Qian").Return(fakeAff1, nil)
 		affProviderMock.On("GetIdentityByUser", "username", "akuster808").Return(fakeAff2, nil)
 
+		params := &EnricherParams{
+			Project:        "dpdk-common",
+			BackendVersion: "0.18",
+		}
 		// Act
-		srv := NewEnricher("0.18", "dpdk-common", affProviderMock)
+		srv := NewEnricher(params, affProviderMock)
 
 		enrich, err := srv.EnrichItem(raw, expectedEnrich.MetadataEnrichedOn.UTC())
 		if err != nil {

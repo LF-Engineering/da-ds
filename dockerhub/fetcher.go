@@ -108,11 +108,13 @@ func (f *Fetcher) FetchItem(owner string, repository string, now time.Time) (*Re
 
 	statusCode, resBody, err := f.HTTPClientProvider.Request(requestURL, "GET", headers, nil, nil)
 	if err != nil || statusCode != http.StatusOK {
+		dads.Printf("[dads-dockerhub] FetchItem get repository error : %+v %v\n", err, http.StatusOK)
 		return nil, err
 	}
 
 	repoRes := &RepositoryResponse{}
 	if err := jsoniter.Unmarshal(resBody, &repoRes); err != nil {
+		dads.Printf("[dads-dockerhub] FetchItem unmarshal error : %+v\n", err)
 		return nil, errors.New("unable to resolve json request")
 	}
 
@@ -135,6 +137,7 @@ func (f *Fetcher) FetchItem(owner string, repository string, now time.Time) (*Re
 	// generate UUID
 	uid, err := uuid.Generate(raw.Origin)
 	if err != nil {
+		dads.Printf("[dads-dockerhub] FetchItem Generate uuid error : %+v\n", err)
 		return nil, err
 	}
 	raw.UUID = uid

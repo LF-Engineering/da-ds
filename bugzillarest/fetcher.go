@@ -26,19 +26,14 @@ type Fetcher struct {
 	BackendName           string
 }
 
-// Params required parameters for bugzilla fetcher
-type Params struct {
-	Name           string
+// FetcherParams required parameters for bugzilla fetcher
+type FetcherParams struct {
 	Endpoint       string
-	FromDate       time.Time
-	Order          string
-	Project        string
 	BackendVersion string
-	BackendName    string
 }
 
 // NewFetcher initiates a new bugZillaRest fetcher
-func NewFetcher(params Params, httpClientProvider HTTPClientProvider, esClientProvider ESClientProvider) *Fetcher {
+func NewFetcher(params *FetcherParams, httpClientProvider HTTPClientProvider, esClientProvider ESClientProvider) *Fetcher {
 	return &Fetcher{
 		HTTPClientProvider:    httpClientProvider,
 		ElasticSearchProvider: esClientProvider,
@@ -52,7 +47,7 @@ func NewFetcher(params Params, httpClientProvider HTTPClientProvider, esClientPr
 func (f *Fetcher) FetchAll(origin string, date string, limit string, offset string, now time.Time) ([]Raw, *time.Time, error) {
 
 	url := fmt.Sprintf("%s", origin)
-	bugsURL := fmt.Sprintf("%srest/bug?include_fields=_extra,_default&last_change_time=%s&limit=%s&offset=%s&", url, date, limit, offset)
+	bugsURL := fmt.Sprintf("%srest/bug?include_fields=_extra,_default&last_change_time=%s&limit=%s&offset=%s&order=%s&", url, date, limit, offset, "changeddate%20ASC")
 
 	// fetch all bugs from a specific date
 	_, res, err := f.HTTPClientProvider.Request(bugsURL, "GET", nil, nil, nil)
@@ -182,7 +177,7 @@ func (f *Fetcher) FetchItem(origin string, bugID int, fetchedBug BugData, now ti
 
 func (f *Fetcher) fetchComments(url string, id int) (Comments, error) {
 	commentsURL := fmt.Sprintf("%s/%v/%s", url, id, "comment")
-	_, res, err := f.HTTPClientProvider.Request(commentsURL, "GET", nil, nil, nil)
+	_, res, err := f.HTTPClientProvider.Request(commentsURL, "GET", map[string]string{"X-Item": "comment"}, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +196,7 @@ func (f *Fetcher) fetchComments(url string, id int) (Comments, error) {
 func (f *Fetcher) fetchHistory(url string, id int) ([]History, error) {
 
 	historyURL := fmt.Sprintf("%s/%v/%s", url, id, "history")
-	_, res, err := f.HTTPClientProvider.Request(historyURL, "GET", nil, nil, nil)
+	_, res, err := f.HTTPClientProvider.Request(historyURL, "GET", map[string]string{"X-Item": "history"}, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +213,7 @@ func (f *Fetcher) fetchHistory(url string, id int) ([]History, error) {
 func (f *Fetcher) fetchAttachments(url string, id int) ([]Attachment, error) {
 
 	attachmentURL := fmt.Sprintf("%s/%v/%s", url, id, "attachment")
-	_, res, err := f.HTTPClientProvider.Request(attachmentURL, "GET", nil, nil, nil)
+	_, res, err := f.HTTPClientProvider.Request(attachmentURL, "GET", map[string]string{"X-Item": "attachment"}, nil, nil)
 	if err != nil {
 		return nil, err
 	}

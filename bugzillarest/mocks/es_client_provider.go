@@ -120,29 +120,6 @@ func (_m *ESClientProvider) DelayOfCreateIndex(ex func(string, []byte) ([]byte, 
 	return r0
 }
 
-// DeleteIndex provides a mock function with given fields: index, ignoreUnavailable
-func (_m *ESClientProvider) DeleteIndex(index string, ignoreUnavailable bool) ([]byte, error) {
-	ret := _m.Called(index, ignoreUnavailable)
-
-	var r0 []byte
-	if rf, ok := ret.Get(0).(func(string, bool) []byte); ok {
-		r0 = rf(index, ignoreUnavailable)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(string, bool) error); ok {
-		r1 = rf(index, ignoreUnavailable)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // Get provides a mock function with given fields: index, query, result
 func (_m *ESClientProvider) Get(index string, query map[string]interface{}, result interface{}) error {
 	ret := _m.Called(index, query, result)

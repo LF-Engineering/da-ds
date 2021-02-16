@@ -6,6 +6,8 @@ import (
 	"log"
 	"time"
 
+	dads "github.com/LF-Engineering/da-ds"
+
 	"github.com/LF-Engineering/dev-analytics-libraries/auth0"
 
 	"github.com/LF-Engineering/da-ds/util"
@@ -143,6 +145,7 @@ func (m *Manager) Sync() error {
 
 	fetcher, enricher, esClientProvider, auth0Client, err := buildServices(m)
 	if err != nil {
+		dads.Printf("[dads-dockerhub] Sync buildServices error : %+v\n", err)
 		return err
 	}
 
@@ -150,6 +153,7 @@ func (m *Manager) Sync() error {
 	if m.Password != "" {
 		_, err := fetcher.Login(m.Username, m.Password)
 		if err != nil {
+			dads.Printf("[dads-dockerhub] Login fetcher error : %+v\n", err)
 			return err
 		}
 	}
@@ -202,6 +206,7 @@ func (m *Manager) Sync() error {
 			if m.FromDate == nil || (*m.FromDate).IsZero() {
 				lastDate, err = fetcher.GetLastDate(repo, time.Now())
 				if err != nil {
+					dads.Printf("[dads-dockerhub] GetLastDate fetcher error : %+v\n", err)
 					log.Println("[GetLastDate] could not get last date")
 				}
 			} else {

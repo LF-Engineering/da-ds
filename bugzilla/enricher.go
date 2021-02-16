@@ -3,6 +3,7 @@ package bugzilla
 import (
 	"fmt"
 	"log"
+	"math"
 	"strings"
 	"time"
 
@@ -65,12 +66,16 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 	enriched.URL = rawItem.Origin + "/show_bug.cgi?id=" + fmt.Sprint(rawItem.BugID)
 	enriched.CreationDate = rawItem.CreationTS
 
-	enriched.ResolutionDays = timeLib.GetDaysBetweenDates(enriched.DeltaTs, enriched.CreationDate)
+	enriched.ResolutionDays = math.Round(timeLib.GetDaysBetweenDates(enriched.DeltaTs, enriched.CreationDate)*100) / 100
 	if rawItem.StatusWhiteboard != "" {
 		enriched.Whiteboard = rawItem.StatusWhiteboard
 	}
 	unknown := "Unknown"
 	multiOrgs := []string{unknown}
+
+	if enriched.Labels == nil {
+		enriched.Labels = make([]string, 0)
+	}
 
 	if rawItem.Assignee.Username != "" && rawItem.Assignee.Name != "" {
 		enriched.Assigned = rawItem.Assignee.Username
