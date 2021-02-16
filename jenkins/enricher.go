@@ -93,7 +93,9 @@ func (e *Enricher) EnrichItem(rawItem BuildsRaw, project string, now time.Time) 
 	enriched.JobURL = strings.TrimRight(rawItem.Data.URL, "/"+rawItem.Data.ID)
 	parts = strings.Split(enriched.JobURL, "/")
 	enriched.JobName = parts[len(parts)-1]
-	enriched.Result = rawItem.Data.Result
+	if rawItem.Data.Result != nil {
+		enriched.Result = rawItem.Data.Result
+	}
 	enriched.GrimoireCreationDate = enriched.BuildDate
 	enriched.IsJenkinsJob = 1
 	// Calculate Duration
