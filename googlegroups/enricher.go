@@ -9,7 +9,6 @@ import (
 	"github.com/LF-Engineering/dev-analytics-libraries/affiliation"
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
-	"github.com/badoux/checkmail"
 )
 
 // Enricher contains google groups datasource enrich logic
@@ -57,9 +56,9 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 		IsGoogleGroupMessage: 1,
 		Origin:               rawMessage.Origin,
 		AuthorMultiOrgNames:  []string{Unknown},
-		AuthorOrgName: Unknown,
-		AuthorGender: Unknown,
-
+		AuthorOrgName:        Unknown,
+		AuthorGender:         Unknown,
+		Timezone:             rawMessage.Timezone,
 	}
 
 	if rawMessage.InReplyTo == "" {
@@ -77,7 +76,7 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 	}
 
 	if userData != nil {
-		// handle affiliations if user exists
+		// handle affiliations if userEmailsMapping exists
 		if userData.ID != nil {
 			enrichedMessage.AuthorID = *userData.ID
 		}
@@ -111,13 +110,15 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 			}
 		}
 
-		if *userData.IsBot == 1 {
-			enrichedMessage.FromBot = true
+		if userData.IsBot != nil {
+			if *userData.IsBot == 1 {
+				enrichedMessage.FromBot = true
+			}
 		}
 	} else {
 		// add new affiliation if email format is valid
 		if ok := e.IsValidEmail(userAffiliationsEmail); ok {
-			name := e.GetUserName(rawMessage.From)
+			name := enrichedMessage.AuthorName
 			source := GoogleGroups
 			authorUUID, err := uuid.GenerateIdentity(&source, &userAffiliationsEmail, &name, nil)
 			if err == nil {
@@ -126,21 +127,16 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 					Name:         name,
 					Source:       source,
 					Email:        userAffiliationsEmail,
-					UUID:         authorUUID,
+					ID:           authorUUID,
 				}
 
 				if ok := e.affiliationsClientProvider.AddIdentity(&userIdentity); !ok {
 					log.Printf("failed to add identity for [%+v]", userAffiliationsEmail)
-				} else {
-					log.Printf("added identity for [%+v]", name)
-					multipleOrganizations := []string{Unknown}
-
-					// add user data to enriched object
-					enrichedMessage.AuthorID = authorUUID
-					enrichedMessage.AuthorUUID = authorUUID
-					enrichedMessage.AuthorName = name
-					enrichedMessage.AuthorMultiOrgNames = multipleOrganizations
 				}
+
+				enrichedMessage.AuthorID = authorUUID
+				enrichedMessage.AuthorUUID = authorUUID
+				enrichedMessage.AuthorName = name
 			}
 			log.Println(err)
 		}
@@ -193,11 +189,37 @@ func (e *Enricher) IsValidEmail(rawMailString string) bool {
 		return false
 	}
 
-	err := checkmail.ValidateFormat(rawMailString)
-	if err != nil {
-		log.Println("invalid email format: ", err)
-		return false
-	}
-
 	return true
+}
+
+// Find takes a slice and looks for an element in it. If found it will
+// return it's true, otherwise it will return false.
+func (e *Enricher) Find(slice []string, val string) bool {
+	for _, item := range slice {
+		if item == val {
+			return true
+		}
+	}
+	return false
+}
+
+// SanitizeEmails returns the first well formed email address for a given user
+// it filters out norely emails and emails with ellipsis
+func (e *Enricher) SanitizeEmails(emails []string) string {
+	validEmails := make([]string, 0)
+	if len(emails) > 0 {
+		for _, email := range emails {
+			if strings.Contains(email, "noreply") {
+				continue
+			}
+
+			if strings.Contains(email, "...") {
+				continue
+			}
+
+			validEmails = append(validEmails, email)
+		}
+		return validEmails[0]
+	}
+	return ""
 }
