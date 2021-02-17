@@ -64,12 +64,13 @@ func ExecuteAffiliationsAPICall(ctx *Ctx, method, path string, cacheToken bool) 
 		if i == 0 && resp.StatusCode == 401 {
 			_ = resp.Body.Close()
 			Printf("token is invalid, trying to generate another one\n")
+			lock()
 			token, err = GetAPIToken()
 			if err != nil {
+				unlock()
 				fmt.Printf("GetAPIToken error: %v\n", err)
 				return
 			}
-			lock()
 			if cacheToken {
 				gToken = token
 			}
