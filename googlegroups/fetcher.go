@@ -1,8 +1,6 @@
 package googlegroups
 
 import (
-	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -19,7 +17,6 @@ import (
 	"github.com/LF-Engineering/dev-analytics-libraries/http"
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 	"github.com/araddon/dateparse"
-	"github.com/jhillyerd/enmime"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -91,7 +88,7 @@ func (f *Fetcher) Fetch(fromDate, now *time.Time) ([]*RawMessage, error) {
 	}
 	rawMessages := make([]*RawMessage, 0)
 
-	for _, messageId := range messageIDS {
+	for _, messageID := range messageIDS {
 		type result struct {
 			path string
 			message  *gmail.Message
@@ -108,7 +105,7 @@ func (f *Fetcher) Fetch(fromDate, now *time.Time) ([]*RawMessage, error) {
 				defer wgFiles.Done()
 				msg, err := srv.Users.Messages.Get(user, messageId).Do()
 				results <- result{messageId, msg, err}
-			}(messageId)
+			}(messageID)
 		}()
 
 		var nEnvs, nErr int
@@ -139,39 +136,6 @@ func (f *Fetcher) Fetch(fromDate, now *time.Time) ([]*RawMessage, error) {
 	}
 	os.Exit(1)
 	return rawMessages, err
-}
-
-func (f *Fetcher) readEnvelope(path string) (*enmime.Envelope, error) {
-	text, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("could not open %s: %v", path, err)
-	}
-	env, err := enmime.ReadEnvelope(bytes.NewReader(text))
-	for i := 0; i < 4 && err != nil; i++ {
-		errStr := err.Error()
-		if pos := strings.Index(errStr, malformedMIMEHeaderLineErrorMessage); pos >= 0 {
-			data := strings.Replace(errStr[pos+len(malformedMIMEHeaderLineErrorMessage):], " ", "\r\n", -1)
-			if base64RE.MatchString(data) {
-				var decodedData []byte
-				decodedData, err = base64.StdEncoding.DecodeString(data)
-				if err == nil {
-					text = bytes.Replace(text, []byte(data), decodedData, 1)
-					env, err = enmime.ReadEnvelope(bytes.NewReader(text))
-					if err == nil {
-						return env, nil
-					}
-				} else {
-					break
-				}
-			}
-		} else {
-			break
-		}
-	}
-	if err != nil {
-		return nil, fmt.Errorf("could not read envelope: %v", err)
-	}
-	return env, nil
 }
 
 func (f *Fetcher) getMessage(msg *gmail.Message, fromDate, now *time.Time) (rawMessage *RawMessage, err error) {

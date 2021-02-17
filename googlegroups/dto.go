@@ -107,6 +107,7 @@ type NestedRawHits struct {
 	Source RawMessage `json:"_source"`
 }
 
+// HeadersData struct
 type HeadersData struct {
 	// Date is the date the message was originally sent
 	Date string
