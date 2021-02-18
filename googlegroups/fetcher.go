@@ -3,7 +3,6 @@ package googlegroups
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	httpNative "net/http"
@@ -90,9 +89,9 @@ func (f *Fetcher) Fetch(fromDate, now *time.Time) ([]*RawMessage, error) {
 
 	for _, messageID := range messageIDS {
 		type result struct {
-			path string
-			message  *gmail.Message
-			err  error
+			path    string
+			message *gmail.Message
+			err     error
 		}
 		results := make(chan result, 1024)
 
@@ -122,7 +121,9 @@ func (f *Fetcher) Fetch(fromDate, now *time.Time) ([]*RawMessage, error) {
 				if err != nil {
 					return
 				}
-				rawMessages = append(rawMessages, msg)
+				if msg != nil {
+					rawMessages = append(rawMessages, msg)
+				}
 				nEnvs++
 			}
 		}()
@@ -134,42 +135,51 @@ func (f *Fetcher) Fetch(fromDate, now *time.Time) ([]*RawMessage, error) {
 	for _, m := range rawMessages {
 		fmt.Println(m)
 	}
-	os.Exit(1)
+	//os.Exit(1)
 	return rawMessages, err
 }
 
 func (f *Fetcher) getMessage(msg *gmail.Message, fromDate, now *time.Time) (rawMessage *RawMessage, err error) {
 	rawMessage = new(RawMessage)
-	headers := GetHeadersData(msg)
+	headers := getHeadersData(msg)
 
 	date, err := dateparse.ParseAny(headers.Date)
 	if err != nil {
 		log.Println(err)
+		return nil, err
 	}
 	//now := time.Now()
 	from := headers.From
 	to := headers.To
+	sender := headers.Sender
 	messageID := headers.MessageID
 	inReplyTo := headers.InReplyTo
 	references := headers.References
 	subject := headers.Subject
 	messageBody := msg.Snippet
 
+	if sender != f.GroupName {
+		return nil, err
+	}
+
 	if fromDate.After(date) {
-		fmt.Println(fromDate, " > " ,date)
-		return
+		fmt.Println(fromDate, " > ", date)
+		return nil, err
 	}
 
 	timezone, err := f.getTimeZone(headers.Date)
 	if err != nil {
 		log.Println(err)
+		return nil, err
 	}
 
-	uuID, err := uuid.Generate("GoogleGroups", messageID)
+	uuID, err := uuid.Generate(GoogleGroups, messageID)
 	if err != nil {
 		log.Println(err)
+		return nil, err
 	}
 
+	groupName := getGroupName(f.GroupName)
 	rawMessage.From = from
 	rawMessage.Date = date
 	rawMessage.To = to
@@ -183,7 +193,7 @@ func (f *Fetcher) getMessage(msg *gmail.Message, fromDate, now *time.Time) (rawM
 	rawMessage.MetadataUpdatedOn = date
 	rawMessage.MetadataTimestamp = *now
 	rawMessage.ChangedAt = *now
-	rawMessage.GroupName = f.GroupName
+	rawMessage.GroupName = groupName
 	rawMessage.ProjectSlug = f.ProjectSlug
 	rawMessage.Project = f.Project
 	rawMessage.UUID = uuID
@@ -192,44 +202,14 @@ func (f *Fetcher) getMessage(msg *gmail.Message, fromDate, now *time.Time) (rawM
 	rawMessage.BackendVersion = f.BackendVersion
 	//rawMessage.UpdatedOn = timeLib.ConvertTimeToFloat(*now)
 	//rawMessage.Timestamp = *now
-	rawMessage.Origin = fmt.Sprintf("https://groups.google.com/g/%+v", f.GroupName)
-	if strings.Contains(f.GroupName, "/") {
+	rawMessage.Origin = fmt.Sprintf("https://groups.google.com/g/%+v", groupName)
+	if strings.Contains(groupName, "/") {
 		splitGroupName := strings.Split(f.GroupName, "/")
 		organization := strings.TrimSpace(splitGroupName[0])
 		group := strings.TrimSpace(splitGroupName[1])
 		rawMessage.Origin = fmt.Sprintf("https://groups.google.com/a/%+v/g/%+v", organization, group)
 	}
 	return
-}
-
-func (f *Fetcher) cleanupMessage(text string, output io.Writer) error {
-	lines := strings.Split(text, "\n")
-	first := true
-	for _, line := range lines {
-		trimmedLine := strings.TrimSpace(line)
-		if trimmedLine == "" {
-			continue
-		}
-		line = line[:strings.Index(line, trimmedLine)+len(trimmedLine)]
-		if strings.HasPrefix(line, ">") {
-			continue
-		}
-		if strings.HasPrefix(line, "On ") && strings.HasSuffix(line, " wrote:") {
-			continue
-		}
-		if !first {
-			if _, err := output.Write([]byte("\n")); err != nil {
-				return err
-			}
-		} else {
-			first = false
-		}
-
-		if _, err := output.Write([]byte(line)); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (f *Fetcher) formatJSONDataDate(s string) (*time.Time, error) {
@@ -266,8 +246,22 @@ func (f *Fetcher) getTimeZone(dateString string) (int, error) {
 	return timezone, nil
 }
 
-// GetHeadersData gets some of the useful metadata from the headers.
-func GetHeadersData(msg *gmail.Message) *HeadersData {
+func getGroupName(s string) string {
+	splitEmail := strings.Split(s, "@")
+	groupName := ""
+	domain := ""
+	if len(splitEmail) > 1 {
+		groupName, domain = splitEmail[0], splitEmail[1]
+		if domain == "googlegroups.com" {
+			return groupName
+		}
+		return fmt.Sprintf("%s/%s", domain, groupName)
+	}
+	return ""
+}
+
+// getHeadersData gets some of the useful metadata from the headers.
+func getHeadersData(msg *gmail.Message) *HeadersData {
 	data := &HeadersData{}
 	for _, v := range msg.Payload.Headers {
 		switch v.Name {

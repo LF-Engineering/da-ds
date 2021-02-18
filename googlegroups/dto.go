@@ -27,7 +27,7 @@ type GoogleGroupMessage struct {
 type EnrichedMessage struct {
 	From                 string    `json:"from"`
 	Date                 time.Time `json:"date"`
-	To                   []string    `json:"to"`
+	To                   []string  `json:"to"`
 	MessageID            string    `json:"message_id"`
 	InReplyTo            string    `json:"in_reply_to"`
 	References           string    `json:"references"`
@@ -68,7 +68,7 @@ type EnrichedMessage struct {
 type RawMessage struct {
 	From              string    `json:"from"`
 	Date              time.Time `json:"date"`
-	To                []string    `json:"to"`
+	To                []string  `json:"to"`
 	MessageID         string    `json:"message_id"`
 	InReplyTo         string    `json:"in_reply_to"`
 	References        string    `json:"references"`
