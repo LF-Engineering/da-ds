@@ -150,7 +150,7 @@ func (ctx *Ctx) ParseFlags() {
 	flag.Var(ctx.PiperMail.EnrichSize, "pipermail-enrich-size", "Total number of enriched items per request.")
 
 	flag.Var(ctx.GoogleGroups.ProjectSlug, "googlegroups-slug", "GoogleGroups project slug")
-	flag.Var(ctx.GoogleGroups.GroupName, "googlegroups-groupname", "GoogleGroups group name")
+	flag.Var(ctx.GoogleGroups.GroupName, "googlegroups-groupname", "GoogleGroups email address")
 	flag.Var(ctx.GoogleGroups.EsIndex, "googlegroups-es-index", "GoogleGroups es index base name")
 	flag.Var(ctx.GoogleGroups.FromDate, "googlegroups-from-date", "Optional, date to start syncing from")
 	flag.Var(ctx.GoogleGroups.Project, "googlegroups-project", "Slug name of a project e.g. yocto")
