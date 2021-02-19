@@ -5,6 +5,8 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/LF-Engineering/dev-analytics-libraries/slack"
+
 	libAffiliations "github.com/LF-Engineering/dev-analytics-libraries/affiliation"
 	"github.com/LF-Engineering/dev-analytics-libraries/auth0"
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
@@ -147,6 +149,8 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	params.AuthAudience = ctx.Env("AUTH0_AUDIENCE")
 	params.AuthURL = ctx.Env("AUTH0_URL")
 	params.Environment = ctx.Env("BRANCH")
+	params.AUthSecret = ctx.AuthSecret
+	params.WebHookURL = ctx.WebHookURL
 
 	repositoriesJSON := ctx.Env("REPOSITORIES_JSON")
 	if err := jsoniter.Unmarshal([]byte(repositoriesJSON), &params.Repositories); err != nil {
@@ -266,7 +270,7 @@ func buildPipermailManager(ctx *lib.Ctx) (*pipermail.Manager, error) {
 
 	mgr, err := pipermail.NewManager(origin, slug, groupName, ctx.DBConn, fetcherBackendVersion, enricherBackendVersion,
 		doFetch, doEnrich, ctx.ESURL, "", "", esIndex, fromDate, project,
-		fetchSize, enrichSize, affBaseURL, esCacheURL, esCacheUsername, esCachePassword, authGrantType, authClientID, authClientSecret, authAudience, authURL, env)
+		fetchSize, enrichSize, affBaseURL, esCacheURL, esCacheUsername, esCachePassword, authGrantType, authClientID, authClientSecret, authAudience, authURL, env, ctx.AuthSecret, ctx.WebHookURL)
 
 	return mgr, err
 }
@@ -312,6 +316,9 @@ func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
 	params.AuthURL = ctx.Env("AUTH0_URL")
 	params.Environment = ctx.Env("BRANCH")
 
+	params.AuthURL = ctx.Env("AUTH0_URL")
+	params.Environment = ctx.Env("BRANCH")
+
 	fetcher, enricher, esClientProvider, auth0ClientProvider, httpClientProvider, err := buildBugzillaRestMgrServices(params)
 	if err != nil {
 		return nil, err
@@ -343,10 +350,12 @@ func buildBugzillaRestMgrServices(p *bugzillarest.MgrParams) (*bugzillarest.Fetc
 		return nil, nil, nil, nil, nil, err
 	}
 
+	slackProvider := slack.New(p.WebHookURL)
 	// Initialize fetcher object to get data from bugzilla rest api
 	fetcher := bugzillarest.NewFetcher(&bugzillarest.FetcherParams{Endpoint: p.EndPoint, BackendVersion: p.FetcherBackendVersion}, httpClientProvider, esClientProvider)
+	auth0Client, err := auth0.NewAuth0Client(p.ESCacheURL, p.ESCacheUsername, p.ESCachePassword, p.Environment, p.AuthGrantType, p.AuthClientID, p.AuthClientSecret, p.AuthAudience, p.AuthURL, p.AuthSecret, httpClientProvider, esClientProvider, &slackProvider)
 
-	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(p.AffBaseURL, p.Slug, p.ESCacheURL, p.ESCacheUsername, p.ESCachePassword, p.Environment, p.AuthGrantType, p.AuthClientID, p.AuthClientSecret, p.AuthAudience, p.AuthURL)
+	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(p.AffBaseURL, p.Slug, httpClientProvider, esClientProvider, auth0Client, &slackProvider)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
@@ -354,7 +363,6 @@ func buildBugzillaRestMgrServices(p *bugzillarest.MgrParams) (*bugzillarest.Fetc
 	// Initialize enrich object to enrich raw data
 	enricher := bugzillarest.NewEnricher(&bugzillarest.EnricherParams{BackendVersion: p.EnricherBackendVersion, Project: p.Project}, affiliationsClientProvider)
 
-	auth0Client, err := auth0.NewAuth0Client(p.ESCacheURL, p.ESCacheUsername, p.ESCachePassword, p.Environment, p.AuthGrantType, p.AuthClientID, p.AuthClientSecret, p.AuthAudience, p.AuthURL)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}

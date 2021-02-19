@@ -153,7 +153,6 @@ func TestSync(t *testing.T) {
 
 	params := &MgrParams{
 		EndPoint:               origin,
-		ShConnStr:              "",
 		FetcherBackendVersion:  "",
 		EnricherBackendVersion: "",
 		Fetch:                  true,

@@ -9,20 +9,20 @@ type Auth0ClientProvider struct {
 	mock.Mock
 }
 
-// ValidateToken provides a mock function with given fields: env
-func (_m *Auth0ClientProvider) ValidateToken(env string) (string, error) {
-	ret := _m.Called(env)
+// GetToken provides a mock function with given fields:
+func (_m *Auth0ClientProvider) GetToken() (string, error) {
+	ret := _m.Called()
 
 	var r0 string
-	if rf, ok := ret.Get(0).(func(string) string); ok {
-		r0 = rf(env)
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(env)
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
 	} else {
 		r1 = ret.Error(1)
 	}

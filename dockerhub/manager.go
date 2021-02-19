@@ -6,6 +6,8 @@ import (
 	"log"
 	"time"
 
+	"github.com/LF-Engineering/dev-analytics-libraries/slack"
+
 	dads "github.com/LF-Engineering/da-ds"
 
 	"github.com/LF-Engineering/dev-analytics-libraries/auth0"
@@ -46,9 +48,11 @@ type Manager struct {
 	Environment      string
 	Slug             string
 
-	Retries uint
-	Delay   time.Duration
-	GapURL  string
+	Retries    uint
+	Delay      time.Duration
+	GapURL     string
+	WebHookURL string
+	AUthSecret string
 }
 
 // Param required for creating a new instance of Bugzilla manager
@@ -86,6 +90,8 @@ type Param struct {
 	HTTPTimeout            time.Duration
 	Repositories           []*Repository
 	NoIncremental          bool
+	WebHookURL             string
+	AUthSecret             string
 }
 
 // Repository represents dockerhub repository data
@@ -98,7 +104,7 @@ type Repository struct {
 
 // Auth0Client ...
 type Auth0Client interface {
-	ValidateToken(env string) (string, error)
+	GetToken() (string, error)
 }
 
 // NewManager initiates dockerhub manager instance
@@ -270,8 +276,9 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, Auth0Clie
 
 	// Initialize enrich object to enrich raw data
 	enricher := NewEnricher(m.EnricherBackendVersion, esClientProvider)
+	slackProvider := slack.New(m.WebHookURL)
 
-	auth0Client, err := auth0.NewAuth0Client(m.ESCacheURL, m.ESUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.AuthURL)
+	auth0Client, err := auth0.NewAuth0Client(m.ESCacheURL, m.ESUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.AuthURL, m.AUthSecret, httpClientProvider, esClientProvider, &slackProvider)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}

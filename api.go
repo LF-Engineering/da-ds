@@ -36,7 +36,7 @@ func ExecuteAffiliationsAPICall(ctx *Ctx, method, path string, cacheToken bool) 
 		token = gToken
 	}
 	if token == "" {
-		token, err = GetAPIToken()
+		token, err = GetAPIToken(ctx)
 		if err != nil {
 			unlock()
 			fmt.Printf("GetAPIToken error: %v\n", err)
@@ -65,7 +65,7 @@ func ExecuteAffiliationsAPICall(ctx *Ctx, method, path string, cacheToken bool) 
 			_ = resp.Body.Close()
 			Printf("token is invalid, trying to generate another one\n")
 			lock()
-			token, err = GetAPIToken()
+			token, err = GetAPIToken(ctx)
 			if err != nil {
 				unlock()
 				fmt.Printf("GetAPIToken error: %v\n", err)

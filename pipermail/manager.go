@@ -5,6 +5,9 @@ import (
 	"log"
 	"time"
 
+	"github.com/LF-Engineering/dev-analytics-libraries/auth0"
+	"github.com/LF-Engineering/dev-analytics-libraries/slack"
+
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
 
 	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
@@ -67,6 +70,8 @@ type Manager struct {
 	AuthAudience           string
 	AuthURL                string
 	Environment            string
+	AuthSecret             string
+	WebHookURL             string
 
 	esClientProvider ESClientProvider
 	fetcher          *Fetcher
@@ -74,7 +79,7 @@ type Manager struct {
 }
 
 // NewManager initiates piper mail manager instance
-func NewManager(endPoint, slug, groupName, shConnStr, fetcherBackendVersion, enricherBackendVersion string, fetch bool, enrich bool, eSUrl string, esUser string, esPassword string, esIndex string, fromDate *time.Time, project string, fetchSize int, enrichSize int, affBaseURL, esCacheURL, esCacheUsername, esCachePassword, authGrantType, authClientID, authClientSecret, authAudience, authURL, env string) (*Manager, error) {
+func NewManager(endPoint, slug, groupName, shConnStr, fetcherBackendVersion, enricherBackendVersion string, fetch bool, enrich bool, eSUrl string, esUser string, esPassword string, esIndex string, fromDate *time.Time, project string, fetchSize int, enrichSize int, affBaseURL, esCacheURL, esCacheUsername, esCachePassword, authGrantType, authClientID, authClientSecret, authAudience, authURL, env, authSecret, webHookURL string) (*Manager, error) {
 	mng := &Manager{
 		Endpoint:               endPoint,
 		Slug:                   slug,
@@ -106,6 +111,8 @@ func NewManager(endPoint, slug, groupName, shConnStr, fetcherBackendVersion, enr
 		esClientProvider:       nil,
 		fetcher:                nil,
 		enricher:               nil,
+		AuthSecret:             authSecret,
+		WebHookURL:             webHookURL,
 	}
 
 	fetcher, enricher, esClientProvider, err := buildServices(mng)
@@ -422,8 +429,11 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 		return nil, nil, nil, err
 	}
 	identityProvider := affiliation.NewIdentityProvider(dataBase)
+	slackProvider := slack.New(m.WebHookURL)
 
-	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(m.AffBaseURL, m.Slug, m.ESCacheURL, m.ESCacheUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.AuthURL)
+	auth0Client, err := auth0.NewAuth0Client(m.ESCacheURL, m.ESCacheUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.AuthURL, m.AuthSecret, httpClientProvider, esClientProvider, &slackProvider)
+
+	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(m.AffBaseURL, m.Slug, httpClientProvider, esClientProvider, auth0Client, &slackProvider)
 	if err != nil {
 		return nil, nil, nil, err
 	}

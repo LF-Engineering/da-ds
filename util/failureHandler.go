@@ -15,13 +15,13 @@ type HTTPClientProvider interface {
 
 // Auth0Client ...
 type Auth0Client interface {
-	ValidateToken(env string) (string, error)
+	GetToken() (string, error)
 }
 
 // HandleGapData ...
 func HandleGapData(gapURL string, HTTPRequest HTTPClientProvider, data []elastic.BulkData, auth0Client Auth0Client, env string) error {
 
-	token, err := auth0Client.ValidateToken(env)
+	token, err := auth0Client.GetToken()
 	if err != nil {
 		return err
 	}

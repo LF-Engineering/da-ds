@@ -5,8 +5,12 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/LF-Engineering/dev-analytics-libraries/auth0"
+	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
+	"github.com/LF-Engineering/dev-analytics-libraries/http"
+	"github.com/LF-Engineering/dev-analytics-libraries/slack"
 	jsoniter "github.com/json-iterator/go"
 )
 
@@ -17,7 +21,7 @@ var (
 )
 
 // InitializeAuth0 - initializes Auth0 client using data stored in AUTH0_DATA
-func InitializeAuth0() error {
+func InitializeAuth0(ctx *Ctx) error {
 	var err error
 	auth0DataB64 := os.Getenv("AUTH0_DATA")
 	if auth0DataB64 == "" {
@@ -43,6 +47,16 @@ func InitializeAuth0() error {
 	AddRedacted(data["client_secret"], false)
 	AddRedacted(data["audience"], false)
 	AddRedacted(data["url"], false)
+
+	authSecret := os.Getenv("AUTH_SECRET")
+	esUrl := ctx.Env("ES_URL")
+	slackProvider := slack.New(os.Getenv("SLACK_WEBHOOK_URL"))
+	httpClientProvider := http.NewClientProvider(time.Minute)
+	esClientProvider, err := elastic.NewClientProvider(&elastic.Params{
+		URL:      esUrl,
+		Username: "",
+		Password: "",
+	})
 	gAuth0Client, err = auth0.NewAuth0Client(
 		data["es_url"],
 		data["es_user"],
@@ -53,6 +67,10 @@ func InitializeAuth0() error {
 		data["client_secret"],
 		data["audience"],
 		data["url"],
+		authSecret,
+		httpClientProvider,
+		esClientProvider,
+		&slackProvider,
 	)
 	if err == nil {
 		gTokenEnv = data["env"]
@@ -63,7 +81,7 @@ func InitializeAuth0() error {
 // GetAPIToken - return an API token to use dev-analytics-api API calls
 // If JWT_TOKEN env is specified - just use the provided token without any checks
 // Else get auth0 data from AUTH0_DATA and generate/reuse a token stored in ES cache
-func GetAPIToken() (string, error) {
+func GetAPIToken(ctx *Ctx) (string, error) {
 	envToken := os.Getenv("JWT_TOKEN")
 	if envToken != "" {
 		return envToken, nil
@@ -73,11 +91,11 @@ func GetAPIToken() (string, error) {
 		defer gTokenEnvMtx.Unlock()
 	}
 	if gTokenEnv == "" {
-		err := InitializeAuth0()
+		err := InitializeAuth0(ctx)
 		if err != nil {
 			return "", err
 		}
 	}
-	token, err := gAuth0Client.ValidateToken(gTokenEnv)
+	token, err := gAuth0Client.GetToken()
 	return token, err
 }
