@@ -49,11 +49,11 @@ func InitializeAuth0(ctx *Ctx) error {
 	AddRedacted(data["url"], false)
 
 	authSecret := os.Getenv("AUTH_SECRET")
-	esUrl := ctx.Env("ES_URL")
+	esURL := ctx.Env("ES_URL")
 	slackProvider := slack.New(os.Getenv("SLACK_WEBHOOK_URL"))
 	httpClientProvider := http.NewClientProvider(time.Minute)
 	esClientProvider, err := elastic.NewClientProvider(&elastic.Params{
-		URL:      esUrl,
+		URL:      esURL,
 		Username: "",
 		Password: "",
 	})
