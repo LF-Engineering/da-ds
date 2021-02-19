@@ -316,9 +316,6 @@ func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
 	params.AuthURL = ctx.Env("AUTH0_URL")
 	params.Environment = ctx.Env("BRANCH")
 
-	params.AuthURL = ctx.Env("AUTH0_URL")
-	params.Environment = ctx.Env("BRANCH")
-
 	fetcher, enricher, esClientProvider, auth0ClientProvider, httpClientProvider, err := buildBugzillaRestMgrServices(params)
 	if err != nil {
 		return nil, err
