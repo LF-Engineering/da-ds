@@ -421,7 +421,7 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 		return nil, nil, nil, err
 	}
 
-	esClientCacheProvider, err := elastic.NewClientProvider(&elastic.Params{
+	esCacheClientProvider, err := elastic.NewClientProvider(&elastic.Params{
 		URL:      m.ESCacheURL,
 		Username: m.ESCacheUsername,
 		Password: m.ESCachePassword,
@@ -437,9 +437,9 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 	identityProvider := affiliation.NewIdentityProvider(dataBase)
 	slackProvider := slack.New(m.WebHookURL)
 
-	auth0Client, err := auth0.NewAuth0Client(m.ESCacheURL, m.ESCacheUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.AuthURL, m.AuthSecret, httpClientProvider, esClientCacheProvider, &slackProvider)
+	auth0Client, err := auth0.NewAuth0Client(m.ESCacheURL, m.ESCacheUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.AuthURL, m.AuthSecret, httpClientProvider, esCacheClientProvider, &slackProvider)
 
-	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(m.AffBaseURL, m.Slug, httpClientProvider, esClientCacheProvider, auth0Client, &slackProvider)
+	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(m.AffBaseURL, m.Slug, httpClientProvider, esCacheClientProvider, auth0Client, &slackProvider)
 	if err != nil {
 		return nil, nil, nil, err
 	}
