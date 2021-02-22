@@ -40,27 +40,30 @@ func InitializeAuth0(ctx *Ctx) error {
 		Printf("unmarshal error: %+v\n", err)
 		return err
 	}
-	AddRedacted(data["es_url"], false)
-	AddRedacted(data["es_user"], false)
-	AddRedacted(data["es_pass"], false)
+	AddRedacted(data["ES_CACHE_URL"], false)
+	AddRedacted(data["ES_CACHE_USERNAME"], false)
+	AddRedacted(data["ES_CACHE_PASSWORD"], false)
 	AddRedacted(data["client_id"], false)
 	AddRedacted(data["client_secret"], false)
 	AddRedacted(data["audience"], false)
 	AddRedacted(data["url"], false)
 
 	authSecret := os.Getenv("AUTH_SECRET")
-	esURL := ctx.Env("ES_URL")
+	esCacheURL := ctx.Env("ES_CACHE_URL")
 	slackProvider := slack.New(os.Getenv("SLACK_WEBHOOK_URL"))
 	httpClientProvider := http.NewClientProvider(time.Minute)
 	esClientProvider, err := elastic.NewClientProvider(&elastic.Params{
-		URL:      esURL,
-		Username: "",
-		Password: "",
+		URL:      esCacheURL,
+		Username: data["ES_CACHE_USERNAME"],
+		Password: data["ES_CACHE_PASSWORD"],
 	})
+	if err != nil {
+		return err
+	}
 	gAuth0Client, err = auth0.NewAuth0Client(
-		data["es_url"],
-		data["es_user"],
-		data["es_pass"],
+		data["ES_CACHE_URL"],
+		data["ES_CACHE_USERNAME"],
+		data["ES_CACHE_PASSWORD"],
 		data["env"],
 		data["grant_type"],
 		data["client_id"],

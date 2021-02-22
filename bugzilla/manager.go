@@ -218,12 +218,21 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, Auth0Clie
 		return nil, nil, nil, nil, err
 	}
 
+	esClientCacheProvider, err := elastic.NewClientProvider(&elastic.Params{
+		URL:      m.ESCacheURL,
+		Username: m.ESCacheUsername,
+		Password: m.ESCachePassword,
+	})
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
 	slackProvider := slack.New(m.WebHookURL)
 	// Initialize fetcher object to get data from dockerhub api
 	fetcher := NewFetcher(params, httpClientProvider, esClientProvider)
-	auth0Client, err := auth0.NewAuth0Client(m.ESCacheURL, m.ESUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.AuthURL, m.AUthSecret, httpClientProvider, esClientProvider, &slackProvider)
+	auth0Client, err := auth0.NewAuth0Client(m.ESCacheURL, m.ESUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.AuthURL, m.AUthSecret, httpClientProvider, esClientCacheProvider, &slackProvider)
 
-	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(m.AffBaseURL, m.Slug, httpClientProvider, esClientProvider, auth0Client, &slackProvider)
+	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(m.AffBaseURL, m.Slug, httpClientProvider, esClientCacheProvider, auth0Client, &slackProvider)
 
 	// Initialize enrich object to enrich raw data
 	enricher := NewEnricher(m.EnricherBackendVersion, m.Project, affiliationsClientProvider)

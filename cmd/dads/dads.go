@@ -347,12 +347,21 @@ func buildBugzillaRestMgrServices(p *bugzillarest.MgrParams) (*bugzillarest.Fetc
 		return nil, nil, nil, nil, nil, err
 	}
 
+	esClientCacheProvider, err := elastic.NewClientProvider(&elastic.Params{
+		URL:      p.ESCacheURL,
+		Username: p.ESCacheUsername,
+		Password: p.ESCachePassword,
+	})
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+
 	slackProvider := slack.New(p.WebHookURL)
 	// Initialize fetcher object to get data from bugzilla rest api
 	fetcher := bugzillarest.NewFetcher(&bugzillarest.FetcherParams{Endpoint: p.EndPoint, BackendVersion: p.FetcherBackendVersion}, httpClientProvider, esClientProvider)
-	auth0Client, err := auth0.NewAuth0Client(p.ESCacheURL, p.ESCacheUsername, p.ESCachePassword, p.Environment, p.AuthGrantType, p.AuthClientID, p.AuthClientSecret, p.AuthAudience, p.AuthURL, p.AuthSecret, httpClientProvider, esClientProvider, &slackProvider)
+	auth0Client, err := auth0.NewAuth0Client(p.ESCacheURL, p.ESCacheUsername, p.ESCachePassword, p.Environment, p.AuthGrantType, p.AuthClientID, p.AuthClientSecret, p.AuthAudience, p.AuthURL, p.AuthSecret, httpClientProvider, esClientCacheProvider, &slackProvider)
 
-	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(p.AffBaseURL, p.Slug, httpClientProvider, esClientProvider, auth0Client, &slackProvider)
+	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(p.AffBaseURL, p.Slug, httpClientProvider, esClientCacheProvider, auth0Client, &slackProvider)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}

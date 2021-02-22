@@ -421,6 +421,12 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 		return nil, nil, nil, err
 	}
 
+	esClientCacheProvider, err := elastic.NewClientProvider(&elastic.Params{
+		URL:      m.ESCacheURL,
+		Username: m.ESCacheUsername,
+		Password: m.ESCachePassword,
+	})
+
 	// Initialize fetcher object to get data from piper mail archive link
 	fetcher := NewFetcher(params, httpClientProvider, esClientProvider)
 
@@ -431,9 +437,9 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 	identityProvider := affiliation.NewIdentityProvider(dataBase)
 	slackProvider := slack.New(m.WebHookURL)
 
-	auth0Client, err := auth0.NewAuth0Client(m.ESCacheURL, m.ESCacheUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.AuthURL, m.AuthSecret, httpClientProvider, esClientProvider, &slackProvider)
+	auth0Client, err := auth0.NewAuth0Client(m.ESCacheURL, m.ESCacheUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.AuthURL, m.AuthSecret, httpClientProvider, esClientCacheProvider, &slackProvider)
 
-	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(m.AffBaseURL, m.Slug, httpClientProvider, esClientProvider, auth0Client, &slackProvider)
+	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(m.AffBaseURL, m.Slug, httpClientProvider, esClientCacheProvider, auth0Client, &slackProvider)
 	if err != nil {
 		return nil, nil, nil, err
 	}

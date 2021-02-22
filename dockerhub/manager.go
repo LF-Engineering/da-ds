@@ -271,6 +271,15 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, Auth0Clie
 		return nil, nil, nil, nil, err
 	}
 
+	esClientCacheProvider, err := elastic.NewClientProvider(&elastic.Params{
+		URL:      m.ESCacheURL,
+		Username: m.ESCacheUsername,
+		Password: m.ESCachePassword,
+	})
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
 	// Initialize fetcher object to get data from dockerhub api
 	fetcher := NewFetcher(params, httpClientProvider, esClientProvider)
 
@@ -278,7 +287,7 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, Auth0Clie
 	enricher := NewEnricher(m.EnricherBackendVersion, esClientProvider)
 	slackProvider := slack.New(m.WebHookURL)
 
-	auth0Client, err := auth0.NewAuth0Client(m.ESCacheURL, m.ESUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.AuthURL, m.AUthSecret, httpClientProvider, esClientProvider, &slackProvider)
+	auth0Client, err := auth0.NewAuth0Client(m.ESCacheURL, m.ESUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.AuthURL, m.AUthSecret, httpClientProvider, esClientCacheProvider, &slackProvider)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
