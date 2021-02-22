@@ -46,11 +46,11 @@ type Manager struct {
 	AuthClientID           string
 	AuthClientSecret       string
 	AuthAudience           string
-	AuthURL                string
+	Auth0URL               string
 	Environment            string
 	Slug                   string
 	WebHookURL             string
-	AUthSecret             string
+	Auth0Secret            string
 
 	esClientProvider ESClientProvider
 	fetcher          *Fetcher
@@ -86,11 +86,11 @@ type Param struct {
 	AuthClientID           string
 	AuthClientSecret       string
 	AuthAudience           string
-	AuthURL                string
+	Auth0URL               string
 	Environment            string
 	Slug                   string
 	WebHookURL             string
-	AUthSecret             string
+	Auth0Secret            string
 }
 
 // NewManager initiates bugzilla manager instance
@@ -124,7 +124,7 @@ func NewManager(param Param) (*Manager, error) {
 		AuthClientID:           param.AuthClientID,
 		AuthClientSecret:       param.AuthClientSecret,
 		AuthAudience:           param.AuthAudience,
-		AuthURL:                param.AuthURL,
+		Auth0URL:               param.Auth0URL,
 		Environment:            param.Environment,
 		Slug:                   param.Slug,
 		WebHookURL:             param.WebHookURL,
@@ -230,7 +230,7 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, Auth0Clie
 	slackProvider := slack.New(m.WebHookURL)
 	// Initialize fetcher object to get data from dockerhub api
 	fetcher := NewFetcher(params, httpClientProvider, esClientProvider)
-	auth0Client, err := auth0.NewAuth0Client(m.ESCacheURL, m.ESUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.AuthURL, m.AUthSecret, httpClientProvider, esCacheClientProvider, &slackProvider)
+	auth0Client, err := auth0.NewAuth0Client(m.ESCacheURL, m.ESUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.Auth0URL, m.Auth0Secret, httpClientProvider, esCacheClientProvider, &slackProvider)
 
 	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(m.AffBaseURL, m.Slug, httpClientProvider, esCacheClientProvider, auth0Client, &slackProvider)
 

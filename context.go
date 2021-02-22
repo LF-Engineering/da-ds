@@ -65,7 +65,7 @@ type Ctx struct {
 	Repository         []Repository
 	AffAPI             string
 	WebHookURL         string
-	AuthSecret         string
+	Auth0Secret        string
 	// Bugzilla contains all bugzilla params
 	BugZilla *BugZilla
 
@@ -265,7 +265,7 @@ func (ctx *Ctx) Init() {
 		ctx.Delay = delay
 	}
 	ctx.WebHookURL = ctx.Env("SLACK_WEBHOOK_URL")
-	ctx.AuthSecret = ctx.Env("AUTH_SECRET")
+	ctx.Auth0Secret = ctx.Env("AUTH0_SECRET")
 
 	// Affiliation API URL
 	ctx.AffiliationAPIURL = ctx.Env("AFFILIATION_API_URL")

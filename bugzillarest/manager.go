@@ -52,11 +52,11 @@ type Manager struct {
 	AuthClientID           string
 	AuthClientSecret       string
 	AuthAudience           string
-	AuthURL                string
+	Auth0URL               string
 	Environment            string
 	Slug                   string
 	WebHookURL             string
-	AUthSecret             string
+	AUth0Secret            string
 
 	EsClientProvider    ESClientProvider
 	Fetcher             *Fetcher
@@ -97,11 +97,11 @@ type MgrParams struct {
 	AuthClientID           string
 	AuthClientSecret       string
 	AuthAudience           string
-	AuthURL                string
+	Auth0URL               string
 	Environment            string
 	Slug                   string
 	WebHookURL             string
-	AuthSecret             string
+	Auth0Secret            string
 
 	Fetcher             *Fetcher
 	Enricher            *Enricher
@@ -140,7 +140,7 @@ func NewManager(param *MgrParams) (*Manager, error) {
 		AuthClientID:           param.AuthClientID,
 		AuthClientSecret:       param.AuthClientSecret,
 		AuthAudience:           param.AuthAudience,
-		AuthURL:                param.AuthURL,
+		Auth0URL:               param.Auth0URL,
 		Environment:            param.Environment,
 		Slug:                   param.Slug,
 		EsClientProvider:       param.ESClientProvider,

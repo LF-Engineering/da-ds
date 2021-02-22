@@ -48,7 +48,7 @@ func InitializeAuth0(ctx *Ctx) error {
 	AddRedacted(data["audience"], false)
 	AddRedacted(data["url"], false)
 
-	authSecret := os.Getenv("AUTH_SECRET")
+	auth0Secret := os.Getenv("AUTH0_SECRET")
 	esCacheURL := ctx.Env("ES_CACHE_URL")
 	slackProvider := slack.New(os.Getenv("SLACK_WEBHOOK_URL"))
 	httpClientProvider := http.NewClientProvider(time.Minute)
@@ -70,7 +70,7 @@ func InitializeAuth0(ctx *Ctx) error {
 		data["client_secret"],
 		data["audience"],
 		data["url"],
-		authSecret,
+		auth0Secret,
 		httpClientProvider,
 		esClientProvider,
 		&slackProvider,
