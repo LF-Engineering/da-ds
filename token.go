@@ -5,12 +5,8 @@ import (
 	"fmt"
 	"os"
 	"sync"
-	"time"
 
 	"github.com/LF-Engineering/dev-analytics-libraries/auth0"
-	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
-	"github.com/LF-Engineering/dev-analytics-libraries/http"
-	"github.com/LF-Engineering/dev-analytics-libraries/slack"
 	jsoniter "github.com/json-iterator/go"
 )
 
@@ -21,7 +17,7 @@ var (
 )
 
 // InitializeAuth0 - initializes Auth0 client using data stored in AUTH0_DATA
-func InitializeAuth0(ctx *Ctx) error {
+func InitializeAuth0() error {
 	var err error
 	auth0DataB64 := os.Getenv("AUTH0_DATA")
 	if auth0DataB64 == "" {
@@ -40,40 +36,24 @@ func InitializeAuth0(ctx *Ctx) error {
 		Printf("unmarshal error: %+v\n", err)
 		return err
 	}
-	AddRedacted(data["ES_CACHE_URL"], false)
-	AddRedacted(data["ES_CACHE_USERNAME"], false)
-	AddRedacted(data["ES_CACHE_PASSWORD"], false)
+	AddRedacted(data["es_url"], false)
+	AddRedacted(data["es_user"], false)
+	AddRedacted(data["es_pass"], false)
 	AddRedacted(data["client_id"], false)
 	AddRedacted(data["client_secret"], false)
 	AddRedacted(data["audience"], false)
 	AddRedacted(data["url"], false)
 
-	auth0Secret := os.Getenv("AUTH0_SECRET")
-	esCacheURL := ctx.Env("ES_CACHE_URL")
-	slackProvider := slack.New(os.Getenv("SLACK_WEBHOOK_URL"))
-	httpClientProvider := http.NewClientProvider(time.Minute)
-	esClientProvider, err := elastic.NewClientProvider(&elastic.Params{
-		URL:      esCacheURL,
-		Username: data["ES_CACHE_USERNAME"],
-		Password: data["ES_CACHE_PASSWORD"],
-	})
-	if err != nil {
-		return err
-	}
 	gAuth0Client, err = auth0.NewAuth0Client(
-		data["ES_CACHE_URL"],
-		data["ES_CACHE_USERNAME"],
-		data["ES_CACHE_PASSWORD"],
+		data["es_url"],
+		data["es_user"],
+		data["es_pass"],
 		data["env"],
 		data["grant_type"],
 		data["client_id"],
 		data["client_secret"],
 		data["audience"],
 		data["url"],
-		auth0Secret,
-		httpClientProvider,
-		esClientProvider,
-		&slackProvider,
 	)
 	if err == nil {
 		gTokenEnv = data["env"]
@@ -84,7 +64,7 @@ func InitializeAuth0(ctx *Ctx) error {
 // GetAPIToken - return an API token to use dev-analytics-api API calls
 // If JWT_TOKEN env is specified - just use the provided token without any checks
 // Else get auth0 data from AUTH0_DATA and generate/reuse a token stored in ES cache
-func GetAPIToken(ctx *Ctx) (string, error) {
+func GetAPIToken() (string, error) {
 	envToken := os.Getenv("JWT_TOKEN")
 	if envToken != "" {
 		return envToken, nil
@@ -94,11 +74,11 @@ func GetAPIToken(ctx *Ctx) (string, error) {
 		defer gTokenEnvMtx.Unlock()
 	}
 	if gTokenEnv == "" {
-		err := InitializeAuth0(ctx)
+		err := InitializeAuth0()
 		if err != nil {
 			return "", err
 		}
 	}
-	token, err := gAuth0Client.GetToken()
+	token, err := gAuth0Client.ValidateToken(gTokenEnv)
 	return token, err
 }
