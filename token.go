@@ -43,7 +43,6 @@ func InitializeAuth0() error {
 	AddRedacted(data["client_secret"], false)
 	AddRedacted(data["audience"], false)
 	AddRedacted(data["url"], false)
-
 	gAuth0Client, err = auth0.NewAuth0Client(
 		data["es_url"],
 		data["es_user"],
