@@ -48,7 +48,6 @@ func InitializeAuth0() error {
 	AddRedacted(data["audience"], false)
 	AddRedacted(data["url"], false)
 	AddRedacted(data["slack_webhook_url"], false)
-	AddRedacted(data["secret"], false)
 	// Providers
 	httpClientProvider := http.NewClientProvider(60 * time.Second)
 	esCacheClientProvider, err := elastic.NewClientProvider(
@@ -72,7 +71,6 @@ func InitializeAuth0() error {
 		data["client_secret"],
 		data["audience"],
 		data["url"],
-		data["secret"],
 		httpClientProvider,
 		esCacheClientProvider,
 		&slackProvider,
