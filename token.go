@@ -101,6 +101,6 @@ func GetAPIToken() (string, error) {
 			return "", err
 		}
 	}
-	token, err := gAuth0Client.GetToken(gTokenEnv)
+	token, err := gAuth0Client.GetToken()
 	return token, err
 }
