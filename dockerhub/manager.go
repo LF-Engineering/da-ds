@@ -91,7 +91,6 @@ type Param struct {
 	Repositories           []*Repository
 	NoIncremental          bool
 	WebHookURL             string
-	Auth0Secret            string
 }
 
 // Repository represents dockerhub repository data
@@ -287,7 +286,7 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, Auth0Clie
 	enricher := NewEnricher(m.EnricherBackendVersion, esClientProvider)
 	slackProvider := slack.New(m.WebHookURL)
 
-	auth0Client, err := auth0.NewAuth0Client(m.ESCacheURL, m.ESUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.Auth0URL, m.Auth0Secret, httpClientProvider, esCacheClientProvider, &slackProvider)
+	auth0Client, err := auth0.NewAuth0Client(m.ESCacheURL, m.ESUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.Auth0URL, httpClientProvider, esCacheClientProvider, &slackProvider)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}

@@ -35,6 +35,8 @@ github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
 github.com/LF-Engineering/dev-analytics-libraries v1.0.0 h1:Fp1ohey53vs6HovrnX4z6UdDAUODMR3xw955BAzdk4s=
 github.com/LF-Engineering/dev-analytics-libraries v1.0.0/go.mod h1:JVQjrlvKaYgr4+8YqA3hRmKfltXyIL1iraGjcMdBVCI=
+github.com/LF-Engineering/dev-analytics-libraries v1.0.2 h1:D/NTbtiQqC2Lz+jyXGBXasEekCAhPSzXp6iR0rZMaIk=
+github.com/LF-Engineering/dev-analytics-libraries v1.0.2/go.mod h1:JVQjrlvKaYgr4+8YqA3hRmKfltXyIL1iraGjcMdBVCI=
 github.com/PuerkitoBio/goquery v1.6.0 h1:j7taAbelrdcsOlGeMenZxc2AWXD5fieT1/znArdnx94=
 github.com/PuerkitoBio/goquery v1.6.0/go.mod h1:GsLWisAFVj4WgDibEWF4pvYnkVQBpKBKeU+7zCJoLcc=
 github.com/alcortesm/tgz v0.0.0-20161220082320-9c5fe88206d7/go.mod h1:6zEj6s6u/ghQa61ZWa/C2Aw3RkjiTBOix7dkqa1VLIs=
