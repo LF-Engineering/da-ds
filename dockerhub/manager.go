@@ -48,11 +48,10 @@ type Manager struct {
 	Environment      string
 	Slug             string
 
-	Retries     uint
-	Delay       time.Duration
-	GapURL      string
-	WebHookURL  string
-	Auth0Secret string
+	Retries    uint
+	Delay      time.Duration
+	GapURL     string
+	WebHookURL string
 }
 
 // Param required for creating a new instance of Bugzilla manager
