@@ -161,7 +161,7 @@ func TestFetchItem(t *testing.T) {
           "backend_name" : "Dockerhub",
           "perceval_version" : "0.17.0",
           "backend_version" : "0.6.0",
-          "uuid" : "30be4202611736ddd973be7ca2a97da187d54bfe",
+          "uuid" : "38308aeedecf37da98e097af718bbe736dbd4f25",
           "timestamp" : 1.596210705585596E9,
           "metadata__updated_on" : "2020-07-31T15:51:45.585596Z",
           "data" : {
@@ -239,7 +239,7 @@ func TestFetchItem(t *testing.T) {
           "updated_on" : 1.606743763620021E9,
           "metadata__updated_on" : "2020-11-30T13:42:43.620021Z",
           "tag" : "https://hub.docker.com/hyperledger/fabric-zookeeper",
-          "uuid" : "9d134d61ec1b5d94344c9ac42e5c8fcb5c966cec",
+          "uuid" : "150993eea55e4810371c6aa69043bbd9ae8e3cea",
           "origin" : "https://hub.docker.com/hyperledger/fabric-zookeeper",
           "search_fields" : {
             "name" : "fabric-zookeeper",
@@ -297,7 +297,7 @@ func TestFetchItem(t *testing.T) {
           "metadata__timestamp" : "2020-11-30T14:08:44.657876Z",
           "updated_on" : 1.606745324657876E9,
           "metadata__updated_on" : "2020-11-30T14:08:44.657876Z",
-          "uuid" : "fa3d8435822bf92681bbc95639d780b3f86615d8",
+          "uuid" : "6f95ad322b23aec633eceb8d3239fa03d5480082",
           "origin" : "https://hub.docker.com/hyperledger/sawtooth-xo-tp-rust",
           "backend_version" : "0.6.0"
         }`,
@@ -351,7 +351,7 @@ func TestFetchItem(t *testing.T) {
             "item_id" : "1606771175.144550",
             "namespace" : "crops"
           },
-          "uuid" : "d2ed526d29623f28c5e9f52381c1698b34d376d6"
+          "uuid" : "5abdb73ad0b6aa11f13193cad3ee3d40e648cbe8"
         }`,
 	}
 
@@ -391,7 +391,7 @@ func TestFetchItem(t *testing.T) {
          },
          "backend_version" : "0.6.0",
          "classified_fields_filtered" : null,
-         "uuid" : "db792693a3b151fba46bfc3e643e5e301854c6a0",
+         "uuid" : "a59d9433c1c30e83b43ab8d5391bbfcd7f2f5edf",
          "metadata__timestamp" : "2020-09-08T02:06:59.256249Z",
          "metadata__updated_on" : "2020-09-08T02:06:59.256249Z",
          "tag" : "https://hub.docker.com/prom/pushprox",
@@ -419,7 +419,7 @@ func TestFetchItem(t *testing.T) {
           "metadata__updated_on" : "2020-11-30T15:23:26.036942Z",
           "metadata__timestamp" : "2020-11-30T15:23:26.036942Z",
           "perceval_version" : "0.17.1",
-          "uuid" : "737a1c01f993061aa42ada999940b9936dadf84b",
+          "uuid" : "7b61fe17d9b5741d5aba65ae77fa14195bacdde1",
           "search_fields" : {
             "item_id" : "1606749806.036942",
             "namespace" : "edgexfoundry",

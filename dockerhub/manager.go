@@ -89,7 +89,7 @@ type Param struct {
 	HTTPTimeout            time.Duration
 	Repositories           []*Repository
 	NoIncremental          bool
-	WebHookURL             string
+	SlackWebHookURL        string
 }
 
 // Repository represents dockerhub repository data
