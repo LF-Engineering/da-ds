@@ -205,6 +205,7 @@ func (m *Manager) Sync() error {
 
 	if m.Enrich || m.EnrichOnly {
 		data := make([]elastic.BulkData, 0)
+		needUpdateData := make([]elastic.BulkData, 0)
 
 		for _, repo := range m.Repositories {
 			var fromDate *time.Time
@@ -224,6 +225,33 @@ func (m *Manager) Sync() error {
 				return err
 			}
 
+			query := map[string]interface{}{
+				"size": 1,
+				"query": map[string]interface{}{
+					"bool": map[string]interface{}{
+						"must": []map[string]interface{}{},
+					},
+				},
+				"sort": []map[string]interface{}{
+					{
+						"metadata__enriched_on": map[string]string{
+							"order": "desc",
+						},
+					},
+				},
+			}
+			mustTerm := map[string]interface{}{
+				"term": map[string]interface{}{
+					"is_docker_image": map[string]interface{}{
+						"value": 1,
+					},
+				},
+			}
+
+			query["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"] = append(query["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"].([]map[string]interface{}), mustTerm)
+
+			needUpdateHits := &TopHits{}
+			id := ""
 			if len(esData.Hits.Hits) > 0 {
 				// Enrich data for single repo
 				enriched, err := enricher.EnrichItem(*esData.Hits.Hits[0].Source, repo.Project, time.Now())
@@ -232,7 +260,37 @@ func (m *Manager) Sync() error {
 				}
 				data = append(data, elastic.BulkData{IndexName: repo.ESIndex, ID: enriched.UUID, Data: enriched})
 				_ = enricher.HandleMapping(repo.ESIndex)
+				id = enriched.ID
+			}
+			mustTerm2 := map[string]interface{}{
+				"term": map[string]interface{}{
+					"id.keyword": map[string]interface{}{
+						"value": id,
+					},
+				},
+			}
 
+			query["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"] = append(query["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"].([]map[string]interface{}), mustTerm2)
+			err = fetcher.ElasticSearchProvider.Get(repo.ESIndex, query, needUpdateHits)
+			if err != nil {
+				dads.Printf("[dads-dockerhub] Sync no elastic enriched data exist warning : %+v\n", err)
+			}
+
+			if len(needUpdateHits.Hits.Hits) > 0 {
+				upData := map[string]map[string]int{
+					"doc": {
+						"is_docker_image": 0,
+						"is_event":        1,
+					},
+				}
+				needUpdateData = append(needUpdateData, elastic.BulkData{IndexName: repo.ESIndex, ID: needUpdateHits.Hits.Hits[0].ID, Data: upData})
+			}
+		}
+		if len(needUpdateData) > 0 {
+			esRes, err := esClientProvider.BulkUpdate(needUpdateData)
+			if err != nil {
+				dads.Printf("[dads-dockerhub] Sync bulk update elastic data error : %+v\n", err)
+				log.Printf("[BulkUpdate] elastic response :%+v\n", esRes)
 			}
 		}
 
