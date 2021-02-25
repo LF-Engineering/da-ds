@@ -56,7 +56,6 @@ type Manager struct {
 	Environment            string
 	Slug                   string
 	WebHookURL             string
-	AUth0Secret            string
 
 	EsClientProvider    ESClientProvider
 	Fetcher             *Fetcher
@@ -101,7 +100,6 @@ type MgrParams struct {
 	Environment            string
 	Slug                   string
 	WebHookURL             string
-	Auth0Secret            string
 
 	Fetcher             *Fetcher
 	Enricher            *Enricher

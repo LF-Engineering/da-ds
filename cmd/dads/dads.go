@@ -149,7 +149,6 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	params.AuthAudience = ctx.Env("AUTH0_AUDIENCE")
 	params.Auth0URL = ctx.Env("AUTH0_URL")
 	params.Environment = ctx.Env("BRANCH")
-	params.Auth0Secret = ctx.Auth0Secret
 	params.WebHookURL = ctx.WebHookURL
 
 	repositoriesJSON := ctx.Env("REPOSITORIES_JSON")
@@ -270,7 +269,7 @@ func buildPipermailManager(ctx *lib.Ctx) (*pipermail.Manager, error) {
 
 	mgr, err := pipermail.NewManager(origin, slug, groupName, ctx.DBConn, fetcherBackendVersion, enricherBackendVersion,
 		doFetch, doEnrich, ctx.ESURL, "", "", esIndex, fromDate, project,
-		fetchSize, enrichSize, affBaseURL, esCacheURL, esCacheUsername, esCachePassword, authGrantType, authClientID, authClientSecret, authAudience, auth0URL, env, ctx.Auth0Secret, ctx.WebHookURL)
+		fetchSize, enrichSize, affBaseURL, esCacheURL, esCacheUsername, esCachePassword, authGrantType, authClientID, authClientSecret, authAudience, auth0URL, env, ctx.WebHookURL)
 
 	return mgr, err
 }
@@ -359,7 +358,7 @@ func buildBugzillaRestMgrServices(p *bugzillarest.MgrParams) (*bugzillarest.Fetc
 	slackProvider := slack.New(p.WebHookURL)
 	// Initialize fetcher object to get data from bugzilla rest api
 	fetcher := bugzillarest.NewFetcher(&bugzillarest.FetcherParams{Endpoint: p.EndPoint, BackendVersion: p.FetcherBackendVersion}, httpClientProvider, esClientProvider)
-	auth0Client, err := auth0.NewAuth0Client(p.ESCacheURL, p.ESCacheUsername, p.ESCachePassword, p.Environment, p.AuthGrantType, p.AuthClientID, p.AuthClientSecret, p.AuthAudience, p.Auth0URL, p.Auth0Secret, httpClientProvider, esCacheClientProvider, &slackProvider)
+	auth0Client, err := auth0.NewAuth0Client(p.ESCacheURL, p.ESCacheUsername, p.ESCachePassword, p.Environment, p.AuthGrantType, p.AuthClientID, p.AuthClientSecret, p.AuthAudience, p.Auth0URL, httpClientProvider, esCacheClientProvider, &slackProvider)
 
 	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(p.AffBaseURL, p.Slug, httpClientProvider, esCacheClientProvider, auth0Client, &slackProvider)
 	if err != nil {
