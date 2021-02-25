@@ -6,6 +6,8 @@ import (
 	"log"
 	"time"
 
+	"github.com/LF-Engineering/dev-analytics-libraries/slack"
+
 	dads "github.com/LF-Engineering/da-ds"
 
 	"github.com/LF-Engineering/dev-analytics-libraries/auth0"
@@ -42,13 +44,14 @@ type Manager struct {
 	AuthClientID     string
 	AuthClientSecret string
 	AuthAudience     string
-	AuthURL          string
+	Auth0URL         string
 	Environment      string
 	Slug             string
 
-	Retries uint
-	Delay   time.Duration
-	GapURL  string
+	Retries    uint
+	Delay      time.Duration
+	GapURL     string
+	WebHookURL string
 }
 
 // Param required for creating a new instance of Bugzilla manager
@@ -79,13 +82,14 @@ type Param struct {
 	AuthClientID           string
 	AuthClientSecret       string
 	AuthAudience           string
-	AuthURL                string
+	Auth0URL               string
 	Environment            string
 	Slug                   string
 	EnrichOnly             bool
 	HTTPTimeout            time.Duration
 	Repositories           []*Repository
 	NoIncremental          bool
+	WebHookURL             string
 }
 
 // Repository represents dockerhub repository data
@@ -98,7 +102,7 @@ type Repository struct {
 
 // Auth0Client ...
 type Auth0Client interface {
-	ValidateToken(env string) (string, error)
+	GetToken() (string, error)
 }
 
 // NewManager initiates dockerhub manager instance
@@ -128,7 +132,7 @@ func NewManager(param Param) *Manager {
 		AuthClientID:           param.AuthClientID,
 		AuthClientSecret:       param.AuthClientSecret,
 		AuthAudience:           param.AuthAudience,
-		AuthURL:                param.AuthURL,
+		Auth0URL:               param.Auth0URL,
 		Environment:            param.Environment,
 		Slug:                   param.Slug,
 	}
@@ -265,13 +269,23 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, Auth0Clie
 		return nil, nil, nil, nil, err
 	}
 
+	esCacheClientProvider, err := elastic.NewClientProvider(&elastic.Params{
+		URL:      m.ESCacheURL,
+		Username: m.ESCacheUsername,
+		Password: m.ESCachePassword,
+	})
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
 	// Initialize fetcher object to get data from dockerhub api
 	fetcher := NewFetcher(params, httpClientProvider, esClientProvider)
 
 	// Initialize enrich object to enrich raw data
 	enricher := NewEnricher(m.EnricherBackendVersion, esClientProvider)
+	slackProvider := slack.New(m.WebHookURL)
 
-	auth0Client, err := auth0.NewAuth0Client(m.ESCacheURL, m.ESUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.AuthURL)
+	auth0Client, err := auth0.NewAuth0Client(m.ESCacheURL, m.ESUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.Auth0URL, httpClientProvider, esCacheClientProvider, &slackProvider)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}

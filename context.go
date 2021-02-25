@@ -64,7 +64,7 @@ type Ctx struct {
 	Delay              time.Duration
 	Repository         []Repository
 	AffAPI             string
-
+	WebHookURL         string
 	// Bugzilla contains all bugzilla params
 	BugZilla *BugZilla
 
@@ -263,6 +263,7 @@ func (ctx *Ctx) Init() {
 		delay, _ := time.ParseDuration(ctx.Env("DELAY"))
 		ctx.Delay = delay
 	}
+	ctx.WebHookURL = ctx.Env("SLACK_WEBHOOK_URL")
 
 	// Affiliation API URL
 	ctx.AffiliationAPIURL = ctx.Env("AFFILIATION_API_URL")

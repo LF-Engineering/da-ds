@@ -5,6 +5,9 @@ import (
 	"log"
 	"time"
 
+	"github.com/LF-Engineering/dev-analytics-libraries/auth0"
+	"github.com/LF-Engineering/dev-analytics-libraries/slack"
+
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
 
 	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
@@ -65,8 +68,9 @@ type Manager struct {
 	AuthClientID           string
 	AuthClientSecret       string
 	AuthAudience           string
-	AuthURL                string
+	Auth0URL               string
 	Environment            string
+	WebHookURL             string
 
 	esClientProvider ESClientProvider
 	fetcher          *Fetcher
@@ -74,7 +78,7 @@ type Manager struct {
 }
 
 // NewManager initiates piper mail manager instance
-func NewManager(endPoint, slug, groupName, shConnStr, fetcherBackendVersion, enricherBackendVersion string, fetch bool, enrich bool, eSUrl string, esUser string, esPassword string, esIndex string, fromDate *time.Time, project string, fetchSize int, enrichSize int, affBaseURL, esCacheURL, esCacheUsername, esCachePassword, authGrantType, authClientID, authClientSecret, authAudience, authURL, env string) (*Manager, error) {
+func NewManager(endPoint, slug, groupName, shConnStr, fetcherBackendVersion, enricherBackendVersion string, fetch bool, enrich bool, eSUrl string, esUser string, esPassword string, esIndex string, fromDate *time.Time, project string, fetchSize int, enrichSize int, affBaseURL, esCacheURL, esCacheUsername, esCachePassword, authGrantType, authClientID, authClientSecret, authAudience, auth0URL, env, webHookURL string) (*Manager, error) {
 	mng := &Manager{
 		Endpoint:               endPoint,
 		Slug:                   slug,
@@ -101,11 +105,12 @@ func NewManager(endPoint, slug, groupName, shConnStr, fetcherBackendVersion, enr
 		AuthClientID:           authClientID,
 		AuthClientSecret:       authClientSecret,
 		AuthAudience:           authAudience,
-		AuthURL:                authURL,
+		Auth0URL:               auth0URL,
 		Environment:            env,
 		esClientProvider:       nil,
 		fetcher:                nil,
 		enricher:               nil,
+		WebHookURL:             webHookURL,
 	}
 
 	fetcher, enricher, esClientProvider, err := buildServices(mng)
@@ -414,6 +419,12 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 		return nil, nil, nil, err
 	}
 
+	esCacheClientProvider, err := elastic.NewClientProvider(&elastic.Params{
+		URL:      m.ESCacheURL,
+		Username: m.ESCacheUsername,
+		Password: m.ESCachePassword,
+	})
+
 	// Initialize fetcher object to get data from piper mail archive link
 	fetcher := NewFetcher(params, httpClientProvider, esClientProvider)
 
@@ -422,8 +433,11 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 		return nil, nil, nil, err
 	}
 	identityProvider := affiliation.NewIdentityProvider(dataBase)
+	slackProvider := slack.New(m.WebHookURL)
 
-	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(m.AffBaseURL, m.Slug, m.ESCacheURL, m.ESCacheUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.AuthURL)
+	auth0Client, err := auth0.NewAuth0Client(m.ESCacheURL, m.ESCacheUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.Auth0URL, httpClientProvider, esCacheClientProvider, &slackProvider)
+
+	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(m.AffBaseURL, m.Slug, httpClientProvider, esCacheClientProvider, auth0Client, &slackProvider)
 	if err != nil {
 		return nil, nil, nil, err
 	}

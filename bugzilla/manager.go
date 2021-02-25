@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/LF-Engineering/dev-analytics-libraries/slack"
+
 	"github.com/LF-Engineering/dev-analytics-libraries/auth0"
 
 	"github.com/LF-Engineering/da-ds/util"
@@ -18,7 +20,6 @@ import (
 // Manager describes bugzilla manager
 type Manager struct {
 	Endpoint               string
-	SHConnString           string
 	FetcherBackendVersion  string
 	EnricherBackendVersion string
 	Fetch                  bool
@@ -45,9 +46,10 @@ type Manager struct {
 	AuthClientID           string
 	AuthClientSecret       string
 	AuthAudience           string
-	AuthURL                string
+	Auth0URL               string
 	Environment            string
 	Slug                   string
+	WebHookURL             string
 
 	esClientProvider ESClientProvider
 	fetcher          *Fetcher
@@ -58,7 +60,6 @@ type Manager struct {
 // Param required for creating a new instance of Bugzilla manager
 type Param struct {
 	EndPoint               string
-	ShConnStr              string
 	FetcherBackendVersion  string
 	EnricherBackendVersion string
 	Fetch                  bool
@@ -84,9 +85,10 @@ type Param struct {
 	AuthClientID           string
 	AuthClientSecret       string
 	AuthAudience           string
-	AuthURL                string
+	Auth0URL               string
 	Environment            string
 	Slug                   string
+	WebHookURL             string
 }
 
 // NewManager initiates bugzilla manager instance
@@ -120,9 +122,10 @@ func NewManager(param Param) (*Manager, error) {
 		AuthClientID:           param.AuthClientID,
 		AuthClientSecret:       param.AuthClientSecret,
 		AuthAudience:           param.AuthAudience,
-		AuthURL:                param.AuthURL,
+		Auth0URL:               param.Auth0URL,
 		Environment:            param.Environment,
 		Slug:                   param.Slug,
+		WebHookURL:             param.WebHookURL,
 	}
 
 	fetcher, enricher, esClientProvider, auth0Client, err := buildServices(mgr)
@@ -162,7 +165,12 @@ type HitSource struct {
 
 // Auth0Client ...
 type Auth0Client interface {
-	ValidateToken(env string) (string, error)
+	GetToken() (string, error)
+}
+
+// SlackProvider ...
+type SlackProvider interface {
+	SendText(text string) error
 }
 
 // Sync starts fetch and enrich processes
@@ -208,15 +216,25 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, Auth0Clie
 		return nil, nil, nil, nil, err
 	}
 
+	esCacheClientProvider, err := elastic.NewClientProvider(&elastic.Params{
+		URL:      m.ESCacheURL,
+		Username: m.ESCacheUsername,
+		Password: m.ESCachePassword,
+	})
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	slackProvider := slack.New(m.WebHookURL)
 	// Initialize fetcher object to get data from dockerhub api
 	fetcher := NewFetcher(params, httpClientProvider, esClientProvider)
+	auth0Client, err := auth0.NewAuth0Client(m.ESCacheURL, m.ESUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.Auth0URL, httpClientProvider, esCacheClientProvider, &slackProvider)
 
-	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(m.AffBaseURL, m.Slug, m.ESCacheURL, m.ESCacheUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.AuthURL)
+	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(m.AffBaseURL, m.Slug, httpClientProvider, esCacheClientProvider, auth0Client, &slackProvider)
 
 	// Initialize enrich object to enrich raw data
 	enricher := NewEnricher(m.EnricherBackendVersion, m.Project, affiliationsClientProvider)
 
-	auth0Client, err := auth0.NewAuth0Client(m.ESCacheURL, m.ESUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.AuthURL)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}

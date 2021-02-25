@@ -9,8 +9,8 @@ type AuthClientProvider struct {
 	mock.Mock
 }
 
-// ValidateToken provides a mock function with given fields: env
-func (_m *AuthClientProvider) ValidateToken(env string) (string, error) {
+// GetToken provides a mock function with given fields: env
+func (_m *AuthClientProvider) GetToken(env string) (string, error) {
 	ret := _m.Called(env)
 
 	var r0 string

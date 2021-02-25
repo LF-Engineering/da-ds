@@ -24,13 +24,12 @@ type ESClientProvider interface {
 
 // AuthClientProvider interacts with auth0 server
 type AuthClientProvider interface {
-	ValidateToken(env string) (string, error)
+	GetToken(env string) (string, error)
 }
 
 // Manager describes bugzilla manager
 type Manager struct {
 	Endpoint               string
-	SHConnString           string
 	FetcherBackendVersion  string
 	EnricherBackendVersion string
 	Fetch                  bool
@@ -53,9 +52,10 @@ type Manager struct {
 	AuthClientID           string
 	AuthClientSecret       string
 	AuthAudience           string
-	AuthURL                string
+	Auth0URL               string
 	Environment            string
 	Slug                   string
+	WebHookURL             string
 
 	EsClientProvider    ESClientProvider
 	Fetcher             *Fetcher
@@ -71,7 +71,6 @@ type Manager struct {
 // MgrParams required for creating a new instance of Bugzillarest manager
 type MgrParams struct {
 	EndPoint               string
-	ShConnStr              string
 	FetcherBackendVersion  string
 	EnricherBackendVersion string
 	Fetch                  bool
@@ -97,9 +96,10 @@ type MgrParams struct {
 	AuthClientID           string
 	AuthClientSecret       string
 	AuthAudience           string
-	AuthURL                string
+	Auth0URL               string
 	Environment            string
 	Slug                   string
+	WebHookURL             string
 
 	Fetcher             *Fetcher
 	Enricher            *Enricher
@@ -138,7 +138,7 @@ func NewManager(param *MgrParams) (*Manager, error) {
 		AuthClientID:           param.AuthClientID,
 		AuthClientSecret:       param.AuthClientSecret,
 		AuthAudience:           param.AuthAudience,
-		AuthURL:                param.AuthURL,
+		Auth0URL:               param.Auth0URL,
 		Environment:            param.Environment,
 		Slug:                   param.Slug,
 		EsClientProvider:       param.ESClientProvider,
@@ -175,7 +175,7 @@ type HitSource struct {
 
 // Auth0ClientProvider ...
 type Auth0ClientProvider interface {
-	ValidateToken(env string) (string, error)
+	GetToken() (string, error)
 }
 
 // Sync starts fetch and enrich processes
