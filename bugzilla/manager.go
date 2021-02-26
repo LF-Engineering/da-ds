@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/LF-Engineering/da-ds/build"
+
 	"github.com/LF-Engineering/dev-analytics-libraries/slack"
 
 	"github.com/LF-Engineering/dev-analytics-libraries/auth0"
@@ -228,7 +230,19 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, Auth0Clie
 	slackProvider := slack.New(m.WebHookURL)
 	// Initialize fetcher object to get data from dockerhub api
 	fetcher := NewFetcher(params, httpClientProvider, esClientProvider)
-	auth0Client, err := auth0.NewAuth0Client(m.ESCacheURL, m.ESUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.Auth0URL, httpClientProvider, esCacheClientProvider, &slackProvider, "Dads.Bugzilla")
+	auth0Client, err := auth0.NewAuth0Client(m.ESCacheURL,
+		m.ESUsername,
+		m.ESCachePassword,
+		m.Environment,
+		m.AuthGrantType,
+		m.AuthClientID,
+		m.AuthClientSecret,
+		m.AuthAudience,
+		m.Auth0URL,
+		httpClientProvider,
+		esCacheClientProvider,
+		&slackProvider,
+		build.AppName)
 
 	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(m.AffBaseURL, m.Slug, httpClientProvider, esCacheClientProvider, auth0Client, &slackProvider)
 

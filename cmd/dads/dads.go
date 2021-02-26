@@ -5,6 +5,8 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/LF-Engineering/da-ds/build"
+
 	"github.com/LF-Engineering/dev-analytics-libraries/slack"
 
 	libAffiliations "github.com/LF-Engineering/dev-analytics-libraries/affiliation"
@@ -358,7 +360,19 @@ func buildBugzillaRestMgrServices(p *bugzillarest.MgrParams) (*bugzillarest.Fetc
 	slackProvider := slack.New(p.WebHookURL)
 	// Initialize fetcher object to get data from bugzilla rest api
 	fetcher := bugzillarest.NewFetcher(&bugzillarest.FetcherParams{Endpoint: p.EndPoint, BackendVersion: p.FetcherBackendVersion}, httpClientProvider, esClientProvider)
-	auth0Client, err := auth0.NewAuth0Client(p.ESCacheURL, p.ESCacheUsername, p.ESCachePassword, p.Environment, p.AuthGrantType, p.AuthClientID, p.AuthClientSecret, p.AuthAudience, p.Auth0URL, httpClientProvider, esCacheClientProvider, &slackProvider)
+	auth0Client, err := auth0.NewAuth0Client(p.ESCacheURL,
+		p.ESCacheUsername,
+		p.ESCachePassword,
+		p.Environment,
+		p.AuthGrantType,
+		p.AuthClientID,
+		p.AuthClientSecret,
+		p.AuthAudience,
+		p.Auth0URL,
+		httpClientProvider,
+		esCacheClientProvider,
+		&slackProvider,
+		build.AppName)
 
 	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(p.AffBaseURL, p.Slug, httpClientProvider, esCacheClientProvider, auth0Client, &slackProvider)
 	if err != nil {

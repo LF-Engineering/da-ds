@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/LF-Engineering/da-ds/build"
+
 	"github.com/LF-Engineering/dev-analytics-libraries/auth0"
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
 	"github.com/LF-Engineering/dev-analytics-libraries/http"
@@ -74,6 +76,7 @@ func InitializeAuth0() error {
 		httpClientProvider,
 		esCacheClientProvider,
 		&slackProvider,
+		build.AppName,
 	)
 	if err == nil {
 		gTokenEnv = data["env"]
