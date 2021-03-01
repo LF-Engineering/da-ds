@@ -141,7 +141,7 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	params.Delay = ctx.Delay
 	params.GapURL = ctx.GapURL
 
-	params.AffBaseURL = ctx.Env("AFFILIATION_API_URL")
+	params.AffBaseURL = ctx.Env("AFFILIATION_API_URL") + "/v1"
 	params.ESCacheURL = ctx.Env("ES_CACHE_URL")
 	params.ESCacheUsername = ctx.Env("ES_CACHE_USERNAME")
 	params.ESCachePassword = ctx.Env("ES_CACHE_PASSWORD")
@@ -224,7 +224,7 @@ func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 
 	params.GapURL = ctx.GapURL
 
-	params.AffBaseURL = ctx.Env("AFFILIATION_API_URL") + "v1/"
+	params.AffBaseURL = ctx.Env("AFFILIATION_API_URL") + "/v1"
 	params.ESCacheURL = ctx.Env("ES_CACHE_URL")
 	params.ESCacheUsername = ctx.Env("ES_CACHE_USERNAME")
 	params.ESCachePassword = ctx.Env("ES_CACHE_PASSWORD")
@@ -306,7 +306,7 @@ func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
 	params.GapURL = ctx.GapURL
 	params.Slug = ctx.BugZilla.ProjectSlug.String()
 
-	params.AffBaseURL = ctx.Env("AFFILIATION_API_URL") + "v1/"
+	params.AffBaseURL = ctx.Env("AFFILIATION_API_URL") + "/v1"
 	params.ESCacheURL = ctx.Env("ES_CACHE_URL")
 	params.ESCacheUsername = ctx.Env("ES_CACHE_USERNAME")
 	params.ESCachePassword = ctx.Env("ES_CACHE_PASSWORD")
