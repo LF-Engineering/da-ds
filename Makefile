@@ -20,6 +20,8 @@ GO_TEST=go test
 BINARIES=dads
 STRIP=strip
 PKG_LIST := $(shell go list ./... | grep -v mock)
+PRODUCT_NAME?=da-ds
+COMMIT=`git rev-parse --short HEAD`
 
 all: check build
 

@@ -50,6 +50,7 @@ type ESClientProvider interface {
 	GetStat(index string, field string, aggType string, mustConditions []map[string]interface{}, mustNotConditions []map[string]interface{}) (result time.Time, err error)
 	BulkInsert(data []elastic.BulkData) ([]byte, error)
 	DelayOfCreateIndex(ex func(str string, b []byte) ([]byte, error), uin uint, du time.Duration, index string, data []byte) error
+	BulkUpdate(data []elastic.BulkData) ([]byte, error)
 }
 
 // NewFetcher initiates a new dockerhub fetcher
@@ -135,7 +136,8 @@ func (f *Fetcher) FetchItem(owner string, repository string, now time.Time) (*Re
 	raw.MetadataUpdatedOn = now
 
 	// generate UUID
-	uid, err := uuid.Generate(raw.Origin)
+	dStr := now.Format("02-01-2006")
+	uid, err := uuid.Generate(raw.Origin, dStr)
 	if err != nil {
 		dads.Printf("[dads-dockerhub] FetchItem Generate uuid error : %+v\n", err)
 		return nil, err

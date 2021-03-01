@@ -83,6 +83,29 @@ func (_m *ESClientProvider) BulkInsert(data []elastic.BulkData) ([]byte, error) 
 	return r0, r1
 }
 
+// BulkUpdate provides a mock function with given fields: data
+func (_m *ESClientProvider) BulkUpdate(data []elastic.BulkData) ([]byte, error) {
+	ret := _m.Called(data)
+
+	var r0 []byte
+	if rf, ok := ret.Get(0).(func([]elastic.BulkData) []byte); ok {
+		r0 = rf(data)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]byte)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func([]elastic.BulkData) error); ok {
+		r1 = rf(data)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // CreateIndex provides a mock function with given fields: index, body
 func (_m *ESClientProvider) CreateIndex(index string, body []byte) ([]byte, error) {
 	ret := _m.Called(index, body)
@@ -120,29 +143,6 @@ func (_m *ESClientProvider) DelayOfCreateIndex(ex func(string, []byte) ([]byte, 
 	return r0
 }
 
-// DeleteIndex provides a mock function with given fields: index, ignoreUnavailable
-func (_m *ESClientProvider) DeleteIndex(index string, ignoreUnavailable bool) ([]byte, error) {
-	ret := _m.Called(index, ignoreUnavailable)
-
-	var r0 []byte
-	if rf, ok := ret.Get(0).(func(string, bool) []byte); ok {
-		r0 = rf(index, ignoreUnavailable)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(string, bool) error); ok {
-		r1 = rf(index, ignoreUnavailable)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // Get provides a mock function with given fields: index, query, result
 func (_m *ESClientProvider) Get(index string, query map[string]interface{}, result interface{}) error {
 	ret := _m.Called(index, query, result)
@@ -171,6 +171,29 @@ func (_m *ESClientProvider) GetStat(index string, field string, aggType string, 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(string, string, string, []map[string]interface{}, []map[string]interface{}) error); ok {
 		r1 = rf(index, field, aggType, mustConditions, mustNotConditions)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// UpdateByQueryWithMaxDocs provides a mock function with given fields: index, query, fields, max
+func (_m *ESClientProvider) UpdateByQueryWithMaxDocs(index string, query string, fields string, max int) ([]byte, error) {
+	ret := _m.Called(index, query, fields, max)
+
+	var r0 []byte
+	if rf, ok := ret.Get(0).(func(string, string, string, int) []byte); ok {
+		r0 = rf(index, query, fields, max)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]byte)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, string, string, int) error); ok {
+		r1 = rf(index, query, fields, max)
 	} else {
 		r1 = ret.Error(1)
 	}

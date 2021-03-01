@@ -5,6 +5,8 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/LF-Engineering/da-ds/build"
+
 	"github.com/LF-Engineering/dev-analytics-libraries/slack"
 
 	libAffiliations "github.com/LF-Engineering/dev-analytics-libraries/affiliation"
@@ -139,7 +141,7 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	params.Delay = ctx.Delay
 	params.GapURL = ctx.GapURL
 
-	params.AffBaseURL = ctx.Env("AFFILIATION_API_URL")
+	params.AffBaseURL = ctx.Env("AFFILIATION_API_URL") + "/v1"
 	params.ESCacheURL = ctx.Env("ES_CACHE_URL")
 	params.ESCacheUsername = ctx.Env("ES_CACHE_USERNAME")
 	params.ESCachePassword = ctx.Env("ES_CACHE_PASSWORD")
@@ -149,7 +151,7 @@ func buildDockerhubManager(ctx *lib.Ctx) (*dockerhub.Manager, error) {
 	params.AuthAudience = ctx.Env("AUTH0_AUDIENCE")
 	params.Auth0URL = ctx.Env("AUTH0_URL")
 	params.Environment = ctx.Env("BRANCH")
-	params.WebHookURL = ctx.WebHookURL
+	params.SlackWebHookURL = ctx.SlackWebHookURL
 
 	repositoriesJSON := ctx.Env("REPOSITORIES_JSON")
 	if err := jsoniter.Unmarshal([]byte(repositoriesJSON), &params.Repositories); err != nil {
@@ -222,7 +224,7 @@ func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 
 	params.GapURL = ctx.GapURL
 
-	params.AffBaseURL = ctx.Env("AFFILIATION_API_URL") + "v1/"
+	params.AffBaseURL = ctx.Env("AFFILIATION_API_URL") + "/v1"
 	params.ESCacheURL = ctx.Env("ES_CACHE_URL")
 	params.ESCacheUsername = ctx.Env("ES_CACHE_USERNAME")
 	params.ESCachePassword = ctx.Env("ES_CACHE_PASSWORD")
@@ -269,7 +271,7 @@ func buildPipermailManager(ctx *lib.Ctx) (*pipermail.Manager, error) {
 
 	mgr, err := pipermail.NewManager(origin, slug, groupName, ctx.DBConn, fetcherBackendVersion, enricherBackendVersion,
 		doFetch, doEnrich, ctx.ESURL, "", "", esIndex, fromDate, project,
-		fetchSize, enrichSize, affBaseURL, esCacheURL, esCacheUsername, esCachePassword, authGrantType, authClientID, authClientSecret, authAudience, auth0URL, env, ctx.WebHookURL)
+		fetchSize, enrichSize, affBaseURL, esCacheURL, esCacheUsername, esCachePassword, authGrantType, authClientID, authClientSecret, authAudience, auth0URL, env, ctx.SlackWebHookURL)
 
 	return mgr, err
 }
@@ -304,7 +306,7 @@ func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
 	params.GapURL = ctx.GapURL
 	params.Slug = ctx.BugZilla.ProjectSlug.String()
 
-	params.AffBaseURL = ctx.Env("AFFILIATION_API_URL") + "v1/"
+	params.AffBaseURL = ctx.Env("AFFILIATION_API_URL") + "/v1"
 	params.ESCacheURL = ctx.Env("ES_CACHE_URL")
 	params.ESCacheUsername = ctx.Env("ES_CACHE_USERNAME")
 	params.ESCachePassword = ctx.Env("ES_CACHE_PASSWORD")
@@ -358,7 +360,19 @@ func buildBugzillaRestMgrServices(p *bugzillarest.MgrParams) (*bugzillarest.Fetc
 	slackProvider := slack.New(p.WebHookURL)
 	// Initialize fetcher object to get data from bugzilla rest api
 	fetcher := bugzillarest.NewFetcher(&bugzillarest.FetcherParams{Endpoint: p.EndPoint, BackendVersion: p.FetcherBackendVersion}, httpClientProvider, esClientProvider)
-	auth0Client, err := auth0.NewAuth0Client(p.ESCacheURL, p.ESCacheUsername, p.ESCachePassword, p.Environment, p.AuthGrantType, p.AuthClientID, p.AuthClientSecret, p.AuthAudience, p.Auth0URL, httpClientProvider, esCacheClientProvider, &slackProvider)
+	auth0Client, err := auth0.NewAuth0Client(p.ESCacheURL,
+		p.ESCacheUsername,
+		p.ESCachePassword,
+		p.Environment,
+		p.AuthGrantType,
+		p.AuthClientID,
+		p.AuthClientSecret,
+		p.AuthAudience,
+		p.Auth0URL,
+		httpClientProvider,
+		esCacheClientProvider,
+		&slackProvider,
+		build.AppName)
 
 	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(p.AffBaseURL, p.Slug, httpClientProvider, esCacheClientProvider, auth0Client, &slackProvider)
 	if err != nil {

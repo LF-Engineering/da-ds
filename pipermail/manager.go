@@ -5,6 +5,8 @@ import (
 	"log"
 	"time"
 
+	"github.com/LF-Engineering/da-ds/build"
+
 	"github.com/LF-Engineering/dev-analytics-libraries/auth0"
 	"github.com/LF-Engineering/dev-analytics-libraries/slack"
 
@@ -435,7 +437,19 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 	identityProvider := affiliation.NewIdentityProvider(dataBase)
 	slackProvider := slack.New(m.WebHookURL)
 
-	auth0Client, err := auth0.NewAuth0Client(m.ESCacheURL, m.ESCacheUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.Auth0URL, httpClientProvider, esCacheClientProvider, &slackProvider)
+	auth0Client, err := auth0.NewAuth0Client(m.ESCacheURL,
+		m.ESCacheUsername,
+		m.ESCachePassword,
+		m.Environment,
+		m.AuthGrantType,
+		m.AuthClientID,
+		m.AuthClientSecret,
+		m.AuthAudience,
+		m.Auth0URL,
+		httpClientProvider,
+		esCacheClientProvider,
+		&slackProvider,
+		build.AppName)
 
 	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(m.AffBaseURL, m.Slug, httpClientProvider, esCacheClientProvider, auth0Client, &slackProvider)
 	if err != nil {

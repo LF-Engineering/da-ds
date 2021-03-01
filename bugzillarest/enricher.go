@@ -3,6 +3,7 @@ package bugzillarest
 import (
 	"fmt"
 	"log"
+	"math"
 	"strings"
 	"time"
 
@@ -69,7 +70,11 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 	enriched.Status = rawItem.Data.Status
 	enriched.CreationTs = rawItem.Data.CreationTime.Format("2006-01-02T15:04:05")
 	enriched.ISOpen = rawItem.Data.IsOpen
-
+	enriched.TimeToLastUpdateDays = math.Abs(math.Round(timeLib.GetDaysBetweenDates(enriched.DeltaTs, rawItem.Data.CreationTime)*100) / 100)
+	enriched.TimeOpenDays = math.Abs(math.Round(timeLib.GetDaysBetweenDates(now, rawItem.Data.CreationTime)*100) / 100)
+	if !rawItem.Data.IsOpen {
+		enriched.TimeOpenDays = enriched.TimeToLastUpdateDays
+	}
 	if rawItem.Data.Whiteboard != "" {
 		enriched.Whiteboard = &rawItem.Data.Whiteboard
 	}

@@ -176,6 +176,7 @@ type BugRestEnrich struct {
 	Creator               string  `json:"creator"`
 	ISOpen                bool    `json:"is_open"`
 	ID                    int     `json:"id"`
+	TimeToLastUpdateDays  float64 `json:"time_to_last_update_days"`
 }
 
 // Comment describe comment details
