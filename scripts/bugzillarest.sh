@@ -17,5 +17,5 @@ DA_BUGZILLAREST_BRANCH=${10} \
 RAW_INDEX=sds-test-dpdk \
 ./dads --bugzillarest-origin=https://bugs.dpdk.org/ \
 --bugzillarest-project=dpdk \
- --bugzillarest-do-fetch=true --bugzillarest-do-enrich=true --bugzillarest-fetch-size=25 \
- --bugzillarest-enrich-size=25
+ --bugzillarest-do-fetch=true --bugzillarest-do-enrich=true --bugzillarest-fetch-size=1 \
+ --bugzillarest-enrich-size=1

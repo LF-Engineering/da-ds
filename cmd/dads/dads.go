@@ -360,9 +360,7 @@ func buildBugzillaRestMgrServices(p *bugzillarest.MgrParams) (*bugzillarest.Fetc
 	slackProvider := slack.New(p.WebHookURL)
 	// Initialize fetcher object to get data from bugzilla rest api
 	fetcher := bugzillarest.NewFetcher(&bugzillarest.FetcherParams{Endpoint: p.EndPoint, BackendVersion: p.FetcherBackendVersion}, httpClientProvider, esClientProvider)
-	auth0Client, err := auth0.NewAuth0Client(p.ESCacheURL,
-		p.ESCacheUsername,
-		p.ESCachePassword,
+	auth0Client, err := auth0.NewAuth0Client(
 		p.Environment,
 		p.AuthGrantType,
 		p.AuthClientID,
