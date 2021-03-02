@@ -16,7 +16,8 @@ const (
 
 var (
 	// AffsFields - all properties added by affiliations (excluding multi org name)
-	AffsFields = []string{"_id", "_uuid", "_name", "_user_name", "_domain", "_gender", "_gender_acc", "_org_name", "_bot"}
+	// AffsFields = []string{"_id", "_uuid", "_name", "_user_name", "_domain", "_gender", "_gender_acc", "_org_name", "_bot"}
+	AffsFields = []string{"_id", "_uuid", "_name", "_user_name", "_domain", "_org_name", "_bot"}
 	// RequiredAffsFields - required affs fields
 	RequiredAffsFields = []string{"_org_name", "_name", "_user_name"}
 	identityCache      = map[string][2]interface{}{}
@@ -35,13 +36,13 @@ func EmptyAffsItem(role string, undef bool) map[string]interface{} {
 		// panic("track empty")
 	}
 	return map[string]interface{}{
-		role + "_id":         emp,
-		role + "_uuid":       emp,
-		role + "_name":       emp,
-		role + "_user_name":  emp,
-		role + "_domain":     emp,
-		role + "_gender":     emp,
-		role + "_gender_acc": nil,
+		role + "_id":        emp,
+		role + "_uuid":      emp,
+		role + "_name":      emp,
+		role + "_user_name": emp,
+		role + "_domain":    emp,
+		//role + "_gender":     emp,
+		//role + "_gender_acc": nil,
 		role + "_org_name":   emp,
 		role + "_bot":        false,
 		role + MultiOrgNames: []interface{}{},
@@ -438,7 +439,8 @@ func IdentityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, aid inte
 		return
 	}
 	suuid, _ := uuid.(string)
-	profile, err := FindObject(ctx, "profiles", "uuid", suuid, []string{"name", "email", "gender", "gender_acc", "is_bot"})
+	// profile, err := FindObject(ctx, "profiles", "uuid", suuid, []string{"name", "email", "gender", "gender_acc", "is_bot"})
+	profile, err := FindObject(ctx, "profiles", "uuid", suuid, []string{"name", "email", "is_bot"})
 	isBot := 0
 	if aid != nil && profile == nil {
 		Printf("warning cannot find profile for identity id %v\n", aid)
@@ -455,29 +457,33 @@ func IdentityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, aid inte
 				outItem[role+"_domain"] = ary[1]
 			}
 		}
-		gender, _ := profile["gender"]
-		if gender != nil {
-			outItem[role+"_gender"] = gender
-		} else {
-			outItem[role+"_gender"] = Unknown
-		}
-		genderAcc, _ := profile["gender_acc"]
-		if genderAcc != nil {
-			outItem[role+"_gender_acc"] = genderAcc
-		} else {
-			outItem[role+"_gender_acc"] = nil
-		}
+		/*
+			gender, _ := profile["gender"]
+			if gender != nil {
+				outItem[role+"_gender"] = gender
+			} else {
+				outItem[role+"_gender"] = Unknown
+			}
+			genderAcc, _ := profile["gender_acc"]
+			if genderAcc != nil {
+				outItem[role+"_gender_acc"] = genderAcc
+			} else {
+				outItem[role+"_gender_acc"] = nil
+			}
+		*/
 		bot, ok := profile["is_bot"].(int64)
 		if ok && bot > 0 {
 			isBot = 1
 		}
 	}
-	gender, ok := outItem[role+"_gender"]
-	if !ok || gender == nil {
-		outItem[role+"_gender"] = Unknown
-		// outItem[role+"_gender_acc"] = 0
-		outItem[role+"_gender_acc"] = nil
-	}
+	/*
+		gender, ok := outItem[role+"_gender"]
+		if !ok || gender == nil {
+			outItem[role+"_gender"] = Unknown
+			// outItem[role+"_gender_acc"] = 0
+			outItem[role+"_gender_acc"] = nil
+		}
+	*/
 	if isBot == 0 {
 		outItem[role+"_bot"] = false
 	} else {
