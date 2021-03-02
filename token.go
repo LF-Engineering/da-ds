@@ -64,9 +64,6 @@ func InitializeAuth0() error {
 	}
 	slackProvider := slack.New(data["slack_webhook_url"])
 	gAuth0Client, err = auth0.NewAuth0Client(
-		data["es_url"],
-		data["es_user"],
-		data["es_pass"],
 		data["env"],
 		data["grant_type"],
 		data["client_id"],

@@ -437,9 +437,7 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 	identityProvider := affiliation.NewIdentityProvider(dataBase)
 	slackProvider := slack.New(m.WebHookURL)
 
-	auth0Client, err := auth0.NewAuth0Client(m.ESCacheURL,
-		m.ESCacheUsername,
-		m.ESCachePassword,
+	auth0Client, err := auth0.NewAuth0Client(
 		m.Environment,
 		m.AuthGrantType,
 		m.AuthClientID,
