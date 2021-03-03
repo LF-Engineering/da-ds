@@ -392,6 +392,7 @@ func buildBugzillaRestMgrServices(p *bugzillarest.MgrParams) (*bugzillarest.Fetc
 		return nil, nil, nil, nil, nil, err
 	}
 	return fetcher, enricher, esClientProvider, auth0Client, httpClientProvider, err
+}
 
 func buildGoogleGroupsManager(ctx *lib.Ctx) (*googlegroups.Manager, error) {
 	slug := ctx.GoogleGroups.ProjectSlug.String()

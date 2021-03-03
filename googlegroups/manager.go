@@ -6,9 +6,12 @@ import (
 	"log"
 	"time"
 
+	"github.com/LF-Engineering/da-ds/build"
 	"github.com/LF-Engineering/dev-analytics-libraries/affiliation"
+	"github.com/LF-Engineering/dev-analytics-libraries/auth0"
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
 	"github.com/LF-Engineering/dev-analytics-libraries/http"
+	"github.com/LF-Engineering/dev-analytics-libraries/slack"
 	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
 )
 
@@ -60,8 +63,9 @@ type Manager struct {
 	AuthClientID           string
 	AuthClientSecret       string
 	AuthAudience           string
-	AuthURL                string
+	Auth0URL               string
 	Environment            string
+	WebHookURL             string
 
 	esClientProvider *elastic.ClientProvider
 	fetcher          *Fetcher
@@ -95,7 +99,7 @@ func NewManager(slug, groupName, shConnStr, fetcherBackendVersion, enricherBacke
 		AuthClientID:           authClientID,
 		AuthClientSecret:       authClientSecret,
 		AuthAudience:           authAudience,
-		AuthURL:                authURL,
+		Auth0URL:               authURL,
 		Environment:            env,
 		esClientProvider:       nil,
 		enricher:               nil,
@@ -405,7 +409,29 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, *elastic.ClientProvider, er
 		return nil, nil, nil, err
 	}
 
-	affiliationsClientProvider, err := affiliation.NewAffiliationsClient(m.AffBaseURL, m.Slug, m.ESCacheURL, m.ESCacheUsername, m.ESCachePassword, m.Environment, m.AuthGrantType, m.AuthClientID, m.AuthClientSecret, m.AuthAudience, m.AuthURL)
+	esCacheClientProvider, err := elastic.NewClientProvider(&elastic.Params{
+		URL:      m.ESCacheURL,
+		Username: m.ESCacheUsername,
+		Password: m.ESCachePassword,
+	})
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	slackProvider := slack.New(m.WebHookURL)
+	auth0Client, err := auth0.NewAuth0Client(
+		m.Environment,
+		m.AuthGrantType,
+		m.AuthClientID,
+		m.AuthClientSecret,
+		m.AuthAudience,
+		m.Auth0URL,
+		httpClientProvider,
+		esCacheClientProvider,
+		&slackProvider,
+		build.AppName)
+
+	affiliationsClientProvider, err := affiliation.NewAffiliationsClient(m.AffBaseURL, m.Slug, httpClientProvider, esCacheClientProvider, auth0Client, &slackProvider)
 	if err != nil {
 		return nil, nil, nil, err
 	}
