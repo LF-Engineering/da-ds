@@ -11,4 +11,6 @@ var (
 	BuildCategory = "build"
 	// DefaultDateTime is the default time used when no time is provided
 	DefaultDateTime = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
+	// ListView represents the classname of the jenkins jobs that are views
+	ListView = "hudson.model.ListView"
 )

@@ -4,7 +4,9 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
@@ -109,6 +111,27 @@ func (f *Fetcher) FetchBuilds(params *Params, jobURL string) (*BuildResponse, er
 	return &buildResponse, nil
 }
 
+// FetchJobsByViews fetches the total jobs associated with the url provided
+func (f *Fetcher) FetchJobsByViews(params *Params) (*JobResponse, error) {
+	var header = make(map[string]string)
+	if params.Username != "" && params.Password != "" {
+		auth := params.Username + ":" + params.Password
+		auth = "Basic " + base64.StdEncoding.EncodeToString([]byte(auth))
+		header["Authorization"] = auth
+	}
+	url := fmt.Sprintf("%s/api/json", params.JenkinsURL)
+	statusCode, body, err := f.HTTPClientProvider.Request(url, "GET", header, nil, nil)
+	if err != nil || statusCode != http.StatusOK {
+		return nil, err
+	}
+	var jobResponse JobResponse
+	if err := jsoniter.Unmarshal(body, &jobResponse); err != nil {
+		return nil, errors.New("unable to unmarshal the job response")
+	}
+	return &jobResponse, nil
+}
+
+
 // FetchItem pulls all the jobs and the builds data
 func (f *Fetcher) FetchItem(params *Params) ([]BuildsRaw, error) {
 	var raw = make([]BuildsRaw, 0)
@@ -116,6 +139,10 @@ func (f *Fetcher) FetchItem(params *Params) ([]BuildsRaw, error) {
 	jobResponse, err := f.FetchJobs(params)
 	if err != nil {
 		return raw, err
+	}
+	var installers = make(map[string]string)
+	if f.hasViews(jobResponse) {
+		installers = f.initializeCategories(jobResponse)
 	}
 	for _, job := range jobResponse.Jobs {
 		// Check the class of jobs if the class
@@ -132,7 +159,7 @@ func (f *Fetcher) FetchItem(params *Params) ([]BuildsRaw, error) {
 				if err != nil {
 					continue
 				}
-				data := f.MapToJenkinsRaw(builds, params)
+				data := f.MapToJenkinsRaw(builds, params, &installers)
 				raw = append(raw, data...)
 			}
 		} else {
@@ -142,7 +169,7 @@ func (f *Fetcher) FetchItem(params *Params) ([]BuildsRaw, error) {
 				continue
 			}
 			// append the fetched builds to the BuildsRaw slice
-			data := f.MapToJenkinsRaw(builds, params)
+			data := f.MapToJenkinsRaw(builds, params, &installers)
 			raw = append(raw, data...)
 		}
 	}
@@ -150,8 +177,16 @@ func (f *Fetcher) FetchItem(params *Params) ([]BuildsRaw, error) {
 }
 
 // MapToJenkinsRaw maps the api response from jenkins to the BuildsRaw documents
-func (f *Fetcher) MapToJenkinsRaw(response *BuildResponse, params *Params) []BuildsRaw {
+func (f *Fetcher) MapToJenkinsRaw(response *BuildResponse, params *Params, installers *map[string]string) []BuildsRaw {
 	var data = make([]BuildsRaw, 0)
+	var installer string
+	if installers != nil {
+		installer = (*installers)[response.Name]
+	}
+	if installer == "" {
+		parts := strings.Split(response.Name, "-")
+		installer = parts[0]
+	}
 	for _, build := range response.Builds {
 		var raw BuildsRaw
 		raw.Data = build
@@ -162,6 +197,7 @@ func (f *Fetcher) MapToJenkinsRaw(response *BuildResponse, params *Params) []Bui
 		raw.SearchFields.Number = build.Number
 		raw.BackendVersion = f.BackendVersion
 		raw.Category = BuildCategory
+		raw.Installer = installer
 		raw.Origin = params.JenkinsURL
 		raw.UpdatedOn = float64(build.Timestamp) / 1000
 		raw.BackendName = f.DSName
@@ -189,4 +225,30 @@ func (f *Fetcher) GetLastDate(buildServer BuildServer, now time.Time) (time.Time
 	}
 
 	return lastDate, nil
+}
+
+// hasViews checks if there is any view with class hudson.model.ListView
+func (f *Fetcher) hasViews(response *JobResponse) bool {
+	return len(response.Views) != 0
+}
+
+// initializeCategories fetch the builds via views and associate them in a map
+func (f *Fetcher) initializeCategories(response *JobResponse) (installers map[string]string)  {
+	installers = make(map[string]string)
+	for _, view := range response.Views {
+		if view.Class != ListView {
+			continue
+		}
+		jobsByViewsResponse, err := f.FetchJobsByViews(&Params{
+			JenkinsURL:     view.URL,
+		})
+		if err != nil {
+			log.Println("could not get the views for jenkins")
+			continue
+		}
+		for _, fetchedJob := range jobsByViewsResponse.Jobs{
+			installers[fetchedJob.Name] = view.Name
+		}
+	}
+	return installers
 }

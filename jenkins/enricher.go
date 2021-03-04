@@ -109,19 +109,17 @@ func (e *Enricher) EnrichItem(rawItem BuildsRaw, project string, now time.Time) 
 		kind := jobParts[1]
 		if kind == "os" {
 			enriched.Category = "parents/main"
-			enriched.Installer = jobParts[0]
 			enriched.Scenario = strings.Join(jobParts[2:len(jobParts)-3], "-")
 		} else if kind == "deploy" {
 			enriched.Category = "deploy"
-			enriched.Installer = jobParts[0]
 		} else {
 			enriched.Category = "test"
 			enriched.Testproject = jobParts[0]
-			enriched.Installer = jobParts[1]
 		}
 		enriched.Loop = jobParts[len(jobParts)-2]
 		enriched.Branch = jobParts[len(jobParts)-1]
 	}
+	enriched.Installer = rawItem.Installer
 	if len(jobParts) >= 3 {
 		enriched.Pod = jobParts[len(jobParts)-3]
 	}

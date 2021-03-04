@@ -12,11 +12,23 @@ type JobResponse struct {
 		Color string `json:"color,omitempty"`
 	} `json:"jobs"`
 	URL string `json:"url"`
+	Views       []struct {
+		Class string `json:"_class"`
+		Name  string `json:"name"`
+		URL   string `json:"url"`
+	} `json:"views"`
 }
 
 // BuildResponse struct represent the response of
 // the jenkins api to get all the builds
 type BuildResponse struct {
+	Description       string      `json:"description"`
+	DisplayName       string      `json:"displayName"`
+	DisplayNameOrNull interface{} `json:"displayNameOrNull"`
+	FullDisplayName   string      `json:"fullDisplayName"`
+	FullName          string      `json:"fullName"`
+	Name              string      `json:"name"`
+	URL               string      `json:"url"`
 	Builds []Build `json:"builds"`
 }
 
@@ -40,6 +52,7 @@ type BuildsRaw struct {
 	Data              Build     `json:"data"`
 	MetadataUpdatedOn time.Time `json:"metadata__updated_on"`
 	MetadataTimestamp time.Time `json:"metadata__timestamp"`
+	Installer         string    `json:"installer"`
 }
 
 // Build is the single build in the response of
