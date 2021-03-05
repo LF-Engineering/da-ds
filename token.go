@@ -62,6 +62,11 @@ func InitializeAuth0() error {
 		Printf("ES client provider error: %+v\n", err)
 		return err
 	}
+	appName := build.AppName
+	ds := os.Getenv("DA_DS")
+	if ds != "" {
+		appName += "-" + ds
+	}
 	slackProvider := slack.New(data["slack_webhook_url"])
 	gAuth0Client, err = auth0.NewAuth0Client(
 		data["env"],
@@ -73,7 +78,7 @@ func InitializeAuth0() error {
 		httpClientProvider,
 		esCacheClientProvider,
 		&slackProvider,
-		build.AppName,
+		appName,
 	)
 	if err == nil {
 		gTokenEnv = data["env"]
