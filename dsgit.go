@@ -1751,6 +1751,7 @@ func (j *DSGit) GetRoleIdentity(ctx *Ctx, commit map[string]interface{}, role st
 	iAuthor, _ := Dig(commit, []string{role}, true, false)
 	author, _ := iAuthor.(string)
 	identity := j.IdentityFromGitAuthor(ctx, author)
+	// Printf("GetRoleIdentity(%s,%s) -> (%s,%+v)\n", printObj(commit), role, author, identity)
 	return map[string]interface{}{"name": identity[0], "username": identity[1], "email": identity[2]}
 }
 

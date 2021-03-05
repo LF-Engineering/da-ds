@@ -516,9 +516,19 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 }
 
 func prettyPrint(data interface{}) string {
-	pretty, err := jsoniter.MarshalIndent(data, "", "  ")
+	j := jsoniter.Config{SortMapKeys: true, EscapeHTML: true}.Froze()
+	pretty, err := j.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return fmt.Sprintf("%T: %+v", data, data)
+	}
+	return string(pretty)
+}
+
+func printObj(data interface{}) string {
+	j := jsoniter.Config{SortMapKeys: true, EscapeHTML: true}.Froze()
+	pretty, err := j.Marshal(data)
+	if err != nil {
+		return fmt.Sprintf("%+v", data)
 	}
 	return string(pretty)
 }
