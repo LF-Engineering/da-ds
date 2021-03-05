@@ -12,10 +12,12 @@ type Enricher struct {
 	DSName                string // Datasource will be used as key for ES
 	ElasticSearchProvider ESClientProvider
 	BackendVersion        string
+	ScrollSize            int
 }
 
 // TopHits result
 type TopHits struct {
+	ScrollID     string       `json:"_scroll_id"`
 	Took         int          `json:"took"`
 	Hits         Hits         `json:"hits"`
 	Aggregations Aggregations `json:"aggregations"`
@@ -55,11 +57,12 @@ type LastDate struct {
 }
 
 // NewEnricher initiates a new Enricher
-func NewEnricher(backendVersion string, esClientProvider ESClientProvider) *Enricher {
+func NewEnricher(backendVersion string, esClientProvider ESClientProvider, scrollSize int) *Enricher {
 	return &Enricher{
 		DSName:                Jenkins,
 		ElasticSearchProvider: esClientProvider,
 		BackendVersion:        backendVersion,
+		ScrollSize:            scrollSize,
 	}
 }
 
@@ -135,13 +138,15 @@ func (e *Enricher) HandleMapping(index string) error {
 // GetFetchedDataItem gets fetched data items starting from lastDate
 func (e *Enricher) GetFetchedDataItem(buildServer *BuildServer, cmdLastDate *time.Time, lastDate *time.Time, noIncremental bool) (result *TopHits, err error) {
 	rawIndex := fmt.Sprintf("%s-raw", buildServer.Index)
+	var lastEnrichDate *time.Time
 
-	var lastEnrichDate *time.Time = nil
-
+	// if the fetch needs to be incremental
 	if noIncremental == false {
 		if cmdLastDate != nil && !cmdLastDate.IsZero() {
+			// if fromDate is given in the command
 			lastEnrichDate = cmdLastDate
 		} else if lastDate != nil {
+			// lastRawDate exists
 			lastEnrichDate = lastDate
 
 			enrichLastDate, err := e.ElasticSearchProvider.GetStat(buildServer.Index, "metadata__enriched_on", "max", nil, nil)
@@ -152,6 +157,8 @@ func (e *Enricher) GetFetchedDataItem(buildServer *BuildServer, cmdLastDate *tim
 					lastEnrichDate = &enrichLastDate
 				}
 			}
+		} else {
+			lastEnrichDate = &DefaultDateTime
 		}
 	}
 
@@ -160,7 +167,7 @@ func (e *Enricher) GetFetchedDataItem(buildServer *BuildServer, cmdLastDate *tim
 	hits := &TopHits{}
 
 	query := map[string]interface{}{
-		"size": 10000,
+		"size": e.ScrollSize,
 		"query": map[string]interface{}{
 			"bool": map[string]interface{}{
 				"must": []map[string]interface{}{},
@@ -197,10 +204,21 @@ func (e *Enricher) GetFetchedDataItem(buildServer *BuildServer, cmdLastDate *tim
 
 	query["query"].(map[string]interface{})["bool"].(map[string]interface{})["must"] = conditions
 
-	err = e.ElasticSearchProvider.Get(rawIndex, query, hits)
-	if err != nil {
-		return nil, err
+	scrollID := ""
+	for {
+		result := &TopHits{}
+		err = e.ElasticSearchProvider.ReadWithScroll(rawIndex, query, result, scrollID)
+		if err != nil {
+			return nil, err
+		}
+		if len(result.Hits.Hits) < 1 {
+			break
+		}
+		scrollID = result.ScrollID
+		hits.Hits.Hits = append(hits.Hits.Hits, result.Hits.Hits...)
+		if scrollID == "" {
+			break
+		}
 	}
-
 	return hits, nil
 }

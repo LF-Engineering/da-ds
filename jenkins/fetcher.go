@@ -55,6 +55,7 @@ type ESClientProvider interface {
 	Bulk(body []byte) ([]byte, error)
 	Get(index string, query map[string]interface{}, result interface{}) (err error)
 	GetStat(index string, field string, aggType string, mustConditions []map[string]interface{}, mustNotConditions []map[string]interface{}) (result time.Time, err error)
+	ReadWithScroll(index string, query map[string]interface{}, result interface{}, scrollID string) (err error)
 	BulkInsert(data []elastic.BulkData) ([]byte, error)
 }
 
@@ -219,7 +220,7 @@ func (f *Fetcher) HandleMapping(index string) error {
 
 // GetLastDate gets fetching lastDate
 func (f *Fetcher) GetLastDate(buildServer BuildServer, now time.Time) (time.Time, error) {
-	lastDate, err := f.ElasticSearchProvider.GetStat(fmt.Sprintf("%s", buildServer.Index), "metadata__updated_on", "max", nil, nil)
+	lastDate, err := f.ElasticSearchProvider.GetStat(fmt.Sprintf("%s-raw", buildServer.Index), "metadata__updated_on", "max", nil, nil)
 	if err != nil {
 		return DefaultTime, err
 	}
