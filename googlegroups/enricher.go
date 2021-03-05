@@ -11,11 +11,18 @@ import (
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 )
 
+// AffiliationClient manages user identity
+type AffiliationClient interface {
+	GetIdentityByUser(key string, value string) (*affiliation.AffIdentity, error)
+	AddIdentity(identity *affiliation.Identity) bool
+	GetOrganizations(uuid string, projectSlug string) *[]affiliation.Enrollment
+}
+
 // Enricher contains google groups datasource enrich logic
 type Enricher struct {
 	DSName                     string // Datasource will be used as key for ES
 	ElasticSearchProvider      *elastic.ClientProvider
-	affiliationsClientProvider *affiliation.Affiliation
+	affiliationsClientProvider AffiliationClient
 }
 
 // NewEnricher initiates a new Enricher

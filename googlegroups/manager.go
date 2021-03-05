@@ -15,6 +15,11 @@ import (
 	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
 )
 
+// AuthClientProvider interacts with auth0 server
+type AuthClientProvider interface {
+	GetToken(env string) (string, error)
+}
+
 // TopHits result
 type TopHits struct {
 	Hits Hits `json:"hits"`
