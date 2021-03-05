@@ -28,7 +28,7 @@ var (
 	i2uCacheMtx        *sync.RWMutex
 )
 
-// EmptyAffsItem - return empty affiliation sitem for a given role
+// EmptyAffsItem - return empty affiliations item for a given role
 func EmptyAffsItem(role string, undef bool) map[string]interface{} {
 	emp := ""
 	if undef {
@@ -406,6 +406,10 @@ func CopyAffsRoleData(dst, src map[string]interface{}, dstRole, srcRole string) 
 // either identity or aid must be specified
 func IdentityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, aid interface{}, dt time.Time, role string) (outItem map[string]interface{}, empty bool, e error) {
 	outItem = EmptyAffsItem(role, false)
+	if ctx.NoAffiliation {
+		empty = true
+		return
+	}
 	var uuid interface{}
 	if identity != nil {
 		ids := AffsIdentityIDs(ctx, ds, identity)

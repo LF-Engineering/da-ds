@@ -363,6 +363,9 @@ func StringToBool(v string) bool {
 	if err == nil {
 		return i != 0
 	}
+	if v == "no" || v == "n" {
+		return false
+	}
 	return true
 }
 
