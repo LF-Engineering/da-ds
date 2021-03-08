@@ -131,11 +131,6 @@ func (f *Fetcher) Fetch(fromDate, now *time.Time) ([]*RawMessage, error) {
 		close(results)
 		wgProcess.Wait()
 	}
-	fmt.Println(len(rawMessages))
-	for _, m := range rawMessages {
-		fmt.Println(m)
-	}
-	//os.Exit(1)
 	return rawMessages, err
 }
 
@@ -188,8 +183,6 @@ func (f *Fetcher) getMessage(msg *gmail.Message, fromDate, now *time.Time) (rawM
 	rawMessage.References = references
 	rawMessage.Subject = subject
 	rawMessage.MessageBody = messageBody
-	//rawMessage.TopicID = topicID
-	//rawMessage.Topic = topic
 	rawMessage.MetadataUpdatedOn = date
 	rawMessage.MetadataTimestamp = *now
 	rawMessage.ChangedAt = *now
@@ -200,11 +193,21 @@ func (f *Fetcher) getMessage(msg *gmail.Message, fromDate, now *time.Time) (rawM
 	rawMessage.Timezone = timezone
 	rawMessage.BackendName = fmt.Sprintf("%sFetch", strings.Title(GoogleGroups))
 	rawMessage.BackendVersion = f.BackendVersion
-	//rawMessage.UpdatedOn = timeLib.ConvertTimeToFloat(*now)
-	//rawMessage.Timestamp = *now
+	if msg.ThreadId != "" {
+		rawMessage.TopicID = msg.ThreadId
+	}
+
+	if inReplyTo == "" {
+		rawMessage.Topic = subject
+	}
+
+	if rawMessage.TopicID != "" && rawMessage.Topic == "" {
+		rawMessage.Topic = getSubjectFromReply(subject)
+	}
+
 	rawMessage.Origin = fmt.Sprintf("https://groups.google.com/g/%+v", groupName)
 	if strings.Contains(groupName, "/") {
-		splitGroupName := strings.Split(f.GroupName, "/")
+		splitGroupName := strings.Split(groupName, "/")
 		organization := strings.TrimSpace(splitGroupName[0])
 		group := strings.TrimSpace(splitGroupName[1])
 		rawMessage.Origin = fmt.Sprintf("https://groups.google.com/a/%+v/g/%+v", organization, group)
@@ -258,6 +261,14 @@ func getGroupName(s string) string {
 		return fmt.Sprintf("%s/%s", domain, groupName)
 	}
 	return ""
+}
+
+func getSubjectFromReply(s string) string {
+	splitSubject := strings.Split(s, "Re: ")
+	if len(splitSubject) > 1 {
+		return splitSubject[1]
+	}
+	return splitSubject[0]
 }
 
 // getHeadersData gets some of the useful metadata from the headers.

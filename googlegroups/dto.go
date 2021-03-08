@@ -38,12 +38,10 @@ type EnrichedMessage struct {
 	BackendVersion       string    `json:"backend_version"`
 	UUID                 string    `json:"uuid"`
 	Origin               string    `json:"origin"`
-	UpdatedOn            float64   `json:"updated_on"`
 	MetadataUpdatedOn    time.Time `json:"metadata__updated_on"`
 	BackendName          string    `json:"backend_name"`
 	MetadataTimestamp    time.Time `json:"metadata__timestamp"`
 	MetadataEnrichedOn   time.Time `json:"metadata__enriched_on"`
-	Timestamp            float64   `json:"timestamp"`
 	ProjectSlug          string    `json:"project_slug"`
 	GroupName            string    `json:"group_name"`
 	Project              string    `json:"project"`
@@ -53,11 +51,9 @@ type EnrichedMessage struct {
 	AuthorName           string    `json:"author_name"`
 	AuthorID             string    `json:"author_id"`
 	AuthorUUID           string    `json:"author_uuid"`
-	AuthorGender         string    `json:"author_gender"`
 	AuthorOrgName        string    `json:"author_org_name"`
 	AuthorUserName       string    `json:"author_user_name"`
 	AuthorBot            bool      `json:"author_bot"`
-	AuthorGenderAcc      int64     `json:"author_gender_acc"`
 	AuthorMultiOrgNames  []string  `json:"author_multi_org_names"`
 	MboxAuthorDomain     string    `json:"mbox_author_domain"`
 	IsGoogleGroupMessage int       `json:"is_google_group_message"`
@@ -79,11 +75,9 @@ type RawMessage struct {
 	BackendVersion    string    `json:"backend_version"`
 	UUID              string    `json:"uuid"`
 	Origin            string    `json:"origin"`
-	UpdatedOn         float64   `json:"updated_on"`
 	MetadataUpdatedOn time.Time `json:"metadata__updated_on"`
 	BackendName       string    `json:"backend_name"`
 	MetadataTimestamp time.Time `json:"metadata__timestamp"`
-	Timestamp         float64   `json:"timestamp"`
 	ProjectSlug       string    `json:"project_slug"`
 	GroupName         string    `json:"group_name"`
 	Project           string    `json:"project"`

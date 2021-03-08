@@ -53,8 +53,6 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 		MetadataUpdatedOn:    rawMessage.MetadataUpdatedOn,
 		MetadataTimestamp:    rawMessage.MetadataTimestamp,
 		MetadataEnrichedOn:   now,
-		UpdatedOn:            rawMessage.UpdatedOn,
-		Timestamp:            rawMessage.Timestamp,
 		BackendName:          fmt.Sprintf("%sEnrich", strings.Title(e.DSName)),
 		ProjectSlug:          rawMessage.ProjectSlug,
 		GroupName:            rawMessage.GroupName,
@@ -64,7 +62,6 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 		Origin:               rawMessage.Origin,
 		AuthorMultiOrgNames:  []string{Unknown},
 		AuthorOrgName:        Unknown,
-		AuthorGender:         Unknown,
 		Timezone:             rawMessage.Timezone,
 	}
 
@@ -96,13 +93,6 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 		}
 		if userData.UUID != nil {
 			enrichedMessage.AuthorUUID = *userData.UUID
-		}
-		if userData.Gender != nil {
-			enrichedMessage.AuthorGender = *userData.Gender
-		}
-
-		if userData.GenderACC != nil {
-			enrichedMessage.AuthorGenderAcc = *userData.GenderACC
 		}
 
 		enrollments := e.affiliationsClientProvider.GetOrganizations(*userData.UUID, rawMessage.ProjectSlug)
