@@ -188,6 +188,7 @@ func buildJenkinsManager(ctx *lib.Ctx) (*jenkins.Manager, error) {
 	enrich := ctx.Enrich
 	fromDate := ctx.DateFrom
 	bulkSize := ctx.ESBulkSize
+	scrollSize := ctx.ESScrollSize
 	if bulkSize == 0 {
 		bulkSize = 1000
 	}
@@ -200,7 +201,7 @@ func buildJenkinsManager(ctx *lib.Ctx) (*jenkins.Manager, error) {
 		return nil, err
 	}
 	return jenkins.NewManager(fetcherBackendVersion, enricherBackendVersion,
-		enrichOnly, enrich, esURL, timeout, buildServers, fromDate, noIncremental, bulkSize), nil
+		enrichOnly, enrich, esURL, timeout, buildServers, fromDate, noIncremental, bulkSize, scrollSize), nil
 }
 
 func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {

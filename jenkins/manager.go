@@ -25,6 +25,7 @@ type Manager struct {
 	FromDate               *time.Time
 	NoIncremental          bool
 	BulkSize               int
+	ESScrollSize           int
 }
 
 // BuildServer is a single Jenkins
@@ -49,6 +50,7 @@ func NewManager(
 	fromDate *time.Time,
 	noIncremental bool,
 	bulkSize int,
+	scrollSize int,
 ) *Manager {
 	mng := &Manager{
 		FetcherBackendVersion:  fetcherBackendVersion,
@@ -61,6 +63,7 @@ func NewManager(
 		FromDate:               fromDate,
 		NoIncremental:          noIncremental,
 		BulkSize:               bulkSize,
+		ESScrollSize:           scrollSize,
 	}
 
 	return mng
@@ -202,7 +205,7 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 	fetcher := NewFetcher(params, httpClientProvider, esClientProvider)
 
 	// Initialize enrich object to enrich raw data
-	enricher := NewEnricher(m.EnricherBackendVersion, esClientProvider)
+	enricher := NewEnricher(m.EnricherBackendVersion, esClientProvider, m.ESScrollSize)
 
 	return fetcher, enricher, esClientProvider, err
 }
