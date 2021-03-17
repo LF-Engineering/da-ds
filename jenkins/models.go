@@ -11,8 +11,8 @@ type JobResponse struct {
 		URL   string `json:"url"`
 		Color string `json:"color,omitempty"`
 	} `json:"jobs"`
-	URL string `json:"url"`
-	Views       []struct {
+	URL   string `json:"url"`
+	Views []struct {
 		Class string `json:"_class"`
 		Name  string `json:"name"`
 		URL   string `json:"url"`
@@ -29,7 +29,7 @@ type BuildResponse struct {
 	FullName          string      `json:"fullName"`
 	Name              string      `json:"name"`
 	URL               string      `json:"url"`
-	Builds []Build `json:"builds"`
+	Builds            []Build     `json:"builds"`
 }
 
 // BuildsRaw struct represent the schema of

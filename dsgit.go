@@ -27,6 +27,8 @@ const (
 	GitDefaultCachePath = "$HOME/.perceval/cache"
 	// GitOpsCommand - command that maintains git stats cache
 	GitOpsCommand = "gitops.py"
+	// OrphanedCommitsCommand - command to list orphaned commits
+	OrphanedCommitsCommand = "detect-removed-commits.sh"
 	// GitOpsNoCleanup - if set, it will skip gitops.py repo cleanup
 	GitOpsNoCleanup = false
 	// GitParseStateInit - init parser state
@@ -130,16 +132,17 @@ type DSGit struct {
 	NoSSLVerify     bool   // From DA_GIT_NO_SSL_VERIFY
 	PairProgramming bool   // From DA_GIT_PAIR_PROGRAMMING
 	// Non-config variables
-	RepoName    string                            // repo name
-	Loc         int                               // lines of code as reported by GitOpsCommand
-	Pls         []PLS                             // programming language suppary as reported by GitOpsCommand
-	GitPath     string                            // path to git repo clone
-	LineScanner *bufio.Scanner                    // line scanner for git log
-	CurrLine    int                               // current line in git log
-	ParseState  int                               // 0-init, 1-commit, 2-header, 3-message, 4-file
-	Commit      map[string]interface{}            // current parsed commit
-	CommitFiles map[string]map[string]interface{} // current commit's files
-	RecentLines []string                          // recent commit lines
+	RepoName        string                            // repo name
+	Loc             int                               // lines of code as reported by GitOpsCommand
+	Pls             []PLS                             // programming language suppary as reported by GitOpsCommand
+	GitPath         string                            // path to git repo clone
+	LineScanner     *bufio.Scanner                    // line scanner for git log
+	CurrLine        int                               // current line in git log
+	ParseState      int                               // 0-init, 1-commit, 2-header, 3-message, 4-file
+	Commit          map[string]interface{}            // current parsed commit
+	CommitFiles     map[string]map[string]interface{} // current commit's files
+	RecentLines     []string                          // recent commit lines
+	OrphanedCommits []string                          // orphaned commits SHAs
 }
 
 // ParseArgs - parse git specific environment variables
@@ -219,6 +222,48 @@ func (j *DSGit) CustomEnrich() bool {
 func (j *DSGit) Enrich(ctx *Ctx) (err error) {
 	Printf("%s should use generic Enrich()\n", j.DS)
 	return
+}
+
+// GetOrphanedCommits - return data about orphaned commits: commits present in git object storage
+// but not present in rev-list - for example squashed commits
+func (j *DSGit) GetOrphanedCommits(ctx *Ctx, thrN int) (ch chan error, err error) {
+	worker := func(c chan error) (e error) {
+		Printf("searching for orphaned commits\n")
+		defer func() {
+			if c != nil {
+				c <- e
+			}
+		}()
+		var (
+			sout string
+			serr string
+		)
+		cmdLine := []string{OrphanedCommitsCommand}
+		sout, serr, e = ExecCommand(ctx, cmdLine, j.GitPath, GitDefaultEnv)
+		if e != nil {
+			Printf("error executing %v: %v\n%s\n%s\n", cmdLine, e, sout, serr)
+			return
+		}
+		ary := strings.Split(sout, " ")
+		for _, sha := range ary {
+			sha = strings.TrimSpace(sha)
+			if sha == "" {
+				continue
+			}
+			j.OrphanedCommits = append(j.OrphanedCommits, sha)
+		}
+		Printf("found %d orphaned commits\n", len(j.OrphanedCommits))
+		if ctx.Debug > 1 {
+			Printf("OrphanedCommits: %+v\n", j.OrphanedCommits)
+		}
+		return
+	}
+	if thrN <= 1 {
+		return nil, worker(nil)
+	}
+	ch = make(chan error)
+	go func() { _ = worker(ch) }()
+	return ch, nil
 }
 
 // GetGitOps - LOC, lang summary stats
@@ -713,6 +758,7 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 		escha         []chan error
 		eschaMtx      *sync.Mutex
 		goch          chan error
+		occh          chan error
 		waitLOCMtx    *sync.Mutex
 	)
 	thrN := GetThreadsNum(ctx)
@@ -737,6 +783,14 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 	}
 	FatalOnError(j.CreateGitRepo(ctx))
 	FatalOnError(j.UpdateGitRepo(ctx))
+	if thrN > 1 {
+		occh, _ = j.GetOrphanedCommits(ctx, thrN)
+	} else {
+		_, err = j.GetOrphanedCommits(ctx, thrN)
+		if err != nil {
+			return
+		}
+	}
 	var cmd *exec.Cmd
 	cmd, err = j.ParseGitLog(ctx)
 	// Continue with operations that need git ops
@@ -916,6 +970,9 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 				Printf("loc: %d, programming languages: %d\n", j.Loc, len(j.Pls))
 			}
 		}()
+	}
+	if thrN > 0 {
+		err = <-occh
 	}
 	return
 }
@@ -1441,6 +1498,70 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 func (j *DSGit) EnrichItems(ctx *Ctx) (err error) {
 	Printf("enriching items\n")
 	err = ForEachESItem(ctx, j, true, ESBulkUploadFunc, GitEnrichItemsFunc, nil, true)
+	if err != nil {
+		return
+	}
+	err = j.MarkOrphanedCommits(ctx)
+	return
+}
+
+// MarkOrphanedCommits - mark all orphaned commits as "orphaned: true"
+func (j *DSGit) MarkOrphanedCommits(ctx *Ctx) (err error) {
+	nOrphanedCommits := len(j.OrphanedCommits)
+	if nOrphanedCommits == 0 {
+		return
+	}
+	packSize := ctx.ESBulkSize
+	nPacks := nOrphanedCommits / packSize
+	if nOrphanedCommits%packSize != 0 {
+		nPacks++
+	}
+	packs := []string{}
+	for i := 0; i < nPacks; i++ {
+		from := i * packSize
+		to := from + packSize
+		if to > nOrphanedCommits {
+			to = nOrphanedCommits
+		}
+		s := "["
+		for k := from; k < to; k++ {
+			s += `"` + j.OrphanedCommits[k] + `",`
+		}
+		if s != "[" {
+			s = s[:len(s)-1] + "]"
+			packs = append(packs, s)
+		}
+	}
+	url := ctx.ESURL + "/" + ctx.RichIndex + "/_update_by_query?conflicts=proceed&refresh=true&timeout=20m"
+	method := Post
+	Printf("updating %d orphaned commits in %d packs\n", nOrphanedCommits, len(packs))
+	for _, pack := range packs {
+		// payload := []byte(`{"script":{"inline":"ctx._source.orphaned=true;"},"query":{"terms":{"hash":` + pack + `}}}`)
+		// payload := []byte(`{"script":{"inline":"if(!ctx._source.containsKey(\"orphaned\")){ctx._source.orphaned=true;}"},"query":{"terms":{"hash":` + pack + `}}}`)
+		payload := []byte(`{"script":{"inline":"ctx._source.orphaned=true;"},"query":{"bool":{"must":{"terms":{"hash":` + pack + `}},"must_not":{"terms":{"orphaned":[true]}}}}}`)
+		resp, _, _, _, e := Request(
+			ctx,
+			url,
+			method,
+			map[string]string{"Content-Type": "application/json"}, // headers
+			payload,                             // payload
+			[]string{},                          // cookies
+			map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses: 200
+			nil,                                 // Error statuses
+			map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
+			nil,                                 // Cache statuses
+			true,                                // retry
+			nil,                                 // cache for
+			true,                                // skip in dry-run mode
+		)
+		if e != nil {
+			err = e
+			Printf("MarkOrphanedCommits error: %v\n", err)
+			return
+		}
+		updated, _ := Dig(resp, []string{"updated"}, true, false)
+		Printf("marked %v orphaned commits\n", updated)
+	}
 	return
 }
 

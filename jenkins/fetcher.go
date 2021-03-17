@@ -132,7 +132,6 @@ func (f *Fetcher) FetchJobsByViews(params *Params) (*JobResponse, error) {
 	return &jobResponse, nil
 }
 
-
 // FetchItem pulls all the jobs and the builds data
 func (f *Fetcher) FetchItem(params *Params) ([]BuildsRaw, error) {
 	var raw = make([]BuildsRaw, 0)
@@ -234,20 +233,20 @@ func (f *Fetcher) hasViews(response *JobResponse) bool {
 }
 
 // initializeCategories fetch the builds via views and associate them in a map
-func (f *Fetcher) initializeCategories(response *JobResponse) (installers map[string]string)  {
+func (f *Fetcher) initializeCategories(response *JobResponse) (installers map[string]string) {
 	installers = make(map[string]string)
 	for _, view := range response.Views {
 		if view.Class != ListView {
 			continue
 		}
 		jobsByViewsResponse, err := f.FetchJobsByViews(&Params{
-			JenkinsURL:     view.URL,
+			JenkinsURL: view.URL,
 		})
 		if err != nil {
 			log.Println("could not get the views for jenkins")
 			continue
 		}
-		for _, fetchedJob := range jobsByViewsResponse.Jobs{
+		for _, fetchedJob := range jobsByViewsResponse.Jobs {
 			installers[fetchedJob.Name] = view.Name
 		}
 	}
