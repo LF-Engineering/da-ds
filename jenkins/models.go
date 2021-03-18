@@ -65,11 +65,6 @@ type Build struct {
 			Class            string `json:"_class"`
 			ShortDescription string `json:"shortDescription"`
 		} `json:"causes,omitempty"`
-		Parameters []struct {
-			Class string `json:"_class"`
-			Name  string `json:"name"`
-			Value string `json:"value"`
-		} `json:"parameters,omitempty"`
 		BuildsByBranchName struct {
 			RefsRemotesOriginMaster struct {
 				Class       string      `json:"_class"`
