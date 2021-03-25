@@ -103,7 +103,45 @@ var (
 	// GitTrailerPPAuthors - trailer name to authors map (for pair programming)
 	GitTrailerPPAuthors = map[string]string{"Signed-off-by": "authors_signed_off", "Co-authored-by": "co_authors"}
 	// GitAllowedTrailers - allowed commit trailer flags (lowercase/case insensitive -> correct case)
-	GitAllowedTrailers = map[string]string{"signed-off-by": "Signed-off-by", "co-authored-by": "Co-authored-by"}
+	GitAllowedTrailers = map[string]string{
+		"signed-off":            "Signed-off-by",
+		"signed-off-by":         "Signed-off-by",
+		"co-authored":           "Co-authored-by",
+		"co-authored-by":        "Co-authored-by",
+		"cc":                    "Acked-by",
+		"cc-by":                 "Acked-by",
+		"ack":                   "Acked-by",
+		"ack-by":                "Acked-by",
+		"acked":                 "Acked-by",
+		"acked-by":              "Acked-by",
+		"acked-and-tested-by":   "Tested-by",
+		"tested":                "Tested-by",
+		"tested-by":             "Tested-by",
+		"approved":              "Approved-by",
+		"approved-by":           "Approved-by",
+		"acked-and-reviewed-by": "Reviewed-by",
+		"acked-and-reviewed":    "Reviewed-by",
+		"reviewed":              "Reviewed-by",
+		"reviewed-by":           "Reviewed-by",
+		"looks-good-to":         "Reviewed-by",
+		"analyzed":              "Reviewed-by",
+		"analyzed-by":           "Reviewed-by",
+		"reported":              "Reported-by",
+		"reported-by":           "Reported-by",
+		"committed":             "Committed-by",
+		"committed-by":          "Committed-by",
+	}
+	// GitTrailerOtherAuthors - trailer name to authors map (for all documents)
+	GitTrailerOtherAuthors = map[string]string{
+		"Signed-off-by":  "authors_signed_off",
+		"Co-authored-by": "authors_co_authored",
+		"Acked-by":       "authors_acked",
+		"Tested-by":      "authors_tested",
+		"Approved-by":    "authors_approved",
+		"Reviewed-by":    "authors_reviewed",
+		"Reported-by":    "authors_reported",
+		"Committed-by":   "authors_committed",
+	}
 )
 
 // RawPLS - programming language summary (all fields as strings)
@@ -638,6 +676,19 @@ func (j *DSGit) ParseFile(ctx *Ctx, line string) (parsed, empty bool, err error)
 	return
 }
 
+// UniqueStringArray - make array unique
+func (j *DSGit) UniqueStringArray(ary []interface{}) []interface{} {
+	m := map[string]struct{}{}
+	for _, i := range ary {
+		m[i.(string)] = struct{}{}
+	}
+	ret := []interface{}{}
+	for i := range m {
+		ret = append(ret, i)
+	}
+	return ret
+}
+
 // ParseTrailer - parse possible trailer line
 func (j *DSGit) ParseTrailer(ctx *Ctx, line string) {
 	m := MatchGroups(GitTrailerPattern, line)
@@ -675,7 +726,7 @@ func (j *DSGit) ParseTrailer(ctx *Ctx, line string) {
 				j.Commit[trailer] = []interface{}{m["value"]}
 			}
 		} else {
-			j.Commit[trailer] = append(ary.([]interface{}), m["value"])
+			j.Commit[trailer] = j.UniqueStringArray(append(ary.([]interface{}), m["value"]))
 			if ctx.Debug > 1 {
 				Printf("appended trailer %s found in '%s'\n", trailer, line)
 			}
@@ -1230,7 +1281,7 @@ func (j *DSGit) GetAuthorsData(ctx *Ctx, doc interface{}, auth string) (authorsM
 }
 
 // GetOtherPPAuthors - get others authors - possible from fields: Signed-off-by and/or Co-authored-by
-func (j *DSGit) GetOtherPPAuthors(ctx *Ctx, doc interface{}) (othersMap map[string]string) {
+func (j *DSGit) GetOtherPPAuthors(ctx *Ctx, doc interface{}) (othersMap map[string]map[string]struct{}) {
 	for otherKey := range GitTrailerPPAuthors {
 		iothers, ok := Dig(doc, []string{"data", otherKey}, false, true)
 		if ok {
@@ -1238,9 +1289,41 @@ func (j *DSGit) GetOtherPPAuthors(ctx *Ctx, doc interface{}) (othersMap map[stri
 			if ctx.Debug > 1 {
 				Printf("pp %s: %s\n", otherKey, others)
 			}
-			othersMap = make(map[string]string)
-			for _, other := range others {
-				othersMap[strings.TrimSpace(other.(string))] = otherKey
+			if othersMap == nil {
+				othersMap = make(map[string]map[string]struct{})
+			}
+			for _, iOther := range others {
+				other := strings.TrimSpace(iOther.(string))
+				_, ok := othersMap[other]
+				if !ok {
+					othersMap[other] = map[string]struct{}{}
+				}
+				othersMap[other][otherKey] = struct{}{}
+			}
+		}
+	}
+	return
+}
+
+// GetOtherTrailersAuthors - get others authors - from other trailers fields (mostly for korg)
+func (j *DSGit) GetOtherTrailersAuthors(ctx *Ctx, doc interface{}) (othersMap map[string]map[string]struct{}) {
+	for otherKey, otherRichKey := range GitTrailerOtherAuthors {
+		iothers, ok := Dig(doc, []string{"data", otherKey}, false, true)
+		if ok {
+			others, _ := iothers.([]interface{})
+			if ctx.Debug > 1 {
+				Printf("other trailers %s -> %s: %s\n", otherKey, otherRichKey, others)
+			}
+			if othersMap == nil {
+				othersMap = make(map[string]map[string]struct{})
+			}
+			for _, iOther := range others {
+				other := strings.TrimSpace(iOther.(string))
+				_, ok := othersMap[other]
+				if !ok {
+					othersMap[other] = map[string]struct{}{}
+				}
+				othersMap[other][otherKey] = struct{}{}
 			}
 		}
 	}
@@ -1259,10 +1342,14 @@ func (j *DSGit) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3]
 	authorsMap, _ := j.GetAuthorsData(ctx, doc, "Author")
 	committersMap, _ := j.GetAuthorsData(ctx, doc, "Commit")
 	othersMap := j.GetOtherPPAuthors(ctx, doc)
+	trailersMap := j.GetOtherTrailersAuthors(ctx, doc)
 	for auth := range committersMap {
 		authorsMap[auth] = struct{}{}
 	}
 	for auth := range othersMap {
+		authorsMap[auth] = struct{}{}
+	}
+	for auth := range trailersMap {
 		authorsMap[auth] = struct{}{}
 	}
 	if len(authorsMap) > 0 {
@@ -1320,14 +1407,17 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 			if len(othersMap) > 0 {
 				signers = []string{firstAuthor}
 				coAuthors = []string{firstAuthor}
-				for auth, authType := range othersMap {
+				for auth, authTypes := range othersMap {
 					if auth == firstAuthor {
 						continue
 					}
-					if authType == "Signed-off-by" {
+					_, signedOff := authTypes["Signed-off-by"]
+					if signedOff {
 						hasSigners = true
 						signers = append(signers, auth)
-					} else {
+					}
+					_, coAuthored := authTypes["Co-authored-by"]
+					if coAuthored {
 						hasCoAuthors = true
 						coAuthors = append(coAuthors, auth)
 					}
@@ -1723,6 +1813,31 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 		rich["github_repo"] = githubRepo
 		rich["url_id"] = githubRepo + "/commit/" + hsh
 	}
+	othersMap := j.GetOtherTrailersAuthors(ctx, item)
+	/*
+		if len(othersMap) > 0 {
+			signers = []string{firstAuthor}
+			coAuthors = []string{firstAuthor}
+			for auth, authType := range othersMap {
+				if auth == firstAuthor {
+					continue
+				}
+				if authType == "Signed-off-by" {
+					hasSigners = true
+					signers = append(signers, auth)
+				} else {
+					hasCoAuthors = true
+					coAuthors = append(coAuthors, auth)
+				}
+			}
+			if hasSigners {
+				data["authors_signed_off"] = signers
+			}
+			if hasCoAuthors {
+				data["co_authors"] = coAuthors
+			}
+		}
+	*/
 	if affs {
 		authorKey := "Author"
 		var affsItems map[string]interface{}
@@ -1733,6 +1848,7 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 		if err != nil {
 			return
 		}
+		// fmt.Printf(">>>> %+v\n", affsItems)
 		for prop, value := range affsItems {
 			rich[prop] = value
 		}
