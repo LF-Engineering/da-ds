@@ -4,6 +4,10 @@ declare -A glog
 declare -A gfile
 set -o pipefail
 set -e
+if [ -z "`git rev-list -n 1 --all`" ]
+then
+  exit 0
+fi
 allcommits=`git cat-file --unordered --batch-all-objects --buffer --batch-check | grep ' commit ' | awk '{print $1}'`
 for f in $allcommits
 do
