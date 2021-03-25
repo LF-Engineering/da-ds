@@ -89,6 +89,8 @@ var (
 	GitAuthorsPattern = regexp.MustCompile(`(?P<first_authors>.* .*) and (?P<last_author>.* .*) (?P<email>.*)`)
 	// GitCoAuthorsPattern - author pattern
 	GitCoAuthorsPattern = regexp.MustCompile(`Co-authored-by:(?P<first_authors>.* .*)<(?P<email>.*)>\n?`)
+	// GitDocFilePattern - files matching this pattern are detected as documentation files, so commit will be marked as doc_commit
+	GitDocFilePattern = regexp.MustCompile(`(?i)(\.md$|^readme)`)
 	// GitCommitRoles - roles to fetch affiliation data
 	GitCommitRoles = []string{"Author", "Commit"}
 	// GitPairProgrammingAuthors - flag to authors mapping used in pair programming mode
@@ -428,8 +430,12 @@ func (j *DSGit) BuildCommit(ctx *Ctx) (commit map[string]interface{}) {
 	}
 	files := []map[string]interface{}{}
 	sf := []string{}
+	doc := false
 	for f := range j.CommitFiles {
 		sf = append(sf, f)
+		if GitDocFilePattern.MatchString(f) {
+			doc = true
+		}
 	}
 	sort.Strings(sf)
 	for _, f := range sf {
@@ -446,6 +452,7 @@ func (j *DSGit) BuildCommit(ctx *Ctx) (commit map[string]interface{}) {
 		files = append(files, d)
 	}
 	commit["files"] = files
+	commit["doc_commit"] = doc
 	j.Commit = nil
 	j.CommitFiles = nil
 	return
