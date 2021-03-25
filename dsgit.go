@@ -57,7 +57,7 @@ var (
 	// GitRawMapping - Git raw index mapping
 	GitRawMapping = []byte(`{"dynamic":true,"properties":{"metadata__updated_on":{"type":"date"},"data":{"properties":{"message":{"type":"text","index":true}}}}}`)
 	// GitRichMapping - Git rich index mapping
-	GitRichMapping = []byte(`{"properties":{"metadata__updated_on":{"type":"date"},"message_analyzed":{"type":"text","index":true}}}`)
+	GitRichMapping = []byte(`{"properties":{"authors_signed":{"type":"nested"},"authors_co_authored":{"type":"nested"},"authors_acked":{"type":"nested"},"authors_tested":{"type":"nested"},"authors_approved":{"type":"nested"},"authors_reviewed":{"type":"nested"},"authors_reported":{"type":"nested"},"authors_committed":{"type":"nested"},"metadata__updated_on":{"type":"date"},"message_analyzed":{"type":"text","index":true}}}`)
 	// GitCategories - categories defined for git
 	GitCategories = map[string]struct{}{Commit: {}}
 	// GitDefaultEnv - default git command environment
@@ -132,15 +132,15 @@ var (
 		"committed-by":          "Committed-by",
 	}
 	// GitTrailerOtherAuthors - trailer name to authors map (for all documents)
-	GitTrailerOtherAuthors = map[string]string{
-		"Signed-off-by":  "authors_signed_off",
-		"Co-authored-by": "authors_co_authored",
-		"Acked-by":       "authors_acked",
-		"Tested-by":      "authors_tested",
-		"Approved-by":    "authors_approved",
-		"Reviewed-by":    "authors_reviewed",
-		"Reported-by":    "authors_reported",
-		"Committed-by":   "authors_committed",
+	GitTrailerOtherAuthors = map[string][2]string{
+		"Signed-off-by":  {"authors_signed", "signer"},
+		"Co-authored-by": {"authors_co_authored", "co_author"},
+		"Acked-by":       {"authors_acked", "author"},
+		"Tested-by":      {"authors_tested", "tester"},
+		"Approved-by":    {"authors_approved", "approver"},
+		"Reviewed-by":    {"authors_reviewed", "reviewer"},
+		"Reported-by":    {"authors_reported", "reporter"},
+		"Committed-by":   {"authors_committed", "committer"},
 	}
 )
 
@@ -1306,7 +1306,7 @@ func (j *DSGit) GetOtherPPAuthors(ctx *Ctx, doc interface{}) (othersMap map[stri
 }
 
 // GetOtherTrailersAuthors - get others authors - from other trailers fields (mostly for korg)
-func (j *DSGit) GetOtherTrailersAuthors(ctx *Ctx, doc interface{}) (othersMap map[string]map[string]struct{}) {
+func (j *DSGit) GetOtherTrailersAuthors(ctx *Ctx, doc interface{}) (othersMap map[string]map[[2]string]struct{}) {
 	for otherKey, otherRichKey := range GitTrailerOtherAuthors {
 		iothers, ok := Dig(doc, []string{"data", otherKey}, false, true)
 		if ok {
@@ -1315,15 +1315,15 @@ func (j *DSGit) GetOtherTrailersAuthors(ctx *Ctx, doc interface{}) (othersMap ma
 				Printf("other trailers %s -> %s: %s\n", otherKey, otherRichKey, others)
 			}
 			if othersMap == nil {
-				othersMap = make(map[string]map[string]struct{})
+				othersMap = make(map[string]map[[2]string]struct{})
 			}
 			for _, iOther := range others {
 				other := strings.TrimSpace(iOther.(string))
 				_, ok := othersMap[other]
 				if !ok {
-					othersMap[other] = map[string]struct{}{}
+					othersMap[other] = map[[2]string]struct{}{}
 				}
-				othersMap[other][otherKey] = struct{}{}
+				othersMap[other][otherRichKey] = struct{}{}
 			}
 		}
 	}
@@ -1814,30 +1814,67 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 		rich["url_id"] = githubRepo + "/commit/" + hsh
 	}
 	othersMap := j.GetOtherTrailersAuthors(ctx, item)
-	/*
-		if len(othersMap) > 0 {
-			signers = []string{firstAuthor}
-			coAuthors = []string{firstAuthor}
-			for auth, authType := range othersMap {
-				if auth == firstAuthor {
-					continue
-				}
-				if authType == "Signed-off-by" {
-					hasSigners = true
-					signers = append(signers, auth)
-				} else {
-					hasCoAuthors = true
-					coAuthors = append(coAuthors, auth)
-				}
-			}
-			if hasSigners {
-				data["authors_signed_off"] = signers
-			}
-			if hasCoAuthors {
-				data["co_authors"] = coAuthors
+	otherIdents := map[string]map[string]interface{}{}
+	rolePH := "{{r}}"
+	for authorStr := range othersMap {
+		ident := j.IdentityFromGitAuthor(ctx, authorStr)
+		identity := map[string]interface{}{
+			"name":               ident[0],
+			"username":           ident[1],
+			"email":              ident[2],
+			rolePH + "_name":     ident[0],
+			rolePH + "_username": ident[1],
+			rolePH + "_email":    ident[2],
+		}
+		otherIdents[authorStr] = identity
+		if !affs {
+			continue
+		}
+		affsIdentity, empty, e := IdentityAffsData(ctx, j, identity, nil, authorDate, rolePH)
+		if e != nil {
+			Printf("AffsItems/IdentityAffsData: error: %v for %v,%v\n", e, identity, authorDate)
+		}
+		if empty {
+			Printf("no identity affiliation data for identity %+v\n", identity)
+			continue
+		}
+		for _, suff := range RequiredAffsFields {
+			k := rolePH + suff
+			_, ok := affsIdentity[k]
+			if !ok {
+				affsIdentity[k] = Unknown
 			}
 		}
-	*/
+		for prop, value := range affsIdentity {
+			identity[prop] = value
+		}
+		otherIdents[authorStr] = identity
+	}
+	for authorStr, roles := range othersMap {
+		identity, ok := otherIdents[authorStr]
+		if !ok {
+			Printf("Cannot find pre calculated identity data for %s and roles %v\n", authorStr, roles)
+			continue
+		}
+		for roleData := range roles {
+			roleObject := roleData[0]
+			roleName := roleData[1]
+			item := map[string]interface{}{}
+			for prop, value := range identity {
+				if !strings.HasPrefix(prop, rolePH) {
+					continue
+				}
+				prop = strings.Replace(prop, rolePH, roleName, -1)
+				item[prop] = value
+			}
+			_, ok := rich[roleObject]
+			if !ok {
+				rich[roleObject] = []interface{}{item}
+				continue
+			}
+			rich[roleObject] = append(rich[roleObject].([]interface{}), item)
+		}
+	}
 	if affs {
 		authorKey := "Author"
 		var affsItems map[string]interface{}
@@ -1848,7 +1885,6 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 		if err != nil {
 			return
 		}
-		// fmt.Printf(">>>> %+v\n", affsItems)
 		for prop, value := range affsItems {
 			rich[prop] = value
 		}
