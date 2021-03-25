@@ -57,7 +57,7 @@ var (
 	// GitRawMapping - Git raw index mapping
 	GitRawMapping = []byte(`{"dynamic":true,"properties":{"metadata__updated_on":{"type":"date"},"data":{"properties":{"message":{"type":"text","index":true}}}}}`)
 	// GitRichMapping - Git rich index mapping
-	GitRichMapping = []byte(`{"properties":{"authors_signed":{"type":"nested"},"authors_co_authored":{"type":"nested"},"authors_acked":{"type":"nested"},"authors_tested":{"type":"nested"},"authors_approved":{"type":"nested"},"authors_reviewed":{"type":"nested"},"authors_reported":{"type":"nested"},"authors_committed":{"type":"nested"},"metadata__updated_on":{"type":"date"},"message_analyzed":{"type":"text","index":true}}}`)
+	GitRichMapping = []byte(`{"properties":{"file_data":{"type":"nested"},"authors_signed":{"type":"nested"},"authors_co_authored":{"type":"nested"},"authors_acked":{"type":"nested"},"authors_tested":{"type":"nested"},"authors_approved":{"type":"nested"},"authors_reviewed":{"type":"nested"},"authors_reported":{"type":"nested"},"authors_committed":{"type":"nested"},"metadata__updated_on":{"type":"date"},"message_analyzed":{"type":"text","index":true}}}`)
 	// GitCategories - categories defined for git
 	GitCategories = map[string]struct{}{Commit: {}}
 	// GitDefaultEnv - default git command environment
@@ -1759,30 +1759,46 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 	nFiles := 0
 	linesAdded := 0
 	linesRemoved := 0
+	fileData := []map[string]interface{}{}
 	iFiles, ok := Dig(commit, []string{"files"}, false, true)
 	if ok {
 		files, ok := iFiles.([]interface{})
 		if ok {
 			for _, file := range files {
-				_, action := Dig(file, []string{"action"}, false, true)
-				if !action {
+				action, ok := Dig(file, []string{"action"}, false, true)
+				if !ok {
 					continue
 				}
 				nFiles++
 				iAdded, ok := Dig(file, []string{"added"}, false, true)
+				added, removed, name := 0, 0, ""
 				if ok {
-					added, _ := strconv.Atoi(fmt.Sprintf("%v", iAdded))
+					added, _ = strconv.Atoi(fmt.Sprintf("%v", iAdded))
 					linesAdded += added
 				}
 				iRemoved, ok := Dig(file, []string{"removed"}, false, true)
 				if ok {
 					//removed, _ := iRemoved.(float64)
-					removed, _ := strconv.Atoi(fmt.Sprintf("%v", iRemoved))
+					removed, _ = strconv.Atoi(fmt.Sprintf("%v", iRemoved))
 					linesRemoved += int(removed)
 				}
+				iName, ok := Dig(file, []string{"file"}, false, true)
+				if ok {
+					name, _ = iName.(string)
+				}
+				fileData = append(
+					fileData,
+					map[string]interface{}{
+						"action":  action,
+						"name":    name,
+						"added":   added,
+						"removed": removed,
+					},
+				)
 			}
 		}
 	}
+	rich["file_data"] = fileData
 	rich["files"] = nFiles
 	rich["lines_added"] = linesAdded
 	rich["lines_removed"] = linesRemoved
