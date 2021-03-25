@@ -93,17 +93,17 @@ var (
 	GitDocFilePattern = regexp.MustCompile(`(?i)(\.md$|^readme)`)
 	// GitCommitRoles - roles to fetch affiliation data
 	GitCommitRoles = []string{"Author", "Commit"}
-	// GitPairProgrammingAuthors - flag to authors mapping used in pair programming mode
-	GitPairProgrammingAuthors = map[string]string{
+	// GitPPAuthors - flag to authors mapping used in pair programming mode
+	GitPPAuthors = map[string]string{
 		"is_git_commit_multi_author":    "authors",
 		"is_git_commit_multi_committer": "committers",
 		"is_git_commit_signed_off":      "authors_signed_off",
 		"is_git_commit_co_author":       "co_authors",
 	}
-	// GitTrailerAuthors - trailer name to authors map
-	GitTrailerAuthors = map[string]string{"Signed-off-by": "authors_signed_off", "Co-authored-by": "co_authors"}
-	// GitAllowedTrailers - allowed commit trailer flags
-	GitAllowedTrailers = map[string]struct{}{"Signed-off-by": {}, "Co-authored-by": {}}
+	// GitTrailerPPAuthors - trailer name to authors map (for pair programming)
+	GitTrailerPPAuthors = map[string]string{"Signed-off-by": "authors_signed_off", "Co-authored-by": "co_authors"}
+	// GitAllowedTrailers - allowed commit trailer flags (lowercase/case insensitive -> correct case)
+	GitAllowedTrailers = map[string]string{"signed-off-by": "Signed-off-by", "co-authored-by": "Co-authored-by"}
 )
 
 // RawPLS - programming language summary (all fields as strings)
@@ -644,11 +644,12 @@ func (j *DSGit) ParseTrailer(ctx *Ctx, line string) {
 	if len(m) == 0 {
 		return
 	}
-	trailer := m["name"]
-	_, ok := GitAllowedTrailers[trailer]
+	oTrailer := m["name"]
+	lTrailer := strings.ToLower(oTrailer)
+	trailer, ok := GitAllowedTrailers[lTrailer]
 	if !ok {
 		if ctx.Debug > 1 {
-			Printf("Trailer %s not in the allowed list %v, skipping\n", trailer, GitAllowedTrailers)
+			Printf("Trailer %s/%s not in the allowed list %v, skipping\n", oTrailer, lTrailer, GitAllowedTrailers)
 		}
 		return
 	}
@@ -675,6 +676,9 @@ func (j *DSGit) ParseTrailer(ctx *Ctx, line string) {
 			}
 		} else {
 			j.Commit[trailer] = append(ary.([]interface{}), m["value"])
+			if ctx.Debug > 1 {
+				Printf("appended trailer %s found in '%s'\n", trailer, line)
+			}
 		}
 	} else {
 		j.Commit[trailer] = []interface{}{m["value"]}
@@ -1225,9 +1229,9 @@ func (j *DSGit) GetAuthorsData(ctx *Ctx, doc interface{}, auth string) (authorsM
 	return
 }
 
-// GetOtherAuthors - get others authors - possible from fields: Signed-off-by and/or Co-authored-by
-func (j *DSGit) GetOtherAuthors(ctx *Ctx, doc interface{}) (othersMap map[string]string) {
-	for _, otherKey := range []string{"Signed-off-by", "Co-authored-by"} {
+// GetOtherPPAuthors - get others authors - possible from fields: Signed-off-by and/or Co-authored-by
+func (j *DSGit) GetOtherPPAuthors(ctx *Ctx, doc interface{}) (othersMap map[string]string) {
+	for otherKey := range GitTrailerPPAuthors {
 		iothers, ok := Dig(doc, []string{"data", otherKey}, false, true)
 		if ok {
 			others, _ := iothers.([]interface{})
@@ -1254,7 +1258,7 @@ func (j *DSGit) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3]
 	}
 	authorsMap, _ := j.GetAuthorsData(ctx, doc, "Author")
 	committersMap, _ := j.GetAuthorsData(ctx, doc, "Commit")
-	othersMap := j.GetOtherAuthors(ctx, doc)
+	othersMap := j.GetOtherPPAuthors(ctx, doc)
 	for auth := range committersMap {
 		authorsMap[auth] = struct{}{}
 	}
@@ -1312,7 +1316,7 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 				signers   []string
 				coAuthors []string
 			)
-			othersMap := git.GetOtherAuthors(ctx, doc)
+			othersMap := git.GetOtherPPAuthors(ctx, doc)
 			if len(othersMap) > 0 {
 				signers = []string{firstAuthor}
 				coAuthors = []string{firstAuthor}
@@ -1693,6 +1697,8 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 	rich["lines_added"] = linesAdded
 	rich["lines_removed"] = linesRemoved
 	rich["lines_changed"] = linesAdded + linesRemoved
+	doc, _ := Dig(commit, []string{"doc_commit"}, false, true)
+	rich["doc_commit"] = doc
 	loc, ok := Dig(commit, []string{"total_lines_of_code"}, false, true)
 	if ok {
 		rich["total_lines_of_code"] = loc
@@ -1765,7 +1771,7 @@ func (j *DSGit) PairProgrammingMetrics(ctx *Ctx, rich, commit map[string]interfa
 	iMainAuthor, _ := Dig(commit, []string{"Author"}, true, false)
 	mainAuthor, _ := iMainAuthor.(string)
 	allAuthors := map[string]struct{}{mainAuthor: {}}
-	for flag, authorsKey := range GitPairProgrammingAuthors {
+	for flag, authorsKey := range GitPPAuthors {
 		_, ok := Dig(commit, []string{flag}, false, true)
 		if !ok {
 			continue
@@ -1779,7 +1785,7 @@ func (j *DSGit) PairProgrammingMetrics(ctx *Ctx, rich, commit map[string]interfa
 			allAuthors[author] = struct{}{}
 		}
 	}
-	for k, v := range GitTrailerAuthors {
+	for k, v := range GitTrailerPPAuthors {
 		_, ok := Dig(commit, []string{k}, false, true)
 		if !ok {
 			continue
