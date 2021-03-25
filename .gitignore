@@ -37,6 +37,8 @@
 /check.txt
 /uuid/uuid
 /uuid/duuid
+/git-*.json
+/scripts/git.trailers
 
 .DS_Store
 .idea
