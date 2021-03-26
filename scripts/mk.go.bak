@@ -1,0 +1,46 @@
+package main
+
+import (
+	"fmt"
+	jsoniter "github.com/json-iterator/go"
+	"io/ioutil"
+	"os"
+	"sort"
+)
+
+func main() {
+	trailers := map[string]map[string]struct{}{}
+	for _, arg := range os.Args {
+		data, _ := ioutil.ReadFile(arg)
+		m := map[string]interface{}{}
+		jsoniter.Unmarshal(data, &m)
+		for k, v := range m {
+			_, ok := trailers[k]
+			if !ok {
+				trailers[k] = map[string]struct{}{}
+			}
+			trailers[k][v.(string)] = struct{}{}
+		}
+	}
+	ks := []string{}
+	for k := range trailers {
+		ks = append(ks, k)
+	}
+	sort.Strings(ks)
+	s := "GitAllowedTrailers = map[string][]string{\n"
+	for _, ky := range ks {
+		m, _ := trailers[ky]
+		ks := []string{}
+		for k := range m {
+			ks = append(ks, k)
+		}
+		sort.Strings(ks)
+		s += `  "` + ky + `": []string{`
+		for _, k := range ks {
+			s += `"` + k + `", `
+		}
+		s = s[:len(s)-2] + "},\n"
+	}
+	s += "}\n"
+	fmt.Printf("%s", s)
+}
