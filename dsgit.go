@@ -1555,7 +1555,10 @@ func (j *DSGit) IdentityFromGitAuthor(ctx *Ctx, author string) (identity [3]stri
 	email := Nil
 	if len(fields) > 1 {
 		email = fields[1]
-		email = email[:len(email)-1]
+		lEmail := len(email)
+		if lEmail > 1 {
+			email = email[:lEmail-1]
+		}
 	}
 	identity = [3]string{name, Nil, email}
 	return
