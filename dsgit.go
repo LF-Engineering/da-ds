@@ -90,7 +90,7 @@ var (
 	// GitCoAuthorsPattern - author pattern
 	GitCoAuthorsPattern = regexp.MustCompile(`Co-authored-by:(?P<first_authors>.* .*)<(?P<email>.*)>\n?`)
 	// GitDocFilePattern - files matching this pattern are detected as documentation files, so commit will be marked as doc_commit
-	GitDocFilePattern = regexp.MustCompile(`(?i)(\.md$|^readme)`)
+	GitDocFilePattern = regexp.MustCompile(`(?i)(\.md$|\.rst$|\.docx?$|\.txt$|^readme)`)
 	// GitCommitRoles - roles to fetch affiliation data
 	GitCommitRoles = []string{"Author", "Commit"}
 	// GitPPAuthors - flag to authors mapping used in pair programming mode
