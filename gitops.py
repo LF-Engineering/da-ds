@@ -221,24 +221,28 @@ class GitOps:
         """
         def extract_program_language_summary(value, force=False):
             stats = list()
-            lan_smry_lst = value.split('\n')
-            if len(lan_smry_lst) > 0 and ('SUM:' in value or force):
-                for smry in lan_smry_lst[::-1]:
-                    if smry.startswith('---') or len(smry) == 0:
-                        continue
-                    elif smry.startswith('Language'):
-                        break
-                    else:
-                        smry_result = smry.split()
-                        stats.append({
-                            'language': smry_result[0].replace('SUM:', 'Total'),
-                            'files': smry_result[1],
-                            'blank': smry_result[2],
-                            'comment': smry_result[3],
-                            'code': smry_result[4]
-                        })
-
-            return stats
+            try:
+                lan_smry_lst = value.split('\n')
+                if len(lan_smry_lst) > 0 and ('SUM:' in value or force):
+                    for smry in lan_smry_lst[::-1]:
+                        if smry.startswith('---') or len(smry) == 0:
+                            continue
+                        elif smry.startswith('Language'):
+                            break
+                        else:
+                            smry_result = smry.split()
+                            stats.append({
+                                'language': smry_result[0].replace('SUM:', 'Total'),
+                                'files': smry_result[1],
+                                'blank': smry_result[2],
+                                'comment': smry_result[3],
+                                'code': smry_result[4]
+                            })
+            except (Exception, RuntimeError) as re:
+                # logger.error('Extract program language summary : %s', str(re))
+                pass
+            finally:
+                return stats
 
         return extract_program_language_summary(self.sanitize_os_output(result), force)
 
@@ -247,9 +251,15 @@ class GitOps:
         Get the total lines of code from the default branch
         """
         def extract_lines_of_code(value, force=False):
-            if len(value) > 0 and ('SUM:' in value or force):
-                return int((value.split('\n')[-3]).split(' ')[-1])
-            return 0
+            loc_value = 0
+            try:
+                if len(value) > 0 and ('SUM:' in value or force):
+                    loc_value = int((value.split('\n')[-3]).split(' ')[-1])
+            except (Exception, RuntimeError) as re:
+                # logger.error('Extract lines of code : %s', str(re))
+                pass
+            finally:
+                return loc_value
 
         return extract_lines_of_code(self.sanitize_os_output(result), force)
 
