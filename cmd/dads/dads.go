@@ -406,7 +406,7 @@ func buildGoogleGroupsManager(ctx *lib.Ctx) (*googlegroups.Manager, error) {
 	fetchSize := ctx.GoogleGroups.FetchSize.Int()
 	enrichSize := ctx.GoogleGroups.EnrichSize.Int()
 	project := ctx.GoogleGroups.Project.String()
-	esIndex := ctx.GoogleGroups.EsIndex.String()
+	esIndex := ctx.Env("RICH_INDEX")
 	affBaseURL := ctx.Env("AFFILIATIONS_API_BASE_URL")
 	esCacheURL := ctx.Env("ES_CACHE_URL")
 	esCacheUsername := ctx.Env("ES_CACHE_USERNAME")
