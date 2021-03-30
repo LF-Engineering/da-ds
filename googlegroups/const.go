@@ -7,7 +7,7 @@ import (
 
 const (
 	// GoogleGroups ...
-	GoogleGroups = "GoogleGroups"
+	GoogleGroups = "googlegroups"
 	// malformedMIMEHeaderLineErrorMessage
 	malformedMIMEHeaderLineErrorMessage = "malformed MIME header line: "
 	// archivesBasePath ...
@@ -20,6 +20,10 @@ const (
 	script = "./googlegroups/cmd.sh"
 	// Unknown ...
 	Unknown = "Unknown"
+	// CredentialsFile ...
+	CredentialsFile = "/Users/code/lf/da/da-ds/googlegroups/credentials.json"
+	// TokenFile ...
+	TokenFile = "/Users/code/lf/da/da-ds/googlegroups/token.json"
 )
 
 var (

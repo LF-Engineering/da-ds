@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/rand"
+	"os"
 	"time"
 
 	"github.com/LF-Engineering/da-ds/build"
@@ -410,12 +411,12 @@ func buildGoogleGroupsManager(ctx *lib.Ctx) (*googlegroups.Manager, error) {
 	esCacheURL := ctx.Env("ES_CACHE_URL")
 	esCacheUsername := ctx.Env("ES_CACHE_USERNAME")
 	esCachePassword := ctx.Env("ES_CACHE_PASSWORD")
-	authGrantType := ctx.Env("AUTH0_GRANT_TYPE")
-	authClientID := ctx.Env("AUTH0_CLIENT_ID")
+	authGrantType := os.Getenv("AUTH0_GRANT_TYPE")
+	authClientID := os.Getenv("AUTH0_CLIENT_ID")
 	authClientSecret := ctx.Env("AUTH0_CLIENT_SECRET")
-	authAudience := ctx.Env("AUTH0_AUDIENCE")
-	authURL := ctx.Env("AUTH0_BASE_URL")
-	env := ctx.Env("ENVIRONMENT")
+	authAudience := os.Getenv("AUTH0_AUDIENCE")
+	authURL := os.Getenv("AUTH0_URL")
+	env := os.Getenv("ENVIRONMENT")
 
 	mgr, err := googlegroups.NewManager(slug, groupName, ctx.DBConn, fetcherBackendVersion, enricherBackendVersion,
 		doFetch, doEnrich, ctx.ESURL, "", "", esIndex, fromDate, project,

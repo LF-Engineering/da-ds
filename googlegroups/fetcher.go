@@ -54,12 +54,7 @@ func NewFetcher(groupName, projectSlug, project string, httpClientProvider *http
 
 // Fetch ...
 func (f *Fetcher) Fetch(fromDate, now *time.Time) ([]*RawMessage, error) {
-	dir, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-	credentialsFilePath := fmt.Sprintf("%+v/%+v/%+v", dir, "googlegroups", "credentials.json")
-	b, err := ioutil.ReadFile(credentialsFilePath)
+	b, err := ioutil.ReadFile(CredentialsFile)
 	if err != nil {
 		log.Fatalf("Unable to read client secret file: %v", err)
 	}
@@ -306,15 +301,10 @@ func getClient(config *oauth2.Config) *httpNative.Client {
 	// The file token.json stores the user's access and refresh tokens, and is
 	// created automatically when the authorization flow completes for the first
 	// time.
-	dir, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-	tokFile := fmt.Sprintf("%+v/%+v/%+v", dir, "googlegroups", "token.json")
-	tok, err := tokenFromFile(tokFile)
+	tok, err := tokenFromFile(TokenFile)
 	if err != nil {
 		tok = getTokenFromWeb(config)
-		saveToken(tokFile, tok)
+		saveToken(TokenFile, tok)
 	}
 	return config.Client(context.Background(), tok)
 }
