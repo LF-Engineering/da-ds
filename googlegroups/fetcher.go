@@ -54,7 +54,7 @@ func NewFetcher(groupName, projectSlug, project string, httpClientProvider *http
 // Fetch ...
 func (f *Fetcher) Fetch(fromDate, now *time.Time) ([]*RawMessage, error) {
 	ssmClient, err := ssm.NewSSMClient()
-	if err != nil{
+	if err != nil {
 		return nil, err
 	}
 
@@ -70,7 +70,7 @@ func (f *Fetcher) Fetch(fromDate, now *time.Time) ([]*RawMessage, error) {
 	}
 
 	client, err := getClient(config)
-	if err != nil{
+	if err != nil {
 		return nil, err
 	}
 
@@ -341,7 +341,7 @@ func getTokenFromWeb(config *oauth2.Config) *oauth2.Token {
 // Retrieves a token from ssm.
 func getTokenFromSSM(ssmKey string) (*oauth2.Token, error) {
 	ssmClient, err := ssm.NewSSMClient()
-	if err != nil{
+	if err != nil {
 		return nil, err
 	}
 
@@ -358,12 +358,12 @@ func getTokenFromSSM(ssmKey string) (*oauth2.Token, error) {
 // Saves a token to ssm store.
 func saveTokenToSSM(ssmKey string, token *oauth2.Token) error {
 	ssmClient, err := ssm.NewSSMClient()
-	if err != nil{
+	if err != nil {
 		return err
 	}
 
 	tokenBytes, err := json.Marshal(token)
-	if err != nil{
+	if err != nil {
 		return err
 	}
 
@@ -378,12 +378,12 @@ func saveTokenToSSM(ssmKey string, token *oauth2.Token) error {
 // Update a token in ssm store.
 func updateTokenInSSM(ssmKey string, token *oauth2.Token) error {
 	ssmClient, err := ssm.NewSSMClient()
-	if err != nil{
+	if err != nil {
 		return err
 	}
 
 	tokenBytes, err := json.Marshal(token)
-	if err != nil{
+	if err != nil {
 		return err
 	}
 
@@ -394,4 +394,3 @@ func updateTokenInSSM(ssmKey string, token *oauth2.Token) error {
 	log.Println(message)
 	return nil
 }
-
