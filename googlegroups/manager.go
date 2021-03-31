@@ -352,7 +352,6 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 				ch <- nil
 				return
 			}
-			fmt.Println(len(topHits.Hits.Hits))
 
 			data := make([]elastic.BulkData, 0)
 			for _, hit := range topHits.Hits.Hits {

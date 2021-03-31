@@ -162,7 +162,7 @@ func (f *Fetcher) getMessage(msg *gmail.Message, fromDate, now *time.Time) (rawM
 
 	if fromDate.After(date) {
 		fmt.Println(fromDate, " > ", date)
-		return nil, err
+		return nil, fmt.Errorf("fromDate: [%+v] greater than date: [%+v]", fromDate, date)
 	}
 
 	timezone, err := f.getTimeZone(headers.Date)
