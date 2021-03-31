@@ -411,11 +411,11 @@ func buildGoogleGroupsManager(ctx *lib.Ctx) (*googlegroups.Manager, error) {
 	esCacheURL := ctx.Env("ES_CACHE_URL")
 	esCacheUsername := ctx.Env("ES_CACHE_USERNAME")
 	esCachePassword := ctx.Env("ES_CACHE_PASSWORD")
-	authGrantType := os.Getenv("AUTH0_GRANT_TYPE")
-	authClientID := os.Getenv("AUTH0_CLIENT_ID")
+	authGrantType := ctx.Env("AUTH0_GRANT_TYPE")
+	authClientID := ctx.Env("AUTH0_CLIENT_ID")
 	authClientSecret := ctx.Env("AUTH0_CLIENT_SECRET")
-	authAudience := os.Getenv("AUTH0_AUDIENCE")
-	authURL := os.Getenv("AUTH0_URL")
+	authAudience := ctx.Env("AUTH0_AUDIENCE")
+	authURL := ctx.Env("AUTH0_URL")
 	env := os.Getenv("ENVIRONMENT")
 
 	mgr, err := googlegroups.NewManager(slug, groupName, ctx.DBConn, fetcherBackendVersion, enricherBackendVersion,
