@@ -20,10 +20,10 @@ const (
 	script = "./googlegroups/cmd.sh"
 	// Unknown ...
 	Unknown = "Unknown"
-	// CredentialsFile ...
-	CredentialsFile = "/root/.ggcreds/credentials.json"
-	// TokenFile ...
-	TokenFile = "/root/.ggcreds/token.json"
+	// CredentialsSSMParamName from ssm
+	CredentialsSSMParamName = "insights_googlegroups_credentials"
+	// TokenSSMParamName from ssm
+	TokenSSMParamName = "insights_googlegroups_token"
 )
 
 var (
