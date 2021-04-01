@@ -3,15 +3,14 @@ package googlegroups
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	httpNative "net/http"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/LF-Engineering/dev-analytics-libraries/aws/ssm"
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
 	"github.com/LF-Engineering/dev-analytics-libraries/http"
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
@@ -29,8 +28,6 @@ type Fetcher struct {
 	ElasticSearchProvider *elastic.ClientProvider
 	BackendVersion        string
 	DateFrom              time.Time
-	ArchivesBasePath      string
-	JSONFilesBasePath     string
 	GroupName             string
 	ProjectSlug           string
 	Project               string
@@ -44,8 +41,6 @@ func NewFetcher(groupName, projectSlug, project string, httpClientProvider *http
 		ElasticSearchProvider: esClientProvider,
 		BackendVersion:        "0.0.1",
 		DateFrom:              time.Time{},
-		ArchivesBasePath:      archivesBasePath,
-		JSONFilesBasePath:     jsonFilesBasePath,
 		GroupName:             groupName,
 		ProjectSlug:           projectSlug,
 		Project:               project,
@@ -54,22 +49,26 @@ func NewFetcher(groupName, projectSlug, project string, httpClientProvider *http
 
 // Fetch ...
 func (f *Fetcher) Fetch(fromDate, now *time.Time) ([]*RawMessage, error) {
-	dir, err := os.Getwd()
+	ssmClient, err := ssm.NewSSMClient()
 	if err != nil {
 		return nil, err
 	}
-	credentialsFilePath := fmt.Sprintf("%+v/%+v/%+v", dir, "googlegroups", "credentials.json")
-	b, err := ioutil.ReadFile(credentialsFilePath)
+
+	credentialsFileString, err := ssmClient.Param(CredentialsSSMParamName, true, false, "", "", "").GetValue()
 	if err != nil {
-		log.Fatalf("Unable to read client secret file: %v", err)
+		return nil, err
 	}
 
 	// If modifying these scopes, delete your previously saved token.json.
-	config, err := google.ConfigFromJSON(b, gmail.GmailModifyScope)
+	config, err := google.ConfigFromJSON([]byte(credentialsFileString), gmail.GmailModifyScope)
 	if err != nil {
 		log.Fatalf("Unable to parse client secret file to config: %v", err)
 	}
-	client := getClient(config)
+
+	client, err := getClient(config)
+	if err != nil {
+		return nil, err
+	}
 
 	srv, err := gmail.New(client)
 	if err != nil {
@@ -159,7 +158,7 @@ func (f *Fetcher) getMessage(msg *gmail.Message, fromDate, now *time.Time) (rawM
 
 	if fromDate.After(date) {
 		fmt.Println(fromDate, " > ", date)
-		return nil, err
+		return nil, fmt.Errorf("fromDate: [%+v] greater than date: [%+v]", fromDate, date)
 	}
 
 	timezone, err := f.getTimeZone(headers.Date)
@@ -302,21 +301,19 @@ func getHeadersData(msg *gmail.Message) *HeadersData {
 }
 
 // Retrieve a token, saves the token, then returns the generated client.
-func getClient(config *oauth2.Config) *httpNative.Client {
+func getClient(config *oauth2.Config) (*httpNative.Client, error) {
 	// The file token.json stores the user's access and refresh tokens, and is
 	// created automatically when the authorization flow completes for the first
 	// time.
-	dir, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-	tokFile := fmt.Sprintf("%+v/%+v/%+v", dir, "googlegroups", "token.json")
-	tok, err := tokenFromFile(tokFile)
+	tok, err := getTokenFromSSM(TokenSSMParamName)
 	if err != nil {
 		tok = getTokenFromWeb(config)
-		saveToken(tokFile, tok)
+		err = saveTokenToSSM(TokenSSMParamName, tok)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return config.Client(context.Background(), tok)
+	return config.Client(context.Background(), tok), nil
 }
 
 // Request a token from the web, then returns the retrieved token.
@@ -337,35 +334,59 @@ func getTokenFromWeb(config *oauth2.Config) *oauth2.Token {
 	return tok
 }
 
-// Retrieves a token from a local file.
-func tokenFromFile(file string) (*oauth2.Token, error) {
-	f, err := os.Open(file)
+// Retrieves a token from ssm.
+func getTokenFromSSM(ssmKey string) (*oauth2.Token, error) {
+	ssmClient, err := ssm.NewSSMClient()
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		if err := f.Close(); err != nil {
-			log.Fatal(err)
-		}
-	}()
+
+	tokenString, err := ssmClient.Param(ssmKey, true, false, "", "", "").GetValue()
+	if err != nil {
+		return nil, err
+	}
+
 	tok := &oauth2.Token{}
-	err = json.NewDecoder(f).Decode(tok)
+	err = json.Unmarshal([]byte(tokenString), &tok)
 	return tok, err
 }
 
-// Saves a token to a file path.
-func saveToken(path string, token *oauth2.Token) {
-	fmt.Printf("Saving credential file to: %s\n", path)
-	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+// Saves a token to ssm store.
+func saveTokenToSSM(ssmKey string, token *oauth2.Token) error {
+	ssmClient, err := ssm.NewSSMClient()
 	if err != nil {
-		log.Fatalf("Unable to cache oauth token: %v", err)
+		return err
 	}
-	defer func() {
-		if err := f.Close(); err != nil {
-			log.Fatal(err)
-		}
-	}()
-	if err := json.NewEncoder(f).Encode(token); err != nil {
-		log.Fatal(err)
+
+	tokenBytes, err := json.Marshal(token)
+	if err != nil {
+		return err
 	}
+
+	message, err := ssmClient.Param(ssmKey, true, true, "text", "SecureString", string(tokenBytes)).SetValue()
+	if err != nil {
+		return err
+	}
+	log.Println(message)
+	return nil
+}
+
+// Update a token in ssm store.
+func updateTokenInSSM(ssmKey string, token *oauth2.Token) error {
+	ssmClient, err := ssm.NewSSMClient()
+	if err != nil {
+		return err
+	}
+
+	tokenBytes, err := json.Marshal(token)
+	if err != nil {
+		return err
+	}
+
+	message, err := ssmClient.Param(ssmKey, true, true, "text", "SecureString", string(tokenBytes)).UpdateValue()
+	if err != nil {
+		return err
+	}
+	log.Println(message)
+	return nil
 }
