@@ -28,8 +28,6 @@ type Fetcher struct {
 	ElasticSearchProvider *elastic.ClientProvider
 	BackendVersion        string
 	DateFrom              time.Time
-	ArchivesBasePath      string
-	JSONFilesBasePath     string
 	GroupName             string
 	ProjectSlug           string
 	Project               string
@@ -43,8 +41,6 @@ func NewFetcher(groupName, projectSlug, project string, httpClientProvider *http
 		ElasticSearchProvider: esClientProvider,
 		BackendVersion:        "0.0.1",
 		DateFrom:              time.Time{},
-		ArchivesBasePath:      archivesBasePath,
-		JSONFilesBasePath:     jsonFilesBasePath,
 		GroupName:             groupName,
 		ProjectSlug:           projectSlug,
 		Project:               project,
