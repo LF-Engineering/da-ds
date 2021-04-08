@@ -13,4 +13,6 @@ var (
 	DefaultDateTime = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
 	// ListView represents the classname of the jenkins jobs that are views
 	ListView = "hudson.model.ListView"
+	// UndefinedCategory is used for jobs without categories
+	UndefinedCategory = "UNDEFINED_CATEGORY"
 )

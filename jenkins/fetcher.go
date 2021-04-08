@@ -186,6 +186,9 @@ func (f *Fetcher) MapToJenkinsRaw(response *BuildResponse, params *Params, insta
 	if installer == "" {
 		parts := strings.Split(response.Name, "-")
 		installer = parts[0]
+		if installer == "" {
+			installer = UndefinedCategory
+		}
 	}
 	for _, build := range response.Builds {
 		var raw BuildsRaw
