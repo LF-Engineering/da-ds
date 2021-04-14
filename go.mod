@@ -3,7 +3,7 @@ module github.com/LF-Engineering/da-ds
 go 1.15
 
 require (
-	github.com/LF-Engineering/dev-analytics-libraries v1.1.5
+	github.com/LF-Engineering/dev-analytics-libraries v1.1.6
 	github.com/PuerkitoBio/goquery v1.6.0
 	github.com/andybalholm/cascadia v1.2.0 // indirect
 	github.com/araddon/dateparse v0.0.0-20210207001429-0eec95c9db7e
