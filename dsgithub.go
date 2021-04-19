@@ -19,6 +19,8 @@ import (
 const (
 	// GitHubBackendVersion - backend version
 	GitHubBackendVersion = "0.1.0"
+	// cMaxGitHubUsersFileCacheAge 90 days (in seconds) - file is considered too old anywhere between 90-180 days
+	cMaxGitHubUsersFileCacheAge = 7776000
 )
 
 var (
@@ -43,11 +45,14 @@ type DSGitHub struct {
 	OAuthKeys       []string
 	ThrN            int
 	Hint            int
+	CacheDir        string
 	GitHubMtx       *sync.RWMutex
 	GitHubReposMtx  *sync.RWMutex
 	GitHubRepos     map[string]map[string]interface{}
 	GitHubIssuesMtx *sync.RWMutex
 	GitHubIssues    map[string][]map[string]interface{}
+	GitHubUserMtx   *sync.RWMutex
+	GitHubUser      map[string]map[string]interface{}
 }
 
 func (j *DSGitHub) getRateLimits(gctx context.Context, ctx *Ctx, gcs []*github.Client, core bool) (int, []int, []int, []time.Duration) {
@@ -216,6 +221,177 @@ func (j *DSGitHub) githubRepos(ctx *Ctx, org, repo string) (repoData map[string]
 	return
 }
 
+func (j *DSGitHub) githubUser(ctx *Ctx, login string) (user map[string]interface{}, found bool, err error) {
+	// Try memory cache 1st
+	if j.GitHubUserMtx != nil {
+		j.GitHubUserMtx.RLock()
+	}
+	user, ok := j.GitHubUser[login]
+	if j.GitHubUserMtx != nil {
+		j.GitHubUserMtx.RUnlock()
+	}
+	if ok {
+		found = len(user) > 0
+		// xxx
+		Printf("user found in memory cache: %+v\n", user)
+		return
+	}
+	// Try file cache 2nd
+	path := j.CacheDir + login + ".json"
+	lockPath := path + ".lock"
+	file, e := os.Stat(path)
+	if e == nil {
+		for {
+			_, e := os.Stat(lockPath)
+			if e == nil {
+				// xxx
+				Printf("user %s lock file %s present, waitng 1s\n", user, lockPath)
+				time.Sleep(time.Duration(1) * time.Second)
+				continue
+			}
+			file, _ = os.Stat(path)
+			break
+		}
+		modified := file.ModTime()
+		age := int(time.Now().Sub(modified).Seconds())
+		allowedAge := cMaxGitHubUsersFileCacheAge + rand.Intn(cMaxGitHubUsersFileCacheAge)
+		if age <= allowedAge {
+			bts, e := ioutil.ReadFile(path)
+			if e == nil {
+				e = jsoniter.Unmarshal(bts, &user)
+				bts = nil
+				if e == nil {
+					found = len(user) > 0
+					if found {
+						if j.GitHubUserMtx != nil {
+							j.GitHubUserMtx.Lock()
+						}
+						j.GitHubUser[login] = user
+						if j.GitHubUserMtx != nil {
+							j.GitHubUserMtx.Unlock()
+						}
+						// xxx
+						Printf("user found in files cache: %+v\n", user)
+						return
+					}
+					Printf("githubUser: unmarshaled %s cache file is empty\n", path)
+				}
+				Printf("githubUser: cannot unmarshal %s cache file: %v\n", path, e)
+			} else {
+				Printf("githubUser: cannot read %s user cache file: %v\n", path, e)
+			}
+		} else {
+			Printf("githubUser: %s user cache file is too old: %v (allowed %v)\n", path, time.Duration(age)*time.Second, time.Duration(allowedAge)*time.Second)
+		}
+	} else {
+		if ctx.Debug > 0 {
+			// xxx
+			Printf("githubUser: no %s user cache file: %v\n", path, e)
+		}
+	}
+	lockFile, _ := os.Create(lockPath)
+	defer func() {
+		if lockFile != nil {
+			defer func() {
+				// xxx
+				Printf("remove lock file %s\n", lockPath)
+				_ = os.Remove(lockPath)
+			}()
+		}
+		if err != nil {
+			return
+		}
+		// path := j.CacheDir + login + ".json"
+		bts, err := jsoniter.Marshal(user)
+		if err != nil {
+			Printf("githubUser: cannot marshal user %s to file %s\n", login, path)
+			return
+		}
+		err = ioutil.WriteFile(path, bts, 0644)
+		if err != nil {
+			Printf("githubUser: cannot write file %s, %d bytes\n", path, len(bts))
+			return
+		}
+		if ctx.Debug > 0 {
+			Printf("githubUser: saved %s user file\n", path)
+		}
+	}()
+	// Try GitHub API 3rd
+	var c *github.Client
+	if j.GitHubMtx != nil {
+		j.GitHubMtx.RLock()
+	}
+	c = j.Clients[j.Hint]
+	if j.GitHubMtx != nil {
+		j.GitHubMtx.RUnlock()
+	}
+	retry := false
+	for {
+		var (
+			response *github.Response
+			usr      *github.User
+			e        error
+		)
+		usr, response, e = c.Users.Get(j.Context, login)
+		// xxx
+		Printf("GET %s -> {%+v, %+v, %+v}\n", login, usr, response, e)
+		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
+			if j.GitHubUserMtx != nil {
+				j.GitHubUserMtx.Lock()
+			}
+			// xxx
+			Printf("user not found using API: %s\n", login)
+			j.GitHubUser[login] = map[string]interface{}{}
+			if j.GitHubUserMtx != nil {
+				j.GitHubUserMtx.Unlock()
+			}
+			return
+		}
+		if e != nil && !retry {
+			Printf("Error getting %s user: response: %+v, error: %+v, retrying rate\n", login, response, e)
+			Printf("githubUser: handle rate\n")
+			abuse := j.isAbuse(e)
+			if abuse {
+				sleepFor := 10 + rand.Intn(10)
+				Printf("GitHub detected abuse (get user %s), waiting for %ds\n", login, sleepFor)
+				time.Sleep(time.Duration(sleepFor) * time.Second)
+			}
+			if j.GitHubMtx != nil {
+				j.GitHubMtx.Lock()
+			}
+			j.Hint, _ = j.handleRate(ctx)
+			c = j.Clients[j.Hint]
+			if j.GitHubMtx != nil {
+				j.GitHubMtx.Unlock()
+			}
+			if !abuse {
+				retry = true
+			}
+			continue
+		}
+		if e != nil {
+			err = e
+			return
+		}
+		if usr != nil {
+			jm, _ := jsoniter.Marshal(usr)
+			_ = jsoniter.Unmarshal(jm, &user)
+			// xxx
+			Printf("user found using API: %+v\n", user)
+			found = true
+		}
+		break
+	}
+	if j.GitHubUserMtx != nil {
+		j.GitHubUserMtx.Lock()
+	}
+	j.GitHubUser[login] = user
+	if j.GitHubUserMtx != nil {
+		j.GitHubUserMtx.Unlock()
+	}
+	return
+}
+
 func (j *DSGitHub) githubIssues(ctx *Ctx, org, repo string, since *time.Time) (issuesData []map[string]interface{}, err error) {
 	origin := org + "/" + repo
 	// Try memory cache 1st
@@ -380,13 +556,16 @@ func (j *DSGitHub) Validate(ctx *Ctx) (err error) {
 	}
 	j.GitHubRepos = make(map[string]map[string]interface{})
 	j.GitHubIssues = make(map[string][]map[string]interface{})
+	j.GitHubUser = make(map[string]map[string]interface{})
 	j.ThrN = GetThreadsNum(ctx)
 	if j.ThrN > 1 {
 		j.GitHubMtx = &sync.RWMutex{}
 		j.GitHubReposMtx = &sync.RWMutex{}
 		j.GitHubIssuesMtx = &sync.RWMutex{}
+		j.GitHubUserMtx = &sync.RWMutex{}
 	}
 	j.Hint, _ = j.handleRate(ctx)
+	j.CacheDir = os.Getenv("HOME") + "/.perceval/github-users-cache/"
 	return
 }
 
@@ -457,8 +636,29 @@ func (j *DSGitHub) FetchItemsRepository(ctx *Ctx) (err error) {
 }
 
 // ProcessIssue - add issues sub items
-func (j *DSGitHub) ProcessIssue(ctx *Ctx, inIssue map[string]interface{}) (outIssue map[string]interface{}, err error) {
-	outIssue = inIssue
+func (j *DSGitHub) ProcessIssue(ctx *Ctx, inIssue map[string]interface{}) (issue map[string]interface{}, err error) {
+	issue = inIssue
+	issue["user_data"] = map[string]interface{}{}
+	issue["assignee_data"] = map[string]interface{}{}
+	issue["assignees_data"] = []interface{}{}
+	issue["comments_data"] = []interface{}{}
+	issue["reactions_data"] = []interface{}{}
+	// ['user', 'assignee', 'assignees', 'comments', 'reactions']
+	userLogin, ok := Dig(issue, []string{"user", "login"}, false, true)
+	if ok {
+		issue["user_data"], _, err = j.githubUser(ctx, userLogin.(string))
+		if err != nil {
+			return
+		}
+	}
+	assigneeLogin, ok := Dig(issue, []string{"assignee", "login"}, false, true)
+	if ok {
+		issue["assignee_data"], _, err = j.githubUser(ctx, assigneeLogin.(string))
+		if err != nil {
+			return
+		}
+	}
+	// xxx
 	return
 }
 
