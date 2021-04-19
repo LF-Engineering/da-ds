@@ -370,6 +370,9 @@ func buildBugzillaRestMgrServices(p *bugzillarest.MgrParams) (*bugzillarest.Fetc
 	slackProvider := slack.New(p.WebHookURL)
 	// Initialize fetcher object to get data from bugzilla rest api
 	fetcher := bugzillarest.NewFetcher(&bugzillarest.FetcherParams{Endpoint: p.EndPoint, BackendVersion: p.FetcherBackendVersion}, httpClientProvider, esClientProvider)
+
+	commitID := build.GitCommit[7]
+	appNameVersion := fmt.Sprintf("%s-%v", build.AppName, commitID)
 	auth0Client, err := auth0.NewAuth0Client(
 		p.Environment,
 		p.AuthGrantType,
@@ -380,7 +383,7 @@ func buildBugzillaRestMgrServices(p *bugzillarest.MgrParams) (*bugzillarest.Fetc
 		httpClientProvider,
 		esCacheClientProvider,
 		&slackProvider,
-		build.AppName)
+		appNameVersion)
 
 	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(p.AffBaseURL, p.Slug, httpClientProvider, esCacheClientProvider, auth0Client, &slackProvider)
 	if err != nil {

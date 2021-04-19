@@ -67,6 +67,8 @@ func InitializeAuth0() error {
 	if ds != "" {
 		appName += "-" + ds
 	}
+	commitID := build.GitCommit[7]
+	appNameVersion := fmt.Sprintf("%s-%v", appName, commitID)
 	slackProvider := slack.New(data["slack_webhook_url"])
 	gAuth0Client, err = auth0.NewAuth0Client(
 		data["env"],
@@ -78,7 +80,7 @@ func InitializeAuth0() error {
 		httpClientProvider,
 		esCacheClientProvider,
 		&slackProvider,
-		appName,
+		appNameVersion,
 	)
 	if err == nil {
 		gTokenEnv = data["env"]
