@@ -293,3 +293,27 @@ func ParseDateWithTz(indt string) (dt, dtInTz time.Time, off float64, valid bool
 	Printf("ParseDateWithTz: '%s' -> '%s', day: %s\n", indt, sdt, day)
 	return
 }
+
+// PeriodParse - tries to parse period
+func PeriodParse(perStr string) (dur time.Duration, ok bool) {
+	idx := strings.Index(perStr, "[rate reset in ")
+	if idx == -1 {
+		return
+	}
+	rateStr := ""
+	_, err := fmt.Sscanf(perStr[idx:], "[rate reset in %s", &rateStr)
+	if err != nil || len(rateStr) < 2 {
+		return
+	}
+	rateStr = rateStr[0 : len(rateStr)-1]
+	if rateStr == "" {
+		return
+	}
+	d, err := time.ParseDuration(rateStr)
+	if err != nil {
+		return
+	}
+	dur = d
+	ok = true
+	return
+}

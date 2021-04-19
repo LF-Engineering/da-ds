@@ -64,7 +64,7 @@ func (j *DSConfluence) ParseArgs(ctx *Ctx) (err error) {
 }
 
 // Validate - is current DS configuration OK?
-func (j *DSConfluence) Validate() (err error) {
+func (j *DSConfluence) Validate(ctx *Ctx) (err error) {
 	j.URL = strings.TrimSpace(j.URL)
 	if strings.HasSuffix(j.URL, "/") {
 		j.URL = j.URL[:len(j.URL)-1]
@@ -512,8 +512,15 @@ func (j *DSConfluence) Categories() map[string]struct{} {
 
 // ResumeNeedsOrigin - is origin field needed when resuming
 // Origin should be needed when multiple configurations save to the same index
-func (j *DSConfluence) ResumeNeedsOrigin(ctx *Ctx) bool {
+func (j *DSConfluence) ResumeNeedsOrigin(ctx *Ctx, raw bool) bool {
 	return j.MultiOrigin
+}
+
+// ResumeNeedsCategory - is category field needed when resuming
+// Category should be needed when multiple types of categories save to the same index
+// or there are multiple types of documents within the same category
+func (j *DSConfluence) ResumeNeedsCategory(ctx *Ctx, raw bool) bool {
+	return false
 }
 
 // Origin - return current origin

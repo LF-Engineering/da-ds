@@ -574,10 +574,20 @@ func GetLastUpdate(ctx *Ctx, ds DS, raw bool) (lastUpdate *time.Time) {
 	originField := JSONEscape(ds.OriginField(ctx))
 	origin := JSONEscape(ds.Origin(ctx))
 	var payloadBytes []byte
-	if ds.ResumeNeedsOrigin(ctx) {
-		payloadBytes = []byte(`{"query":{"bool":{"filter":{"term":{"` + originField + `":"` + origin + `"}}}},"aggs":{"m":{"max":{"field":"` + dateField + `"}}}}`)
+	if ds.ResumeNeedsCategory(ctx, raw) {
+		category := ds.ItemCategory(ctx)
+		categoryField := "is_" + ds.Name() + "_" + category
+		if ds.ResumeNeedsOrigin(ctx, raw) {
+			payloadBytes = []byte(`{"query":{"bool":{"filter":[{"term":{"` + originField + `":"` + origin + `"}},{"term":{"` + categoryField + `":1}}]}},"aggs":{"m":{"max":{"field":"` + dateField + `"}}}}`)
+		} else {
+			payloadBytes = []byte(`{"query":{"bool":{"filter":{"term":{"` + categoryField + `":1}}}},"aggs":{"m":{"max":{"field":"` + dateField + `"}}}}`)
+		}
 	} else {
-		payloadBytes = []byte(`{"aggs":{"m":{"max":{"field":"` + dateField + `"}}}}`)
+		if ds.ResumeNeedsOrigin(ctx, raw) {
+			payloadBytes = []byte(`{"query":{"bool":{"filter":{"term":{"` + originField + `":"` + origin + `"}}}},"aggs":{"m":{"max":{"field":"` + dateField + `"}}}}`)
+		} else {
+			payloadBytes = []byte(`{"aggs":{"m":{"max":{"field":"` + dateField + `"}}}}`)
+		}
 	}
 	var url string
 	if raw {
@@ -638,10 +648,20 @@ func GetLastOffset(ctx *Ctx, ds DS, raw bool) (offset float64) {
 	originField := JSONEscape(ds.OriginField(ctx))
 	origin := JSONEscape(ds.Origin(ctx))
 	var payloadBytes []byte
-	if ds.ResumeNeedsOrigin(ctx) {
-		payloadBytes = []byte(`{"query":{"bool":{"filter":{"term":{"` + originField + `":"` + origin + `"}}}},"aggs":{"m":{"max":{"field":"` + offsetField + `"}}}}`)
+	if ds.ResumeNeedsCategory(ctx, raw) {
+		category := ds.ItemCategory(ctx)
+		categoryField := "is_" + ds.Name() + "_" + category
+		if ds.ResumeNeedsOrigin(ctx, raw) {
+			payloadBytes = []byte(`{"query":{"bool":{"filter":[{"term":{"` + originField + `":"` + origin + `"}},{"term":{"` + categoryField + `":1}}]}},"aggs":{"m":{"max":{"field":"` + offsetField + `"}}}}`)
+		} else {
+			payloadBytes = []byte(`{"query":{"bool":{"filter":{"term":{"` + categoryField + `":1}}}},"aggs":{"m":{"max":{"field":"` + offsetField + `"}}}}`)
+		}
 	} else {
-		payloadBytes = []byte(`{"aggs":{"m":{"max":{"field":"` + offsetField + `"}}}}`)
+		if ds.ResumeNeedsOrigin(ctx, raw) {
+			payloadBytes = []byte(`{"query":{"bool":{"filter":{"term":{"` + originField + `":"` + origin + `"}}}},"aggs":{"m":{"max":{"field":"` + offsetField + `"}}}}`)
+		} else {
+			payloadBytes = []byte(`{"aggs":{"m":{"max":{"field":"` + offsetField + `"}}}}`)
+		}
 	}
 	var url string
 	if raw {

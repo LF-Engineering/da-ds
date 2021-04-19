@@ -34,7 +34,7 @@ func (j *DSStub) ParseArgs(ctx *Ctx) (err error) {
 }
 
 // Validate - is current DS configuration OK?
-func (j *DSStub) Validate() (err error) {
+func (j *DSStub) Validate(ctx *Ctx) (err error) {
 	// IMPL:
 	return
 }
@@ -256,8 +256,15 @@ func (j *DSStub) Categories() map[string]struct{} {
 
 // ResumeNeedsOrigin - is origin field needed when resuming
 // Origin should be needed when multiple configurations save to the same index
-func (j *DSStub) ResumeNeedsOrigin(ctx *Ctx) bool {
+func (j *DSStub) ResumeNeedsOrigin(ctx *Ctx, raw bool) bool {
 	return j.MultiOrigin
+}
+
+// ResumeNeedsCategory - is category field needed when resuming
+// Category should be needed when multiple types of categories save to the same index
+// or there are multiple types of documents within the same category
+func (j *DSStub) ResumeNeedsCategory(ctx *Ctx, raw bool) bool {
+	return false
 }
 
 // Origin - return current origin

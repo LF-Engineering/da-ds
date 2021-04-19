@@ -37,7 +37,7 @@ type DS interface {
 	ParseArgs(*Ctx) error
 	Name() string
 	Info() string
-	Validate() error
+	Validate(*Ctx) error
 	FetchRaw(*Ctx) error
 	FetchItems(*Ctx) error
 	Enrich(*Ctx) error
@@ -49,7 +49,8 @@ type DS interface {
 	CustomEnrich() bool
 	SupportDateFrom() bool
 	SupportOffsetFrom() bool
-	ResumeNeedsOrigin(*Ctx) bool
+	ResumeNeedsOrigin(*Ctx, bool) bool
+	ResumeNeedsCategory(*Ctx, bool) bool
 	Origin(*Ctx) string
 	ItemID(interface{}) string
 	RichIDField(*Ctx) string
@@ -763,7 +764,8 @@ func ForEachESItem(
 		e = ufunct(ctx, ds, fThrN, &docs, &outDocs, last)
 		return
 	}
-	needsOrigin := ds.ResumeNeedsOrigin(ctx)
+	needsOrigin := ds.ResumeNeedsOrigin(ctx, raw)
+	needsCategory := ds.ResumeNeedsCategory(ctx, raw)
 	for {
 		var (
 			url     string
@@ -775,18 +777,35 @@ func ForEachESItem(
 			} else {
 				url = ctx.ESURL + "/" + ctx.RichIndex + "/_search?scroll=" + ctx.ESScrollWait + "&size=" + strconv.Itoa(ctx.ESScrollSize)
 			}
-			if needsOrigin {
-				if ctx.DateFrom == nil {
-					payload = []byte(`{"query":{"bool":{"filter":{"term":{"` + originField + `":"` + origin + `"}}}},"sort":{"` + dateField + `":{"order":"asc"}}}`)
+			if needsCategory {
+				category := ds.ItemCategory(ctx)
+				categoryField := "is_" + ds.Name() + "_" + category
+				if needsOrigin {
+					if ctx.DateFrom == nil {
+						payload = []byte(`{"query":{"bool":{"filter":[{"term":{"` + originField + `":"` + origin + `"}},{"term":{"` + categoryField + `":1}}]}},"sort":{"` + dateField + `":{"order":"asc"}}}`)
+					} else {
+						payload = []byte(`{"query":{"bool":{"filter":[{"term":{"` + originField + `":"` + origin + `"}},{"term":{"` + categoryField + `":1}},{"range":{"` + dateField + `":{"gte":"` + dateFrom + `"}}}]}},"sort":{"` + dateField + `":{"order":"asc"}}}`)
+					}
 				} else {
-					payload = []byte(`{"query":{"bool":{"filter":[{"term":{"` + originField + `":"` + origin + `"}},{"range":{"` + dateField + `":{"gte":"` + dateFrom + `"}}}]}},"sort":{"` + dateField + `":{"order":"asc"}}}`)
+					if ctx.DateFrom == nil {
+						payload = []byte(`{"query":{"bool":{"filter":{"term":{"` + categoryField + `":1}}}},"sort":{"` + dateField + `":{"order":"asc"}}}`)
+					} else {
+						payload = []byte(`{"query":{"bool":{"filter":[{"term":{"` + categoryField + `":1}},{"range":{"` + dateField + `":{"gte":"` + dateFrom + `"}}}]}},"sort":{"` + dateField + `":{"order":"asc"}}}`)
+					}
 				}
 			} else {
-				if ctx.DateFrom == nil {
-					payload = []byte(`{"sort":{"` + dateField + `":{"order":"asc"}}}`)
+				if needsOrigin {
+					if ctx.DateFrom == nil {
+						payload = []byte(`{"query":{"bool":{"filter":{"term":{"` + originField + `":"` + origin + `"}}}},"sort":{"` + dateField + `":{"order":"asc"}}}`)
+					} else {
+						payload = []byte(`{"query":{"bool":{"filter":[{"term":{"` + originField + `":"` + origin + `"}},{"range":{"` + dateField + `":{"gte":"` + dateFrom + `"}}}]}},"sort":{"` + dateField + `":{"order":"asc"}}}`)
+					}
 				} else {
-					payload = []byte(`{"query":{"bool":{"range":{"` + dateField + `":{"gte":"` + dateFrom + `"}}}},"sort":{"` + dateField + `":{"order":"asc"}}}`)
-					payload = []byte(`{"query":{"bool":{"filter":{"range":{"` + dateField + `":{"gte":"` + dateFrom + `"}}}}},"sort":{"` + dateField + `":{"order":"asc"}}}`)
+					if ctx.DateFrom == nil {
+						payload = []byte(`{"sort":{"` + dateField + `":{"order":"asc"}}}`)
+					} else {
+						payload = []byte(`{"query":{"bool":{"filter":{"range":{"` + dateField + `":{"gte":"` + dateFrom + `"}}}}},"sort":{"` + dateField + `":{"order":"asc"}}}`)
+					}
 				}
 			}
 			if ctx.Debug > 0 {

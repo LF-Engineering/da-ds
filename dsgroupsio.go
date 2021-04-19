@@ -103,7 +103,7 @@ func (j *DSGroupsio) ParseArgs(ctx *Ctx) (err error) {
 }
 
 // Validate - is current DS configuration OK?
-func (j *DSGroupsio) Validate() (err error) {
+func (j *DSGroupsio) Validate(ctx *Ctx) (err error) {
 	url := strings.TrimSpace(j.GroupName)
 	if strings.HasSuffix(url, "/") {
 		url = url[:len(url)-1]
@@ -598,8 +598,15 @@ func (j *DSGroupsio) Categories() map[string]struct{} {
 
 // ResumeNeedsOrigin - is origin field needed when resuming
 // Origin should be needed when multiple configurations save to the same index
-func (j *DSGroupsio) ResumeNeedsOrigin(ctx *Ctx) bool {
+func (j *DSGroupsio) ResumeNeedsOrigin(ctx *Ctx, raw bool) bool {
 	return j.MultiOrigin
+}
+
+// ResumeNeedsCategory - is category field needed when resuming
+// Category should be needed when multiple types of categories save to the same index
+// or there are multiple types of documents within the same category
+func (j *DSGroupsio) ResumeNeedsCategory(ctx *Ctx, raw bool) bool {
+	return false
 }
 
 // Origin - return current origin

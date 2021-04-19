@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/google/go-github/github"
+	"github.com/google/go-github/v35/github"
+	jsoniter "github.com/json-iterator/go"
 	"golang.org/x/oauth2"
 )
 
@@ -29,15 +31,186 @@ var (
 
 // DSGitHub - DS implementation for GitHub
 type DSGitHub struct {
-	DS        string // From DA_DS - data source type "github"
-	Org       string // From DA_GITHUB_ORG - github org
-	Repo      string // From DA_GITHUB_REPO - github repo
-	Category  string // From DA_GITHUB_CATEGORY - issue, pull_request, repository
-	Tokens    string // From DA_GITHUB_TOKENS - "," separated list of OAuth tokens
-	URL       string
-	Clients   []*github.Client
-	Context   context.Context
-	OAuthKeys []string
+	DS             string // From DA_DS - data source type "github"
+	Org            string // From DA_GITHUB_ORG - github org
+	Repo           string // From DA_GITHUB_REPO - github repo
+	Category       string // From DA_GITHUB_CATEGORY - issue, pull_request, repository
+	Tokens         string // From DA_GITHUB_TOKENS - "," separated list of OAuth tokens
+	URL            string
+	Clients        []*github.Client
+	Context        context.Context
+	OAuthKeys      []string
+	ThrN           int
+	Hint           int
+	GitHubMtx      *sync.RWMutex
+	GitHubReposMtx *sync.RWMutex
+	GitHubRepos    map[string]map[string]interface{}
+}
+
+func (j *DSGitHub) getRateLimits(gctx context.Context, ctx *Ctx, gcs []*github.Client, core bool) (int, []int, []int, []time.Duration) {
+	var (
+		limits     []int
+		remainings []int
+		durations  []time.Duration
+	)
+	display := false
+	for idx, gc := range gcs {
+		rl, _, err := gc.RateLimits(gctx)
+		if err != nil {
+			rem, ok := PeriodParse(err.Error())
+			if ok {
+				Printf("Parsed wait time from error message: %v\n", rem)
+				limits = append(limits, -1)
+				remainings = append(remainings, -1)
+				durations = append(durations, rem)
+				display = true
+				continue
+			}
+			Printf("GetRateLimit(%d): %v\n", idx, err)
+		}
+		if rl == nil {
+			limits = append(limits, -1)
+			remainings = append(remainings, -1)
+			durations = append(durations, time.Duration(5)*time.Second)
+			continue
+		}
+		if core {
+			limits = append(limits, rl.Core.Limit)
+			remainings = append(remainings, rl.Core.Remaining)
+			durations = append(durations, rl.Core.Reset.Time.Sub(time.Now())+time.Duration(1)*time.Second)
+			continue
+		}
+		limits = append(limits, rl.Search.Limit)
+		remainings = append(remainings, rl.Search.Remaining)
+		durations = append(durations, rl.Search.Reset.Time.Sub(time.Now())+time.Duration(1)*time.Second)
+	}
+	hint := 0
+	for idx := range limits {
+		if remainings[idx] > remainings[hint] {
+			hint = idx
+		} else if idx != hint && remainings[idx] == remainings[hint] && durations[idx] < durations[hint] {
+			hint = idx
+		}
+	}
+	if display || ctx.Debug > 0 {
+		Printf("GetRateLimits: hint: %d, limits: %+v, remaining: %+v, reset: %+v\n", hint, limits, remainings, durations)
+	}
+	return hint, limits, remainings, durations
+}
+
+func (j *DSGitHub) handleRate(ctx *Ctx) (aHint int, canCache bool) {
+	h, _, rem, wait := j.getRateLimits(j.Context, ctx, j.Clients, true)
+	for {
+		// Printf("Checking token %d %+v %+v\n", h, rem, wait)
+		if rem[h] <= 5 {
+			Printf("All GH API tokens are overloaded, maximum points %d, waiting %+v\n", rem[h], wait[h])
+			time.Sleep(time.Duration(1) * time.Second)
+			time.Sleep(wait[h])
+			h, _, rem, wait = j.getRateLimits(j.Context, ctx, j.Clients, true)
+			continue
+		}
+		if rem[h] >= 500 {
+			canCache = true
+		}
+		break
+	}
+	aHint = h
+	j.Hint = aHint
+	// Printf("Found usable token %d/%d/%v, cache enabled: %v\n", aHint, rem[h], wait[h], canCache)
+	return
+}
+
+func (j *DSGitHub) isAbuse(e error) bool {
+	if e == nil {
+		return false
+	}
+	errStr := e.Error()
+	return strings.Contains(errStr, "403 You have triggered an abuse detection mechanism") || strings.Contains(errStr, "403 API rate limit")
+}
+
+func (j *DSGitHub) githubRepos(ctx *Ctx, org, repo string) (repoData map[string]interface{}, err error) {
+	origin := org + "/" + repo
+	// Try memory cache 1st
+	if j.GitHubReposMtx != nil {
+		j.GitHubReposMtx.RLock()
+	}
+	repoData, found := j.GitHubRepos[origin]
+	if j.GitHubReposMtx != nil {
+		j.GitHubReposMtx.RUnlock()
+	}
+	if found {
+		// Printf("found in cache: %+v\n", repoData)
+		return
+	}
+	var c *github.Client
+	if j.GitHubMtx != nil {
+		j.GitHubMtx.RLock()
+	}
+	c = j.Clients[j.Hint]
+	if j.GitHubMtx != nil {
+		j.GitHubMtx.RUnlock()
+	}
+	retry := false
+	for {
+		var (
+			response *github.Response
+			rep      *github.Repository
+			e        error
+		)
+		rep, response, e = c.Repositories.Get(j.Context, org, repo)
+		// Printf("GET %s/%s -> {%+v, %+v, %+v}\n", org, repo, rep, response, e)
+		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
+			if j.GitHubReposMtx != nil {
+				j.GitHubReposMtx.Lock()
+			}
+			j.GitHubRepos[origin] = nil
+			if j.GitHubReposMtx != nil {
+				j.GitHubReposMtx.Unlock()
+			}
+			if ctx.Debug > 1 {
+				Printf("GithubRepos: repo not found %s: %v\n", origin, e)
+			}
+			return
+		}
+		if e != nil && !retry {
+			Printf("Error getting %s repo: response: %+v, error: %+v, retrying rate\n", origin, response, e)
+			Printf("GithubRepos: handle rate\n")
+			abuse := j.isAbuse(e)
+			if abuse {
+				sleepFor := 10 + rand.Intn(10)
+				Printf("GitHub detected abuse (get repo %s), waiting for %ds\n", origin, sleepFor)
+				time.Sleep(time.Duration(sleepFor) * time.Second)
+			}
+			if j.GitHubMtx != nil {
+				j.GitHubMtx.Lock()
+			}
+			j.Hint, _ = j.handleRate(ctx)
+			c = j.Clients[j.Hint]
+			if j.GitHubMtx != nil {
+				j.GitHubMtx.Unlock()
+			}
+			if !abuse {
+				retry = true
+			}
+			continue
+		}
+		if e != nil {
+			err = e
+			return
+		}
+		jm, _ := jsoniter.Marshal(rep)
+		_ = jsoniter.Unmarshal(jm, &repoData)
+		// Printf("got from API: %+v\n", repoData)
+		break
+	}
+	if j.GitHubReposMtx != nil {
+		j.GitHubReposMtx.Lock()
+	}
+	j.GitHubRepos[origin] = repoData
+	if j.GitHubReposMtx != nil {
+		j.GitHubReposMtx.Unlock()
+	}
+	return
 }
 
 // ParseArgs - parse GitHub specific environment variables
@@ -52,7 +225,7 @@ func (j *DSGitHub) ParseArgs(ctx *Ctx) (err error) {
 }
 
 // Validate - is current DS configuration OK?
-func (j *DSGitHub) Validate() (err error) {
+func (j *DSGitHub) Validate(ctx *Ctx) (err error) {
 	j.Org = strings.TrimSpace(j.Org)
 	if j.Org == "" {
 		err = fmt.Errorf("github org must be set")
@@ -73,7 +246,7 @@ func (j *DSGitHub) Validate() (err error) {
 	}
 	j.URL = "https://github.com/" + j.Org + "/" + j.Repo
 	defer func() {
-		fmt.Printf("configured %d GitHub OAuth clients\n", len(j.Clients))
+		Printf("configured %d GitHub OAuth clients\n", len(j.Clients))
 	}()
 	j.Tokens = strings.TrimSpace(j.Tokens)
 	// Get GitHub OAuth from env or from file
@@ -100,6 +273,13 @@ func (j *DSGitHub) Validate() (err error) {
 			j.Clients = append(j.Clients, client)
 		}
 	}
+	j.GitHubRepos = make(map[string]map[string]interface{})
+	j.ThrN = GetThreadsNum(ctx)
+	if j.ThrN > 1 {
+		j.GitHubMtx = &sync.RWMutex{}
+		j.GitHubReposMtx = &sync.RWMutex{}
+	}
+	j.Hint, _ = j.handleRate(ctx)
 	return
 }
 
@@ -135,8 +315,39 @@ func (j *DSGitHub) Enrich(ctx *Ctx) (err error) {
 	return
 }
 
-// FetchItems - implement enrich data for GitHub datasource
+// FetchItems - implement raw data for GitHub datasource
 func (j *DSGitHub) FetchItems(ctx *Ctx) (err error) {
+	switch j.Category {
+	case "repository":
+		return j.FetchItemsRepository(ctx)
+	default:
+		err = fmt.Errorf("unknown category %s", j.Category)
+	}
+	return
+}
+
+// FetchItemsRepository - implement raw repository data for GitHub datasource
+func (j *DSGitHub) FetchItemsRepository(ctx *Ctx) (err error) {
+	items := []interface{}{}
+	item, err := j.githubRepos(ctx, j.Org, j.Repo)
+	item, err = j.githubRepos(ctx, j.Org, j.Repo)
+	FatalOnError(err)
+	item["fetched_on"] = fmt.Sprintf("%.6f", float64(time.Now().UnixNano())/1.0e9)
+	esItem := j.AddMetadata(ctx, item)
+	if ctx.Project != "" {
+		item["project"] = ctx.Project
+	}
+	esItem["data"] = item
+	items = append(items, esItem)
+	err = SendToElastic(ctx, j, true, UUID, items)
+	if err != nil {
+		Printf("Error %v sending %d messages to ES\n", err, len(items))
+	}
+	return
+}
+
+// FetchItemsIssue - implement raw issue data for GitHub datasource
+func (j *DSGitHub) FetchItemsIssue(ctx *Ctx) (err error) {
 	// IMPL:
 	var messages [][]byte
 	// Process messages (possibly in threads)
@@ -317,8 +528,15 @@ func (j *DSGitHub) Categories() map[string]struct{} {
 
 // ResumeNeedsOrigin - is origin field needed when resuming
 // Origin should be needed when multiple configurations save to the same index
-func (j *DSGitHub) ResumeNeedsOrigin(ctx *Ctx) bool {
+func (j *DSGitHub) ResumeNeedsOrigin(ctx *Ctx, raw bool) bool {
 	return true
+}
+
+// ResumeNeedsCategory - is category field needed when resuming
+// Category should be needed when multiple types of categories save to the same index
+// or there are multiple types of documents within the same category
+func (j *DSGitHub) ResumeNeedsCategory(ctx *Ctx, raw bool) bool {
+	return j.Category != "repository"
 }
 
 // Origin - return current origin
@@ -328,6 +546,13 @@ func (j *DSGitHub) Origin(ctx *Ctx) string {
 
 // ItemID - return unique identifier for an item
 func (j *DSGitHub) ItemID(item interface{}) string {
+	if j.Category == "repository" {
+		id, ok := item.(map[string]interface{})["fetched_on"]
+		if !ok {
+			Fatalf("%s: ItemID() - cannot extract fetched_on from %+v", j.DS, DumpKeys(item))
+		}
+		return fmt.Sprintf("%v", id)
+	}
 	// IMPL:
 	return fmt.Sprintf("%d", time.Now().UnixNano())
 }

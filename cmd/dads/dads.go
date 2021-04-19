@@ -96,7 +96,7 @@ func runDS(ctx *lib.Ctx) (err error) {
 		lib.Printf("%s: ParseArgs(%s) error: %v\n", ds.Info(), ctx.Info(), err)
 		return
 	}
-	err = ds.Validate()
+	err = ds.Validate(ctx)
 	if err != nil {
 		lib.Printf("%s: Validate error: %v\n", ds.Info(), err)
 		return

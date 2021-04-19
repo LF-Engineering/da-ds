@@ -102,7 +102,7 @@ func (j *DSJira) ParseArgs(ctx *Ctx) (err error) {
 }
 
 // Validate - is current DS configuration OK?
-func (j *DSJira) Validate() (err error) {
+func (j *DSJira) Validate(ctx *Ctx) (err error) {
 	if strings.HasSuffix(j.URL, "/") {
 		j.URL = j.URL[:len(j.URL)-1]
 	}
@@ -742,8 +742,15 @@ func (j *DSJira) OriginField(ctx *Ctx) string {
 // ResumeNeedsOrigin - is origin field needed when resuming
 // Origin should be needed when multiple configurations save to the same index
 // Jira usually stores only one instance per index, so we don't need to enable filtering by origin to resume
-func (j *DSJira) ResumeNeedsOrigin(ctx *Ctx) bool {
+func (j *DSJira) ResumeNeedsOrigin(ctx *Ctx, raw bool) bool {
 	return j.MultiOrigin
+}
+
+// ResumeNeedsCategory - is category field needed when resuming
+// Category should be needed when multiple types of categories save to the same index
+// or there are multiple types of documents within the same category
+func (j *DSJira) ResumeNeedsCategory(ctx *Ctx, raw bool) bool {
+	return false
 }
 
 // Origin - return current origin

@@ -107,7 +107,7 @@ func (j *DSGerrit) ParseArgs(ctx *Ctx) (err error) {
 }
 
 // Validate - is current DS configuration OK?
-func (j *DSGerrit) Validate() (err error) {
+func (j *DSGerrit) Validate(ctx *Ctx) (err error) {
 	j.URL = strings.TrimSpace(j.URL)
 	if strings.HasSuffix(j.URL, "/") {
 		j.URL = j.URL[:len(j.URL)-1]
@@ -537,8 +537,15 @@ func (j *DSGerrit) Categories() map[string]struct{} {
 
 // ResumeNeedsOrigin - is origin field needed when resuming
 // Origin should be needed when multiple configurations save to the same index
-func (j *DSGerrit) ResumeNeedsOrigin(ctx *Ctx) bool {
+func (j *DSGerrit) ResumeNeedsOrigin(ctx *Ctx, raw bool) bool {
 	return !j.SingleOrigin
+}
+
+// ResumeNeedsCategory - is category field needed when resuming
+// Category should be needed when multiple types of categories save to the same index
+// or there are multiple types of documents within the same category
+func (j *DSGerrit) ResumeNeedsCategory(ctx *Ctx, raw bool) bool {
+	return false
 }
 
 // Origin - return current origin

@@ -8,7 +8,7 @@ require (
 	github.com/andybalholm/cascadia v1.2.0 // indirect
 	github.com/araddon/dateparse v0.0.0-20210207001429-0eec95c9db7e
 	github.com/go-sql-driver/mysql v1.5.0
-	github.com/google/go-github v17.0.0+incompatible
+	github.com/google/go-github/v35 v35.0.0
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/json-iterator/go v1.1.10
 	github.com/lib/pq v1.9.0 // indirect
