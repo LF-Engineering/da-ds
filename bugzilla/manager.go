@@ -230,6 +230,12 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, Auth0Clie
 	slackProvider := slack.New(m.WebHookURL)
 	// Initialize fetcher object to get data from dockerhub api
 	fetcher := NewFetcher(params, httpClientProvider, esClientProvider)
+
+	commitId := ""
+	for i := 0; i < 3; i++ {
+		commitId += string(build.GitCommit[i])
+	}
+	appNameVersion := fmt.Sprintf("%s-%s", build.AppName, commitId)
 	auth0Client, err := auth0.NewAuth0Client(
 		m.Environment,
 		m.AuthGrantType,
@@ -240,7 +246,7 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, Auth0Clie
 		httpClientProvider,
 		esCacheClientProvider,
 		&slackProvider,
-		build.AppName)
+		appNameVersion)
 
 	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(m.AffBaseURL, m.Slug, httpClientProvider, esCacheClientProvider, auth0Client, &slackProvider)
 
