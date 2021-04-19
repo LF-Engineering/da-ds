@@ -8,7 +8,7 @@ jobs:
     steps:
       - checkout
 
-      - run: echo $(COMMIT)
+      - run: echo $COMMIT
       - run: go get -u golang.org/x/lint/golint
       - run: go get golang.org/x/tools/cmd/goimports
       - run: go get github.com/jgautheron/usedexports
