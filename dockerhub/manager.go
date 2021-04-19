@@ -346,7 +346,7 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, Auth0Clie
 	slackProvider := slack.New(m.WebHookURL)
 
 	commitID := build.GitCommit[7]
-	appNameVersion := fmt.Sprintf("%s-%s", build.AppName, commitID)
+	appNameVersion := fmt.Sprintf("%s-%v", build.AppName, commitID)
 	auth0Client, err := auth0.NewAuth0Client(
 		m.Environment,
 		m.AuthGrantType,

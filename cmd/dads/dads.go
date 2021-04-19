@@ -372,7 +372,7 @@ func buildBugzillaRestMgrServices(p *bugzillarest.MgrParams) (*bugzillarest.Fetc
 	fetcher := bugzillarest.NewFetcher(&bugzillarest.FetcherParams{Endpoint: p.EndPoint, BackendVersion: p.FetcherBackendVersion}, httpClientProvider, esClientProvider)
 
 	commitID := build.GitCommit[7]
-	appNameVersion := fmt.Sprintf("%s-%s", build.AppName, commitID)
+	appNameVersion := fmt.Sprintf("%s-%v", build.AppName, commitID)
 	auth0Client, err := auth0.NewAuth0Client(
 		p.Environment,
 		p.AuthGrantType,
