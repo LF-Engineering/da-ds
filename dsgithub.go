@@ -322,7 +322,7 @@ func (j *DSGitHub) FetchItems(ctx *Ctx) (err error) {
 	case "repository":
 		return j.FetchItemsRepository(ctx)
 	default:
-		err = fmt.Errorf("unknown category %s", j.Category)
+		err = fmt.Errorf("FetchItems: unknown category %s", j.Category)
 	}
 	return
 }
@@ -632,6 +632,9 @@ func (j *DSGitHub) ElasticRichMapping() []byte {
 // (name, username, email) tripples, special value Nil "none" means null
 // we use string and not *string which allows nil to allow usage as a map key
 func (j *DSGitHub) GetItemIdentities(ctx *Ctx, doc interface{}) (map[[3]string]struct{}, error) {
+	if j.Category == "repository" {
+		return map[[3]string]struct{}{}, nil
+	}
 	// IMPL:
 	return map[[3]string]struct{}{}, nil
 }
@@ -640,9 +643,112 @@ func (j *DSGitHub) GetItemIdentities(ctx *Ctx, doc interface{}) (map[[3]string]s
 // items is a current pack of input items
 // docs is a pointer to where extracted identities will be stored
 func GitHubEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]interface{}) (err error) {
+	j, _ := ds.(*DSGitHub)
+	switch j.Category {
+	case "repository":
+		return j.GitHubRepositoryEnrichItemsFunc(ctx, thrN, items, docs)
+	default:
+		err = fmt.Errorf("GitHubEnrichItemsFunc: unknown category %s", j.Category)
+	}
+	return
+}
+
+// GitHubRepositoryEnrichItemsFunc - iterate items and enrich them
+// items is a current pack of input items
+// docs is a pointer to where extracted identities will be stored
+func (j *DSGitHub) GitHubRepositoryEnrichItemsFunc(ctx *Ctx, thrN int, items []interface{}, docs *[]interface{}) (err error) {
+	if ctx.Debug > 0 {
+		Printf("github enrich repository items %d/%d func\n", len(items), len(*docs))
+	}
+	var (
+		mtx *sync.RWMutex
+		ch  chan error
+	)
+	if thrN > 1 {
+		mtx = &sync.RWMutex{}
+		ch = make(chan error)
+	}
+	nThreads := 0
+	procItem := func(c chan error, idx int) (e error) {
+		if thrN > 1 {
+			mtx.RLock()
+		}
+		item := items[idx]
+		if thrN > 1 {
+			mtx.RUnlock()
+		}
+		defer func() {
+			if c != nil {
+				c <- e
+			}
+		}()
+		src, ok := item.(map[string]interface{})["_source"]
+		if !ok {
+			e = fmt.Errorf("Missing _source in item %+v", DumpKeys(item))
+			return
+		}
+		doc, ok := src.(map[string]interface{})
+		if !ok {
+			e = fmt.Errorf("Failed to parse document %+v", doc)
+			return
+		}
+		var rich map[string]interface{}
+		rich, e = j.EnrichItem(ctx, doc, "", false, nil)
+		if e != nil {
+			return
+		}
+		e = EnrichItem(ctx, j, rich)
+		if e != nil {
+			return
+		}
+		if thrN > 1 {
+			mtx.Lock()
+		}
+		*docs = append(*docs, rich)
+		if thrN > 1 {
+			mtx.Unlock()
+		}
+		return
+	}
+	if thrN > 1 {
+		for i := range items {
+			go func(i int) {
+				_ = procItem(ch, i)
+			}(i)
+			nThreads++
+			if nThreads == thrN {
+				err = <-ch
+				if err != nil {
+					return
+				}
+				nThreads--
+			}
+		}
+		for nThreads > 0 {
+			err = <-ch
+			nThreads--
+			if err != nil {
+				return
+			}
+		}
+		return
+	}
+	for i := range items {
+		err = procItem(nil, i)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
+// GitHubEnrichIssueItemsFunc - iterate items and enrich them
+// items is a current pack of input items
+// docs is a pointer to where extracted identities will be stored
+func (j *DSGitHub) GitHubEnrichIssueItemsFunc(ctx *Ctx, thrN int, items []interface{}, docs *[]interface{}) (err error) {
 	// IMPL:
 	if ctx.Debug > 0 {
-		Printf("github enrich items %d/%d func\n", len(items), len(*docs))
+		Printf("github enrich issue items %d/%d func\n", len(items), len(*docs))
 	}
 	var (
 		mtx *sync.RWMutex
@@ -734,8 +840,40 @@ func (j *DSGitHub) EnrichItems(ctx *Ctx) (err error) {
 
 // EnrichItem - return rich item from raw item for a given author type
 func (j *DSGitHub) EnrichItem(ctx *Ctx, item map[string]interface{}, author string, affs bool, extra interface{}) (rich map[string]interface{}, err error) {
-	// IMPL:
-	rich = item
+	switch j.Category {
+	case "repository":
+		return j.EnrichRepositoryItem(ctx, item, author, affs, extra)
+	default:
+		err = fmt.Errorf("EnrichItem: unknown category %s", j.Category)
+	}
+	return
+}
+
+// EnrichRepositoryItem - return rich item from raw item for a given author type
+func (j *DSGitHub) EnrichRepositoryItem(ctx *Ctx, item map[string]interface{}, author string, affs bool, extra interface{}) (rich map[string]interface{}, err error) {
+	rich = make(map[string]interface{})
+	repo, ok := item["data"].(map[string]interface{})
+	if !ok {
+		err = fmt.Errorf("missing data field in item %+v", DumpKeys(item))
+		return
+	}
+	for _, field := range RawFields {
+		v, _ := item[field]
+		rich[field] = v
+	}
+	repoFields := []string{"forks_count", "subscribers_count", "stargazers_count", "fetched_on"}
+	for _, field := range repoFields {
+		v, _ := repo[field]
+		rich[field] = v
+	}
+	v, _ := repo["html_url"]
+	rich["url"] = v
+	rich["repo_name"] = j.URL
+	updatedOn, _ := Dig(item, []string{j.DateField(ctx)}, true, false)
+	for prop, value := range CommonFields(j, updatedOn, "repository") {
+		rich[prop] = value
+	}
+	rich["type"] = "repository"
 	return
 }
 
@@ -756,6 +894,9 @@ func (j *DSGitHub) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role s
 // second return parameter is static mode (true/false)
 // dynamic roles will use item to get its roles
 func (j *DSGitHub) AllRoles(ctx *Ctx, item map[string]interface{}) ([]string, bool) {
+	if j.Category == "repository" {
+		return []string{}, false
+	}
 	// IMPL:
 	return []string{Author}, true
 }
