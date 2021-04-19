@@ -18,6 +18,9 @@ const Jira string = "jira"
 // Git - common constant string
 const Git string = "git"
 
+// GitHub - common constant string
+const GitHub string = "github"
+
 // Gerrit - common constant string
 const Gerrit string = "gerrit"
 

@@ -65,6 +65,8 @@ func runDS(ctx *lib.Ctx) (err error) {
 		return manager.Sync()
 	case lib.Git:
 		ds = &lib.DSGit{}
+	case lib.GitHub:
+		ds = &lib.DSGitHub{}
 	case lib.Gerrit:
 		ds = &lib.DSGerrit{}
 	case lib.Confluence:

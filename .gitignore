@@ -38,6 +38,7 @@
 /uuid/uuid
 /uuid/duuid
 /git-*.json
+/github-*.json
 /scripts/git.trailers
 
 .DS_Store
