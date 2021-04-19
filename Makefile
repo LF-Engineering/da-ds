@@ -22,11 +22,12 @@ STRIP=strip
 PKG_LIST := $(shell go list ./... | grep -v mock)
 PRODUCT_NAME?=da-ds
 COMMIT=`git rev-parse --short HEAD`
+LDFLAGS=-ldflags "-s -w -extldflags '-static' -X build.GitCommit=$(COMMIT)"
 
 all: check build
 
 build: cmd/dads/dads.go ${GO_LIB_FILES}
-	 ${GO_ENV} ${GO_BUILD} -o dads "-w -X github.com/LF-Engineering/da-ds/build.GitCommit=${CIRCLE_SHA1}" cmd/dads/dads.go
+	 ${GO_ENV} ${GO_BUILD} -o dads ${LDFLAGS} cmd/dads/dads.go
 
 fmt: ${GO_BIN_FILES} ${GO_LIB_FILES} ${GO_TEST_FILES} ${GO_LIBTEST_FILES}
 	./scripts/for_each_go_file.sh "${GO_FMT}"
