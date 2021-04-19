@@ -237,6 +237,7 @@ func (j *DSGitHub) githubUser(ctx *Ctx, login string) (user map[string]interface
 		return
 	}
 	// Try file cache 2nd
+	// IMPL: make sure EC2test & EC2prod both have j.cacheDir directory created
 	path := j.CacheDir + login + ".json"
 	lockPath := path + ".lock"
 	file, e := os.Stat(path)
@@ -566,6 +567,8 @@ func (j *DSGitHub) Validate(ctx *Ctx) (err error) {
 	}
 	j.Hint, _ = j.handleRate(ctx)
 	j.CacheDir = os.Getenv("HOME") + "/.perceval/github-users-cache/"
+	// xxx: make sure MkDir() to create cache dir
+	// IMPL: make sure EC2test & EC2prod both have j.cacheDir directory created
 	return
 }
 
