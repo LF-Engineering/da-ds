@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -578,6 +579,9 @@ func (j *DSGitHub) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string]int
 	mItem[DefaultTagField] = tag
 	mItem[DefaultOffsetField] = float64(updatedOn.Unix())
 	mItem["category"] = j.ItemCategory(item)
+	mItem["search_fields"] = make(map[string]interface{})
+	FatalOnError(DeepSet(mItem, []string{"search_fields", "owner"}, j.Org, false))
+	FatalOnError(DeepSet(mItem, []string{"search_fields", "repo"}, j.Repo, false))
 	//mItem["search_fields"] = j.GenSearchFields(ctx, issue, uuid)
 	//mItem["search_fields"] = make(map[string]interface{})
 	mItem[DefaultDateField] = ToESDate(updatedOn)
@@ -588,8 +592,25 @@ func (j *DSGitHub) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string]int
 
 // ItemUpdatedOn - return updated on date for an item
 func (j *DSGitHub) ItemUpdatedOn(item interface{}) time.Time {
-	// IMPL:
-	return time.Now()
+	if j.Category == "repository" {
+		epochNS, ok := item.(map[string]interface{})["fetched_on"].(float64)
+		if ok {
+			epochNS *= 1.0e9
+			return time.Unix(0, int64(epochNS))
+		}
+		epochS, ok := item.(map[string]interface{})["fetched_on"].(string)
+		if !ok {
+			Fatalf("%s: ItemUpdatedOn() - cannot extract fetched_on from %+v", j.DS, DumpKeys(item))
+		}
+		epochNS, err := strconv.ParseFloat(epochS, 64)
+		FatalOnError(err)
+		epochNS *= 1.0e9
+		return time.Unix(0, int64(epochNS))
+	}
+	iWhen, _ := Dig(item, []string{"updated_at"}, true, false)
+	when, err := TimeParseInterfaceString(iWhen)
+	FatalOnError(err)
+	return when
 }
 
 // ItemCategory - return unique identifier for an item
