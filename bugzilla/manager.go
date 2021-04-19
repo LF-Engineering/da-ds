@@ -231,11 +231,8 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, Auth0Clie
 	// Initialize fetcher object to get data from dockerhub api
 	fetcher := NewFetcher(params, httpClientProvider, esClientProvider)
 
-	commitId := ""
-	for i := 0; i < 3; i++ {
-		commitId += string(build.GitCommit[i])
-	}
-	appNameVersion := fmt.Sprintf("%s-%s", build.AppName, commitId)
+	commitID := build.GitCommit[0:7]
+	appNameVersion := fmt.Sprintf("%s-%s", build.AppName, commitID)
 	auth0Client, err := auth0.NewAuth0Client(
 		m.Environment,
 		m.AuthGrantType,
