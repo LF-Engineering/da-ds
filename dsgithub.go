@@ -252,7 +252,6 @@ func (j *DSGitHub) githubIssues(ctx *Ctx, org, repo string, since *time.Time) (i
 		var (
 			response *github.Response
 			issues   []*github.Issue
-			iss      map[string]interface{}
 			e        error
 		)
 		issues, response, e = c.Issues.ListByRepo(j.Context, org, repo, opt)
@@ -297,6 +296,7 @@ func (j *DSGitHub) githubIssues(ctx *Ctx, org, repo string, since *time.Time) (i
 			return
 		}
 		for _, issue := range issues {
+			iss := map[string]interface{}{}
 			jm, _ := jsoniter.Marshal(issue)
 			_ = jsoniter.Unmarshal(jm, &iss)
 			issuesData = append(issuesData, iss)
@@ -456,6 +456,12 @@ func (j *DSGitHub) FetchItemsRepository(ctx *Ctx) (err error) {
 	return
 }
 
+// ProcessIssue - add issues sub items
+func (j *DSGitHub) ProcessIssue(ctx *Ctx, inIssue map[string]interface{}) (outIssue map[string]interface{}, err error) {
+	outIssue = inIssue
+	return
+}
+
 // FetchItemsIssue - implement raw issue data for GitHub datasource
 func (j *DSGitHub) FetchItemsIssue(ctx *Ctx) (err error) {
 	// Process issues (possibly in threads)
@@ -478,10 +484,8 @@ func (j *DSGitHub) FetchItemsIssue(ctx *Ctx) (err error) {
 				c <- e
 			}
 		}()
-		// xxx
-		// item, err := j.processIssue(ctx, ...)
-		// FatalOnError(err)
-		item := map[string]interface{}{}
+		item, err := j.ProcessIssue(ctx, issue)
+		FatalOnError(err)
 		esItem := j.AddMetadata(ctx, item)
 		if ctx.Project != "" {
 			item["project"] = ctx.Project
@@ -529,7 +533,6 @@ func (j *DSGitHub) FetchItemsIssue(ctx *Ctx) (err error) {
 	}
 	issues, err := j.githubIssues(ctx, j.Org, j.Repo, ctx.DateFrom)
 	FatalOnError(err)
-	// xxx
 	Printf("got %d issues\n", len(issues))
 	if j.ThrN > 1 {
 		for _, issue := range issues {
