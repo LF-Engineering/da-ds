@@ -8,7 +8,6 @@ jobs:
     steps:
       - checkout
 
-      - run: echo $CIRCLE_SHA1
       - run: go get -u golang.org/x/lint/golint
       - run: go get golang.org/x/tools/cmd/goimports
       - run: go get github.com/jgautheron/usedexports
