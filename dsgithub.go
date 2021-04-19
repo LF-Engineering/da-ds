@@ -32,20 +32,22 @@ var (
 
 // DSGitHub - DS implementation for GitHub
 type DSGitHub struct {
-	DS             string // From DA_DS - data source type "github"
-	Org            string // From DA_GITHUB_ORG - github org
-	Repo           string // From DA_GITHUB_REPO - github repo
-	Category       string // From DA_GITHUB_CATEGORY - issue, pull_request, repository
-	Tokens         string // From DA_GITHUB_TOKENS - "," separated list of OAuth tokens
-	URL            string
-	Clients        []*github.Client
-	Context        context.Context
-	OAuthKeys      []string
-	ThrN           int
-	Hint           int
-	GitHubMtx      *sync.RWMutex
-	GitHubReposMtx *sync.RWMutex
-	GitHubRepos    map[string]map[string]interface{}
+	DS              string // From DA_DS - data source type "github"
+	Org             string // From DA_GITHUB_ORG - github org
+	Repo            string // From DA_GITHUB_REPO - github repo
+	Category        string // From DA_GITHUB_CATEGORY - issue, pull_request, repository
+	Tokens          string // From DA_GITHUB_TOKENS - "," separated list of OAuth tokens
+	URL             string
+	Clients         []*github.Client
+	Context         context.Context
+	OAuthKeys       []string
+	ThrN            int
+	Hint            int
+	GitHubMtx       *sync.RWMutex
+	GitHubReposMtx  *sync.RWMutex
+	GitHubRepos     map[string]map[string]interface{}
+	GitHubIssuesMtx *sync.RWMutex
+	GitHubIssues    map[string][]map[string]interface{}
 }
 
 func (j *DSGitHub) getRateLimits(gctx context.Context, ctx *Ctx, gcs []*github.Client, core bool) (int, []int, []int, []time.Duration) {
@@ -140,7 +142,7 @@ func (j *DSGitHub) githubRepos(ctx *Ctx, org, repo string) (repoData map[string]
 		j.GitHubReposMtx.RUnlock()
 	}
 	if found {
-		// Printf("found in cache: %+v\n", repoData)
+		// Printf("repos found in cache: %+v\n", repoData)
 		return
 	}
 	var c *github.Client
@@ -169,13 +171,13 @@ func (j *DSGitHub) githubRepos(ctx *Ctx, org, repo string) (repoData map[string]
 				j.GitHubReposMtx.Unlock()
 			}
 			if ctx.Debug > 1 {
-				Printf("GithubRepos: repo not found %s: %v\n", origin, e)
+				Printf("githubRepos: repo not found %s: %v\n", origin, e)
 			}
 			return
 		}
 		if e != nil && !retry {
 			Printf("Error getting %s repo: response: %+v, error: %+v, retrying rate\n", origin, response, e)
-			Printf("GithubRepos: handle rate\n")
+			Printf("githubRepos: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {
 				sleepFor := 10 + rand.Intn(10)
@@ -201,7 +203,7 @@ func (j *DSGitHub) githubRepos(ctx *Ctx, org, repo string) (repoData map[string]
 		}
 		jm, _ := jsoniter.Marshal(rep)
 		_ = jsoniter.Unmarshal(jm, &repoData)
-		// Printf("got from API: %+v\n", repoData)
+		// Printf("repos got from API: %+v\n", repoData)
 		break
 	}
 	if j.GitHubReposMtx != nil {
@@ -210,6 +212,108 @@ func (j *DSGitHub) githubRepos(ctx *Ctx, org, repo string) (repoData map[string]
 	j.GitHubRepos[origin] = repoData
 	if j.GitHubReposMtx != nil {
 		j.GitHubReposMtx.Unlock()
+	}
+	return
+}
+
+func (j *DSGitHub) githubIssues(ctx *Ctx, org, repo string, since *time.Time) (issuesData []map[string]interface{}, err error) {
+	origin := org + "/" + repo
+	// Try memory cache 1st
+	if j.GitHubIssuesMtx != nil {
+		j.GitHubIssuesMtx.RLock()
+	}
+	issuesData, found := j.GitHubIssues[origin]
+	if j.GitHubIssuesMtx != nil {
+		j.GitHubIssuesMtx.RUnlock()
+	}
+	if found {
+		// Printf("issues found in cache: %+v\n", issuesData)
+		return
+	}
+	var c *github.Client
+	if j.GitHubMtx != nil {
+		j.GitHubMtx.RLock()
+	}
+	c = j.Clients[j.Hint]
+	if j.GitHubMtx != nil {
+		j.GitHubMtx.RUnlock()
+	}
+	opt := &github.IssueListByRepoOptions{
+		State:     "all",
+		Sort:      "updated",
+		Direction: "asc",
+	}
+	opt.PerPage = 100
+	if since != nil {
+		opt.Since = *since
+	}
+	retry := false
+	for {
+		var (
+			response *github.Response
+			issues   []*github.Issue
+			iss      map[string]interface{}
+			e        error
+		)
+		issues, response, e = c.Issues.ListByRepo(j.Context, org, repo, opt)
+		// Printf("GET %s/%s -> {%+v, %+v, %+v}\n", org, repo, issues, response, e)
+		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
+			if j.GitHubIssuesMtx != nil {
+				j.GitHubIssuesMtx.Lock()
+			}
+			j.GitHubIssues[origin] = []map[string]interface{}{}
+			if j.GitHubIssuesMtx != nil {
+				j.GitHubIssuesMtx.Unlock()
+			}
+			if ctx.Debug > 1 {
+				Printf("githubIssues: issues not found %s: %v\n", origin, e)
+			}
+			return
+		}
+		if e != nil && !retry {
+			Printf("Error getting %s issues: response: %+v, error: %+v, retrying rate\n", origin, response, e)
+			Printf("githubIssues: handle rate\n")
+			abuse := j.isAbuse(e)
+			if abuse {
+				sleepFor := 10 + rand.Intn(10)
+				Printf("GitHub detected abuse (get issues %s), waiting for %ds\n", origin, sleepFor)
+				time.Sleep(time.Duration(sleepFor) * time.Second)
+			}
+			if j.GitHubMtx != nil {
+				j.GitHubMtx.Lock()
+			}
+			j.Hint, _ = j.handleRate(ctx)
+			c = j.Clients[j.Hint]
+			if j.GitHubMtx != nil {
+				j.GitHubMtx.Unlock()
+			}
+			if !abuse {
+				retry = true
+			}
+			continue
+		}
+		if e != nil {
+			err = e
+			return
+		}
+		for _, issue := range issues {
+			jm, _ := jsoniter.Marshal(issue)
+			_ = jsoniter.Unmarshal(jm, &iss)
+			issuesData = append(issuesData, iss)
+		}
+		if response.NextPage == 0 {
+			break
+		}
+		opt.Page = response.NextPage
+		retry = false
+		// Printf("issues got from API: %+v\n", issuesData)
+	}
+	if j.GitHubIssuesMtx != nil {
+		j.GitHubIssuesMtx.Lock()
+	}
+	j.GitHubIssues[origin] = issuesData
+	if j.GitHubIssuesMtx != nil {
+		j.GitHubIssuesMtx.Unlock()
 	}
 	return
 }
@@ -275,10 +379,12 @@ func (j *DSGitHub) Validate(ctx *Ctx) (err error) {
 		}
 	}
 	j.GitHubRepos = make(map[string]map[string]interface{})
+	j.GitHubIssues = make(map[string][]map[string]interface{})
 	j.ThrN = GetThreadsNum(ctx)
 	if j.ThrN > 1 {
 		j.GitHubMtx = &sync.RWMutex{}
 		j.GitHubReposMtx = &sync.RWMutex{}
+		j.GitHubIssuesMtx = &sync.RWMutex{}
 	}
 	j.Hint, _ = j.handleRate(ctx)
 	return
@@ -321,6 +427,10 @@ func (j *DSGitHub) FetchItems(ctx *Ctx) (err error) {
 	switch j.Category {
 	case "repository":
 		return j.FetchItemsRepository(ctx)
+	case "issue":
+		return j.FetchItemsIssue(ctx)
+	case "pull_request":
+		return j.FetchItemsIssue(ctx)
 	default:
 		err = fmt.Errorf("FetchItems: unknown category %s", j.Category)
 	}
@@ -331,7 +441,6 @@ func (j *DSGitHub) FetchItems(ctx *Ctx) (err error) {
 func (j *DSGitHub) FetchItemsRepository(ctx *Ctx) (err error) {
 	items := []interface{}{}
 	item, err := j.githubRepos(ctx, j.Org, j.Repo)
-	item, err = j.githubRepos(ctx, j.Org, j.Repo)
 	FatalOnError(err)
 	item["fetched_on"] = fmt.Sprintf("%.6f", float64(time.Now().UnixNano())/1.0e9)
 	esItem := j.AddMetadata(ctx, item)
@@ -349,6 +458,146 @@ func (j *DSGitHub) FetchItemsRepository(ctx *Ctx) (err error) {
 
 // FetchItemsIssue - implement raw issue data for GitHub datasource
 func (j *DSGitHub) FetchItemsIssue(ctx *Ctx) (err error) {
+	// Process issues (possibly in threads)
+	var (
+		ch           chan error
+		allIssues    []interface{}
+		allIssuesMtx *sync.Mutex
+		escha        []chan error
+		eschaMtx     *sync.Mutex
+	)
+	if j.ThrN > 1 {
+		ch = make(chan error)
+		allIssuesMtx = &sync.Mutex{}
+		eschaMtx = &sync.Mutex{}
+	}
+	nThreads := 0
+	processIssue := func(c chan error, issue map[string]interface{}) (wch chan error, e error) {
+		defer func() {
+			if c != nil {
+				c <- e
+			}
+		}()
+		// xxx
+		// item, err := j.processIssue(ctx, ...)
+		// FatalOnError(err)
+		item := map[string]interface{}{}
+		esItem := j.AddMetadata(ctx, item)
+		if ctx.Project != "" {
+			item["project"] = ctx.Project
+		}
+		esItem["data"] = item
+		if allIssuesMtx != nil {
+			allIssuesMtx.Lock()
+		}
+		allIssues = append(allIssues, esItem)
+		nIssues := len(allIssues)
+		if nIssues >= ctx.ESBulkSize {
+			sendToElastic := func(c chan error) (ee error) {
+				defer func() {
+					if c != nil {
+						c <- ee
+					}
+				}()
+				ee = SendToElastic(ctx, j, true, UUID, allIssues)
+				if ee != nil {
+					Printf("error %v sending %d issues to ElasticSearch\n", ee, len(allIssues))
+				}
+				allIssues = []interface{}{}
+				if allIssuesMtx != nil {
+					allIssuesMtx.Unlock()
+				}
+				return
+			}
+			if j.ThrN > 1 {
+				wch = make(chan error)
+				go func() {
+					_ = sendToElastic(wch)
+				}()
+			} else {
+				e = sendToElastic(nil)
+				if e != nil {
+					return
+				}
+			}
+		} else {
+			if allIssuesMtx != nil {
+				allIssuesMtx.Unlock()
+			}
+		}
+		return
+	}
+	issues, err := j.githubIssues(ctx, j.Org, j.Repo, ctx.DateFrom)
+	FatalOnError(err)
+	// xxx
+	Printf("got %d issues\n", len(issues))
+	if j.ThrN > 1 {
+		for _, issue := range issues {
+			go func(iss map[string]interface{}) {
+				var (
+					e    error
+					esch chan error
+				)
+				esch, e = processIssue(ch, iss)
+				if e != nil {
+					Printf("process error: %v\n", e)
+					return
+				}
+				if esch != nil {
+					if eschaMtx != nil {
+						eschaMtx.Lock()
+					}
+					escha = append(escha, esch)
+					if eschaMtx != nil {
+						eschaMtx.Unlock()
+					}
+				}
+			}(issue)
+			nThreads++
+			if nThreads == j.ThrN {
+				err = <-ch
+				if err != nil {
+					return
+				}
+				nThreads--
+			}
+		}
+		for nThreads > 0 {
+			err = <-ch
+			nThreads--
+			if err != nil {
+				return
+			}
+		}
+	} else {
+		for _, issue := range issues {
+			_, err = processIssue(nil, issue)
+			if err != nil {
+				return
+			}
+		}
+	}
+	for _, esch := range escha {
+		err = <-esch
+		if err != nil {
+			return
+		}
+	}
+	nIssues := len(allIssues)
+	if ctx.Debug > 0 {
+		Printf("%d remaining issues to send to ES\n", nIssues)
+	}
+	if nIssues > 0 {
+		err = SendToElastic(ctx, j, true, UUID, allIssues)
+		if err != nil {
+			Printf("Error %v sending %d issues to ES\n", err, len(allIssues))
+		}
+	}
+	return
+}
+
+// FetchItemsPullRequest - implement raw issue data for GitHub datasource
+func (j *DSGitHub) FetchItemsPullRequest(ctx *Ctx) (err error) {
 	// IMPL:
 	var messages [][]byte
 	// Process messages (possibly in threads)
