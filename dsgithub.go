@@ -1368,13 +1368,15 @@ func (j *DSGitHub) ItemID(item interface{}) string {
 		}
 		return fmt.Sprintf("%v", id)
 	}
-	// IMPL:
-	return fmt.Sprintf("%d", time.Now().UnixNano())
+	id, ok := item.(map[string]interface{})["id"]
+	if !ok {
+		Fatalf("%s: ItemID() - cannot extract id from %+v", j.DS, DumpKeys(item))
+	}
+	return fmt.Sprintf("%d", int64(id.(float64)))
 }
 
 // AddMetadata - add metadata to the item
 func (j *DSGitHub) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string]interface{}) {
-	// IMPL:
 	mItem = make(map[string]interface{})
 	origin := j.URL
 	tag := ctx.Tag
@@ -1382,6 +1384,7 @@ func (j *DSGitHub) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string]int
 		tag = origin
 	}
 	itemID := j.ItemID(item)
+	// fmt.Printf("id = %s\n", itemID)
 	updatedOn := j.ItemUpdatedOn(item)
 	uuid := UUIDNonEmpty(ctx, origin, itemID)
 	timestamp := time.Now()
@@ -1396,8 +1399,6 @@ func (j *DSGitHub) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string]int
 	mItem["search_fields"] = make(map[string]interface{})
 	FatalOnError(DeepSet(mItem, []string{"search_fields", "owner"}, j.Org, false))
 	FatalOnError(DeepSet(mItem, []string{"search_fields", "repo"}, j.Repo, false))
-	//mItem["search_fields"] = j.GenSearchFields(ctx, issue, uuid)
-	//mItem["search_fields"] = make(map[string]interface{})
 	mItem[DefaultDateField] = ToESDate(updatedOn)
 	mItem[DefaultTimestampField] = ToESDate(timestamp)
 	mItem[ProjectSlug] = ctx.ProjectSlug
