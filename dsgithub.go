@@ -232,8 +232,7 @@ func (j *DSGitHub) githubUser(ctx *Ctx, login string) (user map[string]interface
 	}
 	if ok {
 		found = len(user) > 0
-		// xxx
-		Printf("user found in memory cache: %+v\n", user)
+		// Printf("user found in memory cache: %+v\n", user)
 		return
 	}
 	// Try file cache 2nd
@@ -245,8 +244,7 @@ func (j *DSGitHub) githubUser(ctx *Ctx, login string) (user map[string]interface
 		for {
 			_, e := os.Stat(lockPath)
 			if e == nil {
-				// xxx
-				Printf("user %s lock file %s present, waitng 1s\n", user, lockPath)
+				// Printf("user %s lock file %s present, waitng 1s\n", user, lockPath)
 				time.Sleep(time.Duration(1) * time.Second)
 				continue
 			}
@@ -271,8 +269,7 @@ func (j *DSGitHub) githubUser(ctx *Ctx, login string) (user map[string]interface
 						if j.GitHubUserMtx != nil {
 							j.GitHubUserMtx.Unlock()
 						}
-						// xxx
-						Printf("user found in files cache: %+v\n", user)
+						// Printf("user found in files cache: %+v\n", user)
 						return
 					}
 					Printf("githubUser: unmarshaled %s cache file is empty\n", path)
@@ -286,16 +283,14 @@ func (j *DSGitHub) githubUser(ctx *Ctx, login string) (user map[string]interface
 		}
 	} else {
 		if ctx.Debug > 0 {
-			// xxx
-			Printf("githubUser: no %s user cache file: %v\n", path, e)
+			// Printf("githubUser: no %s user cache file: %v\n", path, e)
 		}
 	}
 	lockFile, _ := os.Create(lockPath)
 	defer func() {
 		if lockFile != nil {
 			defer func() {
-				// xxx
-				Printf("remove lock file %s\n", lockPath)
+				// Printf("remove lock file %s\n", lockPath)
 				_ = os.Remove(lockPath)
 			}()
 		}
@@ -334,14 +329,12 @@ func (j *DSGitHub) githubUser(ctx *Ctx, login string) (user map[string]interface
 			e        error
 		)
 		usr, response, e = c.Users.Get(j.Context, login)
-		// xxx
-		Printf("GET %s -> {%+v, %+v, %+v}\n", login, usr, response, e)
+		// Printf("GET %s -> {%+v, %+v, %+v}\n", login, usr, response, e)
 		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
 			if j.GitHubUserMtx != nil {
 				j.GitHubUserMtx.Lock()
 			}
-			// xxx
-			Printf("user not found using API: %s\n", login)
+			// Printf("user not found using API: %s\n", login)
 			j.GitHubUser[login] = map[string]interface{}{}
 			if j.GitHubUserMtx != nil {
 				j.GitHubUserMtx.Unlock()
@@ -377,8 +370,7 @@ func (j *DSGitHub) githubUser(ctx *Ctx, login string) (user map[string]interface
 		if usr != nil {
 			jm, _ := jsoniter.Marshal(usr)
 			_ = jsoniter.Unmarshal(jm, &user)
-			// xxx
-			Printf("user found using API: %+v\n", user)
+			// Printf("user found using API: %+v\n", user)
 			found = true
 		}
 		break
@@ -567,8 +559,7 @@ func (j *DSGitHub) Validate(ctx *Ctx) (err error) {
 	}
 	j.Hint, _ = j.handleRate(ctx)
 	j.CacheDir = os.Getenv("HOME") + "/.perceval/github-users-cache/"
-	// xxx: make sure MkDir() to create cache dir
-	// IMPL: make sure EC2test & EC2prod both have j.cacheDir directory created
+	_ = os.MkdirAll(j.CacheDir, 0777)
 	return
 }
 
@@ -660,6 +651,23 @@ func (j *DSGitHub) ProcessIssue(ctx *Ctx, inIssue map[string]interface{}) (issue
 		if err != nil {
 			return
 		}
+	}
+	iAssignees, ok := Dig(issue, []string{"assignees"}, false, true)
+	if ok {
+		assignees, _ := iAssignees.([]interface{})
+		assigneesAry := []map[string]interface{}{}
+		for _, assignee := range assignees {
+			aLogin, ok := Dig(assignee, []string{"login"}, false, true)
+			if ok {
+				assigneeData, _, e := j.githubUser(ctx, aLogin.(string))
+				if e != nil {
+					err = e
+					return
+				}
+				assigneesAry = append(assigneesAry, assigneeData)
+			}
+		}
+		issue["assignees_data"] = assigneesAry
 	}
 	// xxx
 	return
