@@ -57,6 +57,8 @@ type DSGitHub struct {
 	GitHubIssueComments       map[string][]map[string]interface{}
 	GitHubCommentReactionsMtx *sync.RWMutex
 	GitHubCommentReactions    map[string][]map[string]interface{}
+	GitHubIssueReactionsMtx   *sync.RWMutex
+	GitHubIssueReactions      map[string][]map[string]interface{}
 }
 
 func (j *DSGitHub) getRateLimits(gctx context.Context, ctx *Ctx, gcs []*github.Client, core bool) (int, []int, []int, []time.Duration) {
@@ -650,13 +652,13 @@ func (j *DSGitHub) githubCommentReactions(ctx *Ctx, org, repo string, cid int64)
 				j.GitHubCommentReactionsMtx.Unlock()
 			}
 			if ctx.Debug > 1 {
-				Printf("githubCommentreactions: reactions not found %s: %v\n", key, e)
+				Printf("githubCommentReactions: reactions not found %s: %v\n", key, e)
 			}
 			return
 		}
 		if e != nil && !retry {
 			Printf("Error getting %s comment reactions: response: %+v, error: %+v, retrying rate\n", key, response, e)
-			Printf("githubCommentreactions: handle rate\n")
+			Printf("githubCommentReactions: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {
 				sleepFor := 10 + rand.Intn(10)
@@ -706,6 +708,109 @@ func (j *DSGitHub) githubCommentReactions(ctx *Ctx, org, repo string, cid int64)
 	j.GitHubCommentReactions[key] = reactions
 	if j.GitHubCommentReactionsMtx != nil {
 		j.GitHubCommentReactionsMtx.Unlock()
+	}
+	return
+}
+
+func (j *DSGitHub) githubIssueReactions(ctx *Ctx, org, repo string, number int) (reactions []map[string]interface{}, err error) {
+	key := fmt.Sprintf("%s/%s/%d", org, repo, number)
+	// fmt.Printf("githubIssueReactions %s\n", key)
+	// Try memory cache 1st
+	if j.GitHubIssueReactionsMtx != nil {
+		j.GitHubIssueReactionsMtx.RLock()
+	}
+	reactions, found := j.GitHubIssueReactions[key]
+	if j.GitHubIssueReactionsMtx != nil {
+		j.GitHubIssueReactionsMtx.RUnlock()
+	}
+	if found {
+		// Printf("issue reactions found in cache: %+v\n", reactions)
+		return
+	}
+	var c *github.Client
+	if j.GitHubMtx != nil {
+		j.GitHubMtx.RLock()
+	}
+	c = j.Clients[j.Hint]
+	if j.GitHubMtx != nil {
+		j.GitHubMtx.RUnlock()
+	}
+	opt := &github.ListOptions{}
+	opt.PerPage = 100
+	retry := false
+	for {
+		var (
+			response *github.Response
+			reacts   []*github.Reaction
+			e        error
+		)
+		reacts, response, e = c.Reactions.ListIssueReactions(j.Context, org, repo, number, opt)
+		// Printf("GET %s/%s/%d -> {%+v, %+v, %+v}\n", org, repo, number, reacts, response, e)
+		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
+			if j.GitHubIssueReactionsMtx != nil {
+				j.GitHubIssueReactionsMtx.Lock()
+			}
+			j.GitHubIssueReactions[key] = []map[string]interface{}{}
+			if j.GitHubIssueReactionsMtx != nil {
+				j.GitHubIssueReactionsMtx.Unlock()
+			}
+			if ctx.Debug > 1 {
+				Printf("githubIssueReactions: reactions not found %s: %v\n", key, e)
+			}
+			return
+		}
+		if e != nil && !retry {
+			Printf("Error getting %s issue reactions: response: %+v, error: %+v, retrying rate\n", key, response, e)
+			Printf("githubIssueReactions: handle rate\n")
+			abuse := j.isAbuse(e)
+			if abuse {
+				sleepFor := 10 + rand.Intn(10)
+				Printf("GitHub detected abuse (get issue reactions %s), waiting for %ds\n", key, sleepFor)
+				time.Sleep(time.Duration(sleepFor) * time.Second)
+			}
+			if j.GitHubMtx != nil {
+				j.GitHubMtx.Lock()
+			}
+			j.Hint, _ = j.handleRate(ctx)
+			c = j.Clients[j.Hint]
+			if j.GitHubMtx != nil {
+				j.GitHubMtx.Unlock()
+			}
+			if !abuse {
+				retry = true
+			}
+			continue
+		}
+		if e != nil {
+			err = e
+			return
+		}
+		for _, reaction := range reacts {
+			react := map[string]interface{}{}
+			jm, _ := jsoniter.Marshal(reaction)
+			_ = jsoniter.Unmarshal(jm, &react)
+			userLogin, ok := Dig(react, []string{"user", "login"}, false, true)
+			if ok {
+				react["user_data"], _, err = j.githubUser(ctx, userLogin.(string))
+				if err != nil {
+					return
+				}
+			}
+			reactions = append(reactions, react)
+		}
+		if response.NextPage == 0 {
+			break
+		}
+		opt.Page = response.NextPage
+		retry = false
+		// Printf("issue reactions got from API: %+v\n", reactions)
+	}
+	if j.GitHubIssueReactionsMtx != nil {
+		j.GitHubIssueReactionsMtx.Lock()
+	}
+	j.GitHubIssueReactions[key] = reactions
+	if j.GitHubIssueReactionsMtx != nil {
+		j.GitHubIssueReactionsMtx.Unlock()
 	}
 	return
 }
@@ -775,6 +880,7 @@ func (j *DSGitHub) Validate(ctx *Ctx) (err error) {
 	j.GitHubUser = make(map[string]map[string]interface{})
 	j.GitHubIssueComments = make(map[string][]map[string]interface{})
 	j.GitHubCommentReactions = make(map[string][]map[string]interface{})
+	j.GitHubIssueReactions = make(map[string][]map[string]interface{})
 	j.ThrN = GetThreadsNum(ctx)
 	if j.ThrN > 1 {
 		j.GitHubMtx = &sync.RWMutex{}
@@ -783,6 +889,7 @@ func (j *DSGitHub) Validate(ctx *Ctx) (err error) {
 		j.GitHubUserMtx = &sync.RWMutex{}
 		j.GitHubIssueCommentsMtx = &sync.RWMutex{}
 		j.GitHubCommentReactionsMtx = &sync.RWMutex{}
+		j.GitHubIssueReactionsMtx = &sync.RWMutex{}
 	}
 	j.Hint, _ = j.handleRate(ctx)
 	j.CacheDir = os.Getenv("HOME") + "/.perceval/github-users-cache/"
@@ -902,8 +1009,18 @@ func (j *DSGitHub) ProcessIssue(ctx *Ctx, inIssue map[string]interface{}) (issue
 		if err != nil {
 			return
 		}
+		iCnt, ok := Dig(issue, []string{"reactions", "total_count"}, false, true)
+		if ok {
+			issue["reactions_data"] = []interface{}{}
+			cnt := int(iCnt.(float64))
+			if cnt > 0 {
+				issue["reactions_data"], err = j.githubIssueReactions(ctx, j.Org, j.Repo, int(number.(float64)))
+				if err != nil {
+					return
+				}
+			}
+		}
 	}
-	// xxx
 	return
 }
 
