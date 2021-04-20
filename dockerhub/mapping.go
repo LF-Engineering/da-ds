@@ -11,5 +11,5 @@ var (
 	DockerhubRawMapping = []byte(`{"mappings": {"dynamic":true,"properties":{"metadata__updated_on":{"type":"date"},"data":{"properties":{"description":{"type":"text","index":true},"full_description":{"type":"text","index":true}}}}}}`)
 
 	// DockerhubRichMapping - Dockerhub rich index mapping
-	DockerhubRichMapping = []byte(`{"mappings": {"properties":{"metadata__updated_on":{"type":"date"},"description":{"type":"text","index":true},"description_analyzed":{"type":"text","index":true},"full_description_analyzed":{"type":"text","index":true}}}}`)
+	DockerhubRichMapping = []byte(`{"mappings": {"properties":{"origin":{"type":"keyword"},"metadata__updated_on":{"type":"date"},"description":{"type":"text","index":true},"description_analyzed":{"type":"text","index":true},"full_description_analyzed":{"type":"text","index":true}}}}`)
 )
