@@ -34,25 +34,27 @@ var (
 
 // DSGitHub - DS implementation for GitHub
 type DSGitHub struct {
-	DS              string // From DA_DS - data source type "github"
-	Org             string // From DA_GITHUB_ORG - github org
-	Repo            string // From DA_GITHUB_REPO - github repo
-	Category        string // From DA_GITHUB_CATEGORY - issue, pull_request, repository
-	Tokens          string // From DA_GITHUB_TOKENS - "," separated list of OAuth tokens
-	URL             string
-	Clients         []*github.Client
-	Context         context.Context
-	OAuthKeys       []string
-	ThrN            int
-	Hint            int
-	CacheDir        string
-	GitHubMtx       *sync.RWMutex
-	GitHubReposMtx  *sync.RWMutex
-	GitHubRepos     map[string]map[string]interface{}
-	GitHubIssuesMtx *sync.RWMutex
-	GitHubIssues    map[string][]map[string]interface{}
-	GitHubUserMtx   *sync.RWMutex
-	GitHubUser      map[string]map[string]interface{}
+	DS                     string // From DA_DS - data source type "github"
+	Org                    string // From DA_GITHUB_ORG - github org
+	Repo                   string // From DA_GITHUB_REPO - github repo
+	Category               string // From DA_GITHUB_CATEGORY - issue, pull_request, repository
+	Tokens                 string // From DA_GITHUB_TOKENS - "," separated list of OAuth tokens
+	URL                    string
+	Clients                []*github.Client
+	Context                context.Context
+	OAuthKeys              []string
+	ThrN                   int
+	Hint                   int
+	CacheDir               string
+	GitHubMtx              *sync.RWMutex
+	GitHubReposMtx         *sync.RWMutex
+	GitHubRepos            map[string]map[string]interface{}
+	GitHubIssuesMtx        *sync.RWMutex
+	GitHubIssues           map[string][]map[string]interface{}
+	GitHubUserMtx          *sync.RWMutex
+	GitHubUser             map[string]map[string]interface{}
+	GitHubIssueCommentsMtx *sync.RWMutex
+	GitHubIssueComments    map[string][]map[string]interface{}
 }
 
 func (j *DSGitHub) getRateLimits(gctx context.Context, ctx *Ctx, gcs []*github.Client, core bool) (int, []int, []int, []time.Duration) {
@@ -487,6 +489,101 @@ func (j *DSGitHub) githubIssues(ctx *Ctx, org, repo string, since *time.Time) (i
 	return
 }
 
+func (j *DSGitHub) githubIssueComments(ctx *Ctx, org, repo string, number int) (comments []map[string]interface{}, err error) {
+	key := fmt.Sprintf("%s/%s/%d", org, repo, number)
+	// Try memory cache 1st
+	if j.GitHubIssueCommentsMtx != nil {
+		j.GitHubIssueCommentsMtx.RLock()
+	}
+	comments, found := j.GitHubIssueComments[key]
+	if j.GitHubIssueCommentsMtx != nil {
+		j.GitHubIssueCommentsMtx.RUnlock()
+	}
+	if found {
+		// Printf("issue comments found in cache: %+v\n", comments)
+		return
+	}
+	var c *github.Client
+	if j.GitHubMtx != nil {
+		j.GitHubMtx.RLock()
+	}
+	c = j.Clients[j.Hint]
+	if j.GitHubMtx != nil {
+		j.GitHubMtx.RUnlock()
+	}
+	opt := &github.IssueListCommentsOptions{}
+	opt.PerPage = 100
+	retry := false
+	for {
+		var (
+			response *github.Response
+			comms    []*github.IssueComment
+			e        error
+		)
+		comms, response, e = c.Issues.ListComments(j.Context, org, repo, number, opt)
+		// Printf("GET %s/%s -> {%+v, %+v, %+v}\n", org, repo, issues, response, e)
+		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
+			if j.GitHubIssueCommentsMtx != nil {
+				j.GitHubIssueCommentsMtx.Lock()
+			}
+			j.GitHubIssueComments[key] = []map[string]interface{}{}
+			if j.GitHubIssueCommentsMtx != nil {
+				j.GitHubIssueCommentsMtx.Unlock()
+			}
+			if ctx.Debug > 1 {
+				Printf("githubIssueComments: comments not found %s: %v\n", key, e)
+			}
+			return
+		}
+		if e != nil && !retry {
+			Printf("Error getting %s issue comments: response: %+v, error: %+v, retrying rate\n", key, response, e)
+			Printf("githubIssueComments: handle rate\n")
+			abuse := j.isAbuse(e)
+			if abuse {
+				sleepFor := 10 + rand.Intn(10)
+				Printf("GitHub detected abuse (get issue comments %s), waiting for %ds\n", key, sleepFor)
+				time.Sleep(time.Duration(sleepFor) * time.Second)
+			}
+			if j.GitHubMtx != nil {
+				j.GitHubMtx.Lock()
+			}
+			j.Hint, _ = j.handleRate(ctx)
+			c = j.Clients[j.Hint]
+			if j.GitHubMtx != nil {
+				j.GitHubMtx.Unlock()
+			}
+			if !abuse {
+				retry = true
+			}
+			continue
+		}
+		if e != nil {
+			err = e
+			return
+		}
+		for _, comment := range comms {
+			com := map[string]interface{}{}
+			jm, _ := jsoniter.Marshal(comment)
+			_ = jsoniter.Unmarshal(jm, &com)
+			comments = append(comments, com)
+		}
+		if response.NextPage == 0 {
+			break
+		}
+		opt.Page = response.NextPage
+		retry = false
+		// Printf("issue comments got from API: %+v\n", comments)
+	}
+	if j.GitHubIssueCommentsMtx != nil {
+		j.GitHubIssueCommentsMtx.Lock()
+	}
+	j.GitHubIssueComments[key] = comments
+	if j.GitHubIssueCommentsMtx != nil {
+		j.GitHubIssueCommentsMtx.Unlock()
+	}
+	return
+}
+
 // ParseArgs - parse GitHub specific environment variables
 func (j *DSGitHub) ParseArgs(ctx *Ctx) (err error) {
 	j.DS = GitHub
@@ -550,12 +647,14 @@ func (j *DSGitHub) Validate(ctx *Ctx) (err error) {
 	j.GitHubRepos = make(map[string]map[string]interface{})
 	j.GitHubIssues = make(map[string][]map[string]interface{})
 	j.GitHubUser = make(map[string]map[string]interface{})
+	j.GitHubIssueComments = make(map[string][]map[string]interface{})
 	j.ThrN = GetThreadsNum(ctx)
 	if j.ThrN > 1 {
 		j.GitHubMtx = &sync.RWMutex{}
 		j.GitHubReposMtx = &sync.RWMutex{}
 		j.GitHubIssuesMtx = &sync.RWMutex{}
 		j.GitHubUserMtx = &sync.RWMutex{}
+		j.GitHubIssueCommentsMtx = &sync.RWMutex{}
 	}
 	j.Hint, _ = j.handleRate(ctx)
 	j.CacheDir = os.Getenv("HOME") + "/.perceval/github-users-cache/"
@@ -668,6 +767,13 @@ func (j *DSGitHub) ProcessIssue(ctx *Ctx, inIssue map[string]interface{}) (issue
 			}
 		}
 		issue["assignees_data"] = assigneesAry
+	}
+	number, ok := Dig(issue, []string{"number"}, false, true)
+	if ok {
+		issue["comments_data"], err = j.githubIssueComments(ctx, j.Org, j.Repo, int(number.(float64)))
+		if err != nil {
+			return
+		}
 	}
 	// xxx
 	return
