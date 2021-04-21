@@ -61,6 +61,8 @@ const (
 	CacheGitHubPullRequestedReviewers = false
 	// CacheGitHubPullCommits - cache this?
 	CacheGitHubPullCommits = false
+	// CacheGitHubUserOrgs - cache this?
+	CacheGitHubUserOrgs = true
 )
 
 var (
@@ -100,6 +102,7 @@ type DSGitHub struct {
 	GitHubReviewCommentReactionsMtx *sync.RWMutex
 	GitHubPullRequestedReviewersMtx *sync.RWMutex
 	GitHubPullCommitsMtx            *sync.RWMutex
+	GitHubUserOrgsMtx               *sync.RWMutex
 	GitHubRepo                      map[string]map[string]interface{}
 	GitHubIssues                    map[string][]map[string]interface{}
 	GitHubUser                      map[string]map[string]interface{}
@@ -113,6 +116,7 @@ type DSGitHub struct {
 	GitHubReviewCommentReactions    map[string][]map[string]interface{}
 	GitHubPullRequestedReviewers    map[string][]map[string]interface{}
 	GitHubPullCommits               map[string][]map[string]interface{}
+	GitHubUserOrgs                  map[string][]map[string]interface{}
 }
 
 func (j *DSGitHub) getRateLimits(gctx context.Context, ctx *Ctx, gcs []*github.Client, core bool) (int, []int, []int, []time.Duration) {
@@ -444,6 +448,10 @@ func (j *DSGitHub) githubUser(ctx *Ctx, login string) (user map[string]interface
 		if usr != nil {
 			jm, _ := jsoniter.Marshal(usr)
 			_ = jsoniter.Unmarshal(jm, &user)
+			user["organizations"], err = j.githubUserOrgs(ctx, login)
+			if err != nil {
+				return
+			}
 			// Printf("user found using API: %+v\n", user)
 			found = true
 		}
@@ -1750,6 +1758,107 @@ func (j *DSGitHub) githubPullCommits(ctx *Ctx, org, repo string, number int, dee
 	return
 }
 
+func (j *DSGitHub) githubUserOrgs(ctx *Ctx, login string) (orgsData []map[string]interface{}, err error) {
+	var found bool
+	// Try memory cache 1st
+	if CacheGitHubUserOrgs {
+		if j.GitHubUserOrgsMtx != nil {
+			j.GitHubUserOrgsMtx.RLock()
+		}
+		orgsData, found = j.GitHubUserOrgs[login]
+		if j.GitHubUserOrgsMtx != nil {
+			j.GitHubUserOrgsMtx.RUnlock()
+		}
+		if found {
+			// Printf("user orgs found in cache: %+v\n", orgsData)
+			return
+		}
+	}
+	var c *github.Client
+	if j.GitHubMtx != nil {
+		j.GitHubMtx.RLock()
+	}
+	c = j.Clients[j.Hint]
+	if j.GitHubMtx != nil {
+		j.GitHubMtx.RUnlock()
+	}
+	opt := &github.ListOptions{}
+	opt.PerPage = ItemsPerPage
+	retry := false
+	for {
+		var (
+			response      *github.Response
+			organizations []*github.Organization
+			e             error
+		)
+		organizations, response, e = c.Organizations.List(j.Context, login, opt)
+		// Printf("GET %s -> {%+v, %+v, %+v}\n", login, organizations, response, e)
+		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
+			if CacheGitHubUserOrgs {
+				if j.GitHubUserOrgsMtx != nil {
+					j.GitHubUserOrgsMtx.Lock()
+				}
+				j.GitHubUserOrgs[login] = []map[string]interface{}{}
+				if j.GitHubUserOrgsMtx != nil {
+					j.GitHubUserOrgsMtx.Unlock()
+				}
+			}
+			if ctx.Debug > 1 {
+				Printf("githubUserOrgs: orgs not found %s: %v\n", login, e)
+			}
+			return
+		}
+		if e != nil && !retry {
+			Printf("Error getting %s user orgs: response: %+v, error: %+v, retrying rate\n", login, response, e)
+			Printf("githubUserOrgs: handle rate\n")
+			abuse := j.isAbuse(e)
+			if abuse {
+				sleepFor := 10 + rand.Intn(10)
+				Printf("GitHub detected abuse (get user orgs %s), waiting for %ds\n", login, sleepFor)
+				time.Sleep(time.Duration(sleepFor) * time.Second)
+			}
+			if j.GitHubMtx != nil {
+				j.GitHubMtx.Lock()
+			}
+			j.Hint, _ = j.handleRate(ctx)
+			c = j.Clients[j.Hint]
+			if j.GitHubMtx != nil {
+				j.GitHubMtx.Unlock()
+			}
+			if !abuse {
+				retry = true
+			}
+			continue
+		}
+		if e != nil {
+			err = e
+			return
+		}
+		for _, organization := range organizations {
+			org := map[string]interface{}{}
+			jm, _ := jsoniter.Marshal(organization)
+			_ = jsoniter.Unmarshal(jm, &org)
+			orgsData = append(orgsData, org)
+		}
+		if response.NextPage == 0 {
+			break
+		}
+		opt.Page = response.NextPage
+		retry = false
+		// Printf("user orgs got from API: %+v\n", orgsData)
+	}
+	if CacheGitHubUserOrgs {
+		if j.GitHubUserOrgsMtx != nil {
+			j.GitHubUserOrgsMtx.Lock()
+		}
+		j.GitHubUserOrgs[login] = orgsData
+		if j.GitHubUserOrgsMtx != nil {
+			j.GitHubUserOrgsMtx.Unlock()
+		}
+	}
+	return
+}
+
 // ParseArgs - parse GitHub specific environment variables
 func (j *DSGitHub) ParseArgs(ctx *Ctx) (err error) {
 	j.DS = GitHub
@@ -1849,6 +1958,9 @@ func (j *DSGitHub) Validate(ctx *Ctx) (err error) {
 	if CacheGitHubPullCommits {
 		j.GitHubPullCommits = make(map[string][]map[string]interface{})
 	}
+	if CacheGitHubUserOrgs {
+		j.GitHubUserOrgs = make(map[string][]map[string]interface{})
+	}
 	// Multithreading
 	j.ThrN = GetThreadsNum(ctx)
 	if j.ThrN > 1 {
@@ -1891,6 +2003,9 @@ func (j *DSGitHub) Validate(ctx *Ctx) (err error) {
 		}
 		if CacheGitHubPullCommits {
 			j.GitHubPullCommitsMtx = &sync.RWMutex{}
+		}
+		if CacheGitHubUserOrgs {
+			j.GitHubUserOrgsMtx = &sync.RWMutex{}
 		}
 	}
 	j.Hint, _ = j.handleRate(ctx)
