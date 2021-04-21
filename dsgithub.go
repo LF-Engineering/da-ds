@@ -25,6 +25,8 @@ const (
 	MaxCommentBodyLength = 4096
 	// MaxIssueBodyLength - max issue body length
 	MaxIssueBodyLength = 4096
+	// MaxPullBodyLength - max pull request body length
+	MaxPullBodyLength = 4096
 	// CacheGitHubRepos - cache this?
 	CacheGitHubRepos = true
 	// CacheGitHubIssues - cache this?
@@ -39,6 +41,8 @@ const (
 	CacheGitHubCommentReactions = false
 	// CacheGitHubIssueReactions - cache this?
 	CacheGitHubIssueReactions = false
+	// CacheGitHubPulls - cache this?
+	CacheGitHubPulls = true
 )
 
 var (
@@ -71,12 +75,14 @@ type DSGitHub struct {
 	GitHubIssueCommentsMtx    *sync.RWMutex
 	GitHubCommentReactionsMtx *sync.RWMutex
 	GitHubIssueReactionsMtx   *sync.RWMutex
+	GitHubPullsMtx            *sync.RWMutex
 	GitHubRepos               map[string]map[string]interface{}
 	GitHubIssues              map[string][]map[string]interface{}
 	GitHubUser                map[string]map[string]interface{}
 	GitHubIssueComments       map[string][]map[string]interface{}
 	GitHubCommentReactions    map[string][]map[string]interface{}
 	GitHubIssueReactions      map[string][]map[string]interface{}
+	GitHubPulls               map[string]map[string]interface{}
 }
 
 func (j *DSGitHub) getRateLimits(gctx context.Context, ctx *Ctx, gcs []*github.Client, core bool) (int, []int, []int, []time.Duration) {
@@ -520,6 +526,7 @@ func (j *DSGitHub) githubIssues(ctx *Ctx, org, repo string, since *time.Time) (i
 					iss["body"] = body.(string)[:MaxIssueBodyLength]
 				}
 			}
+			iss["is_pull"] = issue.IsPullRequest()
 			issuesData = append(issuesData, iss)
 		}
 		if response.NextPage == 0 {
@@ -891,6 +898,129 @@ func (j *DSGitHub) githubIssueReactions(ctx *Ctx, org, repo string, number int) 
 	return
 }
 
+func (j *DSGitHub) githubPull(ctx *Ctx, org, repo string, number int) (pullData map[string]interface{}, err error) {
+	var found bool
+	key := fmt.Sprintf("%s/%s/%d", org, repo, number)
+	// Try memory cache 1st
+	if CacheGitHubPulls {
+		if j.GitHubPullsMtx != nil {
+			j.GitHubPullsMtx.RLock()
+		}
+		pullData, found = j.GitHubPulls[key]
+		if j.GitHubPullsMtx != nil {
+			j.GitHubPullsMtx.RUnlock()
+		}
+		if found {
+			// Printf("pull found in cache: %+v\n", pullData)
+			return
+		}
+	}
+	var c *github.Client
+	if j.GitHubMtx != nil {
+		j.GitHubMtx.RLock()
+	}
+	c = j.Clients[j.Hint]
+	if j.GitHubMtx != nil {
+		j.GitHubMtx.RUnlock()
+	}
+	retry := false
+	for {
+		var (
+			response *github.Response
+			pull     *github.PullRequest
+			e        error
+		)
+		pull, response, e = c.PullRequests.Get(j.Context, org, repo, number)
+		// Printf("GET %s/%s/%d -> {%+v, %+v, %+v}\n", org, repo, number, pull, response, e)
+		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
+			if CacheGitHubPulls {
+				if j.GitHubPullsMtx != nil {
+					j.GitHubPullsMtx.Lock()
+				}
+				j.GitHubPulls[key] = nil
+				if j.GitHubPullsMtx != nil {
+					j.GitHubPullsMtx.Unlock()
+				}
+			}
+			if ctx.Debug > 1 {
+				Printf("githubPull: pull not found %s: %v\n", key, e)
+			}
+			return
+		}
+		if e != nil && !retry {
+			Printf("Error getting %s pull: response: %+v, error: %+v, retrying rate\n", key, response, e)
+			Printf("githubPulls: handle rate\n")
+			abuse := j.isAbuse(e)
+			if abuse {
+				sleepFor := 10 + rand.Intn(10)
+				Printf("GitHub detected abuse (get pull %s), waiting for %ds\n", key, sleepFor)
+				time.Sleep(time.Duration(sleepFor) * time.Second)
+			}
+			if j.GitHubMtx != nil {
+				j.GitHubMtx.Lock()
+			}
+			j.Hint, _ = j.handleRate(ctx)
+			c = j.Clients[j.Hint]
+			if j.GitHubMtx != nil {
+				j.GitHubMtx.Unlock()
+			}
+			if !abuse {
+				retry = true
+			}
+			continue
+		}
+		if e != nil {
+			err = e
+			return
+		}
+		jm, _ := jsoniter.Marshal(pull)
+		_ = jsoniter.Unmarshal(jm, &pullData)
+		body, ok := Dig(pullData, []string{"body"}, false, true)
+		if ok {
+			nBody := len(body.(string))
+			if nBody > MaxPullBodyLength {
+				pullData["body"] = body.(string)[:MaxPullBodyLength]
+			}
+		}
+		// Printf("pull got from API: %+v\n", pullData)
+		break
+	}
+	if CacheGitHubPulls {
+		if j.GitHubPullsMtx != nil {
+			j.GitHubPullsMtx.Lock()
+		}
+		j.GitHubPulls[key] = pullData
+		if j.GitHubPullsMtx != nil {
+			j.GitHubPullsMtx.Unlock()
+		}
+	}
+	return
+}
+
+func (j *DSGitHub) githubPulls(ctx *Ctx, org, repo string, since *time.Time) (pullsData []map[string]interface{}, err error) {
+	var (
+		issues []map[string]interface{}
+		pull   map[string]interface{}
+	)
+	issues, err = j.githubIssues(ctx, org, repo, ctx.DateFrom)
+	if err != nil {
+		return
+	}
+	for _, issue := range issues {
+		isPR, _ := issue["is_pull"]
+		if !isPR.(bool) {
+			continue
+		}
+		number, _ := issue["number"]
+		pull, err = j.githubPull(ctx, org, repo, int(number.(float64)))
+		if err != nil {
+			return
+		}
+		pullsData = append(pullsData, pull)
+	}
+	return
+}
+
 // ParseArgs - parse GitHub specific environment variables
 func (j *DSGitHub) ParseArgs(ctx *Ctx) (err error) {
 	j.DS = GitHub
@@ -969,6 +1099,9 @@ func (j *DSGitHub) Validate(ctx *Ctx) (err error) {
 	if CacheGitHubIssueReactions {
 		j.GitHubIssueReactions = make(map[string][]map[string]interface{})
 	}
+	if CacheGitHubPulls {
+		j.GitHubPulls = make(map[string]map[string]interface{})
+	}
 	j.ThrN = GetThreadsNum(ctx)
 	if j.ThrN > 1 {
 		j.GitHubMtx = &sync.RWMutex{}
@@ -989,6 +1122,9 @@ func (j *DSGitHub) Validate(ctx *Ctx) (err error) {
 		}
 		if CacheGitHubIssueReactions {
 			j.GitHubIssueReactionsMtx = &sync.RWMutex{}
+		}
+		if CacheGitHubPulls {
+			j.GitHubPullsMtx = &sync.RWMutex{}
 		}
 	}
 	j.Hint, _ = j.handleRate(ctx)
@@ -1121,6 +1257,13 @@ func (j *DSGitHub) ProcessIssue(ctx *Ctx, inIssue map[string]interface{}) (issue
 			}
 		}
 	}
+	return
+}
+
+// ProcessPull - add PRs sub items
+func (j *DSGitHub) ProcessPull(ctx *Ctx, inPull map[string]interface{}) (pull map[string]interface{}, err error) {
+	pull = inPull
+	// xxx
 	return
 }
 
@@ -1263,59 +1406,56 @@ func (j *DSGitHub) FetchItemsIssue(ctx *Ctx) (err error) {
 
 // FetchItemsPullRequest - implement raw issue data for GitHub datasource
 func (j *DSGitHub) FetchItemsPullRequest(ctx *Ctx) (err error) {
-	// IMPL:
-	var messages [][]byte
-	// Process messages (possibly in threads)
+	// Process pull requests (possibly in threads)
 	var (
-		ch         chan error
-		allMsgs    []interface{}
-		allMsgsMtx *sync.Mutex
-		escha      []chan error
-		eschaMtx   *sync.Mutex
+		ch          chan error
+		allPulls    []interface{}
+		allPullsMtx *sync.Mutex
+		escha       []chan error
+		eschaMtx    *sync.Mutex
 	)
-	thrN := GetThreadsNum(ctx)
-	if thrN > 1 {
+	if j.ThrN > 1 {
 		ch = make(chan error)
-		allMsgsMtx = &sync.Mutex{}
+		allPullsMtx = &sync.Mutex{}
 		eschaMtx = &sync.Mutex{}
 	}
 	nThreads := 0
-	processMsg := func(c chan error, msg []byte) (wch chan error, e error) {
+	processPull := func(c chan error, pull map[string]interface{}) (wch chan error, e error) {
 		defer func() {
 			if c != nil {
 				c <- e
 			}
 		}()
-		// FIXME: Real data processing here
-		item := map[string]interface{}{"id": time.Now().UnixNano(), "name": "xyz"}
+		item, err := j.ProcessPull(ctx, pull)
+		FatalOnError(err)
 		esItem := j.AddMetadata(ctx, item)
 		if ctx.Project != "" {
 			item["project"] = ctx.Project
 		}
 		esItem["data"] = item
-		if allMsgsMtx != nil {
-			allMsgsMtx.Lock()
+		if allPullsMtx != nil {
+			allPullsMtx.Lock()
 		}
-		allMsgs = append(allMsgs, esItem)
-		nMsgs := len(allMsgs)
-		if nMsgs >= ctx.ESBulkSize {
+		allPulls = append(allPulls, esItem)
+		nPulls := len(allPulls)
+		if nPulls >= ctx.ESBulkSize {
 			sendToElastic := func(c chan error) (ee error) {
 				defer func() {
 					if c != nil {
 						c <- ee
 					}
 				}()
-				ee = SendToElastic(ctx, j, true, UUID, allMsgs)
+				ee = SendToElastic(ctx, j, true, UUID, allPulls)
 				if ee != nil {
-					Printf("error %v sending %d messages to ElasticSearch\n", ee, len(allMsgs))
+					Printf("error %v sending %d pulls to ElasticSearch\n", ee, len(allPulls))
 				}
-				allMsgs = []interface{}{}
-				if allMsgsMtx != nil {
-					allMsgsMtx.Unlock()
+				allPulls = []interface{}{}
+				if allPullsMtx != nil {
+					allPullsMtx.Unlock()
 				}
 				return
 			}
-			if thrN > 1 {
+			if j.ThrN > 1 {
 				wch = make(chan error)
 				go func() {
 					_ = sendToElastic(wch)
@@ -1327,20 +1467,23 @@ func (j *DSGitHub) FetchItemsPullRequest(ctx *Ctx) (err error) {
 				}
 			}
 		} else {
-			if allMsgsMtx != nil {
-				allMsgsMtx.Unlock()
+			if allPullsMtx != nil {
+				allPullsMtx.Unlock()
 			}
 		}
 		return
 	}
-	if thrN > 1 {
-		for _, message := range messages {
-			go func(msg []byte) {
+	pulls, err := j.githubPulls(ctx, j.Org, j.Repo, ctx.DateFrom)
+	FatalOnError(err)
+	Printf("got %d pulls\n", len(pulls))
+	if j.ThrN > 1 {
+		for _, pull := range pulls {
+			go func(pr map[string]interface{}) {
 				var (
 					e    error
 					esch chan error
 				)
-				esch, e = processMsg(ch, msg)
+				esch, e = processPull(ch, pr)
 				if e != nil {
 					Printf("process error: %v\n", e)
 					return
@@ -1354,9 +1497,9 @@ func (j *DSGitHub) FetchItemsPullRequest(ctx *Ctx) (err error) {
 						eschaMtx.Unlock()
 					}
 				}
-			}(message)
+			}(pull)
 			nThreads++
-			if nThreads == thrN {
+			if nThreads == j.ThrN {
 				err = <-ch
 				if err != nil {
 					return
@@ -1372,8 +1515,8 @@ func (j *DSGitHub) FetchItemsPullRequest(ctx *Ctx) (err error) {
 			}
 		}
 	} else {
-		for _, message := range messages {
-			_, err = processMsg(nil, message)
+		for _, pull := range pulls {
+			_, err = processPull(nil, pull)
 			if err != nil {
 				return
 			}
@@ -1385,14 +1528,14 @@ func (j *DSGitHub) FetchItemsPullRequest(ctx *Ctx) (err error) {
 			return
 		}
 	}
-	nMsgs := len(allMsgs)
+	nPulls := len(allPulls)
 	if ctx.Debug > 0 {
-		Printf("%d remaining messages to send to ES\n", nMsgs)
+		Printf("%d remaining pulls to send to ES\n", nPulls)
 	}
-	if nMsgs > 0 {
-		err = SendToElastic(ctx, j, true, UUID, allMsgs)
+	if nPulls > 0 {
+		err = SendToElastic(ctx, j, true, UUID, allPulls)
 		if err != nil {
-			Printf("Error %v sending %d messages to ES\n", err, len(allMsgs))
+			Printf("Error %v sending %d pulls to ES\n", err, len(allPulls))
 		}
 	}
 	return

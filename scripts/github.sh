@@ -25,6 +25,6 @@ fi
 if [ ! -z "$PULLREQUEST" ]
 then
   PROJECT_SLUG='cncf/devstats' DA_DS=github DA_GITHUB_NO_AFFILIATION=1 DA_GITHUB_DB_HOST=127.0.0.1 DA_GITHUB_DB_NAME=shdb DA_GITHUB_DB_PASS=shpwd DA_GITHUB_DB_PORT=13306 DA_GITHUB_DB_USER=shusername DA_GITHUB_ES_URL='http://127.0.0.1:19200' DA_GITHUB_PROJECT_SLUG='cncf/devstats' DA_GITHUB_RAW_INDEX=sds-cncf-devstats-github-issue-raw DA_GITHUB_RICH_INDEX=sds-cncf-devstats-github-issue DA_GITHUB_ORG=cncf DA_GITHUB_REPO=devstats DA_GITHUB_CATEGORY=pull_request DA_GITHUB_TOKENS="`cat /etc/github/oauths`" DA_GITHUB_ENRICH=1 DA_GITHUB_DEBUG=1 ./dads 2>&1 | tee run-pull-request.log
-  curl -s -XPOST -H 'Content-Type: application/json' 'http://127.0.0.1:19200/sds-cncf-devstats-github-issue-raw/_search' -d '{"query":{"term":{"is_github_pull_request":1}}}' | jq -S '.hits.hits[]._source' | tee github-issue-raw.json
-  curl -s -XPOST -H 'Content-Type: application/json' 'http://127.0.0.1:19200/sds-cncf-devstats-github-issue/_search' -d '{"query":{"term":{"is_github_pull_request":1}}}' | jq -S '.hits.hits[]._source' | tee github-issue-rich.json
+  curl -s -XPOST -H 'Content-Type: application/json' 'http://127.0.0.1:19200/sds-cncf-devstats-github-issue-raw/_search' -d '{"query":{"term":{"is_github_pull_request":1}}}' | jq -S '.hits.hits[]._source' | tee github-pull-request-raw.json
+  curl -s -XPOST -H 'Content-Type: application/json' 'http://127.0.0.1:19200/sds-cncf-devstats-github-issue/_search' -d '{"query":{"term":{"is_github_pull_request":1}}}' | jq -S '.hits.hits[]._source' | tee github-pull-request-rich.json
 fi
