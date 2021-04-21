@@ -58,7 +58,9 @@ const (
 	// CacheGitHubReviewCommentReactions - cache this?
 	CacheGitHubReviewCommentReactions = false
 	// CacheGitHubPullRequestedReviewers - cache this?
-	CacheGitHubPullRequestedReviewers = true
+	CacheGitHubPullRequestedReviewers = false
+	// CacheGitHubPullCommits - cache this?
+	CacheGitHubPullCommits = false
 )
 
 var (
@@ -97,6 +99,7 @@ type DSGitHub struct {
 	GitHubPullReviewCommentsMtx     *sync.RWMutex
 	GitHubReviewCommentReactionsMtx *sync.RWMutex
 	GitHubPullRequestedReviewersMtx *sync.RWMutex
+	GitHubPullCommitsMtx            *sync.RWMutex
 	GitHubRepo                      map[string]map[string]interface{}
 	GitHubIssues                    map[string][]map[string]interface{}
 	GitHubUser                      map[string]map[string]interface{}
@@ -109,6 +112,7 @@ type DSGitHub struct {
 	GitHubPullReviewComments        map[string][]map[string]interface{}
 	GitHubReviewCommentReactions    map[string][]map[string]interface{}
 	GitHubPullRequestedReviewers    map[string][]map[string]interface{}
+	GitHubPullCommits               map[string][]map[string]interface{}
 }
 
 func (j *DSGitHub) getRateLimits(gctx context.Context, ctx *Ctx, gcs []*github.Client, core bool) (int, []int, []int, []time.Duration) {
@@ -1628,6 +1632,124 @@ func (j *DSGitHub) githubPullRequestedReviewers(ctx *Ctx, org, repo string, numb
 	return
 }
 
+func (j *DSGitHub) githubPullCommits(ctx *Ctx, org, repo string, number int, deep bool) (commits []map[string]interface{}, err error) {
+	var found bool
+	key := fmt.Sprintf("%s/%s/%d", org, repo, number)
+	// Try memory cache 1st
+	if CacheGitHubPullCommits {
+		if j.GitHubPullCommitsMtx != nil {
+			j.GitHubPullCommitsMtx.RLock()
+		}
+		commits, found = j.GitHubPullCommits[key]
+		if j.GitHubPullCommitsMtx != nil {
+			j.GitHubPullCommitsMtx.RUnlock()
+		}
+		if found {
+			// Printf("pull commits found in cache: %+v\n", commits)
+			return
+		}
+	}
+	var c *github.Client
+	if j.GitHubMtx != nil {
+		j.GitHubMtx.RLock()
+	}
+	c = j.Clients[j.Hint]
+	if j.GitHubMtx != nil {
+		j.GitHubMtx.RUnlock()
+	}
+	opt := &github.ListOptions{}
+	opt.PerPage = ItemsPerPage
+	retry := false
+	for {
+		var (
+			response *github.Response
+			comms    []*github.RepositoryCommit
+			e        error
+		)
+		comms, response, e = c.PullRequests.ListCommits(j.Context, org, repo, number, opt)
+		// Printf("GET %s/%s/%s -> {%+v, %+v, %+v}\n", org, repo, number, comms, response, e)
+		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
+			if CacheGitHubPullCommits {
+				if j.GitHubPullCommitsMtx != nil {
+					j.GitHubPullCommitsMtx.Lock()
+				}
+				j.GitHubPullCommits[key] = []map[string]interface{}{}
+				if j.GitHubPullCommitsMtx != nil {
+					j.GitHubPullCommitsMtx.Unlock()
+				}
+			}
+			if ctx.Debug > 1 {
+				Printf("githubPullCommits: commits not found %s: %v\n", key, e)
+			}
+			return
+		}
+		if e != nil && !retry {
+			Printf("Error getting %s pull commits: response: %+v, error: %+v, retrying rate\n", key, response, e)
+			Printf("githubPullCommits: handle rate\n")
+			abuse := j.isAbuse(e)
+			if abuse {
+				sleepFor := 10 + rand.Intn(10)
+				Printf("GitHub detected abuse (get pull commits %s), waiting for %ds\n", key, sleepFor)
+				time.Sleep(time.Duration(sleepFor) * time.Second)
+			}
+			if j.GitHubMtx != nil {
+				j.GitHubMtx.Lock()
+			}
+			j.Hint, _ = j.handleRate(ctx)
+			c = j.Clients[j.Hint]
+			if j.GitHubMtx != nil {
+				j.GitHubMtx.Unlock()
+			}
+			if !abuse {
+				retry = true
+			}
+			continue
+		}
+		if e != nil {
+			err = e
+			return
+		}
+		for _, commit := range comms {
+			com := map[string]interface{}{}
+			jm, _ := jsoniter.Marshal(commit)
+			_ = jsoniter.Unmarshal(jm, &com)
+			if deep {
+				userLogin, ok := Dig(com, []string{"author", "login"}, false, true)
+				if ok {
+					com["author_data"], _, err = j.githubUser(ctx, userLogin.(string))
+					if err != nil {
+						return
+					}
+				}
+				userLogin, ok = Dig(com, []string{"committer", "login"}, false, true)
+				if ok {
+					com["committer_data"], _, err = j.githubUser(ctx, userLogin.(string))
+					if err != nil {
+						return
+					}
+				}
+			}
+			commits = append(commits, com)
+		}
+		if response.NextPage == 0 {
+			break
+		}
+		opt.Page = response.NextPage
+		retry = false
+		// Printf("pull commits got from API: %+v\n", commits)
+	}
+	if CacheGitHubPullCommits {
+		if j.GitHubPullCommitsMtx != nil {
+			j.GitHubPullCommitsMtx.Lock()
+		}
+		j.GitHubPullCommits[key] = commits
+		if j.GitHubPullCommitsMtx != nil {
+			j.GitHubPullCommitsMtx.Unlock()
+		}
+	}
+	return
+}
+
 // ParseArgs - parse GitHub specific environment variables
 func (j *DSGitHub) ParseArgs(ctx *Ctx) (err error) {
 	j.DS = GitHub
@@ -1724,6 +1846,9 @@ func (j *DSGitHub) Validate(ctx *Ctx) (err error) {
 	if CacheGitHubPullRequestedReviewers {
 		j.GitHubPullRequestedReviewers = make(map[string][]map[string]interface{})
 	}
+	if CacheGitHubPullCommits {
+		j.GitHubPullCommits = make(map[string][]map[string]interface{})
+	}
 	// Multithreading
 	j.ThrN = GetThreadsNum(ctx)
 	if j.ThrN > 1 {
@@ -1763,6 +1888,9 @@ func (j *DSGitHub) Validate(ctx *Ctx) (err error) {
 		}
 		if CacheGitHubPullRequestedReviewers {
 			j.GitHubPullRequestedReviewersMtx = &sync.RWMutex{}
+		}
+		if CacheGitHubPullCommits {
+			j.GitHubPullCommitsMtx = &sync.RWMutex{}
 		}
 	}
 	j.Hint, _ = j.handleRate(ctx)
@@ -1902,10 +2030,10 @@ func (j *DSGitHub) ProcessIssue(ctx *Ctx, inIssue map[string]interface{}) (issue
 func (j *DSGitHub) ProcessPull(ctx *Ctx, inPull map[string]interface{}) (pull map[string]interface{}, err error) {
 	pull = inPull
 	pull["user_data"] = map[string]interface{}{}
+	pull["merged_by_data"] = map[string]interface{}{}
 	pull["review_comments_data"] = map[string]interface{}{}
 	pull["reviews_data"] = []interface{}{}
 	pull["requested_reviewers_data"] = []interface{}{}
-	pull["merged_by_data"] = []interface{}{}
 	pull["commits_data"] = []interface{}{}
 	// ["user", "review_comments", "requested_reviewers", "merged_by", "commits", "assignee", "assignees"]
 	number, ok := Dig(pull, []string{"number"}, false, true)
@@ -1923,6 +2051,21 @@ func (j *DSGitHub) ProcessPull(ctx *Ctx, inPull map[string]interface{}) (pull ma
 		if err != nil {
 			return
 		}
+		// That would fetch the full commit data
+		//pull["commits_data"], err = j.githubPullCommits(ctx, j.Org, j.Repo, iNumber, true)
+		var commitsData []map[string]interface{}
+		commitsData, err = j.githubPullCommits(ctx, j.Org, j.Repo, iNumber, false)
+		if err != nil {
+			return
+		}
+		ary := []interface{}{}
+		for _, com := range commitsData {
+			sha, ok := Dig(com, []string{"sha"}, false, true)
+			if ok {
+				ary = append(ary, sha)
+			}
+		}
+		pull["commits_data"] = ary
 	}
 	userLogin, ok := Dig(pull, []string{"user", "login"}, false, true)
 	if ok {
@@ -1962,7 +2105,6 @@ func (j *DSGitHub) ProcessPull(ctx *Ctx, inPull map[string]interface{}) (pull ma
 		}
 		pull["assignees_data"] = assigneesAry
 	}
-	// xxx
 	return
 }
 
