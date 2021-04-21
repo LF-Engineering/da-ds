@@ -27,8 +27,8 @@ const (
 	MaxIssueBodyLength = 4096
 	// MaxPullBodyLength - max pull request body length
 	MaxPullBodyLength = 4096
-	// CacheGitHubRepos - cache this?
-	CacheGitHubRepos = true
+	// CacheGitHubRepo - cache this?
+	CacheGitHubRepo = true
 	// CacheGitHubIssues - cache this?
 	CacheGitHubIssues = false
 	// CacheGitHubUser - cache this?
@@ -41,8 +41,10 @@ const (
 	CacheGitHubCommentReactions = false
 	// CacheGitHubIssueReactions - cache this?
 	CacheGitHubIssueReactions = false
+	// CacheGitHubPull - cache this?
+	CacheGitHubPull = false
 	// CacheGitHubPulls - cache this?
-	CacheGitHubPulls = true
+	CacheGitHubPulls = false
 )
 
 var (
@@ -69,20 +71,22 @@ type DSGitHub struct {
 	Hint                      int
 	CacheDir                  string
 	GitHubMtx                 *sync.RWMutex
-	GitHubReposMtx            *sync.RWMutex
+	GitHubRepoMtx             *sync.RWMutex
 	GitHubIssuesMtx           *sync.RWMutex
 	GitHubUserMtx             *sync.RWMutex
 	GitHubIssueCommentsMtx    *sync.RWMutex
 	GitHubCommentReactionsMtx *sync.RWMutex
 	GitHubIssueReactionsMtx   *sync.RWMutex
+	GitHubPullMtx             *sync.RWMutex
 	GitHubPullsMtx            *sync.RWMutex
-	GitHubRepos               map[string]map[string]interface{}
+	GitHubRepo                map[string]map[string]interface{}
 	GitHubIssues              map[string][]map[string]interface{}
 	GitHubUser                map[string]map[string]interface{}
 	GitHubIssueComments       map[string][]map[string]interface{}
 	GitHubCommentReactions    map[string][]map[string]interface{}
 	GitHubIssueReactions      map[string][]map[string]interface{}
-	GitHubPulls               map[string]map[string]interface{}
+	GitHubPull                map[string]map[string]interface{}
+	GitHubPulls               map[string][]map[string]interface{}
 }
 
 func (j *DSGitHub) getRateLimits(gctx context.Context, ctx *Ctx, gcs []*github.Client, core bool) (int, []int, []int, []time.Duration) {
@@ -166,17 +170,17 @@ func (j *DSGitHub) isAbuse(e error) bool {
 	return strings.Contains(errStr, "403 You have triggered an abuse detection mechanism") || strings.Contains(errStr, "403 API rate limit")
 }
 
-func (j *DSGitHub) githubRepos(ctx *Ctx, org, repo string) (repoData map[string]interface{}, err error) {
+func (j *DSGitHub) githubRepo(ctx *Ctx, org, repo string) (repoData map[string]interface{}, err error) {
 	var found bool
 	origin := org + "/" + repo
 	// Try memory cache 1st
-	if CacheGitHubRepos {
-		if j.GitHubReposMtx != nil {
-			j.GitHubReposMtx.RLock()
+	if CacheGitHubRepo {
+		if j.GitHubRepoMtx != nil {
+			j.GitHubRepoMtx.RLock()
 		}
-		repoData, found = j.GitHubRepos[origin]
-		if j.GitHubReposMtx != nil {
-			j.GitHubReposMtx.RUnlock()
+		repoData, found = j.GitHubRepo[origin]
+		if j.GitHubRepoMtx != nil {
+			j.GitHubRepoMtx.RUnlock()
 		}
 		if found {
 			// Printf("repos found in cache: %+v\n", repoData)
@@ -201,13 +205,13 @@ func (j *DSGitHub) githubRepos(ctx *Ctx, org, repo string) (repoData map[string]
 		rep, response, e = c.Repositories.Get(j.Context, org, repo)
 		// Printf("GET %s/%s -> {%+v, %+v, %+v}\n", org, repo, rep, response, e)
 		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
-			if CacheGitHubRepos {
-				if j.GitHubReposMtx != nil {
-					j.GitHubReposMtx.Lock()
+			if CacheGitHubRepo {
+				if j.GitHubRepoMtx != nil {
+					j.GitHubRepoMtx.Lock()
 				}
-				j.GitHubRepos[origin] = nil
-				if j.GitHubReposMtx != nil {
-					j.GitHubReposMtx.Unlock()
+				j.GitHubRepo[origin] = nil
+				if j.GitHubRepoMtx != nil {
+					j.GitHubRepoMtx.Unlock()
 				}
 			}
 			if ctx.Debug > 1 {
@@ -246,13 +250,13 @@ func (j *DSGitHub) githubRepos(ctx *Ctx, org, repo string) (repoData map[string]
 		// Printf("repos got from API: %+v\n", repoData)
 		break
 	}
-	if CacheGitHubRepos {
-		if j.GitHubReposMtx != nil {
-			j.GitHubReposMtx.Lock()
+	if CacheGitHubRepo {
+		if j.GitHubRepoMtx != nil {
+			j.GitHubRepoMtx.Lock()
 		}
-		j.GitHubRepos[origin] = repoData
-		if j.GitHubReposMtx != nil {
-			j.GitHubReposMtx.Unlock()
+		j.GitHubRepo[origin] = repoData
+		if j.GitHubRepoMtx != nil {
+			j.GitHubRepoMtx.Unlock()
 		}
 	}
 	return
@@ -902,13 +906,13 @@ func (j *DSGitHub) githubPull(ctx *Ctx, org, repo string, number int) (pullData 
 	var found bool
 	key := fmt.Sprintf("%s/%s/%d", org, repo, number)
 	// Try memory cache 1st
-	if CacheGitHubPulls {
-		if j.GitHubPullsMtx != nil {
-			j.GitHubPullsMtx.RLock()
+	if CacheGitHubPull {
+		if j.GitHubPullMtx != nil {
+			j.GitHubPullMtx.RLock()
 		}
-		pullData, found = j.GitHubPulls[key]
-		if j.GitHubPullsMtx != nil {
-			j.GitHubPullsMtx.RUnlock()
+		pullData, found = j.GitHubPull[key]
+		if j.GitHubPullMtx != nil {
+			j.GitHubPullMtx.RUnlock()
 		}
 		if found {
 			// Printf("pull found in cache: %+v\n", pullData)
@@ -933,13 +937,13 @@ func (j *DSGitHub) githubPull(ctx *Ctx, org, repo string, number int) (pullData 
 		pull, response, e = c.PullRequests.Get(j.Context, org, repo, number)
 		// Printf("GET %s/%s/%d -> {%+v, %+v, %+v}\n", org, repo, number, pull, response, e)
 		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
-			if CacheGitHubPulls {
-				if j.GitHubPullsMtx != nil {
-					j.GitHubPullsMtx.Lock()
+			if CacheGitHubPull {
+				if j.GitHubPullMtx != nil {
+					j.GitHubPullMtx.Lock()
 				}
-				j.GitHubPulls[key] = nil
-				if j.GitHubPullsMtx != nil {
-					j.GitHubPullsMtx.Unlock()
+				j.GitHubPull[key] = nil
+				if j.GitHubPullMtx != nil {
+					j.GitHubPullMtx.Unlock()
 				}
 			}
 			if ctx.Debug > 1 {
@@ -985,19 +989,22 @@ func (j *DSGitHub) githubPull(ctx *Ctx, org, repo string, number int) (pullData 
 		// Printf("pull got from API: %+v\n", pullData)
 		break
 	}
-	if CacheGitHubPulls {
-		if j.GitHubPullsMtx != nil {
-			j.GitHubPullsMtx.Lock()
+	if CacheGitHubPull {
+		if j.GitHubPullMtx != nil {
+			j.GitHubPullMtx.Lock()
 		}
-		j.GitHubPulls[key] = pullData
-		if j.GitHubPullsMtx != nil {
-			j.GitHubPullsMtx.Unlock()
+		j.GitHubPull[key] = pullData
+		if j.GitHubPullMtx != nil {
+			j.GitHubPullMtx.Unlock()
 		}
 	}
 	return
 }
 
-func (j *DSGitHub) githubPulls(ctx *Ctx, org, repo string, since *time.Time) (pullsData []map[string]interface{}, err error) {
+func (j *DSGitHub) githubPullsFromIssues(ctx *Ctx, org, repo string, since *time.Time) (pullsData []map[string]interface{}, err error) {
+	if ctx.Debug > 0 {
+		Printf("using issues API to support since %+v\n", *since)
+	}
 	var (
 		issues []map[string]interface{}
 		pull   map[string]interface{}
@@ -1017,6 +1024,122 @@ func (j *DSGitHub) githubPulls(ctx *Ctx, org, repo string, since *time.Time) (pu
 			return
 		}
 		pullsData = append(pullsData, pull)
+	}
+	return
+}
+
+func (j *DSGitHub) githubPulls(ctx *Ctx, org, repo string) (pullsData []map[string]interface{}, err error) {
+	if ctx.Debug > 0 {
+		Printf("using pulls API\n")
+	}
+	var found bool
+	origin := org + "/" + repo
+	// Try memory cache 1st
+	if CacheGitHubPulls {
+		if j.GitHubPullsMtx != nil {
+			j.GitHubPullsMtx.RLock()
+		}
+		pullsData, found = j.GitHubPulls[origin]
+		if j.GitHubPullsMtx != nil {
+			j.GitHubPullsMtx.RUnlock()
+		}
+		if found {
+			// Printf("pulls found in cache: %+v\n", pullsData)
+			return
+		}
+	}
+	var c *github.Client
+	if j.GitHubMtx != nil {
+		j.GitHubMtx.RLock()
+	}
+	c = j.Clients[j.Hint]
+	if j.GitHubMtx != nil {
+		j.GitHubMtx.RUnlock()
+	}
+	opt := &github.PullRequestListOptions{
+		State:     "all",
+		Sort:      "updated",
+		Direction: "asc",
+	}
+	opt.PerPage = 100
+	retry := false
+	for {
+		var (
+			response *github.Response
+			pulls    []*github.PullRequest
+			e        error
+		)
+		pulls, response, e = c.PullRequests.List(j.Context, org, repo, opt)
+		// Printf("GET %s/%s -> {%+v, %+v, %+v}\n", org, repo, pulls, response, e)
+		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
+			if CacheGitHubPulls {
+				if j.GitHubPullsMtx != nil {
+					j.GitHubPullsMtx.Lock()
+				}
+				j.GitHubPulls[origin] = []map[string]interface{}{}
+				if j.GitHubPullsMtx != nil {
+					j.GitHubPullsMtx.Unlock()
+				}
+			}
+			if ctx.Debug > 1 {
+				Printf("githubPulls: pulls not found %s: %v\n", origin, e)
+			}
+			return
+		}
+		if e != nil && !retry {
+			Printf("Error getting %s pulls: response: %+v, error: %+v, retrying rate\n", origin, response, e)
+			Printf("githubPulls: handle rate\n")
+			abuse := j.isAbuse(e)
+			if abuse {
+				sleepFor := 10 + rand.Intn(10)
+				Printf("GitHub detected abuse (get pulls %s), waiting for %ds\n", origin, sleepFor)
+				time.Sleep(time.Duration(sleepFor) * time.Second)
+			}
+			if j.GitHubMtx != nil {
+				j.GitHubMtx.Lock()
+			}
+			j.Hint, _ = j.handleRate(ctx)
+			c = j.Clients[j.Hint]
+			if j.GitHubMtx != nil {
+				j.GitHubMtx.Unlock()
+			}
+			if !abuse {
+				retry = true
+			}
+			continue
+		}
+		if e != nil {
+			err = e
+			return
+		}
+		for _, pull := range pulls {
+			pr := map[string]interface{}{}
+			jm, _ := jsoniter.Marshal(pull)
+			_ = jsoniter.Unmarshal(jm, &pr)
+			body, ok := Dig(pr, []string{"body"}, false, true)
+			if ok {
+				nBody := len(body.(string))
+				if nBody > MaxPullBodyLength {
+					pr["body"] = body.(string)[:MaxPullBodyLength]
+				}
+			}
+			pullsData = append(pullsData, pr)
+		}
+		if response.NextPage == 0 {
+			break
+		}
+		opt.Page = response.NextPage
+		retry = false
+		// Printf("pulls got from API: %+v\n", pullsData)
+	}
+	if CacheGitHubPulls {
+		if j.GitHubPullsMtx != nil {
+			j.GitHubPullsMtx.Lock()
+		}
+		j.GitHubPulls[origin] = pullsData
+		if j.GitHubPullsMtx != nil {
+			j.GitHubPullsMtx.Unlock()
+		}
 	}
 	return
 }
@@ -1081,8 +1204,8 @@ func (j *DSGitHub) Validate(ctx *Ctx) (err error) {
 			j.Clients = append(j.Clients, client)
 		}
 	}
-	if CacheGitHubRepos {
-		j.GitHubRepos = make(map[string]map[string]interface{})
+	if CacheGitHubRepo {
+		j.GitHubRepo = make(map[string]map[string]interface{})
 	}
 	if CacheGitHubIssues {
 		j.GitHubIssues = make(map[string][]map[string]interface{})
@@ -1099,14 +1222,17 @@ func (j *DSGitHub) Validate(ctx *Ctx) (err error) {
 	if CacheGitHubIssueReactions {
 		j.GitHubIssueReactions = make(map[string][]map[string]interface{})
 	}
+	if CacheGitHubPull {
+		j.GitHubPull = make(map[string]map[string]interface{})
+	}
 	if CacheGitHubPulls {
-		j.GitHubPulls = make(map[string]map[string]interface{})
+		j.GitHubPulls = make(map[string][]map[string]interface{})
 	}
 	j.ThrN = GetThreadsNum(ctx)
 	if j.ThrN > 1 {
 		j.GitHubMtx = &sync.RWMutex{}
-		if CacheGitHubRepos {
-			j.GitHubReposMtx = &sync.RWMutex{}
+		if CacheGitHubRepo {
+			j.GitHubRepoMtx = &sync.RWMutex{}
 		}
 		if CacheGitHubIssues {
 			j.GitHubIssuesMtx = &sync.RWMutex{}
@@ -1122,6 +1248,9 @@ func (j *DSGitHub) Validate(ctx *Ctx) (err error) {
 		}
 		if CacheGitHubIssueReactions {
 			j.GitHubIssueReactionsMtx = &sync.RWMutex{}
+		}
+		if CacheGitHubPull {
+			j.GitHubPullMtx = &sync.RWMutex{}
 		}
 		if CacheGitHubPulls {
 			j.GitHubPullsMtx = &sync.RWMutex{}
@@ -1183,7 +1312,7 @@ func (j *DSGitHub) FetchItems(ctx *Ctx) (err error) {
 // FetchItemsRepository - implement raw repository data for GitHub datasource
 func (j *DSGitHub) FetchItemsRepository(ctx *Ctx) (err error) {
 	items := []interface{}{}
-	item, err := j.githubRepos(ctx, j.Org, j.Repo)
+	item, err := j.githubRepo(ctx, j.Org, j.Repo)
 	FatalOnError(err)
 	item["fetched_on"] = fmt.Sprintf("%.6f", float64(time.Now().UnixNano())/1.0e9)
 	esItem := j.AddMetadata(ctx, item)
@@ -1473,7 +1602,12 @@ func (j *DSGitHub) FetchItemsPullRequest(ctx *Ctx) (err error) {
 		}
 		return
 	}
-	pulls, err := j.githubPulls(ctx, j.Org, j.Repo, ctx.DateFrom)
+	var pulls []map[string]interface{}
+	if ctx.DateFrom != nil {
+		pulls, err = j.githubPullsFromIssues(ctx, j.Org, j.Repo, ctx.DateFrom)
+	} else {
+		pulls, err = j.githubPulls(ctx, j.Org, j.Repo)
+	}
 	FatalOnError(err)
 	Printf("got %d pulls\n", len(pulls))
 	if j.ThrN > 1 {
