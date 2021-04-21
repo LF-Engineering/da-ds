@@ -2751,6 +2751,56 @@ func (j *DSGitHub) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[
 		item, _ := Dig(doc, []string{"data"}, true, false)
 		user, _ := Dig(item, []string{"user_data"}, true, false)
 		identities[j.IdentityForObject(ctx, user.(map[string]interface{}))] = struct{}{}
+		mergedBy, ok := Dig(item, []string{"merged_by_data"}, false, true)
+		if ok {
+			identities[j.IdentityForObject(ctx, mergedBy.(map[string]interface{}))] = struct{}{}
+		}
+		assignee, ok := Dig(item, []string{"assignee_data"}, false, true)
+		if ok {
+			identities[j.IdentityForObject(ctx, assignee.(map[string]interface{}))] = struct{}{}
+		}
+		assignees, ok := Dig(item, []string{"assignees_data"}, false, true)
+		if ok {
+			ary, _ := assignees.([]interface{})
+			for _, assignee := range ary {
+				identities[j.IdentityForObject(ctx, assignee.(map[string]interface{}))] = struct{}{}
+			}
+		}
+		comments, ok := Dig(item, []string{"review_comments_data"}, false, true)
+		if ok {
+			ary, _ := comments.([]interface{})
+			for _, comment := range ary {
+				comm, _ := comment.(map[string]interface{})
+				user, ok := Dig(comm, []string{"user_data"}, false, true)
+				if ok {
+					identities[j.IdentityForObject(ctx, user.(map[string]interface{}))] = struct{}{}
+				}
+				reactions, ok2 := Dig(comm, []string{"reactions_data"}, false, true)
+				if ok2 {
+					ary2, _ := reactions.([]interface{})
+					for _, reaction := range ary2 {
+						react, _ := reaction.(map[string]interface{})
+						user, ok := Dig(react, []string{"user_data"}, false, true)
+						if ok {
+							identities[j.IdentityForObject(ctx, user.(map[string]interface{}))] = struct{}{}
+						}
+					}
+				}
+			}
+		}
+		reviews, ok := Dig(item, []string{"reviews_data"}, false, true)
+		if ok {
+			ary, _ := reviews.([]interface{})
+			for _, review := range ary {
+				rev, _ := review.(map[string]interface{})
+				user, ok := Dig(rev, []string{"user_data"}, false, true)
+				if ok {
+					identities[j.IdentityForObject(ctx, user.(map[string]interface{}))] = struct{}{}
+				}
+			}
+		}
+		// We don't process commits_data - we only hold array of commits SHAs here
+		// Code to process this is commented out because p2o is not doing this neither
 	}
 	return
 }
