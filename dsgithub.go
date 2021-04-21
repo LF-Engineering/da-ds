@@ -2677,7 +2677,6 @@ func (j *DSGitHub) IdentityForObject(ctx *Ctx, item map[string]interface{}) (ide
 // (name, username, email) tripples, special value Nil "none" means null
 // we use string and not *string which allows nil to allow usage as a map key
 func (j *DSGitHub) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3]string]struct{}, err error) {
-	// IMPL:
 	switch j.Category {
 	case "repository":
 		return
@@ -2918,7 +2917,6 @@ func (j *DSGitHub) GitHubRepositoryEnrichItemsFunc(ctx *Ctx, thrN int, items []i
 // items is a current pack of input items
 // docs is a pointer to where extracted identities will be stored
 func (j *DSGitHub) GitHubIssueEnrichItemsFunc(ctx *Ctx, thrN int, items []interface{}, docs *[]interface{}) (err error) {
-	// IMPL:
 	if ctx.Debug > 0 {
 		Printf("github enrich issue items %d/%d func\n", len(items), len(*docs))
 	}
@@ -2931,6 +2929,44 @@ func (j *DSGitHub) GitHubIssueEnrichItemsFunc(ctx *Ctx, thrN int, items []interf
 		ch = make(chan error)
 	}
 	dbConfigured := ctx.AffsDBConfigured()
+	getRichItems := func(doc map[string]interface{}) (richItems []interface{}, e error) {
+		var rich map[string]interface{}
+		rich, e = j.EnrichItem(ctx, doc, "", dbConfigured, nil)
+		if e != nil {
+			return
+		}
+		richItems = append(richItems, rich)
+		data, _ := Dig(doc, []string{"data"}, true, false)
+		// issue: assignees_data[]
+		// issue: comments_data[].user_data
+		// issue: comments_data[].reactions_data[].user_data
+		// issue: reactions_data[].user_data
+		iComments, ok := Dig(data, []string{"comments_data"}, false, true)
+		if ok && iComments != nil {
+			comments, ok := iComments.([]interface{})
+			if ok {
+				var comms []map[string]interface{}
+				for _, iComment := range comments {
+					comment, ok := iComment.(map[string]interface{})
+					if !ok {
+						continue
+					}
+					comms = append(comms, comment)
+				}
+				if len(comms) > 0 {
+					var riches []interface{}
+					riches, e = j.EnrichComments(ctx, rich, comms, dbConfigured)
+					if e != nil {
+						return
+					}
+					richItems = append(richItems, riches...)
+				}
+			}
+		}
+		// Possibly enrich assignees items
+		// Possibly enrich reactions items (on issue and maybe all its sub-comments)
+		return
+	}
 	nThreads := 0
 	procItem := func(c chan error, idx int) (e error) {
 		if thrN > 1 {
@@ -2955,20 +2991,23 @@ func (j *DSGitHub) GitHubIssueEnrichItemsFunc(ctx *Ctx, thrN int, items []interf
 			e = fmt.Errorf("Failed to parse document %+v", doc)
 			return
 		}
-		if 1 == 0 {
-			Printf("%v\n", dbConfigured)
+		richItems, e := getRichItems(doc)
+		if e != nil {
+			return
 		}
-		// Actual item enrichment
-		/*
-			    var rich map[string]interface{}
-					if thrN > 1 {
-						mtx.Lock()
-					}
-					*docs = append(*docs, rich)
-					if thrN > 1 {
-						mtx.Unlock()
-					}
-		*/
+		for _, rich := range richItems {
+			e = EnrichItem(ctx, j, rich.(map[string]interface{}))
+			if e != nil {
+				return
+			}
+		}
+		if thrN > 1 {
+			mtx.Lock()
+		}
+		*docs = append(*docs, richItems...)
+		if thrN > 1 {
+			mtx.Unlock()
+		}
 		return
 	}
 	if thrN > 1 {
@@ -3015,9 +3054,43 @@ func (j *DSGitHub) EnrichItem(ctx *Ctx, item map[string]interface{}, author stri
 	switch j.Category {
 	case "repository":
 		return j.EnrichRepositoryItem(ctx, item, author, affs, extra)
+	case "issue":
+		return j.EnrichIssueItem(ctx, item, author, affs, extra)
 	default:
 		err = fmt.Errorf("EnrichItem: unknown category %s", j.Category)
 	}
+	return
+}
+
+// EnrichComments - return rich comments from raw issue
+func (j *DSGitHub) EnrichComments(ctx *Ctx, issue map[string]interface{}, comments []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
+	// xxx
+	return
+}
+
+// EnrichIssueItem - return rich item from raw item for a given author type
+func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author string, affs bool, extra interface{}) (rich map[string]interface{}, err error) {
+	rich = make(map[string]interface{})
+	issue, ok := item["data"].(map[string]interface{})
+	if !ok {
+		err = fmt.Errorf("missing data field in item %+v", DumpKeys(item))
+		return
+	}
+	for _, field := range RawFields {
+		v, _ := item[field]
+		rich[field] = v
+	}
+	rich["repo_name"] = j.URL
+	rich["issue_id"], _ = issue["id"]
+	// exx
+	/*
+		updatedOn, _ := Dig(item, []string{j.DateField(ctx)}, true, false)
+		for prop, value := range CommonFields(j, updatedOn, "repository") {
+			rich[prop] = value
+		}
+	*/
+	rich["type"] = "issue"
+	rich["category"] = "issue"
 	return
 }
 
