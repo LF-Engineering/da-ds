@@ -1891,7 +1891,7 @@ func (j *DSGitHub) ItemID(item interface{}) string {
 	if !ok {
 		Fatalf("%s: ItemID() - cannot extract id from %+v", j.DS, DumpKeys(item))
 	}
-	return fmt.Sprintf("%d", int64(id.(float64)))
+	return fmt.Sprintf("%s/%d", j.Category, int64(id.(float64)))
 }
 
 // AddMetadata - add metadata to the item
