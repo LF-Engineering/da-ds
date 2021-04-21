@@ -2652,15 +2652,107 @@ func (j *DSGitHub) ElasticRichMapping() []byte {
 	return GitHubRichMapping
 }
 
+// IdentityForObject - construct identity from a given object
+func (j *DSGitHub) IdentityForObject(ctx *Ctx, item map[string]interface{}) (identity [3]string) {
+	if ctx.Debug > 1 {
+		defer func() {
+			Printf("IdentityForObject: %+v -> %+v\n", item, identity)
+		}()
+	}
+	for i, prop := range []string{"name", "login", "email"} {
+		iVal, ok := Dig(item, []string{prop}, false, true)
+		if ok {
+			val, ok := iVal.(string)
+			if ok {
+				identity[i] = val
+			}
+		} else {
+			identity[i] = Nil
+		}
+	}
+	return
+}
+
 // GetItemIdentities return list of item's identities, each one is [3]string
 // (name, username, email) tripples, special value Nil "none" means null
 // we use string and not *string which allows nil to allow usage as a map key
-func (j *DSGitHub) GetItemIdentities(ctx *Ctx, doc interface{}) (map[[3]string]struct{}, error) {
-	if j.Category == "repository" {
-		return map[[3]string]struct{}{}, nil
-	}
+func (j *DSGitHub) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3]string]struct{}, err error) {
 	// IMPL:
-	return map[[3]string]struct{}{}, nil
+	switch j.Category {
+	case "repository":
+		return
+	case "issue":
+		// issue: user_data
+		// issue: assignee_data
+		// issue: assignees_data[]
+		// issue: comments_data[].user_data
+		// issue: comments_data[].reactions_data[].user_data
+		// issue: reactions_data[].user_data
+		identities = make(map[[3]string]struct{})
+		item, _ := Dig(doc, []string{"data"}, true, false)
+		user, _ := Dig(item, []string{"user_data"}, true, false)
+		identities[j.IdentityForObject(ctx, user.(map[string]interface{}))] = struct{}{}
+		assignee, ok := Dig(item, []string{"assignee_data"}, false, true)
+		if ok {
+			identities[j.IdentityForObject(ctx, assignee.(map[string]interface{}))] = struct{}{}
+		}
+		assignees, ok := Dig(item, []string{"assignees_data"}, false, true)
+		if ok {
+			ary, _ := assignees.([]interface{})
+			for _, assignee := range ary {
+				identities[j.IdentityForObject(ctx, assignee.(map[string]interface{}))] = struct{}{}
+			}
+		}
+		comments, ok := Dig(item, []string{"comments_data"}, false, true)
+		if ok {
+			ary, _ := comments.([]interface{})
+			for _, comment := range ary {
+				comm, _ := comment.(map[string]interface{})
+				user, ok := Dig(comm, []string{"user_data"}, false, true)
+				if ok {
+					identities[j.IdentityForObject(ctx, user.(map[string]interface{}))] = struct{}{}
+				}
+				reactions, ok2 := Dig(comm, []string{"reactions_data"}, false, true)
+				if ok2 {
+					ary2, _ := reactions.([]interface{})
+					for _, reaction := range ary2 {
+						react, _ := reaction.(map[string]interface{})
+						user, ok := Dig(react, []string{"user_data"}, false, true)
+						if ok {
+							identities[j.IdentityForObject(ctx, user.(map[string]interface{}))] = struct{}{}
+						}
+					}
+				}
+			}
+		}
+		reactions, ok := Dig(item, []string{"reactions_data"}, false, true)
+		if ok {
+			ary, _ := reactions.([]interface{})
+			for _, reaction := range ary {
+				react, _ := reaction.(map[string]interface{})
+				user, ok := Dig(react, []string{"user_data"}, false, true)
+				if ok {
+					identities[j.IdentityForObject(ctx, user.(map[string]interface{}))] = struct{}{}
+				}
+			}
+		}
+	case "pull_request":
+		// pr:    user_data
+		// pr:    merged_by_data
+		// pr:    assignee_data
+		// pr:    assignees_data[]
+		// pr:    reviews_data[].user_data
+		// pr:    review_comments_data[].user_data
+		// pr:    review_comments_data[].reactions_data[].user_data
+		// pr:    requested_reviewers_data[].user_data
+		// pr:    commits_data[].author_data (not used)
+		// pr:    commits_data[].committer_data (not used)
+		identities = make(map[[3]string]struct{})
+		item, _ := Dig(doc, []string{"data"}, true, false)
+		user, _ := Dig(item, []string{"user_data"}, true, false)
+		identities[j.IdentityForObject(ctx, user.(map[string]interface{}))] = struct{}{}
+	}
+	return
 }
 
 // GitHubEnrichItemsFunc - iterate items and enrich them
