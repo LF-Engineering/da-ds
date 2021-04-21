@@ -29,6 +29,10 @@ const (
 	MaxPullBodyLength = 4096
 	// MaxReviewBodyLength - max review body length
 	MaxReviewBodyLength = 4096
+	// MaxReviewCommentBodyLength - max review comment body length
+	MaxReviewCommentBodyLength = 4096
+	// ItemsPerPage - how many items in a page
+	ItemsPerPage = 100
 	// CacheGitHubRepo - cache this?
 	CacheGitHubRepo = true
 	// CacheGitHubIssues - cache this?
@@ -49,6 +53,8 @@ const (
 	CacheGitHubPulls = false
 	// CacheGitHubPullReviews - cache this?
 	CacheGitHubPullReviews = false
+	// CacheGitHubPullReviewComments - cache this?
+	CacheGitHubPullReviewComments = true
 )
 
 var (
@@ -62,37 +68,39 @@ var (
 
 // DSGitHub - DS implementation for GitHub
 type DSGitHub struct {
-	DS                        string // From DA_DS - data source type "github"
-	Org                       string // From DA_GITHUB_ORG - github org
-	Repo                      string // From DA_GITHUB_REPO - github repo
-	Category                  string // From DA_GITHUB_CATEGORY - issue, pull_request, repository
-	Tokens                    string // From DA_GITHUB_TOKENS - "," separated list of OAuth tokens
-	URL                       string
-	Clients                   []*github.Client
-	Context                   context.Context
-	OAuthKeys                 []string
-	ThrN                      int
-	Hint                      int
-	CacheDir                  string
-	GitHubMtx                 *sync.RWMutex
-	GitHubRepoMtx             *sync.RWMutex
-	GitHubIssuesMtx           *sync.RWMutex
-	GitHubUserMtx             *sync.RWMutex
-	GitHubIssueCommentsMtx    *sync.RWMutex
-	GitHubCommentReactionsMtx *sync.RWMutex
-	GitHubIssueReactionsMtx   *sync.RWMutex
-	GitHubPullMtx             *sync.RWMutex
-	GitHubPullsMtx            *sync.RWMutex
-	GitHubPullReviewsMtx      *sync.RWMutex
-	GitHubRepo                map[string]map[string]interface{}
-	GitHubIssues              map[string][]map[string]interface{}
-	GitHubUser                map[string]map[string]interface{}
-	GitHubIssueComments       map[string][]map[string]interface{}
-	GitHubCommentReactions    map[string][]map[string]interface{}
-	GitHubIssueReactions      map[string][]map[string]interface{}
-	GitHubPull                map[string]map[string]interface{}
-	GitHubPulls               map[string][]map[string]interface{}
-	GitHubPullReviews         map[string][]map[string]interface{}
+	DS                          string // From DA_DS - data source type "github"
+	Org                         string // From DA_GITHUB_ORG - github org
+	Repo                        string // From DA_GITHUB_REPO - github repo
+	Category                    string // From DA_GITHUB_CATEGORY - issue, pull_request, repository
+	Tokens                      string // From DA_GITHUB_TOKENS - "," separated list of OAuth tokens
+	URL                         string
+	Clients                     []*github.Client
+	Context                     context.Context
+	OAuthKeys                   []string
+	ThrN                        int
+	Hint                        int
+	CacheDir                    string
+	GitHubMtx                   *sync.RWMutex
+	GitHubRepoMtx               *sync.RWMutex
+	GitHubIssuesMtx             *sync.RWMutex
+	GitHubUserMtx               *sync.RWMutex
+	GitHubIssueCommentsMtx      *sync.RWMutex
+	GitHubCommentReactionsMtx   *sync.RWMutex
+	GitHubIssueReactionsMtx     *sync.RWMutex
+	GitHubPullMtx               *sync.RWMutex
+	GitHubPullsMtx              *sync.RWMutex
+	GitHubPullReviewsMtx        *sync.RWMutex
+	GitHubPullReviewCommentsMtx *sync.RWMutex
+	GitHubRepo                  map[string]map[string]interface{}
+	GitHubIssues                map[string][]map[string]interface{}
+	GitHubUser                  map[string]map[string]interface{}
+	GitHubIssueComments         map[string][]map[string]interface{}
+	GitHubCommentReactions      map[string][]map[string]interface{}
+	GitHubIssueReactions        map[string][]map[string]interface{}
+	GitHubPull                  map[string]map[string]interface{}
+	GitHubPulls                 map[string][]map[string]interface{}
+	GitHubPullReviews           map[string][]map[string]interface{}
+	GitHubPullReviewComments    map[string][]map[string]interface{}
 }
 
 func (j *DSGitHub) getRateLimits(gctx context.Context, ctx *Ctx, gcs []*github.Client, core bool) (int, []int, []int, []time.Duration) {
@@ -471,7 +479,7 @@ func (j *DSGitHub) githubIssues(ctx *Ctx, org, repo string, since *time.Time) (i
 		Sort:      "updated",
 		Direction: "asc",
 	}
-	opt.PerPage = 100
+	opt.PerPage = ItemsPerPage
 	if since != nil {
 		opt.Since = *since
 	}
@@ -584,7 +592,7 @@ func (j *DSGitHub) githubIssueComments(ctx *Ctx, org, repo string, number int) (
 		j.GitHubMtx.RUnlock()
 	}
 	opt := &github.IssueListCommentsOptions{}
-	opt.PerPage = 100
+	opt.PerPage = ItemsPerPage
 	retry := false
 	for {
 		var (
@@ -715,7 +723,7 @@ func (j *DSGitHub) githubCommentReactions(ctx *Ctx, org, repo string, cid int64)
 		j.GitHubMtx.RUnlock()
 	}
 	opt := &github.ListOptions{}
-	opt.PerPage = 100
+	opt.PerPage = ItemsPerPage
 	retry := false
 	for {
 		var (
@@ -825,7 +833,7 @@ func (j *DSGitHub) githubIssueReactions(ctx *Ctx, org, repo string, number int) 
 		j.GitHubMtx.RUnlock()
 	}
 	opt := &github.ListOptions{}
-	opt.PerPage = 100
+	opt.PerPage = ItemsPerPage
 	retry := false
 	for {
 		var (
@@ -1062,7 +1070,7 @@ func (j *DSGitHub) githubPulls(ctx *Ctx, org, repo string) (pullsData []map[stri
 		Sort:      "updated",
 		Direction: "asc",
 	}
-	opt.PerPage = 100
+	opt.PerPage = ItemsPerPage
 	retry := false
 	for {
 		var (
@@ -1171,7 +1179,7 @@ func (j *DSGitHub) githubPullReviews(ctx *Ctx, org, repo string, number int) (re
 		j.GitHubMtx.RUnlock()
 	}
 	opt := &github.ListOptions{}
-	opt.PerPage = 100
+	opt.PerPage = ItemsPerPage
 	retry := false
 	for {
 		var (
@@ -1256,6 +1264,125 @@ func (j *DSGitHub) githubPullReviews(ctx *Ctx, org, repo string, number int) (re
 		j.GitHubPullReviews[key] = reviews
 		if j.GitHubPullReviewsMtx != nil {
 			j.GitHubPullReviewsMtx.Unlock()
+		}
+	}
+	return
+}
+
+func (j *DSGitHub) githubPullReviewComments(ctx *Ctx, org, repo string, number int) (reviewComments []map[string]interface{}, err error) {
+	var found bool
+	key := fmt.Sprintf("%s/%s/%d", org, repo, number)
+	// Try memory cache 1st
+	if CacheGitHubPullReviewComments {
+		if j.GitHubPullReviewCommentsMtx != nil {
+			j.GitHubPullReviewCommentsMtx.RLock()
+		}
+		reviewComments, found = j.GitHubPullReviewComments[key]
+		if j.GitHubPullReviewCommentsMtx != nil {
+			j.GitHubPullReviewCommentsMtx.RUnlock()
+		}
+		if found {
+			// Printf("pull review comments found in cache: %+v\n", reviewComments)
+			return
+		}
+	}
+	var c *github.Client
+	if j.GitHubMtx != nil {
+		j.GitHubMtx.RLock()
+	}
+	c = j.Clients[j.Hint]
+	if j.GitHubMtx != nil {
+		j.GitHubMtx.RUnlock()
+	}
+	opt := &github.PullRequestListCommentsOptions{
+		Sort:      "updated",
+		Direction: "asc",
+	}
+	opt.PerPage = ItemsPerPage
+	retry := false
+	for {
+		var (
+			response *github.Response
+			revComms []*github.PullRequestComment
+			e        error
+		)
+		revComms, response, e = c.PullRequests.ListComments(j.Context, org, repo, number, opt)
+		// Printf("GET %s/%s/%s -> {%+v, %+v, %+v}\n", org, repo, number, revComms, response, e)
+		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
+			if CacheGitHubPullReviewComments {
+				if j.GitHubPullReviewCommentsMtx != nil {
+					j.GitHubPullReviewCommentsMtx.Lock()
+				}
+				j.GitHubPullReviewComments[key] = []map[string]interface{}{}
+				if j.GitHubPullReviewCommentsMtx != nil {
+					j.GitHubPullReviewCommentsMtx.Unlock()
+				}
+			}
+			if ctx.Debug > 1 {
+				Printf("githubPullReviewComments: review comments not found %s: %v\n", key, e)
+			}
+			return
+		}
+		if e != nil && !retry {
+			Printf("Error getting %s pull review comments: response: %+v, error: %+v, retrying rate\n", key, response, e)
+			Printf("githubPullReviewComments: handle rate\n")
+			abuse := j.isAbuse(e)
+			if abuse {
+				sleepFor := 10 + rand.Intn(10)
+				Printf("GitHub detected abuse (get pull review comments %s), waiting for %ds\n", key, sleepFor)
+				time.Sleep(time.Duration(sleepFor) * time.Second)
+			}
+			if j.GitHubMtx != nil {
+				j.GitHubMtx.Lock()
+			}
+			j.Hint, _ = j.handleRate(ctx)
+			c = j.Clients[j.Hint]
+			if j.GitHubMtx != nil {
+				j.GitHubMtx.Unlock()
+			}
+			if !abuse {
+				retry = true
+			}
+			continue
+		}
+		if e != nil {
+			err = e
+			return
+		}
+		for _, reviewComment := range revComms {
+			revComm := map[string]interface{}{}
+			jm, _ := jsoniter.Marshal(reviewComment)
+			_ = jsoniter.Unmarshal(jm, &revComm)
+			body, ok := Dig(revComm, []string{"body"}, false, true)
+			if ok {
+				nBody := len(body.(string))
+				if nBody > MaxReviewCommentBodyLength {
+					revComm["body"] = body.(string)[:MaxReviewCommentBodyLength]
+				}
+			}
+			userLogin, ok := Dig(revComm, []string{"user", "login"}, false, true)
+			if ok {
+				revComm["user_data"], _, err = j.githubUser(ctx, userLogin.(string))
+				if err != nil {
+					return
+				}
+			}
+			reviewComments = append(reviewComments, revComm)
+		}
+		if response.NextPage == 0 {
+			break
+		}
+		opt.Page = response.NextPage
+		retry = false
+		// Printf("pull review comments got from API: %+v\n", reviewComments)
+	}
+	if CacheGitHubPullReviewComments {
+		if j.GitHubPullReviewCommentsMtx != nil {
+			j.GitHubPullReviewCommentsMtx.Lock()
+		}
+		j.GitHubPullReviewComments[key] = reviewComments
+		if j.GitHubPullReviewCommentsMtx != nil {
+			j.GitHubPullReviewCommentsMtx.Unlock()
 		}
 	}
 	return
@@ -1348,6 +1475,9 @@ func (j *DSGitHub) Validate(ctx *Ctx) (err error) {
 	if CacheGitHubPullReviews {
 		j.GitHubPullReviews = make(map[string][]map[string]interface{})
 	}
+	if CacheGitHubPullReviewComments {
+		j.GitHubPullReviewComments = make(map[string][]map[string]interface{})
+	}
 	// Multithreading
 	j.ThrN = GetThreadsNum(ctx)
 	if j.ThrN > 1 {
@@ -1378,6 +1508,9 @@ func (j *DSGitHub) Validate(ctx *Ctx) (err error) {
 		}
 		if CacheGitHubPullReviews {
 			j.GitHubPullReviewsMtx = &sync.RWMutex{}
+		}
+		if CacheGitHubPullReviewComments {
+			j.GitHubPullReviewCommentsMtx = &sync.RWMutex{}
 		}
 	}
 	j.Hint, _ = j.handleRate(ctx)
@@ -1525,7 +1658,12 @@ func (j *DSGitHub) ProcessPull(ctx *Ctx, inPull map[string]interface{}) (pull ma
 	// ["user", "review_comments", "requested_reviewers", "merged_by", "commits", "assignee", "assignees"]
 	number, ok := Dig(pull, []string{"number"}, false, true)
 	if ok {
-		pull["reviews_data"], err = j.githubPullReviews(ctx, j.Org, j.Repo, int(number.(float64)))
+		iNumber := int(number.(float64))
+		pull["reviews_data"], err = j.githubPullReviews(ctx, j.Org, j.Repo, iNumber)
+		if err != nil {
+			return
+		}
+		pull["review_comments_data"], err = j.githubPullReviewComments(ctx, j.Org, j.Repo, iNumber)
 		if err != nil {
 			return
 		}
