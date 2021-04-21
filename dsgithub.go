@@ -3256,8 +3256,8 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 		rich[prop] = value
 	}
 	// xxx
-	rich["type"] = "issue"
-	rich["category"] = "issue"
+	rich["type"] = j.Category
+	rich["category"] = j.Category
 	return
 }
 
@@ -3280,8 +3280,8 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 		rich[prop] = value
 	}
 	// xxx
-	rich["type"] = "pull_request"
-	rich["category"] = "pull_request"
+	rich["type"] = j.Category
+	rich["category"] = j.Category
 	return
 }
 
@@ -3309,8 +3309,8 @@ func (j *DSGitHub) EnrichRepositoryItem(ctx *Ctx, item map[string]interface{}, a
 	for prop, value := range CommonFields(j, updatedOn, j.Category) {
 		rich[prop] = value
 	}
-	rich["type"] = "repository"
-	rich["category"] = "repository"
+	rich["type"] = j.Category
+	rich["category"] = j.Category
 	return
 }
 
