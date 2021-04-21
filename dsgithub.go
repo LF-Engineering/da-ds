@@ -48,7 +48,7 @@ const (
 	// CacheGitHubPulls - cache this?
 	CacheGitHubPulls = false
 	// CacheGitHubPullReviews - cache this?
-	CacheGitHubPullReviews = true
+	CacheGitHubPullReviews = false
 )
 
 var (
@@ -1008,9 +1008,6 @@ func (j *DSGitHub) githubPull(ctx *Ctx, org, repo string, number int) (pullData 
 }
 
 func (j *DSGitHub) githubPullsFromIssues(ctx *Ctx, org, repo string, since *time.Time) (pullsData []map[string]interface{}, err error) {
-	if ctx.Debug > 0 {
-		Printf("using issues API to support since %+v\n", *since)
-	}
 	var (
 		issues []map[string]interface{}
 		pull   map[string]interface{}
@@ -1035,9 +1032,7 @@ func (j *DSGitHub) githubPullsFromIssues(ctx *Ctx, org, repo string, since *time
 }
 
 func (j *DSGitHub) githubPulls(ctx *Ctx, org, repo string) (pullsData []map[string]interface{}, err error) {
-	if ctx.Debug > 0 {
-		Printf("using pulls API\n")
-	}
+	// WARNING: this is not returning all possible Pull sub fields, recommend to use githubPullsFromIssues instead.
 	var found bool
 	origin := org + "/" + repo
 	// Try memory cache 1st
@@ -1465,7 +1460,7 @@ func (j *DSGitHub) ProcessIssue(ctx *Ctx, inIssue map[string]interface{}) (issue
 	issue["assignees_data"] = []interface{}{}
 	issue["comments_data"] = []interface{}{}
 	issue["reactions_data"] = []interface{}{}
-	// ['user', 'assignee', 'assignees', 'comments', 'reactions']
+	// ["user", "assignee", "assignees", "comments", "reactions"]
 	userLogin, ok := Dig(issue, []string{"user", "login"}, false, true)
 	if ok {
 		issue["user_data"], _, err = j.githubUser(ctx, userLogin.(string))
@@ -1527,12 +1522,51 @@ func (j *DSGitHub) ProcessPull(ctx *Ctx, inPull map[string]interface{}) (pull ma
 	pull["requested_reviewers_data"] = []interface{}{}
 	pull["merged_by_data"] = []interface{}{}
 	pull["commits_data"] = []interface{}{}
+	// ["user", "review_comments", "requested_reviewers", "merged_by", "commits", "assignee", "assignees"]
 	number, ok := Dig(pull, []string{"number"}, false, true)
 	if ok {
 		pull["reviews_data"], err = j.githubPullReviews(ctx, j.Org, j.Repo, int(number.(float64)))
 		if err != nil {
 			return
 		}
+	}
+	userLogin, ok := Dig(pull, []string{"user", "login"}, false, true)
+	if ok {
+		pull["user_data"], _, err = j.githubUser(ctx, userLogin.(string))
+		if err != nil {
+			return
+		}
+	}
+	mergedByLogin, ok := Dig(pull, []string{"merged_by", "login"}, false, true)
+	if ok {
+		pull["merged_by_data"], _, err = j.githubUser(ctx, mergedByLogin.(string))
+		if err != nil {
+			return
+		}
+	}
+	assigneeLogin, ok := Dig(pull, []string{"assignee", "login"}, false, true)
+	if ok {
+		pull["assignee_data"], _, err = j.githubUser(ctx, assigneeLogin.(string))
+		if err != nil {
+			return
+		}
+	}
+	iAssignees, ok := Dig(pull, []string{"assignees"}, false, true)
+	if ok {
+		assignees, _ := iAssignees.([]interface{})
+		assigneesAry := []map[string]interface{}{}
+		for _, assignee := range assignees {
+			aLogin, ok := Dig(assignee, []string{"login"}, false, true)
+			if ok {
+				assigneeData, _, e := j.githubUser(ctx, aLogin.(string))
+				if e != nil {
+					err = e
+					return
+				}
+				assigneesAry = append(assigneesAry, assigneeData)
+			}
+		}
+		pull["assignees_data"] = assigneesAry
 	}
 	// xxx
 	return
@@ -1745,7 +1779,9 @@ func (j *DSGitHub) FetchItemsPullRequest(ctx *Ctx) (err error) {
 		return
 	}
 	var pulls []map[string]interface{}
-	if ctx.DateFrom != nil {
+	// PullRequests.Lit doesn't return merged_by data, we need to use PullRequests.Get on each pull
+	// if ctx.DateFrom != nil {
+	if 1 == 1 {
 		pulls, err = j.githubPullsFromIssues(ctx, j.Org, j.Repo, ctx.DateFrom)
 	} else {
 		pulls, err = j.githubPulls(ctx, j.Org, j.Repo)
