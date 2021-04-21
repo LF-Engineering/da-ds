@@ -572,7 +572,7 @@ func ItemsIdentitiesFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[
 	return
 }
 
-// ItemsRefreshIdentitiesFunc - refresh input raw items/re-enrich
+// ItemsRefreshIdentitiesFunc - refresh input items/re-enrich
 // items is a current pack of ES rich items
 // docs is a pointer to where updated rich items will be stored
 func ItemsRefreshIdentitiesFunc(ctx *Ctx, ds DS, thrN int, richItems []interface{}, docs *[]interface{}) (err error) {

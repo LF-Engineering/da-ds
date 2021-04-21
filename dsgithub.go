@@ -2817,6 +2817,8 @@ func GitHubEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs 
 	switch j.Category {
 	case "repository":
 		return j.GitHubRepositoryEnrichItemsFunc(ctx, thrN, items, docs)
+	case "issue":
+		return j.GitHubIssueEnrichItemsFunc(ctx, thrN, items, docs)
 	default:
 		err = fmt.Errorf("GitHubEnrichItemsFunc: unknown category %s", j.Category)
 	}
@@ -2912,10 +2914,10 @@ func (j *DSGitHub) GitHubRepositoryEnrichItemsFunc(ctx *Ctx, thrN int, items []i
 	return
 }
 
-// GitHubEnrichIssueItemsFunc - iterate items and enrich them
+// GitHubIssueEnrichItemsFunc - iterate items and enrich them
 // items is a current pack of input items
 // docs is a pointer to where extracted identities will be stored
-func (j *DSGitHub) GitHubEnrichIssueItemsFunc(ctx *Ctx, thrN int, items []interface{}, docs *[]interface{}) (err error) {
+func (j *DSGitHub) GitHubIssueEnrichItemsFunc(ctx *Ctx, thrN int, items []interface{}, docs *[]interface{}) (err error) {
 	// IMPL:
 	if ctx.Debug > 0 {
 		Printf("github enrich issue items %d/%d func\n", len(items), len(*docs))
@@ -3064,11 +3066,12 @@ func (j *DSGitHub) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role s
 // roles can be static (always the same) or dynamic (per item)
 // second return parameter is static mode (true/false)
 // dynamic roles will use item to get its roles
-func (j *DSGitHub) AllRoles(ctx *Ctx, item map[string]interface{}) ([]string, bool) {
+func (j *DSGitHub) AllRoles(ctx *Ctx, item map[string]interface{}) (roles []string, static bool) {
 	if j.Category == "repository" {
-		return []string{}, false
+		return
 	}
 	// IMPL:
+	// This will depend on github documents types
 	return []string{Author}, true
 }
 
