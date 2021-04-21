@@ -2654,8 +2654,7 @@ func (j *DSGitHub) ElasticRichMapping() []byte {
 
 // IdentityForObject - construct identity from a given object
 func (j *DSGitHub) IdentityForObject(ctx *Ctx, item map[string]interface{}) (identity [3]string) {
-	// xxx
-	if ctx.Debug > -1 {
+	if ctx.Debug > 1 {
 		defer func() {
 			Printf("IdentityForObject: %+v -> %+v\n", item, identity)
 		}()
@@ -2701,7 +2700,9 @@ func (j *DSGitHub) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[
 		if ok && assignees != nil {
 			ary, _ := assignees.([]interface{})
 			for _, assignee := range ary {
-				identities[j.IdentityForObject(ctx, assignee.(map[string]interface{}))] = struct{}{}
+				if assignee != nil {
+					identities[j.IdentityForObject(ctx, assignee.(map[string]interface{}))] = struct{}{}
+				}
 			}
 		}
 		comments, ok := Dig(item, []string{"comments_data"}, false, true)
@@ -2764,7 +2765,9 @@ func (j *DSGitHub) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[
 		if ok && assignees != nil {
 			ary, _ := assignees.([]interface{})
 			for _, assignee := range ary {
-				identities[j.IdentityForObject(ctx, assignee.(map[string]interface{}))] = struct{}{}
+				if assignee != nil {
+					identities[j.IdentityForObject(ctx, assignee.(map[string]interface{}))] = struct{}{}
+				}
 			}
 		}
 		comments, ok := Dig(item, []string{"review_comments_data"}, false, true)
