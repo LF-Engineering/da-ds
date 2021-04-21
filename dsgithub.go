@@ -2818,6 +2818,8 @@ func GitHubEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs 
 		return j.GitHubRepositoryEnrichItemsFunc(ctx, thrN, items, docs)
 	case "issue":
 		return j.GitHubIssueEnrichItemsFunc(ctx, thrN, items, docs)
+	case "pull_request":
+		return j.GitHubPullRequestEnrichItemsFunc(ctx, thrN, items, docs)
 	default:
 		err = fmt.Errorf("GitHubEnrichItemsFunc: unknown category %s", j.Category)
 	}
@@ -2955,7 +2957,7 @@ func (j *DSGitHub) GitHubIssueEnrichItemsFunc(ctx *Ctx, thrN int, items []interf
 				}
 				if len(comms) > 0 {
 					var riches []interface{}
-					riches, e = j.EnrichComments(ctx, rich, comms, dbConfigured)
+					riches, e = j.EnrichIssueComments(ctx, rich, comms, dbConfigured)
 					if e != nil {
 						return
 					}
@@ -2965,6 +2967,159 @@ func (j *DSGitHub) GitHubIssueEnrichItemsFunc(ctx *Ctx, thrN int, items []interf
 		}
 		// Possibly enrich assignees items
 		// Possibly enrich reactions items (on issue and maybe all its sub-comments)
+		return
+	}
+	nThreads := 0
+	procItem := func(c chan error, idx int) (e error) {
+		if thrN > 1 {
+			mtx.RLock()
+		}
+		item := items[idx]
+		if thrN > 1 {
+			mtx.RUnlock()
+		}
+		defer func() {
+			if c != nil {
+				c <- e
+			}
+		}()
+		src, ok := item.(map[string]interface{})["_source"]
+		if !ok {
+			e = fmt.Errorf("Missing _source in item %+v", DumpKeys(item))
+			return
+		}
+		doc, ok := src.(map[string]interface{})
+		if !ok {
+			e = fmt.Errorf("Failed to parse document %+v", doc)
+			return
+		}
+		richItems, e := getRichItems(doc)
+		if e != nil {
+			return
+		}
+		for _, rich := range richItems {
+			e = EnrichItem(ctx, j, rich.(map[string]interface{}))
+			if e != nil {
+				return
+			}
+		}
+		if thrN > 1 {
+			mtx.Lock()
+		}
+		*docs = append(*docs, richItems...)
+		if thrN > 1 {
+			mtx.Unlock()
+		}
+		return
+	}
+	if thrN > 1 {
+		for i := range items {
+			go func(i int) {
+				_ = procItem(ch, i)
+			}(i)
+			nThreads++
+			if nThreads == thrN {
+				err = <-ch
+				if err != nil {
+					return
+				}
+				nThreads--
+			}
+		}
+		for nThreads > 0 {
+			err = <-ch
+			nThreads--
+			if err != nil {
+				return
+			}
+		}
+		return
+	}
+	for i := range items {
+		err = procItem(nil, i)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
+// GitHubPullRequestEnrichItemsFunc - iterate items and enrich them
+// items is a current pack of input items
+// docs is a pointer to where extracted identities will be stored
+func (j *DSGitHub) GitHubPullRequestEnrichItemsFunc(ctx *Ctx, thrN int, items []interface{}, docs *[]interface{}) (err error) {
+	if ctx.Debug > 0 {
+		Printf("github enrich pull request items %d/%d func\n", len(items), len(*docs))
+	}
+	var (
+		mtx *sync.RWMutex
+		ch  chan error
+	)
+	if thrN > 1 {
+		mtx = &sync.RWMutex{}
+		ch = make(chan error)
+	}
+	dbConfigured := ctx.AffsDBConfigured()
+	getRichItems := func(doc map[string]interface{}) (richItems []interface{}, e error) {
+		var rich map[string]interface{}
+		rich, e = j.EnrichItem(ctx, doc, "", dbConfigured, nil)
+		if e != nil {
+			return
+		}
+		richItems = append(richItems, rich)
+		data, _ := Dig(doc, []string{"data"}, true, false)
+		// pr:    assignees_data[]
+		// pr:    reviews_data[].user_data
+		// pr:    review_comments_data[].user_data
+		// pr:    review_comments_data[].reactions_data[].user_data
+		// pr:    requested_reviewers_data[].user_data
+		iReviews, ok := Dig(data, []string{"reviews_data"}, false, true)
+		if ok && iReviews != nil {
+			reviews, ok := iReviews.([]interface{})
+			if ok {
+				var revs []map[string]interface{}
+				for _, iReview := range reviews {
+					review, ok := iReview.(map[string]interface{})
+					if !ok {
+						continue
+					}
+					revs = append(revs, review)
+				}
+				if len(revs) > 0 {
+					var riches []interface{}
+					riches, e = j.EnrichPullRequestReviews(ctx, rich, revs, dbConfigured)
+					if e != nil {
+						return
+					}
+					richItems = append(richItems, riches...)
+				}
+			}
+		}
+		iComments, ok := Dig(data, []string{"review_comments_data"}, false, true)
+		if ok && iComments != nil {
+			comments, ok := iComments.([]interface{})
+			if ok {
+				var comms []map[string]interface{}
+				for _, iComment := range comments {
+					comment, ok := iComment.(map[string]interface{})
+					if !ok {
+						continue
+					}
+					comms = append(comms, comment)
+				}
+				if len(comms) > 0 {
+					var riches []interface{}
+					riches, e = j.EnrichPullRequestComments(ctx, rich, comms, dbConfigured)
+					if e != nil {
+						return
+					}
+					richItems = append(richItems, riches...)
+				}
+			}
+		}
+		// Possibly enrich assignees items
+		// Possibly enrich reactions items (on PR sub comments)
+		// Possibly enrich requested reviewers data
 		return
 	}
 	nThreads := 0
@@ -3056,14 +3211,28 @@ func (j *DSGitHub) EnrichItem(ctx *Ctx, item map[string]interface{}, author stri
 		return j.EnrichRepositoryItem(ctx, item, author, affs, extra)
 	case "issue":
 		return j.EnrichIssueItem(ctx, item, author, affs, extra)
+	case "pull_request":
+		return j.EnrichPullRequestItem(ctx, item, author, affs, extra)
 	default:
 		err = fmt.Errorf("EnrichItem: unknown category %s", j.Category)
 	}
 	return
 }
 
-// EnrichComments - return rich comments from raw issue
-func (j *DSGitHub) EnrichComments(ctx *Ctx, issue map[string]interface{}, comments []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
+// EnrichIssueComments - return rich comments from raw issue
+func (j *DSGitHub) EnrichIssueComments(ctx *Ctx, issue map[string]interface{}, comments []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
+	// xxx
+	return
+}
+
+// EnrichPullRequestComments - return rich comments from raw issue
+func (j *DSGitHub) EnrichPullRequestComments(ctx *Ctx, issue map[string]interface{}, comments []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
+	// xxx
+	return
+}
+
+// EnrichPullRequestReviews - return rich comments from raw issue
+func (j *DSGitHub) EnrichPullRequestReviews(ctx *Ctx, issue map[string]interface{}, comments []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
 	// xxx
 	return
 }
@@ -3082,7 +3251,7 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 	}
 	rich["repo_name"] = j.URL
 	rich["issue_id"], _ = issue["id"]
-	// exx
+	// xxx
 	/*
 		updatedOn, _ := Dig(item, []string{j.DateField(ctx)}, true, false)
 		for prop, value := range CommonFields(j, updatedOn, "repository") {
@@ -3091,6 +3260,32 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 	*/
 	rich["type"] = "issue"
 	rich["category"] = "issue"
+	return
+}
+
+// EnrichPullRequestItem - return rich item from raw item for a given author type
+func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, author string, affs bool, extra interface{}) (rich map[string]interface{}, err error) {
+	rich = make(map[string]interface{})
+	pull, ok := item["data"].(map[string]interface{})
+	if !ok {
+		err = fmt.Errorf("missing data field in item %+v", DumpKeys(item))
+		return
+	}
+	for _, field := range RawFields {
+		v, _ := item[field]
+		rich[field] = v
+	}
+	rich["repo_name"] = j.URL
+	rich["pr_id"], _ = pull["id"]
+	// xxx
+	/*
+		updatedOn, _ := Dig(item, []string{j.DateField(ctx)}, true, false)
+		for prop, value := range CommonFields(j, updatedOn, "repository") {
+			rich[prop] = value
+		}
+	*/
+	rich["type"] = "pull_request"
+	rich["category"] = "pull_request"
 	return
 }
 
