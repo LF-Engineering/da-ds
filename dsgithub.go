@@ -21,6 +21,10 @@ const (
 	GitHubBackendVersion = "0.1.0"
 	// cMaxGitHubUsersFileCacheAge 90 days (in seconds) - file is considered too old anywhere between 90-180 days
 	cMaxGitHubUsersFileCacheAge = 7776000
+	// cMaxCommentBodyLength - max comment body length
+	cMaxCommentBodyLength = 4096
+	// cMaxIssueBodyLength - max issue body length
+	cMaxIssueBodyLength = 4096
 )
 
 var (
@@ -474,6 +478,13 @@ func (j *DSGitHub) githubIssues(ctx *Ctx, org, repo string, since *time.Time) (i
 			iss := map[string]interface{}{}
 			jm, _ := jsoniter.Marshal(issue)
 			_ = jsoniter.Unmarshal(jm, &iss)
+			body, ok := Dig(iss, []string{"body"}, false, true)
+			if ok {
+				nBody := len(body.(string))
+				if nBody > cMaxIssueBodyLength {
+					iss["body"] = body.(string)[:cMaxIssueBodyLength]
+				}
+			}
 			issuesData = append(issuesData, iss)
 		}
 		if response.NextPage == 0 {
@@ -569,6 +580,13 @@ func (j *DSGitHub) githubIssueComments(ctx *Ctx, org, repo string, number int) (
 			com := map[string]interface{}{}
 			jm, _ := jsoniter.Marshal(comment)
 			_ = jsoniter.Unmarshal(jm, &com)
+			body, ok := Dig(com, []string{"body"}, false, true)
+			if ok {
+				nBody := len(body.(string))
+				if nBody > cMaxCommentBodyLength {
+					com["body"] = body.(string)[:cMaxCommentBodyLength]
+				}
+			}
 			userLogin, ok := Dig(com, []string{"user", "login"}, false, true)
 			if ok {
 				com["user_data"], _, err = j.githubUser(ctx, userLogin.(string))
@@ -937,7 +955,7 @@ func (j *DSGitHub) FetchItems(ctx *Ctx) (err error) {
 	case "issue":
 		return j.FetchItemsIssue(ctx)
 	case "pull_request":
-		return j.FetchItemsIssue(ctx)
+		return j.FetchItemsPullRequest(ctx)
 	default:
 		err = fmt.Errorf("FetchItems: unknown category %s", j.Category)
 	}
@@ -1396,6 +1414,7 @@ func (j *DSGitHub) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string]int
 	mItem[DefaultTagField] = tag
 	mItem[DefaultOffsetField] = float64(updatedOn.Unix())
 	mItem["category"] = j.ItemCategory(item)
+	mItem["is_github_"+j.Category] = 1
 	mItem["search_fields"] = make(map[string]interface{})
 	FatalOnError(DeepSet(mItem, []string{"search_fields", "owner"}, j.Org, false))
 	FatalOnError(DeepSet(mItem, []string{"search_fields", "repo"}, j.Repo, false))
@@ -1689,6 +1708,7 @@ func (j *DSGitHub) EnrichRepositoryItem(ctx *Ctx, item map[string]interface{}, a
 		rich[prop] = value
 	}
 	rich["type"] = "repository"
+	rich["category"] = "repository"
 	return
 }
 
