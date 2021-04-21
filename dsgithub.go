@@ -3251,13 +3251,11 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 	}
 	rich["repo_name"] = j.URL
 	rich["issue_id"], _ = issue["id"]
+	updatedOn, _ := Dig(item, []string{j.DateField(ctx)}, true, false)
+	for prop, value := range CommonFields(j, updatedOn, "repository") {
+		rich[prop] = value
+	}
 	// xxx
-	/*
-		updatedOn, _ := Dig(item, []string{j.DateField(ctx)}, true, false)
-		for prop, value := range CommonFields(j, updatedOn, "repository") {
-			rich[prop] = value
-		}
-	*/
 	rich["type"] = "issue"
 	rich["category"] = "issue"
 	return
@@ -3277,13 +3275,11 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 	}
 	rich["repo_name"] = j.URL
 	rich["pr_id"], _ = pull["id"]
+	updatedOn, _ := Dig(item, []string{j.DateField(ctx)}, true, false)
+	for prop, value := range CommonFields(j, updatedOn, "repository") {
+		rich[prop] = value
+	}
 	// xxx
-	/*
-		updatedOn, _ := Dig(item, []string{j.DateField(ctx)}, true, false)
-		for prop, value := range CommonFields(j, updatedOn, "repository") {
-			rich[prop] = value
-		}
-	*/
 	rich["type"] = "pull_request"
 	rich["category"] = "pull_request"
 	return
