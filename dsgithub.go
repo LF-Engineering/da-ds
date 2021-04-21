@@ -57,6 +57,8 @@ const (
 	CacheGitHubPullReviewComments = false
 	// CacheGitHubReviewCommentReactions - cache this?
 	CacheGitHubReviewCommentReactions = false
+	// CacheGitHubPullRequestedReviewers - cache this?
+	CacheGitHubPullRequestedReviewers = true
 )
 
 var (
@@ -94,6 +96,7 @@ type DSGitHub struct {
 	GitHubPullReviewsMtx            *sync.RWMutex
 	GitHubPullReviewCommentsMtx     *sync.RWMutex
 	GitHubReviewCommentReactionsMtx *sync.RWMutex
+	GitHubPullRequestedReviewersMtx *sync.RWMutex
 	GitHubRepo                      map[string]map[string]interface{}
 	GitHubIssues                    map[string][]map[string]interface{}
 	GitHubUser                      map[string]map[string]interface{}
@@ -105,6 +108,7 @@ type DSGitHub struct {
 	GitHubPullReviews               map[string][]map[string]interface{}
 	GitHubPullReviewComments        map[string][]map[string]interface{}
 	GitHubReviewCommentReactions    map[string][]map[string]interface{}
+	GitHubPullRequestedReviewers    map[string][]map[string]interface{}
 }
 
 func (j *DSGitHub) getRateLimits(gctx context.Context, ctx *Ctx, gcs []*github.Client, core bool) (int, []int, []int, []time.Duration) {
@@ -1516,6 +1520,114 @@ func (j *DSGitHub) githubReviewCommentReactions(ctx *Ctx, org, repo string, cid 
 	return
 }
 
+func (j *DSGitHub) githubPullRequestedReviewers(ctx *Ctx, org, repo string, number int) (reviewers []map[string]interface{}, err error) {
+	var found bool
+	key := fmt.Sprintf("%s/%s/%d", org, repo, number)
+	// Try memory cache 1st
+	if CacheGitHubPullRequestedReviewers {
+		if j.GitHubPullRequestedReviewersMtx != nil {
+			j.GitHubPullRequestedReviewersMtx.RLock()
+		}
+		reviewers, found = j.GitHubPullRequestedReviewers[key]
+		if j.GitHubPullRequestedReviewersMtx != nil {
+			j.GitHubPullRequestedReviewersMtx.RUnlock()
+		}
+		if found {
+			// Printf("pull requested reviewers found in cache: %+v\n", reviewers)
+			return
+		}
+	}
+	var c *github.Client
+	if j.GitHubMtx != nil {
+		j.GitHubMtx.RLock()
+	}
+	c = j.Clients[j.Hint]
+	if j.GitHubMtx != nil {
+		j.GitHubMtx.RUnlock()
+	}
+	opt := &github.ListOptions{}
+	opt.PerPage = ItemsPerPage
+	retry := false
+	for {
+		var (
+			response *github.Response
+			revsObj  *github.Reviewers
+			e        error
+		)
+		revsObj, response, e = c.PullRequests.ListReviewers(j.Context, org, repo, number, opt)
+		// Printf("GET %s/%s/%s -> {%+v, %+v, %+v}\n", org, repo, number, revsObj, response, e)
+		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
+			if CacheGitHubPullRequestedReviewers {
+				if j.GitHubPullRequestedReviewersMtx != nil {
+					j.GitHubPullRequestedReviewersMtx.Lock()
+				}
+				j.GitHubPullRequestedReviewers[key] = []map[string]interface{}{}
+				if j.GitHubPullRequestedReviewersMtx != nil {
+					j.GitHubPullRequestedReviewersMtx.Unlock()
+				}
+			}
+			if ctx.Debug > 1 {
+				Printf("githubPullRequestedReviewers: reviewers not found %s: %v\n", key, e)
+			}
+			return
+		}
+		if e != nil && !retry {
+			Printf("Error getting %s pull requested reviewers: response: %+v, error: %+v, retrying rate\n", key, response, e)
+			Printf("githubPullRequestedReviewers: handle rate\n")
+			abuse := j.isAbuse(e)
+			if abuse {
+				sleepFor := 10 + rand.Intn(10)
+				Printf("GitHub detected abuse (get pull requested reviewers %s), waiting for %ds\n", key, sleepFor)
+				time.Sleep(time.Duration(sleepFor) * time.Second)
+			}
+			if j.GitHubMtx != nil {
+				j.GitHubMtx.Lock()
+			}
+			j.Hint, _ = j.handleRate(ctx)
+			c = j.Clients[j.Hint]
+			if j.GitHubMtx != nil {
+				j.GitHubMtx.Unlock()
+			}
+			if !abuse {
+				retry = true
+			}
+			continue
+		}
+		if e != nil {
+			err = e
+			return
+		}
+		users := revsObj.Users
+		for _, reviewer := range users {
+			if reviewer.Login == nil {
+				continue
+			}
+			var userData map[string]interface{}
+			userData, _, err = j.githubUser(ctx, *reviewer.Login)
+			if err != nil {
+				return
+			}
+			reviewers = append(reviewers, userData)
+		}
+		if response.NextPage == 0 {
+			break
+		}
+		opt.Page = response.NextPage
+		retry = false
+		// Printf("pull requested reviewers got from API: %+v\n", reviewers)
+	}
+	if CacheGitHubPullRequestedReviewers {
+		if j.GitHubPullRequestedReviewersMtx != nil {
+			j.GitHubPullRequestedReviewersMtx.Lock()
+		}
+		j.GitHubPullRequestedReviewers[key] = reviewers
+		if j.GitHubPullRequestedReviewersMtx != nil {
+			j.GitHubPullRequestedReviewersMtx.Unlock()
+		}
+	}
+	return
+}
+
 // ParseArgs - parse GitHub specific environment variables
 func (j *DSGitHub) ParseArgs(ctx *Ctx) (err error) {
 	j.DS = GitHub
@@ -1609,6 +1721,9 @@ func (j *DSGitHub) Validate(ctx *Ctx) (err error) {
 	if CacheGitHubReviewCommentReactions {
 		j.GitHubReviewCommentReactions = make(map[string][]map[string]interface{})
 	}
+	if CacheGitHubPullRequestedReviewers {
+		j.GitHubPullRequestedReviewers = make(map[string][]map[string]interface{})
+	}
 	// Multithreading
 	j.ThrN = GetThreadsNum(ctx)
 	if j.ThrN > 1 {
@@ -1645,6 +1760,9 @@ func (j *DSGitHub) Validate(ctx *Ctx) (err error) {
 		}
 		if CacheGitHubReviewCommentReactions {
 			j.GitHubReviewCommentReactionsMtx = &sync.RWMutex{}
+		}
+		if CacheGitHubPullRequestedReviewers {
+			j.GitHubPullRequestedReviewersMtx = &sync.RWMutex{}
 		}
 	}
 	j.Hint, _ = j.handleRate(ctx)
@@ -1798,6 +1916,10 @@ func (j *DSGitHub) ProcessPull(ctx *Ctx, inPull map[string]interface{}) (pull ma
 			return
 		}
 		pull["review_comments_data"], err = j.githubPullReviewComments(ctx, j.Org, j.Repo, iNumber)
+		if err != nil {
+			return
+		}
+		pull["requested_reviewers_data"], err = j.githubPullRequestedReviewers(ctx, j.Org, j.Repo, iNumber)
 		if err != nil {
 			return
 		}
