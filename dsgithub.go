@@ -19,12 +19,26 @@ import (
 const (
 	// GitHubBackendVersion - backend version
 	GitHubBackendVersion = "0.1.0"
-	// cMaxGitHubUsersFileCacheAge 90 days (in seconds) - file is considered too old anywhere between 90-180 days
-	cMaxGitHubUsersFileCacheAge = 7776000
-	// cMaxCommentBodyLength - max comment body length
-	cMaxCommentBodyLength = 4096
-	// cMaxIssueBodyLength - max issue body length
-	cMaxIssueBodyLength = 4096
+	// MaxGitHubUsersFileCacheAge 90 days (in seconds) - file is considered too old anywhere between 90-180 days
+	MaxGitHubUsersFileCacheAge = 7776000
+	// MaxCommentBodyLength - max comment body length
+	MaxCommentBodyLength = 4096
+	// MaxIssueBodyLength - max issue body length
+	MaxIssueBodyLength = 4096
+	// CacheGitHubRepos - cache this?
+	CacheGitHubRepos = true
+	// CacheGitHubIssues - cache this?
+	CacheGitHubIssues = false
+	// CacheGitHubUser - cache this?
+	CacheGitHubUser = true
+	// CacheGitHubUserFiles - cache this in files?
+	CacheGitHubUserFiles = true
+	// CacheGitHubIssueComments - cache this?
+	CacheGitHubIssueComments = false
+	// CacheGitHubCommentReactions - cache this?
+	CacheGitHubCommentReactions = false
+	// CacheGitHubIssueReactions - cache this?
+	CacheGitHubIssueReactions = false
 )
 
 var (
@@ -52,16 +66,16 @@ type DSGitHub struct {
 	CacheDir                  string
 	GitHubMtx                 *sync.RWMutex
 	GitHubReposMtx            *sync.RWMutex
-	GitHubRepos               map[string]map[string]interface{}
 	GitHubIssuesMtx           *sync.RWMutex
-	GitHubIssues              map[string][]map[string]interface{}
 	GitHubUserMtx             *sync.RWMutex
-	GitHubUser                map[string]map[string]interface{}
 	GitHubIssueCommentsMtx    *sync.RWMutex
-	GitHubIssueComments       map[string][]map[string]interface{}
 	GitHubCommentReactionsMtx *sync.RWMutex
-	GitHubCommentReactions    map[string][]map[string]interface{}
 	GitHubIssueReactionsMtx   *sync.RWMutex
+	GitHubRepos               map[string]map[string]interface{}
+	GitHubIssues              map[string][]map[string]interface{}
+	GitHubUser                map[string]map[string]interface{}
+	GitHubIssueComments       map[string][]map[string]interface{}
+	GitHubCommentReactions    map[string][]map[string]interface{}
 	GitHubIssueReactions      map[string][]map[string]interface{}
 }
 
@@ -147,18 +161,21 @@ func (j *DSGitHub) isAbuse(e error) bool {
 }
 
 func (j *DSGitHub) githubRepos(ctx *Ctx, org, repo string) (repoData map[string]interface{}, err error) {
+	var found bool
 	origin := org + "/" + repo
 	// Try memory cache 1st
-	if j.GitHubReposMtx != nil {
-		j.GitHubReposMtx.RLock()
-	}
-	repoData, found := j.GitHubRepos[origin]
-	if j.GitHubReposMtx != nil {
-		j.GitHubReposMtx.RUnlock()
-	}
-	if found {
-		// Printf("repos found in cache: %+v\n", repoData)
-		return
+	if CacheGitHubRepos {
+		if j.GitHubReposMtx != nil {
+			j.GitHubReposMtx.RLock()
+		}
+		repoData, found = j.GitHubRepos[origin]
+		if j.GitHubReposMtx != nil {
+			j.GitHubReposMtx.RUnlock()
+		}
+		if found {
+			// Printf("repos found in cache: %+v\n", repoData)
+			return
+		}
 	}
 	var c *github.Client
 	if j.GitHubMtx != nil {
@@ -178,12 +195,14 @@ func (j *DSGitHub) githubRepos(ctx *Ctx, org, repo string) (repoData map[string]
 		rep, response, e = c.Repositories.Get(j.Context, org, repo)
 		// Printf("GET %s/%s -> {%+v, %+v, %+v}\n", org, repo, rep, response, e)
 		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
-			if j.GitHubReposMtx != nil {
-				j.GitHubReposMtx.Lock()
-			}
-			j.GitHubRepos[origin] = nil
-			if j.GitHubReposMtx != nil {
-				j.GitHubReposMtx.Unlock()
+			if CacheGitHubRepos {
+				if j.GitHubReposMtx != nil {
+					j.GitHubReposMtx.Lock()
+				}
+				j.GitHubRepos[origin] = nil
+				if j.GitHubReposMtx != nil {
+					j.GitHubReposMtx.Unlock()
+				}
 			}
 			if ctx.Debug > 1 {
 				Printf("githubRepos: repo not found %s: %v\n", origin, e)
@@ -221,107 +240,114 @@ func (j *DSGitHub) githubRepos(ctx *Ctx, org, repo string) (repoData map[string]
 		// Printf("repos got from API: %+v\n", repoData)
 		break
 	}
-	if j.GitHubReposMtx != nil {
-		j.GitHubReposMtx.Lock()
-	}
-	j.GitHubRepos[origin] = repoData
-	if j.GitHubReposMtx != nil {
-		j.GitHubReposMtx.Unlock()
+	if CacheGitHubRepos {
+		if j.GitHubReposMtx != nil {
+			j.GitHubReposMtx.Lock()
+		}
+		j.GitHubRepos[origin] = repoData
+		if j.GitHubReposMtx != nil {
+			j.GitHubReposMtx.Unlock()
+		}
 	}
 	return
 }
 
 func (j *DSGitHub) githubUser(ctx *Ctx, login string) (user map[string]interface{}, found bool, err error) {
+	var ok bool
 	// Try memory cache 1st
-	if j.GitHubUserMtx != nil {
-		j.GitHubUserMtx.RLock()
-	}
-	user, ok := j.GitHubUser[login]
-	if j.GitHubUserMtx != nil {
-		j.GitHubUserMtx.RUnlock()
-	}
-	if ok {
-		found = len(user) > 0
-		// Printf("user found in memory cache: %+v\n", user)
-		return
-	}
-	// Try file cache 2nd
-	// IMPL: make sure EC2test & EC2prod both have j.cacheDir directory created
-	path := j.CacheDir + login + ".json"
-	lockPath := path + ".lock"
-	file, e := os.Stat(path)
-	if e == nil {
-		for {
-			_, e := os.Stat(lockPath)
-			if e == nil {
-				// Printf("user %s lock file %s present, waitng 1s\n", user, lockPath)
-				time.Sleep(time.Duration(1) * time.Second)
-				continue
-			}
-			file, _ = os.Stat(path)
-			break
+	if CacheGitHubUser {
+		if j.GitHubUserMtx != nil {
+			j.GitHubUserMtx.RLock()
 		}
-		modified := file.ModTime()
-		age := int(time.Now().Sub(modified).Seconds())
-		allowedAge := cMaxGitHubUsersFileCacheAge + rand.Intn(cMaxGitHubUsersFileCacheAge)
-		if age <= allowedAge {
-			bts, e := ioutil.ReadFile(path)
+		user, ok = j.GitHubUser[login]
+		if j.GitHubUserMtx != nil {
+			j.GitHubUserMtx.RUnlock()
+		}
+		if ok {
+			found = len(user) > 0
+			// Printf("user found in memory cache: %+v\n", user)
+			return
+		}
+		// Try file cache 2nd
+		if CacheGitHubUserFiles {
+			// IMPL: make sure EC2test & EC2prod both have j.cacheDir directory created
+			path := j.CacheDir + login + ".json"
+			lockPath := path + ".lock"
+			file, e := os.Stat(path)
 			if e == nil {
-				e = jsoniter.Unmarshal(bts, &user)
-				bts = nil
-				if e == nil {
-					found = len(user) > 0
-					if found {
-						if j.GitHubUserMtx != nil {
-							j.GitHubUserMtx.Lock()
-						}
-						j.GitHubUser[login] = user
-						if j.GitHubUserMtx != nil {
-							j.GitHubUserMtx.Unlock()
-						}
-						// Printf("user found in files cache: %+v\n", user)
-						return
+				for {
+					_, e := os.Stat(lockPath)
+					if e == nil {
+						// Printf("user %s lock file %s present, waitng 1s\n", user, lockPath)
+						time.Sleep(time.Duration(1) * time.Second)
+						continue
 					}
-					Printf("githubUser: unmarshaled %s cache file is empty\n", path)
+					file, _ = os.Stat(path)
+					break
 				}
-				Printf("githubUser: cannot unmarshal %s cache file: %v\n", path, e)
+				modified := file.ModTime()
+				age := int(time.Now().Sub(modified).Seconds())
+				allowedAge := MaxGitHubUsersFileCacheAge + rand.Intn(MaxGitHubUsersFileCacheAge)
+				if age <= allowedAge {
+					bts, e := ioutil.ReadFile(path)
+					if e == nil {
+						e = jsoniter.Unmarshal(bts, &user)
+						bts = nil
+						if e == nil {
+							found = len(user) > 0
+							if found {
+								if j.GitHubUserMtx != nil {
+									j.GitHubUserMtx.Lock()
+								}
+								j.GitHubUser[login] = user
+								if j.GitHubUserMtx != nil {
+									j.GitHubUserMtx.Unlock()
+								}
+								// Printf("user found in files cache: %+v\n", user)
+								return
+							}
+							Printf("githubUser: unmarshaled %s cache file is empty\n", path)
+						}
+						Printf("githubUser: cannot unmarshal %s cache file: %v\n", path, e)
+					} else {
+						Printf("githubUser: cannot read %s user cache file: %v\n", path, e)
+					}
+				} else {
+					Printf("githubUser: %s user cache file is too old: %v (allowed %v)\n", path, time.Duration(age)*time.Second, time.Duration(allowedAge)*time.Second)
+				}
 			} else {
-				Printf("githubUser: cannot read %s user cache file: %v\n", path, e)
+				if ctx.Debug > 0 {
+					// Printf("githubUser: no %s user cache file: %v\n", path, e)
+				}
 			}
-		} else {
-			Printf("githubUser: %s user cache file is too old: %v (allowed %v)\n", path, time.Duration(age)*time.Second, time.Duration(allowedAge)*time.Second)
-		}
-	} else {
-		if ctx.Debug > 0 {
-			// Printf("githubUser: no %s user cache file: %v\n", path, e)
-		}
-	}
-	lockFile, _ := os.Create(lockPath)
-	defer func() {
-		if lockFile != nil {
+			lockFile, _ := os.Create(lockPath)
 			defer func() {
-				// Printf("remove lock file %s\n", lockPath)
-				_ = os.Remove(lockPath)
+				if lockFile != nil {
+					defer func() {
+						// Printf("remove lock file %s\n", lockPath)
+						_ = os.Remove(lockPath)
+					}()
+				}
+				if err != nil {
+					return
+				}
+				// path := j.CacheDir + login + ".json"
+				bts, err := jsoniter.Marshal(user)
+				if err != nil {
+					Printf("githubUser: cannot marshal user %s to file %s\n", login, path)
+					return
+				}
+				err = ioutil.WriteFile(path, bts, 0644)
+				if err != nil {
+					Printf("githubUser: cannot write file %s, %d bytes\n", path, len(bts))
+					return
+				}
+				if ctx.Debug > 0 {
+					Printf("githubUser: saved %s user file\n", path)
+				}
 			}()
 		}
-		if err != nil {
-			return
-		}
-		// path := j.CacheDir + login + ".json"
-		bts, err := jsoniter.Marshal(user)
-		if err != nil {
-			Printf("githubUser: cannot marshal user %s to file %s\n", login, path)
-			return
-		}
-		err = ioutil.WriteFile(path, bts, 0644)
-		if err != nil {
-			Printf("githubUser: cannot write file %s, %d bytes\n", path, len(bts))
-			return
-		}
-		if ctx.Debug > 0 {
-			Printf("githubUser: saved %s user file\n", path)
-		}
-	}()
+	}
 	// Try GitHub API 3rd
 	var c *github.Client
 	if j.GitHubMtx != nil {
@@ -341,13 +367,15 @@ func (j *DSGitHub) githubUser(ctx *Ctx, login string) (user map[string]interface
 		usr, response, e = c.Users.Get(j.Context, login)
 		// Printf("GET %s -> {%+v, %+v, %+v}\n", login, usr, response, e)
 		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
-			if j.GitHubUserMtx != nil {
-				j.GitHubUserMtx.Lock()
-			}
-			// Printf("user not found using API: %s\n", login)
-			j.GitHubUser[login] = map[string]interface{}{}
-			if j.GitHubUserMtx != nil {
-				j.GitHubUserMtx.Unlock()
+			if CacheGitHubUser {
+				if j.GitHubUserMtx != nil {
+					j.GitHubUserMtx.Lock()
+				}
+				// Printf("user not found using API: %s\n", login)
+				j.GitHubUser[login] = map[string]interface{}{}
+				if j.GitHubUserMtx != nil {
+					j.GitHubUserMtx.Unlock()
+				}
 			}
 			return
 		}
@@ -385,29 +413,34 @@ func (j *DSGitHub) githubUser(ctx *Ctx, login string) (user map[string]interface
 		}
 		break
 	}
-	if j.GitHubUserMtx != nil {
-		j.GitHubUserMtx.Lock()
-	}
-	j.GitHubUser[login] = user
-	if j.GitHubUserMtx != nil {
-		j.GitHubUserMtx.Unlock()
+	if CacheGitHubUser {
+		if j.GitHubUserMtx != nil {
+			j.GitHubUserMtx.Lock()
+		}
+		j.GitHubUser[login] = user
+		if j.GitHubUserMtx != nil {
+			j.GitHubUserMtx.Unlock()
+		}
 	}
 	return
 }
 
 func (j *DSGitHub) githubIssues(ctx *Ctx, org, repo string, since *time.Time) (issuesData []map[string]interface{}, err error) {
+	var found bool
 	origin := org + "/" + repo
 	// Try memory cache 1st
-	if j.GitHubIssuesMtx != nil {
-		j.GitHubIssuesMtx.RLock()
-	}
-	issuesData, found := j.GitHubIssues[origin]
-	if j.GitHubIssuesMtx != nil {
-		j.GitHubIssuesMtx.RUnlock()
-	}
-	if found {
-		// Printf("issues found in cache: %+v\n", issuesData)
-		return
+	if CacheGitHubIssues {
+		if j.GitHubIssuesMtx != nil {
+			j.GitHubIssuesMtx.RLock()
+		}
+		issuesData, found = j.GitHubIssues[origin]
+		if j.GitHubIssuesMtx != nil {
+			j.GitHubIssuesMtx.RUnlock()
+		}
+		if found {
+			// Printf("issues found in cache: %+v\n", issuesData)
+			return
+		}
 	}
 	var c *github.Client
 	if j.GitHubMtx != nil {
@@ -436,12 +469,14 @@ func (j *DSGitHub) githubIssues(ctx *Ctx, org, repo string, since *time.Time) (i
 		issues, response, e = c.Issues.ListByRepo(j.Context, org, repo, opt)
 		// Printf("GET %s/%s -> {%+v, %+v, %+v}\n", org, repo, issues, response, e)
 		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
-			if j.GitHubIssuesMtx != nil {
-				j.GitHubIssuesMtx.Lock()
-			}
-			j.GitHubIssues[origin] = []map[string]interface{}{}
-			if j.GitHubIssuesMtx != nil {
-				j.GitHubIssuesMtx.Unlock()
+			if CacheGitHubIssues {
+				if j.GitHubIssuesMtx != nil {
+					j.GitHubIssuesMtx.Lock()
+				}
+				j.GitHubIssues[origin] = []map[string]interface{}{}
+				if j.GitHubIssuesMtx != nil {
+					j.GitHubIssuesMtx.Unlock()
+				}
 			}
 			if ctx.Debug > 1 {
 				Printf("githubIssues: issues not found %s: %v\n", origin, e)
@@ -481,8 +516,8 @@ func (j *DSGitHub) githubIssues(ctx *Ctx, org, repo string, since *time.Time) (i
 			body, ok := Dig(iss, []string{"body"}, false, true)
 			if ok {
 				nBody := len(body.(string))
-				if nBody > cMaxIssueBodyLength {
-					iss["body"] = body.(string)[:cMaxIssueBodyLength]
+				if nBody > MaxIssueBodyLength {
+					iss["body"] = body.(string)[:MaxIssueBodyLength]
 				}
 			}
 			issuesData = append(issuesData, iss)
@@ -494,29 +529,34 @@ func (j *DSGitHub) githubIssues(ctx *Ctx, org, repo string, since *time.Time) (i
 		retry = false
 		// Printf("issues got from API: %+v\n", issuesData)
 	}
-	if j.GitHubIssuesMtx != nil {
-		j.GitHubIssuesMtx.Lock()
-	}
-	j.GitHubIssues[origin] = issuesData
-	if j.GitHubIssuesMtx != nil {
-		j.GitHubIssuesMtx.Unlock()
+	if CacheGitHubIssues {
+		if j.GitHubIssuesMtx != nil {
+			j.GitHubIssuesMtx.Lock()
+		}
+		j.GitHubIssues[origin] = issuesData
+		if j.GitHubIssuesMtx != nil {
+			j.GitHubIssuesMtx.Unlock()
+		}
 	}
 	return
 }
 
 func (j *DSGitHub) githubIssueComments(ctx *Ctx, org, repo string, number int) (comments []map[string]interface{}, err error) {
+	var found bool
 	key := fmt.Sprintf("%s/%s/%d", org, repo, number)
 	// Try memory cache 1st
-	if j.GitHubIssueCommentsMtx != nil {
-		j.GitHubIssueCommentsMtx.RLock()
-	}
-	comments, found := j.GitHubIssueComments[key]
-	if j.GitHubIssueCommentsMtx != nil {
-		j.GitHubIssueCommentsMtx.RUnlock()
-	}
-	if found {
-		// Printf("issue comments found in cache: %+v\n", comments)
-		return
+	if CacheGitHubIssueComments {
+		if j.GitHubIssueCommentsMtx != nil {
+			j.GitHubIssueCommentsMtx.RLock()
+		}
+		comments, found = j.GitHubIssueComments[key]
+		if j.GitHubIssueCommentsMtx != nil {
+			j.GitHubIssueCommentsMtx.RUnlock()
+		}
+		if found {
+			// Printf("issue comments found in cache: %+v\n", comments)
+			return
+		}
 	}
 	var c *github.Client
 	if j.GitHubMtx != nil {
@@ -538,12 +578,14 @@ func (j *DSGitHub) githubIssueComments(ctx *Ctx, org, repo string, number int) (
 		comms, response, e = c.Issues.ListComments(j.Context, org, repo, number, opt)
 		// Printf("GET %s/%s -> {%+v, %+v, %+v}\n", org, repo, comms, response, e)
 		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
-			if j.GitHubIssueCommentsMtx != nil {
-				j.GitHubIssueCommentsMtx.Lock()
-			}
-			j.GitHubIssueComments[key] = []map[string]interface{}{}
-			if j.GitHubIssueCommentsMtx != nil {
-				j.GitHubIssueCommentsMtx.Unlock()
+			if CacheGitHubIssueComments {
+				if j.GitHubIssueCommentsMtx != nil {
+					j.GitHubIssueCommentsMtx.Lock()
+				}
+				j.GitHubIssueComments[key] = []map[string]interface{}{}
+				if j.GitHubIssueCommentsMtx != nil {
+					j.GitHubIssueCommentsMtx.Unlock()
+				}
 			}
 			if ctx.Debug > 1 {
 				Printf("githubIssueComments: comments not found %s: %v\n", key, e)
@@ -583,8 +625,8 @@ func (j *DSGitHub) githubIssueComments(ctx *Ctx, org, repo string, number int) (
 			body, ok := Dig(com, []string{"body"}, false, true)
 			if ok {
 				nBody := len(body.(string))
-				if nBody > cMaxCommentBodyLength {
-					com["body"] = body.(string)[:cMaxCommentBodyLength]
+				if nBody > MaxCommentBodyLength {
+					com["body"] = body.(string)[:MaxCommentBodyLength]
 				}
 			}
 			userLogin, ok := Dig(com, []string{"user", "login"}, false, true)
@@ -617,30 +659,35 @@ func (j *DSGitHub) githubIssueComments(ctx *Ctx, org, repo string, number int) (
 		retry = false
 		// Printf("issue comments got from API: %+v\n", comments)
 	}
-	if j.GitHubIssueCommentsMtx != nil {
-		j.GitHubIssueCommentsMtx.Lock()
-	}
-	j.GitHubIssueComments[key] = comments
-	if j.GitHubIssueCommentsMtx != nil {
-		j.GitHubIssueCommentsMtx.Unlock()
+	if CacheGitHubIssueComments {
+		if j.GitHubIssueCommentsMtx != nil {
+			j.GitHubIssueCommentsMtx.Lock()
+		}
+		j.GitHubIssueComments[key] = comments
+		if j.GitHubIssueCommentsMtx != nil {
+			j.GitHubIssueCommentsMtx.Unlock()
+		}
 	}
 	return
 }
 
 func (j *DSGitHub) githubCommentReactions(ctx *Ctx, org, repo string, cid int64) (reactions []map[string]interface{}, err error) {
+	var found bool
 	key := fmt.Sprintf("%s/%s/%d", org, repo, cid)
 	// fmt.Printf("githubCommentReactions %s\n", key)
 	// Try memory cache 1st
-	if j.GitHubCommentReactionsMtx != nil {
-		j.GitHubCommentReactionsMtx.RLock()
-	}
-	reactions, found := j.GitHubCommentReactions[key]
-	if j.GitHubCommentReactionsMtx != nil {
-		j.GitHubCommentReactionsMtx.RUnlock()
-	}
-	if found {
-		// Printf("comment reactions found in cache: %+v\n", reactions)
-		return
+	if CacheGitHubCommentReactions {
+		if j.GitHubCommentReactionsMtx != nil {
+			j.GitHubCommentReactionsMtx.RLock()
+		}
+		reactions, found = j.GitHubCommentReactions[key]
+		if j.GitHubCommentReactionsMtx != nil {
+			j.GitHubCommentReactionsMtx.RUnlock()
+		}
+		if found {
+			// Printf("comment reactions found in cache: %+v\n", reactions)
+			return
+		}
 	}
 	var c *github.Client
 	if j.GitHubMtx != nil {
@@ -662,12 +709,14 @@ func (j *DSGitHub) githubCommentReactions(ctx *Ctx, org, repo string, cid int64)
 		reacts, response, e = c.Reactions.ListIssueCommentReactions(j.Context, org, repo, cid, opt)
 		// Printf("GET %s/%s/%d -> {%+v, %+v, %+v}\n", org, repo, cid, reacts, response, e)
 		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
-			if j.GitHubCommentReactionsMtx != nil {
-				j.GitHubCommentReactionsMtx.Lock()
-			}
-			j.GitHubCommentReactions[key] = []map[string]interface{}{}
-			if j.GitHubCommentReactionsMtx != nil {
-				j.GitHubCommentReactionsMtx.Unlock()
+			if CacheGitHubCommentReactions {
+				if j.GitHubCommentReactionsMtx != nil {
+					j.GitHubCommentReactionsMtx.Lock()
+				}
+				j.GitHubCommentReactions[key] = []map[string]interface{}{}
+				if j.GitHubCommentReactionsMtx != nil {
+					j.GitHubCommentReactionsMtx.Unlock()
+				}
 			}
 			if ctx.Debug > 1 {
 				Printf("githubCommentReactions: reactions not found %s: %v\n", key, e)
@@ -720,30 +769,35 @@ func (j *DSGitHub) githubCommentReactions(ctx *Ctx, org, repo string, cid int64)
 		retry = false
 		// Printf("comment reactions got from API: %+v\n", reactions)
 	}
-	if j.GitHubCommentReactionsMtx != nil {
-		j.GitHubCommentReactionsMtx.Lock()
-	}
-	j.GitHubCommentReactions[key] = reactions
-	if j.GitHubCommentReactionsMtx != nil {
-		j.GitHubCommentReactionsMtx.Unlock()
+	if CacheGitHubCommentReactions {
+		if j.GitHubCommentReactionsMtx != nil {
+			j.GitHubCommentReactionsMtx.Lock()
+		}
+		j.GitHubCommentReactions[key] = reactions
+		if j.GitHubCommentReactionsMtx != nil {
+			j.GitHubCommentReactionsMtx.Unlock()
+		}
 	}
 	return
 }
 
 func (j *DSGitHub) githubIssueReactions(ctx *Ctx, org, repo string, number int) (reactions []map[string]interface{}, err error) {
+	var found bool
 	key := fmt.Sprintf("%s/%s/%d", org, repo, number)
 	// fmt.Printf("githubIssueReactions %s\n", key)
 	// Try memory cache 1st
-	if j.GitHubIssueReactionsMtx != nil {
-		j.GitHubIssueReactionsMtx.RLock()
-	}
-	reactions, found := j.GitHubIssueReactions[key]
-	if j.GitHubIssueReactionsMtx != nil {
-		j.GitHubIssueReactionsMtx.RUnlock()
-	}
-	if found {
-		// Printf("issue reactions found in cache: %+v\n", reactions)
-		return
+	if CacheGitHubIssueReactions {
+		if j.GitHubIssueReactionsMtx != nil {
+			j.GitHubIssueReactionsMtx.RLock()
+		}
+		reactions, found = j.GitHubIssueReactions[key]
+		if j.GitHubIssueReactionsMtx != nil {
+			j.GitHubIssueReactionsMtx.RUnlock()
+		}
+		if found {
+			// Printf("issue reactions found in cache: %+v\n", reactions)
+			return
+		}
 	}
 	var c *github.Client
 	if j.GitHubMtx != nil {
@@ -765,12 +819,14 @@ func (j *DSGitHub) githubIssueReactions(ctx *Ctx, org, repo string, number int) 
 		reacts, response, e = c.Reactions.ListIssueReactions(j.Context, org, repo, number, opt)
 		// Printf("GET %s/%s/%d -> {%+v, %+v, %+v}\n", org, repo, number, reacts, response, e)
 		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
-			if j.GitHubIssueReactionsMtx != nil {
-				j.GitHubIssueReactionsMtx.Lock()
-			}
-			j.GitHubIssueReactions[key] = []map[string]interface{}{}
-			if j.GitHubIssueReactionsMtx != nil {
-				j.GitHubIssueReactionsMtx.Unlock()
+			if CacheGitHubIssueReactions {
+				if j.GitHubIssueReactionsMtx != nil {
+					j.GitHubIssueReactionsMtx.Lock()
+				}
+				j.GitHubIssueReactions[key] = []map[string]interface{}{}
+				if j.GitHubIssueReactionsMtx != nil {
+					j.GitHubIssueReactionsMtx.Unlock()
+				}
 			}
 			if ctx.Debug > 1 {
 				Printf("githubIssueReactions: reactions not found %s: %v\n", key, e)
@@ -823,12 +879,14 @@ func (j *DSGitHub) githubIssueReactions(ctx *Ctx, org, repo string, number int) 
 		retry = false
 		// Printf("issue reactions got from API: %+v\n", reactions)
 	}
-	if j.GitHubIssueReactionsMtx != nil {
-		j.GitHubIssueReactionsMtx.Lock()
-	}
-	j.GitHubIssueReactions[key] = reactions
-	if j.GitHubIssueReactionsMtx != nil {
-		j.GitHubIssueReactionsMtx.Unlock()
+	if CacheGitHubIssueReactions {
+		if j.GitHubIssueReactionsMtx != nil {
+			j.GitHubIssueReactionsMtx.Lock()
+		}
+		j.GitHubIssueReactions[key] = reactions
+		if j.GitHubIssueReactionsMtx != nil {
+			j.GitHubIssueReactionsMtx.Unlock()
+		}
 	}
 	return
 }
@@ -893,21 +951,45 @@ func (j *DSGitHub) Validate(ctx *Ctx) (err error) {
 			j.Clients = append(j.Clients, client)
 		}
 	}
-	j.GitHubRepos = make(map[string]map[string]interface{})
-	j.GitHubIssues = make(map[string][]map[string]interface{})
-	j.GitHubUser = make(map[string]map[string]interface{})
-	j.GitHubIssueComments = make(map[string][]map[string]interface{})
-	j.GitHubCommentReactions = make(map[string][]map[string]interface{})
-	j.GitHubIssueReactions = make(map[string][]map[string]interface{})
+	if CacheGitHubRepos {
+		j.GitHubRepos = make(map[string]map[string]interface{})
+	}
+	if CacheGitHubIssues {
+		j.GitHubIssues = make(map[string][]map[string]interface{})
+	}
+	if CacheGitHubUser {
+		j.GitHubUser = make(map[string]map[string]interface{})
+	}
+	if CacheGitHubIssueComments {
+		j.GitHubIssueComments = make(map[string][]map[string]interface{})
+	}
+	if CacheGitHubCommentReactions {
+		j.GitHubCommentReactions = make(map[string][]map[string]interface{})
+	}
+	if CacheGitHubIssueReactions {
+		j.GitHubIssueReactions = make(map[string][]map[string]interface{})
+	}
 	j.ThrN = GetThreadsNum(ctx)
 	if j.ThrN > 1 {
 		j.GitHubMtx = &sync.RWMutex{}
-		j.GitHubReposMtx = &sync.RWMutex{}
-		j.GitHubIssuesMtx = &sync.RWMutex{}
-		j.GitHubUserMtx = &sync.RWMutex{}
-		j.GitHubIssueCommentsMtx = &sync.RWMutex{}
-		j.GitHubCommentReactionsMtx = &sync.RWMutex{}
-		j.GitHubIssueReactionsMtx = &sync.RWMutex{}
+		if CacheGitHubRepos {
+			j.GitHubReposMtx = &sync.RWMutex{}
+		}
+		if CacheGitHubIssues {
+			j.GitHubIssuesMtx = &sync.RWMutex{}
+		}
+		if CacheGitHubUser {
+			j.GitHubUserMtx = &sync.RWMutex{}
+		}
+		if CacheGitHubIssueComments {
+			j.GitHubIssueCommentsMtx = &sync.RWMutex{}
+		}
+		if CacheGitHubCommentReactions {
+			j.GitHubCommentReactionsMtx = &sync.RWMutex{}
+		}
+		if CacheGitHubIssueReactions {
+			j.GitHubIssueReactionsMtx = &sync.RWMutex{}
+		}
 	}
 	j.Hint, _ = j.handleRate(ctx)
 	j.CacheDir = os.Getenv("HOME") + "/.perceval/github-users-cache/"
