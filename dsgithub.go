@@ -74,11 +74,13 @@ var (
 	GitHubRawMapping = []byte(`{"dynamic":true,"properties":{"metadata__updated_on":{"type":"date","format":"strict_date_optional_time||epoch_millis"},"data":{"properties":{"comments_data":{"dynamic":false,"properties":{"body":{"type":"text","index":true}}},"review_comments_data":{"dynamic":false,"properties":{"body":{"type":"text","index":true},"diff_hunk":{"type":"text","index":true}}},"reviews_data":{"dynamic":false,"properties":{"body":{"type":"text","index":true}}},"body":{"type":"text","index":true}}}}}`)
 	// GitHubRichMapping - GitHub rich index mapping
 	// GitHubRichMapping = []byte(`{"properties":{"metadata__updated_on":{"type":"date"},"merge_author_geolocation":{"type":"geo_point"},"assignee_geolocation":{"type":"geo_point"},"state":{"type":"keyword"},"user_geolocation":{"type":"geo_point"},"title_analyzed":{"type":"text","index":true}}}`)
-	GitHubRichMapping = []byte(`{"dynamic":true,"properties":{"metadata__updated_on":{"type":"date","format":"strict_date_optional_time||epoch_millis"},"merge_author_geolocation":{"type":"geo_point"},"assignee_geolocation":{"type":"geo_point"},"state":{"type":"keyword"},"user_geolocation":{"type":"geo_point"},"title_analyzed":{"type":"text","index":true}},"dynamic_templates":[{"notanalyzed":{"match":"*","unmatch":"body","match_mapping_type":"string","mapping":{"type":"keyword"}}},{"formatdate":{"match":"*","match_mapping_type":"date","mapping":{"format":"strict_date_optional_time||epoch_millis","type":"date"}}}]}`)
+	GitHubRichMapping = []byte(`{"dynamic":true,"properties":{"metadata__updated_on":{"type":"date","format":"strict_date_optional_time||epoch_millis"},"merge_author_geolocation":{"type":"geo_point"},"assignee_geolocation":{"type":"geo_point"},"state":{"type":"keyword"},"user_geolocation":{"type":"geo_point"},"title_analyzed":{"type":"text","index":true},"body_analyzed":{"type":"text","index":true}},"dynamic_templates":[{"notanalyzed":{"match":"*","unmatch":"body","match_mapping_type":"string","mapping":{"type":"keyword"}}},{"formatdate":{"match":"*","match_mapping_type":"date","mapping":{"format":"strict_date_optional_time||epoch_millis","type":"date"}}}]}`)
 	// GitHubCategories - categories defined for GitHub
 	GitHubCategories = map[string]struct{}{"issue": {}, "pull_request": {}, "repository": {}}
 	// GitHubIssueRoles - roles to fetch affiliation data for github issue
 	GitHubIssueRoles = []string{"user_data", "assignee_data"}
+	// GitHubIssueCommentRoles - roles to fetch affiliation data for github issue comment
+	GitHubIssueCommentRoles = []string{"user_data"}
 )
 
 // DSGitHub - DS implementation for GitHub
@@ -681,6 +683,7 @@ func (j *DSGitHub) githubIssueComments(ctx *Ctx, org, repo string, number int) (
 					com["body"] = body.(string)[:MaxCommentBodyLength]
 				}
 			}
+			com["body_analyzed"], _ = com["body"]
 			userLogin, ok := Dig(com, []string{"user", "login"}, false, true)
 			if ok {
 				com["user_data"], _, err = j.githubUser(ctx, userLogin.(string))
@@ -2975,6 +2978,7 @@ func (j *DSGitHub) GitHubIssueEnrichItemsFunc(ctx *Ctx, thrN int, items []interf
 		}
 		// Possibly enrich assignees items
 		// Possibly enrich reactions items (on issue and maybe all its sub-comments)
+		// xxx
 		return
 	}
 	nThreads := 0
@@ -3125,6 +3129,7 @@ func (j *DSGitHub) GitHubPullRequestEnrichItemsFunc(ctx *Ctx, thrN int, items []
 				}
 			}
 		}
+		// xxx
 		// Possibly enrich assignees items
 		// Possibly enrich reactions items (on PR sub comments)
 		// Possibly enrich requested reviewers data
@@ -3229,7 +3234,113 @@ func (j *DSGitHub) EnrichItem(ctx *Ctx, item map[string]interface{}, author stri
 
 // EnrichIssueComments - return rich comments from raw issue
 func (j *DSGitHub) EnrichIssueComments(ctx *Ctx, issue map[string]interface{}, comments []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
-	// xxx
+	// type: category, type(_), item_type( ), comment=true
+	// copy issue: github_repo, repo_name, repository
+	// copy comment: created_at, updated_at, body, body_analyzed, author_association, url, html_url
+	// identify: id, id_in_repo, comment_id, url_id
+	// standard: metadata..., origin, project, project_slug, uuid
+	// parent: issue_id, issue_number
+	// calc: n_reactions
+	// identity: author_... -> commenter_...,
+	// common: is_github_issue=1, is_github_issue_comment=1
+	iID, _ := issue["id"]
+	id, _ := iID.(string)
+	iIssueID, _ := issue["issue_id"]
+	issueID := int(iIssueID.(float64))
+	issueNumber, _ := issue["id_in_repo"]
+	iNumber, _ := issueNumber.(int)
+	iGithubRepo, _ := issue["github_repo"]
+	githubRepo, _ := iGithubRepo.(string)
+	copyIssueFields := []string{"category", "github_repo", "repo_name", "repository"}
+	copyCommentFields := []string{"created_at", "updated_at", "body", "body_analyzed", "author_association", "url", "html_url"}
+	for _, comment := range comments {
+		rich := make(map[string]interface{})
+		for _, field := range RawFields {
+			v, _ := issue[field]
+			rich[field] = v
+		}
+		for _, field := range copyIssueFields {
+			rich[field], _ = issue[field]
+		}
+		for _, field := range copyCommentFields {
+			rich[field], _ = comment[field]
+		}
+		rich["type"] = "comment"
+		rich["item_type"] = "comment"
+		rich["comment"] = true
+		rich["issue_id"] = issueID
+		rich["issue_number"] = issueNumber
+		iCID, _ := comment["id"]
+		cid := int(iCID.(float64))
+		rich["id_in_repo"] = cid
+		rich["comment_id"] = cid
+		rich["id"] = id + "/comment/" + fmt.Sprintf("%d", cid)
+		rich["url_id"] = fmt.Sprintf("%s/issues/%d/comments/%d", githubRepo, iNumber, cid)
+		reactions := 0
+		iReactions, ok := Dig(comment, []string{"reactions", "total_count"}, false, true)
+		if ok {
+			reactions = int(iReactions.(float64))
+		}
+		rich["n_reactions"] = reactions
+		rich["commenter_association"], _ = comment["author_association"]
+		rich["commenter_login"], _ = Dig(comment, []string{"user", "login"}, true, false)
+		iCommenterData, ok := comment["user_data"]
+		if ok && iCommenterData != nil {
+			user, _ := iCommenterData.(map[string]interface{})
+			rich["author_login"], _ = user["login"]
+			rich["author_name"], _ = user["name"]
+			rich["commenter_name"], _ = user["name"]
+			rich["commenter_domain"] = nil
+			iEmail, ok := user["email"]
+			if ok {
+				email, _ := iEmail.(string)
+				ary := strings.Split(email, "@")
+				if len(ary) > 1 {
+					rich["commenter_domain"] = strings.TrimSpace(ary[1])
+				}
+			}
+			rich["commenter_org"], _ = user["company"]
+			rich["commenter_location"], _ = user["location"]
+			rich["commenter_geolocation"] = nil
+		} else {
+			rich["author_login"] = nil
+			rich["author_name"] = nil
+			rich["commenter_name"] = nil
+			rich["commenter_domain"] = nil
+			rich["commenter_org"] = nil
+			rich["commenter_location"] = nil
+			rich["commenter_geolocation"] = nil
+		}
+		iCreatedAt, _ := comment["created_at"]
+		createdAt, _ := TimeParseInterfaceString(iCreatedAt)
+		if affs {
+			authorKey := "user_data"
+			var affsItems map[string]interface{}
+			affsItems, err = j.AffsItems(ctx, comment, GitHubIssueCommentRoles, createdAt)
+			if err != nil {
+				return
+			}
+			for prop, value := range affsItems {
+				rich[prop] = value
+			}
+			for _, suff := range AffsFields {
+				rich[Author+suff] = rich[authorKey+suff]
+				rich["commenter"+suff] = rich[authorKey+suff]
+			}
+			orgsKey := authorKey + MultiOrgNames
+			_, ok := Dig(rich, []string{orgsKey}, false, true)
+			if !ok {
+				rich[orgsKey] = []interface{}{}
+			}
+		}
+		for prop, value := range CommonFields(j, createdAt, j.Category) {
+			rich[prop] = value
+		}
+		for prop, value := range CommonFields(j, createdAt, j.Category+"_comment") {
+			rich[prop] = value
+		}
+		richItems = append(richItems, rich)
+	}
 	return
 }
 
@@ -3264,7 +3375,7 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 		err = fmt.Errorf("cannot read string uuid from %+v", DumpPreview(rich, 100))
 		return
 	}
-	iid := uuid + j.ItemID(issue)
+	iid := uuid + "/" + j.ItemID(issue)
 	rich["id"] = iid
 	rich["issue_id"], _ = issue["id"]
 	iCreatedAt, _ := issue["created_at"]
@@ -3298,6 +3409,7 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 	iUserData, ok := issue["user_data"]
 	if ok && iUserData != nil {
 		user, _ := iUserData.(map[string]interface{})
+		rich["author_login"], _ = user["login"]
 		rich["author_name"], _ = user["name"]
 		rich["user_name"], _ = user["name"]
 		rich["user_domain"] = nil
@@ -3313,6 +3425,7 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 		rich["user_location"], _ = user["location"]
 		rich["user_geolocation"] = nil
 	} else {
+		rich["author_login"] = nil
 		rich["author_name"] = nil
 		rich["user_name"] = nil
 		rich["user_domain"] = nil
@@ -3350,7 +3463,6 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 	rich["id_in_repo"] = number
 	rich["title"], _ = issue["title"]
 	rich["title_analyzed"], _ = issue["title"]
-	rich["closed_at"], _ = issue["updated_at"]
 	rich["url"], _ = issue["html_url"]
 	iLabels, ok := issue["labels"]
 	if ok && iLabels != nil {
@@ -3390,15 +3502,20 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 	if ok {
 		comments = int(iComments.(float64))
 	}
-	// Note: Reactions API is not returning any time field, p2o tries this but it makes no sense
-	/*
-		reactions := 0
-		iReactions, ok := Dig(issue, []string{"reactions", "total_count"}, false, true)
-		if ok {
-			reactions = int(iReactions.(float64))
-		}
-		if comments+reactions > 0 {
-	*/
+	rich["n_comments"] = comments
+	reactions := 0
+	iReactions, ok := Dig(issue, []string{"reactions", "total_count"}, false, true)
+	if ok {
+		reactions = int(iReactions.(float64))
+	}
+	rich["n_reactions"] = reactions
+	assignees := 0
+	iAssignees, ok := issue["assignees_data"]
+	if ok {
+		assignees = len(iAssignees.([]interface{}))
+	}
+	rich["n_assignees"] = assignees
+	// if comments+reactions > 0 {
 	if comments > 0 {
 		firstAttention := j.GetFirstIssueAttention(issue)
 		rich["time_to_first_attention"] = float64(firstAttention.Sub(createdAt).Seconds()) / 86400.0
@@ -3607,8 +3724,10 @@ func (j *DSGitHub) AllRoles(ctx *Ctx, rich map[string]interface{}) (roles []stri
 			switch typ.(string) {
 			case "issue":
 				possibleRoles = GitHubIssueRoles
+			case "comment":
+				possibleRoles = GitHubIssueCommentRoles
+				// xxx
 			}
-			// xxx
 		}
 	}
 	for _, possibleRole := range possibleRoles {

@@ -39,18 +39,18 @@ then
   DA_GITHUB_RAW_INDEX=sds-da-ds-gh-api-github-repository-raw DA_GITHUB_RICH_INDEX=sds-da-ds-gh-api-github-repository DA_GITHUB_CATEGORY=repository ./dads 2>&1 | tee run-repository.log
   if [ ! -z "$CURL"]
   then
-    curl -s 'http://127.0.0.1:19200/sds-da-ds-gh-api-github-repository-raw/_search?size=1000' | jq -S '.hits.hits[]._source' | tee github-repository-raw.json
-    curl -s 'http://127.0.0.1:19200/sds-da-ds-gh-api-github-repository/_search?size=1000' | jq -S '.hits.hits[]._source' | tee github-repository-rich.json
+    curl -s 'http://127.0.0.1:19200/sds-da-ds-gh-api-github-repository-raw/_search?size=1000' | jq -S '.hits.hits[]._source' > github-repository-raw.json
+    curl -s 'http://127.0.0.1:19200/sds-da-ds-gh-api-github-repository/_search?size=1000' | jq -S '.hits.hits[]._source' > github-repository-rich.json
   fi
 fi
 if [ ! -z "$ISSUE" ]
 then
   #DA_GITHUB_DATE_FROM=2021-01-01 DA_GITHUB_RAW_INDEX=sds-da-ds-gh-api-github-issue-raw DA_GITHUB_RICH_INDEX=sds-da-ds-gh-api-github-issue DA_GITHUB_CATEGORY=issue ./dads 2>&1 | tee run-issue.log
   DA_GITHUB_RAW_INDEX=sds-da-ds-gh-api-github-issue-raw DA_GITHUB_RICH_INDEX=sds-da-ds-gh-api-github-issue DA_GITHUB_CATEGORY=issue ./dads 2>&1 | tee run-issue.log
-  if [ ! -z "$CURL"]
+  if [ ! -z "$CURL" ]
   then
-    curl -s -XPOST -H 'Content-Type: application/json' 'http://127.0.0.1:19200/sds-da-ds-gh-api-github-issue-raw/_search?size=1000' -d '{"query":{"term":{"is_github_issue":1}}}' | jq -S '.hits.hits[]._source' | tee github-issue-raw.json
-    curl -s -XPOST -H 'Content-Type: application/json' 'http://127.0.0.1:19200/sds-da-ds-gh-api-github-issue/_search?size=1000' -d '{"query":{"term":{"is_github_issue":1}}}' | jq -S '.hits.hits[]._source' | tee github-issue-rich.json
+    curl -s -XPOST -H 'Content-Type: application/json' 'http://127.0.0.1:19200/sds-da-ds-gh-api-github-issue-raw/_search?size=1000' -d '{"query":{"term":{"is_github_issue":1}}}' | jq -S '.hits.hits[]._source' > github-issue-raw.json
+    curl -s -XPOST -H 'Content-Type: application/json' 'http://127.0.0.1:19200/sds-da-ds-gh-api-github-issue/_search?size=1000' -d '{"query":{"term":{"is_github_issue":1}}}' | jq -S '.hits.hits[]._source' > github-issue-rich.json
   fi
 fi
 if [ ! -z "$PULLREQUEST" ]
@@ -58,7 +58,7 @@ then
   DA_GITHUB_RAW_INDEX=sds-da-ds-gh-api-github-issue-raw DA_GITHUB_RICH_INDEX=sds-da-ds-gh-api-github-issue DA_GITHUB_CATEGORY=pull_request ./dads 2>&1 | tee run-pull-request.log
   if [ ! -z "$CURL"]
   then
-    curl -s -XPOST -H 'Content-Type: application/json' 'http://127.0.0.1:19200/sds-da-ds-gh-api-github-issue-raw/_search?size=1000' -d '{"query":{"term":{"is_github_pull_request":1}}}' | jq -S '.hits.hits[]._source' | tee github-pull-request-raw.json
-    curl -s -XPOST -H 'Content-Type: application/json' 'http://127.0.0.1:19200/sds-da-ds-gh-api-github-issue/_search?size=1000' -d '{"query":{"term":{"is_github_pull_request":1}}}' | jq -S '.hits.hits[]._source' | tee github-pull-request-rich.json
+    curl -s -XPOST -H 'Content-Type: application/json' 'http://127.0.0.1:19200/sds-da-ds-gh-api-github-issue-raw/_search?size=1000' -d '{"query":{"term":{"is_github_pull_request":1}}}' | jq -S '.hits.hits[]._source' > github-pull-request-raw.json
+    curl -s -XPOST -H 'Content-Type: application/json' 'http://127.0.0.1:19200/sds-da-ds-gh-api-github-issue/_search?size=1000' -d '{"query":{"term":{"is_github_pull_request":1}}}' | jq -S '.hits.hits[]._source' > github-pull-request-rich.json
   fi
 fi
