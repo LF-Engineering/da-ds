@@ -150,7 +150,7 @@ func (j *DSGitHub) getRateLimits(gctx context.Context, ctx *Ctx, gcs []*github.C
 		if err != nil {
 			rem, ok := PeriodParse(err.Error())
 			if ok {
-				Printf("Parsed wait time from error message: %v\n", rem)
+				Printf("Parsed wait time from error message: %v: %s\n", rem, err.Error())
 				limits = append(limits, -1)
 				remainings = append(remainings, -1)
 				durations = append(durations, rem)
