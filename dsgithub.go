@@ -416,7 +416,7 @@ func (j *DSGitHub) githubUser(ctx *Ctx, login string) (user map[string]interface
 				}
 				err = ioutil.WriteFile(path, bts, 0644)
 				if err != nil {
-					Printf("githubUser: cannot write file %s, %d bytes\n", path, len(bts))
+					Printf("githubUser: cannot write file %s, %d bytes: %v\n", path, len(bts), err)
 					return
 				}
 				if ctx.Debug > 0 {
