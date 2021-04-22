@@ -4,6 +4,7 @@
 # dev-analytics-import-bitergia-indexes/README.md: ./es_local_docker.sh
 # dev-analytics-affiliation: ./sh/psql.sh docker, then ./sh/psql.sh
 # dev-analytics-affiliation: ./sh/local_api.sh
+# Example: DA_GITHUB_RETRY=1 ORGREPO2='LF-Engineering/da-ds' CLEAN=1 REPOSITORY='' ISSUE=1 PULLREQUEST='' CURL=1 REFRESH='' ./scripts/github.sh
 # DA_GITHUB_NO_AFFILIATION=1
 if [ -z "$ORGREPO" ]
 then
@@ -27,6 +28,12 @@ export DA_GITHUB_REPO="$REPO"
 export DA_GITHUB_ENRICH=1
 export DA_GITHUB_DEBUG=1 
 export PROJECT_SLUG="$ORGREPO" 
+if [ ! -z "$REFRESH" ]
+then
+  export DA_GITHUB_NO_RAW=1
+  export DA_GITHUB_REFRESH_AFFS=1
+  export DA_GITHUB_FORCE_FULL=1
+fi
 if [ ! -z "$CLEAN" ]
 then
   echo "delete from uidentities" | mysql -h127.0.0.1 -P13306 -prootpwd -uroot shdb || exit 1

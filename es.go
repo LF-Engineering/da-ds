@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	urlLib "net/url"
+
 	jsoniter "github.com/json-iterator/go"
 )
 
@@ -469,6 +471,7 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 	for _, item := range items {
 		doc, _ = jsoniter.Marshal(item)
 		id, _ := item.(map[string]interface{})[key].(string)
+		id = urlLib.PathEscape(id)
 		_, _, _, _, err = Request(
 			ctx,
 			url+id,
