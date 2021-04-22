@@ -3250,14 +3250,91 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 		rich[field] = v
 	}
 	rich["repo_name"] = j.URL
+	rich["repository"] = j.URL
+	rich["id"], _ = issue["id"]
 	rich["issue_id"], _ = issue["id"]
 	updatedOn, _ := Dig(item, []string{j.DateField(ctx)}, true, false)
 	for prop, value := range CommonFields(j, updatedOn, j.Category) {
 		rich[prop] = value
 	}
-	// xxx
 	rich["type"] = j.Category
 	rich["category"] = j.Category
+	now := time.Now()
+	iCreatedAt, _ := issue["created_at"]
+	createdAt, _ := TimeParseInterfaceString(iCreatedAt)
+	iClosedAt, ok := issue["closed_at"]
+	if ok && iClosedAt != nil {
+		closedAt, e := TimeParseInterfaceString(iClosedAt)
+		if e == nil {
+			rich["time_to_close_days"] = float64(closedAt.Sub(createdAt).Seconds()) / 86400.0
+		} else {
+			rich["time_to_close_days"] = nil
+		}
+	} else {
+		rich["time_to_close_days"] = nil
+	}
+	state, ok := issue["state"]
+	if ok && state != nil && state.(string) == "closed" {
+		rich["time_open_days"] = rich["time_to_close_days"]
+	} else {
+		rich["time_open_days"] = float64(now.Sub(createdAt).Seconds()) / 86400.0
+	}
+	rich["user_login"], _ = Dig(issue, []string{"user", "login"}, true, false)
+	iUserData, ok := issue["user_data"]
+	if ok && iUserData != nil {
+		user, _ := iUserData.(map[string]interface{})
+		rich["author_name"], _ = user["name"]
+		rich["user_name"], _ = user["name"]
+		rich["user_domain"] = nil
+		iEmail, ok := user["email"]
+		if ok {
+			email, _ := iEmail.(string)
+			ary := strings.Split(email, "@")
+			if len(ary) > 1 {
+				rich["user_domain"] = strings.TrimSpace(ary[1])
+			}
+		}
+		rich["user_org"], _ = user["company"]
+		rich["user_location"], _ = user["location"]
+		rich["user_geolocation"] = nil
+	} else {
+		rich["author_name"] = nil
+		rich["user_name"] = nil
+		rich["user_domain"] = nil
+		rich["user_org"] = nil
+		rich["user_location"] = nil
+		rich["user_geolocation"] = nil
+	}
+	iAssigneeData, ok := issue["assignee_data"]
+	if ok && iAssigneeData != nil {
+		assignee, _ := iAssigneeData.(map[string]interface{})
+		rich["assignee_login"], _ = assignee["login"]
+		rich["assignee_name"], _ = assignee["name"]
+		rich["assignee_domain"] = nil
+		iEmail, ok := assignee["email"]
+		if ok {
+			email, _ := iEmail.(string)
+			ary := strings.Split(email, "@")
+			if len(ary) > 1 {
+				rich["assignee_domain"] = strings.TrimSpace(ary[1])
+			}
+		}
+		rich["assignee_org"], _ = assignee["company"]
+		rich["assignee_location"], _ = assignee["location"]
+		rich["assignee_geolocation"] = nil
+	} else {
+		rich["assignee_login"] = nil
+		rich["assignee_name"] = nil
+		rich["assignee_domain"] = nil
+		rich["assignee_org"] = nil
+		rich["assignee_location"] = nil
+		rich["assignee_geolocation"] = nil
+	}
+	iNumber, _ := issue["number"]
+	number := int(iNumber.(float64))
+	rich["id_in_repo"] = number
+	rich["title"], _ = issue["title"]
+	rich["title_analyzed"], _ = issue["title"]
 	return
 }
 
