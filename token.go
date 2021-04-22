@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -67,8 +68,7 @@ func InitializeAuth0() error {
 	if ds != "" {
 		appName += "-" + ds
 	}
-	commitID := build.GitCommit
-	appNameVersion := fmt.Sprintf("%s-%v", appName, commitID)
+	appNameVersion := fmt.Sprintf("%s-%v", appName, strconv.FormatInt(time.Now().Unix(), 10))
 	slackProvider := slack.New(data["slack_webhook_url"])
 	gAuth0Client, err = auth0.NewAuth0Client(
 		data["env"],
