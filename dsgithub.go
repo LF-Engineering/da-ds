@@ -2597,11 +2597,18 @@ func (j *DSGitHub) ItemID(item interface{}) string {
 		}
 		return fmt.Sprintf("%v", id)
 	}
-	id, ok := item.(map[string]interface{})["id"]
+	number, ok := item.(map[string]interface{})["number"]
 	if !ok {
-		Fatalf("%s: ItemID() - cannot extract id from %+v", j.DS, DumpKeys(item))
+		Fatalf("%s: ItemID() - cannot extract number from %+v", j.DS, DumpKeys(item))
 	}
-	return fmt.Sprintf("%s/%d", j.Category, int64(id.(float64)))
+	return fmt.Sprintf("%s/%s/%s/%d", j.Org, j.Repo, j.Category, int(number.(float64)))
+	/*
+		id, ok := item.(map[string]interface{})["id"]
+		if !ok {
+			Fatalf("%s: ItemID() - cannot extract id from %+v", j.DS, DumpKeys(item))
+		}
+		return fmt.Sprintf("%s/%d", j.Category, int64(id.(float64)))
+	*/
 }
 
 // AddMetadata - add metadata to the item
@@ -3357,7 +3364,7 @@ func (j *DSGitHub) EnrichIssueComments(ctx *Ctx, issue map[string]interface{}, c
 		cid := int64(iCID.(float64))
 		rich["id_in_repo"] = cid
 		rich["issue_comment_id"] = cid
-		rich["id"] = id + "/issue_comment/" + fmt.Sprintf("%d", cid)
+		rich["id"] = id + "/comment/" + fmt.Sprintf("%d", cid)
 		rich["url_id"] = fmt.Sprintf("%s/issues/%d/comments/%d", githubRepo, iNumber, cid)
 		reactions := 0
 		iReactions, ok := Dig(comment, []string{"reactions", "total_count"}, false, true)
@@ -3463,7 +3470,7 @@ func (j *DSGitHub) EnrichIssueAssignees(ctx *Ctx, issue map[string]interface{}, 
 		login, _ := iLogin.(string)
 		rich["id_in_repo"], _ = assignee["id"]
 		rich["issue_assignee_login"] = login
-		rich["id"] = id + "/issue_assignee/" + login
+		rich["id"] = id + "/assignee/" + login
 		rich["url_id"] = fmt.Sprintf("%s/issues/%d/assignees/%s", githubRepo, iNumber, login)
 		rich["author_login"] = login
 		rich["author_name"], _ = assignee["name"]
@@ -3568,8 +3575,9 @@ func (j *DSGitHub) EnrichIssueReactions(ctx *Ctx, issue map[string]interface{}, 
 			rich["item_type"] = "issue comment reaction"
 			rich["issue"+reactionSuffix] = true
 			rich["issue_comment_id"] = cid
+			rich["issue_comment_reaction_id"] = rid
 			rich["id_in_repo"] = rid
-			rich["id"] = id + "/issue_comment/" + fmt.Sprintf("%d", cid) + "/reaction/" + fmt.Sprintf("%d", rid)
+			rich["id"] = id + "/comment/" + fmt.Sprintf("%d", cid) + "/reaction/" + fmt.Sprintf("%d", rid)
 			rich["url_id"] = fmt.Sprintf("%s/issues/%d/comments/%d/reactions/%d", githubRepo, iNumber, cid, rid)
 			iCreatedAt, _ = comment["created_at"]
 		} else {
@@ -3577,8 +3585,9 @@ func (j *DSGitHub) EnrichIssueReactions(ctx *Ctx, issue map[string]interface{}, 
 			rich["type"] = "issue" + reactionSuffix
 			rich["item_type"] = "issue reaction"
 			rich["issue"+reactionSuffix] = true
+			rich["issue_reaction_id"] = rid
 			rich["id_in_repo"] = rid
-			rich["id"] = id + "/issue_reaction/" + fmt.Sprintf("%d", rid)
+			rich["id"] = id + "/reaction/" + fmt.Sprintf("%d", rid)
 			rich["url_id"] = fmt.Sprintf("%s/issues/%d/reactions/%d", githubRepo, iNumber, rid)
 			iCreatedAt, _ = issue["created_at"]
 		}
@@ -3671,13 +3680,17 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 	}
 	rich["repo_name"] = j.URL
 	rich["repository"] = j.URL
-	uuid, ok := rich[UUID].(string)
-	if !ok {
-		err = fmt.Errorf("cannot read string uuid from %+v", DumpPreview(rich, 100))
-		return
-	}
-	iid := uuid + "/" + j.ItemID(issue)
-	rich["id"] = iid
+	// I think we don't need original UUID in id
+	/*
+		uuid, ok := rich[UUID].(string)
+		if !ok {
+			err = fmt.Errorf("cannot read string uuid from %+v", DumpPreview(rich, 100))
+			return
+		}
+		iid := uuid + "/" + j.ItemID(issue)
+		rich["id"] = iid
+	*/
+	rich["id"] = j.ItemID(issue)
 	rich["issue_id"], _ = issue["id"]
 	iCreatedAt, _ := issue["created_at"]
 	createdAt, _ := TimeParseInterfaceString(iCreatedAt)
