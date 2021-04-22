@@ -347,13 +347,20 @@ func (j *DSGitHub) githubUser(ctx *Ctx, login string) (user map[string]interface
 			file, e := os.Stat(path)
 			if e == nil {
 				for {
+					waited := 0
 					_, e := os.Stat(lockPath)
 					if e == nil {
 						if ctx.Debug > 0 {
-							Printf("user %s lock file %s present, waitng 1s\n", user, lockPath)
+							Printf("user %s lock file %s present, waiting 1s\n", user, lockPath)
 						}
 						time.Sleep(time.Duration(1) * time.Second)
+						waited++
 						continue
+					}
+					if waited > 0 {
+						if ctx.Debug > 0 {
+							Printf("user %s lock file %s was present, waited %ds\n", user, lockPath, waited)
+						}
 					}
 					file, _ = os.Stat(path)
 					break
@@ -395,9 +402,16 @@ func (j *DSGitHub) githubUser(ctx *Ctx, login string) (user map[string]interface
 					Printf("githubUser: no %s user cache file: %v\n", path, e)
 				}
 			}
-			lockFile, _ := os.Create(lockPath)
+			locked := false
+			lockFile, e := os.Create(lockPath)
+			if e != nil {
+				Printf("githubUser: create %s lock file failed: %v\n", lockPath, e)
+			} else {
+				locked = true
+				_ = lockFile.Close()
+			}
 			defer func() {
-				if lockFile != nil {
+				if locked {
 					defer func() {
 						if ctx.Debug > 1 {
 							Printf("remove lock file %s\n", lockPath)
