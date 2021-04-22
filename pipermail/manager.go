@@ -3,6 +3,7 @@ package pipermail
 import (
 	"fmt"
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/LF-Engineering/da-ds/build"
@@ -437,8 +438,7 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 	identityProvider := affiliation.NewIdentityProvider(dataBase)
 	slackProvider := slack.New(m.WebHookURL)
 
-	commitID := build.GitCommit[7]
-	appNameVersion := fmt.Sprintf("%s-%v", build.AppName, commitID)
+	appNameVersion := fmt.Sprintf("%s-%v", build.AppName, strconv.FormatInt(time.Now().Unix(), 10))
 	auth0Client, err := auth0.NewAuth0Client(
 		m.Environment,
 		m.AuthGrantType,
