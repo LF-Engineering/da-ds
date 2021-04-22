@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,6 +20,8 @@ import (
 const (
 	// GitHubBackendVersion - backend version
 	GitHubBackendVersion = "0.1.0"
+	// GitHubURLRoot - GitHub URL root
+	GitHubURLRoot = "https://github.com/"
 	// MaxGitHubUsersFileCacheAge 90 days (in seconds) - file is considered too old anywhere between 90-180 days
 	MaxGitHubUsersFileCacheAge = 7776000
 	// MaxCommentBodyLength - max comment body length
@@ -74,6 +77,8 @@ var (
 	GitHubRichMapping = []byte(`{"dynamic":true,"properties":{"metadata__updated_on":{"type":"date","format":"strict_date_optional_time||epoch_millis"},"merge_author_geolocation":{"type":"geo_point"},"assignee_geolocation":{"type":"geo_point"},"state":{"type":"keyword"},"user_geolocation":{"type":"geo_point"},"title_analyzed":{"type":"text","index":true}},"dynamic_templates":[{"notanalyzed":{"match":"*","unmatch":"body","match_mapping_type":"string","mapping":{"type":"keyword"}}},{"formatdate":{"match":"*","match_mapping_type":"date","mapping":{"format":"strict_date_optional_time||epoch_millis","type":"date"}}}]}`)
 	// GitHubCategories - categories defined for GitHub
 	GitHubCategories = map[string]struct{}{"issue": {}, "pull_request": {}, "repository": {}}
+	// GitHubIssueRoles - roles to fetch affiliation data for github issue
+	GitHubIssueRoles = []string{"user_data", "assignee_data"}
 )
 
 // DSGitHub - DS implementation for GitHub
@@ -2523,7 +2528,8 @@ func (j *DSGitHub) DateField(*Ctx) string {
 
 // RichIDField - return rich ID field name
 func (j *DSGitHub) RichIDField(*Ctx) string {
-	return UUID
+	// return UUID
+	return DefaultIDField
 }
 
 // RichAuthorField - return rich author field name
@@ -3253,16 +3259,16 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 	rich["repository"] = j.URL
 	rich["id"], _ = issue["id"]
 	rich["issue_id"], _ = issue["id"]
+	iCreatedAt, _ := issue["created_at"]
+	createdAt, _ := TimeParseInterfaceString(iCreatedAt)
 	updatedOn, _ := Dig(item, []string{j.DateField(ctx)}, true, false)
-	for prop, value := range CommonFields(j, updatedOn, j.Category) {
-		rich[prop] = value
-	}
 	rich["type"] = j.Category
 	rich["category"] = j.Category
 	now := time.Now()
-	iCreatedAt, _ := issue["created_at"]
-	createdAt, _ := TimeParseInterfaceString(iCreatedAt)
+	rich["created_at"] = createdAt
+	rich["updated_at"] = updatedOn
 	iClosedAt, ok := issue["closed_at"]
+	rich["closed_at"] = iClosedAt
 	if ok && iClosedAt != nil {
 		closedAt, e := TimeParseInterfaceString(iClosedAt)
 		if e == nil {
@@ -3274,6 +3280,7 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 		rich["time_to_close_days"] = nil
 	}
 	state, ok := issue["state"]
+	rich["state"] = state
 	if ok && state != nil && state.(string) == "closed" {
 		rich["time_open_days"] = rich["time_to_close_days"]
 	} else {
@@ -3335,6 +3342,141 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 	rich["id_in_repo"] = number
 	rich["title"], _ = issue["title"]
 	rich["title_analyzed"], _ = issue["title"]
+	rich["closed_at"], _ = issue["updated_at"]
+	rich["url"], _ = issue["html_url"]
+	iLabels, ok := issue["labels"]
+	if ok && iLabels != nil {
+		ary, _ := iLabels.([]interface{})
+		labels := []interface{}{}
+		for _, iLabel := range ary {
+			label, _ := iLabel.(map[string]interface{})
+			iLabelName, _ := label["name"]
+			labelName, _ := iLabelName.(string)
+			if labelName != "" {
+				labels = append(labels, labelName)
+			}
+		}
+		rich["labels"] = labels
+	}
+	_, hasHead := issue["head"]
+	_, hasPR := issue["pull_request"]
+	if !hasHead && !hasPR {
+		rich["pull_request"] = false
+		rich["item_type"] = "issue"
+	} else {
+		rich["pull_request"] = true
+		rich["item_type"] = "pull request"
+	}
+	githubRepo := j.URL
+	if strings.HasSuffix(githubRepo, ".git") {
+		githubRepo = githubRepo[:len(githubRepo)-4]
+	}
+	if strings.Contains(githubRepo, GitHubURLRoot) {
+		githubRepo = strings.Replace(githubRepo, GitHubURLRoot, "", -1)
+	}
+	rich["github_repo"] = githubRepo
+	rich["url_id"] = fmt.Sprintf("%s/issues/%d", githubRepo, number)
+	rich["time_to_first_attention"] = nil
+	comments := 0
+	iComments, ok := issue["comments"]
+	if ok {
+		comments = int(iComments.(float64))
+	}
+	// Note: Reactions API is not returning any time field, p2o tries this but it makes no sense
+	/*
+		reactions := 0
+		iReactions, ok := Dig(issue, []string{"reactions", "total_count"}, false, true)
+		if ok {
+			reactions = int(iReactions.(float64))
+		}
+		if comments+reactions > 0 {
+	*/
+	if comments > 0 {
+		firstAttention := j.GetFirstIssueAttention(issue)
+		rich["time_to_first_attention"] = float64(firstAttention.Sub(createdAt).Seconds()) / 86400.0
+	}
+	if affs {
+		authorKey := "user"
+		var affsItems map[string]interface{}
+		affsItems, err = j.AffsItems(ctx, issue, GitHubIssueRoles, createdAt)
+		if err != nil {
+			return
+		}
+		for prop, value := range affsItems {
+			rich[prop] = value
+		}
+		for _, suff := range AffsFields {
+			rich[Author+suff] = rich[authorKey+suff]
+		}
+		orgsKey := authorKey + MultiOrgNames
+		_, ok := Dig(rich, []string{orgsKey}, false, true)
+		if !ok {
+			rich[orgsKey] = []interface{}{}
+		}
+	}
+	for prop, value := range CommonFields(j, createdAt, j.Category) {
+		rich[prop] = value
+	}
+	return
+}
+
+// GetFirstIssueAttention - get first non-author action date on the issue
+func (j *DSGitHub) GetFirstIssueAttention(issue map[string]interface{}) (dt time.Time) {
+	iUserLogin, _ := Dig(issue, []string{"user", "login"}, true, false)
+	userLogin, _ := iUserLogin.(string)
+	dts := []time.Time{}
+	udts := []time.Time{}
+	iComments, ok := issue["comments_data"]
+	if ok && iComments != nil {
+		ary, _ := iComments.([]interface{})
+		for _, iComment := range ary {
+			comment, _ := iComment.(map[string]interface{})
+			iCommentLogin, _ := Dig(comment, []string{"user", "login"}, true, false)
+			commentLogin, _ := iCommentLogin.(string)
+			iCreatedAt, _ := comment["created_at"]
+			createdAt, _ := TimeParseInterfaceString(iCreatedAt)
+			if userLogin == commentLogin {
+				udts = append(udts, createdAt)
+				continue
+			}
+			dts = append(dts, createdAt)
+		}
+	}
+	// NOTE: p2o does it but reactions API doesn't have any datetimefield specifying when reaction was made
+	/*
+		iReactions, ok := issue["reactions_data"]
+		if ok && iReactions != nil {
+			ary, _ := iReactions.([]interface{})
+			for _, iReaction := range ary {
+				reaction, _ := iReaction.(map[string]interface{})
+				iReactionLogin, _ := Dig(reaction, []string{"user", "login"}, true, false)
+				reactionLogin, _ := iReactionLogin.(string)
+				if userLogin == reactionLogin {
+					continue
+				}
+				iCreatedAt, _ := reaction["created_at"]
+				createdAt, _ := TimeParseInterfaceString(iCreatedAt)
+				dts = append(dts, createdAt)
+			}
+		}
+	*/
+	nDts := len(dts)
+	if nDts == 0 {
+		// If there was no action of anybody else that author's, then fallback to author's actions
+		dts = udts
+		nDts = len(dts)
+	}
+	switch nDts {
+	case 0:
+		dt = time.Now()
+	case 1:
+		dt = dts[0]
+	default:
+		sort.Slice(dts, func(i, j int) bool {
+			return dts[i].Before(dts[j])
+		})
+		dt = dts[0]
+	}
 	return
 }
 
@@ -3392,28 +3534,83 @@ func (j *DSGitHub) EnrichRepositoryItem(ctx *Ctx, item map[string]interface{}, a
 }
 
 // AffsItems - return affiliations data items for given roles and date
-func (j *DSGitHub) AffsItems(ctx *Ctx, rawItem map[string]interface{}, roles []string, date interface{}) (affsItems map[string]interface{}, err error) {
-	// IMPL:
+func (j *DSGitHub) AffsItems(ctx *Ctx, item map[string]interface{}, roles []string, date interface{}) (affsItems map[string]interface{}, err error) {
+	affsItems = make(map[string]interface{})
+	dt, _ := date.(time.Time)
+	for _, role := range roles {
+		identity := j.GetRoleIdentity(ctx, item, role)
+		if len(identity) == 0 {
+			// yyy
+			fmt.Printf("cannot get identity for role %s from %+v\n", role, item)
+			continue
+		}
+		affsIdentity, empty, e := IdentityAffsData(ctx, j, identity, nil, dt, role)
+		if e != nil {
+			Printf("AffsItems/IdentityAffsData: error: %v for %v,%v,%v\n", e, identity, dt, role)
+		}
+		if empty {
+			Printf("no identity affiliation data for identity %+v\n", identity)
+			continue
+		}
+		for prop, value := range affsIdentity {
+			affsItems[prop] = value
+		}
+		for _, suff := range RequiredAffsFields {
+			k := role + suff
+			_, ok := affsIdentity[k]
+			if !ok {
+				affsIdentity[k] = Unknown
+			}
+		}
+	}
 	return
 }
 
 // GetRoleIdentity - return identity data for a given role
-func (j *DSGitHub) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role string) map[string]interface{} {
-	// IMPL:
-	return map[string]interface{}{"name": nil, "username": nil, "email": nil}
+func (j *DSGitHub) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role string) (identity map[string]interface{}) {
+	user, ok := item[role]
+	if ok {
+		ident := j.IdentityForObject(ctx, user.(map[string]interface{}))
+		identity = map[string]interface{}{
+			"name":     ident[0],
+			"username": ident[1],
+			"email":    ident[2],
+		}
+	}
+	return
 }
 
 // AllRoles - return all roles defined for the backend
 // roles can be static (always the same) or dynamic (per item)
 // second return parameter is static mode (true/false)
 // dynamic roles will use item to get its roles
-func (j *DSGitHub) AllRoles(ctx *Ctx, item map[string]interface{}) (roles []string, static bool) {
-	if j.Category == "repository" {
+func (j *DSGitHub) AllRoles(ctx *Ctx, rich map[string]interface{}) (roles []string, static bool) {
+	var possibleRoles []string
+	switch j.Category {
+	case "repository":
+		static = true
 		return
+	case "issue":
+		roles = []string{Author}
+		if rich == nil {
+			return
+		}
+		typ, ok := rich["type"]
+		if ok {
+			switch typ.(string) {
+			case "issue":
+				possibleRoles = GitHubIssueRoles
+			}
+			// xxx
+		}
 	}
-	// IMPL:
-	// This will depend on github documents types
-	return []string{Author}, true
+	for _, possibleRole := range possibleRoles {
+		_, ok := Dig(rich, []string{possibleRole + "_id"}, false, true)
+		if ok {
+			roles = append(roles, possibleRole)
+		}
+	}
+	return
 }
 
 // CalculateTimeToReset - calculate time to reset rate limits based on rate limit value and rate limit reset value

@@ -228,6 +228,9 @@ func (j *DSStub) DateField(*Ctx) string {
 // RichIDField - return rich ID field name
 func (j *DSStub) RichIDField(*Ctx) string {
 	// IMPL:
+	// DefaultIDField - will use rich item's id - so mapping can be 1 raw -> N rich items
+	//   you just need to use different IDs for sub-items
+	// UUID - will use 1:1 raw-rich mapping
 	return DefaultIDField
 }
 
