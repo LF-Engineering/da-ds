@@ -17,18 +17,18 @@ REPO="${ary[1]}"
 export AUTH0_DATA="`cat ../sync-data-sources/helm-charts/sds-helm/sds-helm/secrets/AUTH0_DATA.prod.secret`"
 export DA_DS=github
 export DA_GITHUB_AFFILIATION_API_URL='http://127.0.0.1:8080'
-export DA_GITHUB_DB_HOST=127.0.0.1 
+export DA_GITHUB_DB_HOST=127.0.0.1
 export DA_GITHUB_DB_NAME=shdb
 export DA_GITHUB_DB_USER=shusername
 export DA_GITHUB_DB_PASS=shpwd
 export DA_GITHUB_DB_PORT=13306
-export DA_GITHUB_ES_URL='http://127.0.0.1:19200' 
-export DA_GITHUB_TOKENS="`cat /etc/github/oauths`" 
+export DA_GITHUB_ES_URL='http://127.0.0.1:19200'
+export DA_GITHUB_TOKENS="`cat /etc/github/oauths`"
 export DA_GITHUB_ORG="$ORG"
 export DA_GITHUB_REPO="$REPO"
 export DA_GITHUB_ENRICH=1
-export DA_GITHUB_DEBUG=1 
-export PROJECT_SLUG="$ORGREPO" 
+export DA_GITHUB_DEBUG=1
+export PROJECT_SLUG="$ORGREPO"
 if [ ! -z "$REFRESH" ]
 then
   export DA_GITHUB_NO_RAW=1
