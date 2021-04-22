@@ -192,7 +192,9 @@ func (j *DSGitHub) getRateLimits(gctx context.Context, ctx *Ctx, gcs []*github.C
 func (j *DSGitHub) handleRate(ctx *Ctx) (aHint int, canCache bool) {
 	h, _, rem, wait := j.getRateLimits(j.Context, ctx, j.Clients, true)
 	for {
-		// Printf("Checking token %d %+v %+v\n", h, rem, wait)
+		if ctx.Debug > 1 {
+			Printf("Checking token %d %+v %+v\n", h, rem, wait)
+		}
 		if rem[h] <= 5 {
 			Printf("All GH API tokens are overloaded, maximum points %d, waiting %+v\n", rem[h], wait[h])
 			time.Sleep(time.Duration(1) * time.Second)
@@ -207,7 +209,9 @@ func (j *DSGitHub) handleRate(ctx *Ctx) (aHint int, canCache bool) {
 	}
 	aHint = h
 	j.Hint = aHint
-	// Printf("Found usable token %d/%d/%v, cache enabled: %v\n", aHint, rem[h], wait[h], canCache)
+	if ctx.Debug > 1 {
+		Printf("Found usable token %d/%d/%v, cache enabled: %v\n", aHint, rem[h], wait[h], canCache)
+	}
 	return
 }
 
@@ -232,7 +236,9 @@ func (j *DSGitHub) githubRepo(ctx *Ctx, org, repo string) (repoData map[string]i
 			j.GitHubRepoMtx.RUnlock()
 		}
 		if found {
-			// Printf("repos found in cache: %+v\n", repoData)
+			if ctx.Debug > 2 {
+				Printf("repos found in cache: %+v\n", repoData)
+			}
 			return
 		}
 	}
@@ -252,7 +258,9 @@ func (j *DSGitHub) githubRepo(ctx *Ctx, org, repo string) (repoData map[string]i
 			e        error
 		)
 		rep, response, e = c.Repositories.Get(j.Context, org, repo)
-		// Printf("GET %s/%s -> {%+v, %+v, %+v}\n", org, repo, rep, response, e)
+		if ctx.Debug > 2 {
+			Printf("GET %s/%s -> {%+v, %+v, %+v}\n", org, repo, rep, response, e)
+		}
 		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
 			if CacheGitHubRepo {
 				if j.GitHubRepoMtx != nil {
@@ -296,7 +304,9 @@ func (j *DSGitHub) githubRepo(ctx *Ctx, org, repo string) (repoData map[string]i
 		}
 		jm, _ := jsoniter.Marshal(rep)
 		_ = jsoniter.Unmarshal(jm, &repoData)
-		// Printf("repos got from API: %+v\n", repoData)
+		if ctx.Debug > 2 {
+			Printf("repos got from API: %+v\n", repoData)
+		}
 		break
 	}
 	if CacheGitHubRepo {
@@ -324,7 +334,9 @@ func (j *DSGitHub) githubUser(ctx *Ctx, login string) (user map[string]interface
 		}
 		if ok {
 			found = len(user) > 0
-			// Printf("user found in memory cache: %+v\n", user)
+			if ctx.Debug > 1 {
+				Printf("user found in memory cache: %+v\n", user)
+			}
 			return
 		}
 		// Try file cache 2nd
@@ -337,7 +349,9 @@ func (j *DSGitHub) githubUser(ctx *Ctx, login string) (user map[string]interface
 				for {
 					_, e := os.Stat(lockPath)
 					if e == nil {
-						// Printf("user %s lock file %s present, waitng 1s\n", user, lockPath)
+						if ctx.Debug > 0 {
+							Printf("user %s lock file %s present, waitng 1s\n", user, lockPath)
+						}
 						time.Sleep(time.Duration(1) * time.Second)
 						continue
 					}
@@ -362,7 +376,9 @@ func (j *DSGitHub) githubUser(ctx *Ctx, login string) (user map[string]interface
 								if j.GitHubUserMtx != nil {
 									j.GitHubUserMtx.Unlock()
 								}
-								// Printf("user found in files cache: %+v\n", user)
+								if ctx.Debug > 1 {
+									Printf("user found in files cache: %+v\n", user)
+								}
 								return
 							}
 							Printf("githubUser: unmarshaled %s cache file is empty\n", path)
@@ -375,15 +391,17 @@ func (j *DSGitHub) githubUser(ctx *Ctx, login string) (user map[string]interface
 					Printf("githubUser: %s user cache file is too old: %v (allowed %v)\n", path, time.Duration(age)*time.Second, time.Duration(allowedAge)*time.Second)
 				}
 			} else {
-				if ctx.Debug > 0 {
-					// Printf("githubUser: no %s user cache file: %v\n", path, e)
+				if ctx.Debug > 1 {
+					Printf("githubUser: no %s user cache file: %v\n", path, e)
 				}
 			}
 			lockFile, _ := os.Create(lockPath)
 			defer func() {
 				if lockFile != nil {
 					defer func() {
-						// Printf("remove lock file %s\n", lockPath)
+						if ctx.Debug > 1 {
+							Printf("remove lock file %s\n", lockPath)
+						}
 						_ = os.Remove(lockPath)
 					}()
 				}
@@ -424,13 +442,17 @@ func (j *DSGitHub) githubUser(ctx *Ctx, login string) (user map[string]interface
 			e        error
 		)
 		usr, response, e = c.Users.Get(j.Context, login)
-		// Printf("GET %s -> {%+v, %+v, %+v}\n", login, usr, response, e)
+		if ctx.Debug > 2 {
+			Printf("GET %s -> {%+v, %+v, %+v}\n", login, usr, response, e)
+		}
 		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
 			if CacheGitHubUser {
 				if j.GitHubUserMtx != nil {
 					j.GitHubUserMtx.Lock()
 				}
-				// Printf("user not found using API: %s\n", login)
+				if ctx.Debug > 0 {
+					Printf("user not found using API: %s\n", login)
+				}
 				j.GitHubUser[login] = map[string]interface{}{}
 				if j.GitHubUserMtx != nil {
 					j.GitHubUserMtx.Unlock()
@@ -471,7 +493,9 @@ func (j *DSGitHub) githubUser(ctx *Ctx, login string) (user map[string]interface
 			if err != nil {
 				return
 			}
-			// Printf("user found using API: %+v\n", user)
+			if ctx.Debug > 1 {
+				Printf("user found using API: %+v\n", user)
+			}
 			found = true
 		}
 		break
@@ -501,7 +525,9 @@ func (j *DSGitHub) githubIssues(ctx *Ctx, org, repo string, since *time.Time) (i
 			j.GitHubIssuesMtx.RUnlock()
 		}
 		if found {
-			// Printf("issues found in cache: %+v\n", issuesData)
+			if ctx.Debug > 2 {
+				Printf("issues found in cache: %+v\n", issuesData)
+			}
 			return
 		}
 	}
@@ -530,7 +556,9 @@ func (j *DSGitHub) githubIssues(ctx *Ctx, org, repo string, since *time.Time) (i
 			e        error
 		)
 		issues, response, e = c.Issues.ListByRepo(j.Context, org, repo, opt)
-		// Printf("GET %s/%s -> {%+v, %+v, %+v}\n", org, repo, issues, response, e)
+		if ctx.Debug > 2 {
+			Printf("GET %s/%s -> {%+v, %+v, %+v}\n", org, repo, issues, response, e)
+		}
 		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
 			if CacheGitHubIssues {
 				if j.GitHubIssuesMtx != nil {
@@ -590,8 +618,13 @@ func (j *DSGitHub) githubIssues(ctx *Ctx, org, repo string, since *time.Time) (i
 			break
 		}
 		opt.Page = response.NextPage
+		if ctx.Debug > 0 {
+			Printf("processing next issues page: %d\n", opt.Page)
+		}
 		retry = false
-		// Printf("issues got from API: %+v\n", issuesData)
+	}
+	if ctx.Debug > 2 {
+		Printf("issues got from API: %+v\n", issuesData)
 	}
 	if CacheGitHubIssues {
 		if j.GitHubIssuesMtx != nil {
@@ -618,7 +651,9 @@ func (j *DSGitHub) githubIssueComments(ctx *Ctx, org, repo string, number int) (
 			j.GitHubIssueCommentsMtx.RUnlock()
 		}
 		if found {
-			// Printf("issue comments found in cache: %+v\n", comments)
+			if ctx.Debug > 2 {
+				Printf("issue comments found in cache: %+v\n", comments)
+			}
 			return
 		}
 	}
@@ -640,7 +675,9 @@ func (j *DSGitHub) githubIssueComments(ctx *Ctx, org, repo string, number int) (
 			e        error
 		)
 		comms, response, e = c.Issues.ListComments(j.Context, org, repo, number, opt)
-		// Printf("GET %s/%s -> {%+v, %+v, %+v}\n", org, repo, comms, response, e)
+		if ctx.Debug > 2 {
+			Printf("GET %s/%s -> {%+v, %+v, %+v}\n", org, repo, comms, response, e)
+		}
 		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
 			if CacheGitHubIssueComments {
 				if j.GitHubIssueCommentsMtx != nil {
@@ -721,8 +758,13 @@ func (j *DSGitHub) githubIssueComments(ctx *Ctx, org, repo string, number int) (
 			break
 		}
 		opt.Page = response.NextPage
+		if ctx.Debug > 0 {
+			Printf("processing next issue comments page: %d\n", opt.Page)
+		}
 		retry = false
-		// Printf("issue comments got from API: %+v\n", comments)
+	}
+	if ctx.Debug > 2 {
+		Printf("issue comments got from API: %+v\n", comments)
 	}
 	if CacheGitHubIssueComments {
 		if j.GitHubIssueCommentsMtx != nil {
@@ -739,7 +781,9 @@ func (j *DSGitHub) githubIssueComments(ctx *Ctx, org, repo string, number int) (
 func (j *DSGitHub) githubCommentReactions(ctx *Ctx, org, repo string, cid int64) (reactions []map[string]interface{}, err error) {
 	var found bool
 	key := fmt.Sprintf("%s/%s/%d", org, repo, cid)
-	// fmt.Printf("githubCommentReactions %s\n", key)
+	if ctx.Debug > 1 {
+		fmt.Printf("githubCommentReactions %s\n", key)
+	}
 	// Try memory cache 1st
 	if CacheGitHubCommentReactions {
 		if j.GitHubCommentReactionsMtx != nil {
@@ -750,7 +794,9 @@ func (j *DSGitHub) githubCommentReactions(ctx *Ctx, org, repo string, cid int64)
 			j.GitHubCommentReactionsMtx.RUnlock()
 		}
 		if found {
-			// Printf("comment reactions found in cache: %+v\n", reactions)
+			if ctx.Debug > 2 {
+				Printf("comment reactions found in cache: %+v\n", reactions)
+			}
 			return
 		}
 	}
@@ -772,7 +818,9 @@ func (j *DSGitHub) githubCommentReactions(ctx *Ctx, org, repo string, cid int64)
 			e        error
 		)
 		reacts, response, e = c.Reactions.ListIssueCommentReactions(j.Context, org, repo, cid, opt)
-		// Printf("GET %s/%s/%d -> {%+v, %+v, %+v}\n", org, repo, cid, reacts, response, e)
+		if ctx.Debug > 2 {
+			Printf("GET %s/%s/%d -> {%+v, %+v, %+v}\n", org, repo, cid, reacts, response, e)
+		}
 		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
 			if CacheGitHubCommentReactions {
 				if j.GitHubCommentReactionsMtx != nil {
@@ -831,8 +879,13 @@ func (j *DSGitHub) githubCommentReactions(ctx *Ctx, org, repo string, cid int64)
 			break
 		}
 		opt.Page = response.NextPage
+		if ctx.Debug > 0 {
+			Printf("processing next comment reactions page: %d\n", opt.Page)
+		}
 		retry = false
-		// Printf("comment reactions got from API: %+v\n", reactions)
+	}
+	if ctx.Debug > 2 {
+		Printf("comment reactions got from API: %+v\n", reactions)
 	}
 	if CacheGitHubCommentReactions {
 		if j.GitHubCommentReactionsMtx != nil {
@@ -849,7 +902,9 @@ func (j *DSGitHub) githubCommentReactions(ctx *Ctx, org, repo string, cid int64)
 func (j *DSGitHub) githubIssueReactions(ctx *Ctx, org, repo string, number int) (reactions []map[string]interface{}, err error) {
 	var found bool
 	key := fmt.Sprintf("%s/%s/%d", org, repo, number)
-	// fmt.Printf("githubIssueReactions %s\n", key)
+	if ctx.Debug > 1 {
+		fmt.Printf("githubIssueReactions %s\n", key)
+	}
 	// Try memory cache 1st
 	if CacheGitHubIssueReactions {
 		if j.GitHubIssueReactionsMtx != nil {
@@ -860,7 +915,9 @@ func (j *DSGitHub) githubIssueReactions(ctx *Ctx, org, repo string, number int) 
 			j.GitHubIssueReactionsMtx.RUnlock()
 		}
 		if found {
-			// Printf("issue reactions found in cache: %+v\n", reactions)
+			if ctx.Debug > 2 {
+				Printf("issue reactions found in cache: %+v\n", reactions)
+			}
 			return
 		}
 	}
@@ -882,7 +939,9 @@ func (j *DSGitHub) githubIssueReactions(ctx *Ctx, org, repo string, number int) 
 			e        error
 		)
 		reacts, response, e = c.Reactions.ListIssueReactions(j.Context, org, repo, number, opt)
-		// Printf("GET %s/%s/%d -> {%+v, %+v, %+v}\n", org, repo, number, reacts, response, e)
+		if ctx.Debug > 2 {
+			Printf("GET %s/%s/%d -> {%+v, %+v, %+v}\n", org, repo, number, reacts, response, e)
+		}
 		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
 			if CacheGitHubIssueReactions {
 				if j.GitHubIssueReactionsMtx != nil {
@@ -941,8 +1000,13 @@ func (j *DSGitHub) githubIssueReactions(ctx *Ctx, org, repo string, number int) 
 			break
 		}
 		opt.Page = response.NextPage
+		if ctx.Debug > 0 {
+			Printf("processing next issue reactions page: %d\n", opt.Page)
+		}
 		retry = false
-		// Printf("issue reactions got from API: %+v\n", reactions)
+	}
+	if ctx.Debug > 2 {
+		Printf("issue reactions got from API: %+v\n", reactions)
 	}
 	if CacheGitHubIssueReactions {
 		if j.GitHubIssueReactionsMtx != nil {
@@ -969,7 +1033,9 @@ func (j *DSGitHub) githubPull(ctx *Ctx, org, repo string, number int) (pullData 
 			j.GitHubPullMtx.RUnlock()
 		}
 		if found {
-			// Printf("pull found in cache: %+v\n", pullData)
+			if ctx.Debug > 2 {
+				Printf("pull found in cache: %+v\n", pullData)
+			}
 			return
 		}
 	}
@@ -989,7 +1055,9 @@ func (j *DSGitHub) githubPull(ctx *Ctx, org, repo string, number int) (pullData 
 			e        error
 		)
 		pull, response, e = c.PullRequests.Get(j.Context, org, repo, number)
-		// Printf("GET %s/%s/%d -> {%+v, %+v, %+v}\n", org, repo, number, pull, response, e)
+		if ctx.Debug > 2 {
+			Printf("GET %s/%s/%d -> {%+v, %+v, %+v}\n", org, repo, number, pull, response, e)
+		}
 		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
 			if CacheGitHubPull {
 				if j.GitHubPullMtx != nil {
@@ -1040,7 +1108,9 @@ func (j *DSGitHub) githubPull(ctx *Ctx, org, repo string, number int) (pullData 
 				pullData["body"] = body.(string)[:MaxPullBodyLength]
 			}
 		}
-		// Printf("pull got from API: %+v\n", pullData)
+		if ctx.Debug > 2 {
+			Printf("pull got from API: %+v\n", pullData)
+		}
 		break
 	}
 	if CacheGitHubPull {
@@ -1093,7 +1163,9 @@ func (j *DSGitHub) githubPulls(ctx *Ctx, org, repo string) (pullsData []map[stri
 			j.GitHubPullsMtx.RUnlock()
 		}
 		if found {
-			// Printf("pulls found in cache: %+v\n", pullsData)
+			if ctx.Debug > 2 {
+				Printf("pulls found in cache: %+v\n", pullsData)
+			}
 			return
 		}
 	}
@@ -1119,7 +1191,9 @@ func (j *DSGitHub) githubPulls(ctx *Ctx, org, repo string) (pullsData []map[stri
 			e        error
 		)
 		pulls, response, e = c.PullRequests.List(j.Context, org, repo, opt)
-		// Printf("GET %s/%s -> {%+v, %+v, %+v}\n", org, repo, pulls, response, e)
+		if ctx.Debug > 2 {
+			Printf("GET %s/%s -> {%+v, %+v, %+v}\n", org, repo, pulls, response, e)
+		}
 		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
 			if CacheGitHubPulls {
 				if j.GitHubPullsMtx != nil {
@@ -1178,8 +1252,13 @@ func (j *DSGitHub) githubPulls(ctx *Ctx, org, repo string) (pullsData []map[stri
 			break
 		}
 		opt.Page = response.NextPage
+		if ctx.Debug > 0 {
+			Printf("processing next pulls page: %d\n", opt.Page)
+		}
 		retry = false
-		// Printf("pulls got from API: %+v\n", pullsData)
+	}
+	if ctx.Debug > 2 {
+		Printf("pulls got from API: %+v\n", pullsData)
 	}
 	if CacheGitHubPulls {
 		if j.GitHubPullsMtx != nil {
@@ -1206,7 +1285,9 @@ func (j *DSGitHub) githubPullReviews(ctx *Ctx, org, repo string, number int) (re
 			j.GitHubPullReviewsMtx.RUnlock()
 		}
 		if found {
-			// Printf("pull reviews found in cache: %+v\n", reviews)
+			if ctx.Debug > 2 {
+				Printf("pull reviews found in cache: %+v\n", reviews)
+			}
 			return
 		}
 	}
@@ -1228,7 +1309,9 @@ func (j *DSGitHub) githubPullReviews(ctx *Ctx, org, repo string, number int) (re
 			e        error
 		)
 		revs, response, e = c.PullRequests.ListReviews(j.Context, org, repo, number, opt)
-		// Printf("GET %s/%s/%s -> {%+v, %+v, %+v}\n", org, repo, number, revs, response, e)
+		if ctx.Debug > 2 {
+			Printf("GET %s/%s/%s -> {%+v, %+v, %+v}\n", org, repo, number, revs, response, e)
+		}
 		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
 			if CacheGitHubPullReviews {
 				if j.GitHubPullReviewsMtx != nil {
@@ -1294,8 +1377,13 @@ func (j *DSGitHub) githubPullReviews(ctx *Ctx, org, repo string, number int) (re
 			break
 		}
 		opt.Page = response.NextPage
+		if ctx.Debug > 0 {
+			Printf("processing next pull reviews page: %d\n", opt.Page)
+		}
 		retry = false
-		// Printf("pull reviews got from API: %+v\n", reviews)
+	}
+	if ctx.Debug > 2 {
+		Printf("pull reviews got from API: %+v\n", reviews)
 	}
 	if CacheGitHubPullReviews {
 		if j.GitHubPullReviewsMtx != nil {
@@ -1322,7 +1410,9 @@ func (j *DSGitHub) githubPullReviewComments(ctx *Ctx, org, repo string, number i
 			j.GitHubPullReviewCommentsMtx.RUnlock()
 		}
 		if found {
-			// Printf("pull review comments found in cache: %+v\n", reviewComments)
+			if ctx.Debug > 2 {
+				Printf("pull review comments found in cache: %+v\n", reviewComments)
+			}
 			return
 		}
 	}
@@ -1347,7 +1437,9 @@ func (j *DSGitHub) githubPullReviewComments(ctx *Ctx, org, repo string, number i
 			e        error
 		)
 		revComms, response, e = c.PullRequests.ListComments(j.Context, org, repo, number, opt)
-		// Printf("GET %s/%s/%s -> {%+v, %+v, %+v}\n", org, repo, number, revComms, response, e)
+		if ctx.Debug > 2 {
+			Printf("GET %s/%s/%s -> {%+v, %+v, %+v}\n", org, repo, number, revComms, response, e)
+		}
 		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
 			if CacheGitHubPullReviewComments {
 				if j.GitHubPullReviewCommentsMtx != nil {
@@ -1427,8 +1519,13 @@ func (j *DSGitHub) githubPullReviewComments(ctx *Ctx, org, repo string, number i
 			break
 		}
 		opt.Page = response.NextPage
+		if ctx.Debug > 0 {
+			Printf("processing next pull review comments page: %d\n", opt.Page)
+		}
 		retry = false
-		// Printf("pull review comments got from API: %+v\n", reviewComments)
+	}
+	if ctx.Debug > 2 {
+		Printf("pull review comments got from API: %+v\n", reviewComments)
 	}
 	if CacheGitHubPullReviewComments {
 		if j.GitHubPullReviewCommentsMtx != nil {
@@ -1445,7 +1542,9 @@ func (j *DSGitHub) githubPullReviewComments(ctx *Ctx, org, repo string, number i
 func (j *DSGitHub) githubReviewCommentReactions(ctx *Ctx, org, repo string, cid int64) (reactions []map[string]interface{}, err error) {
 	var found bool
 	key := fmt.Sprintf("%s/%s/%d", org, repo, cid)
-	// fmt.Printf("githubReviewCommentReactions %s\n", key)
+	if ctx.Debug > 1 {
+		fmt.Printf("githubReviewCommentReactions %s\n", key)
+	}
 	// Try memory cache 1st
 	if CacheGitHubReviewCommentReactions {
 		if j.GitHubReviewCommentReactionsMtx != nil {
@@ -1456,7 +1555,9 @@ func (j *DSGitHub) githubReviewCommentReactions(ctx *Ctx, org, repo string, cid 
 			j.GitHubReviewCommentReactionsMtx.RUnlock()
 		}
 		if found {
-			// Printf("comment reactions found in cache: %+v\n", reactions)
+			if ctx.Debug > 2 {
+				Printf("comment reactions found in cache: %+v\n", reactions)
+			}
 			return
 		}
 	}
@@ -1478,7 +1579,9 @@ func (j *DSGitHub) githubReviewCommentReactions(ctx *Ctx, org, repo string, cid 
 			e        error
 		)
 		reacts, response, e = c.Reactions.ListPullRequestCommentReactions(j.Context, org, repo, cid, opt)
-		// Printf("GET %s/%s/%d -> {%+v, %+v, %+v}\n", org, repo, cid, reacts, response, e)
+		if ctx.Debug > 2 {
+			Printf("GET %s/%s/%d -> {%+v, %+v, %+v}\n", org, repo, cid, reacts, response, e)
+		}
 		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
 			if CacheGitHubReviewCommentReactions {
 				if j.GitHubReviewCommentReactionsMtx != nil {
@@ -1537,8 +1640,13 @@ func (j *DSGitHub) githubReviewCommentReactions(ctx *Ctx, org, repo string, cid 
 			break
 		}
 		opt.Page = response.NextPage
+		if ctx.Debug > 0 {
+			Printf("processing next pull review comment reactions page: %d\n", opt.Page)
+		}
 		retry = false
-		// Printf("comment reactions got from API: %+v\n", reactions)
+	}
+	if ctx.Debug > 2 {
+		Printf("review comment reactions got from API: %+v\n", reactions)
 	}
 	if CacheGitHubReviewCommentReactions {
 		if j.GitHubReviewCommentReactionsMtx != nil {
@@ -1565,7 +1673,9 @@ func (j *DSGitHub) githubPullRequestedReviewers(ctx *Ctx, org, repo string, numb
 			j.GitHubPullRequestedReviewersMtx.RUnlock()
 		}
 		if found {
-			// Printf("pull requested reviewers found in cache: %+v\n", reviewers)
+			if ctx.Debug > 2 {
+				Printf("pull requested reviewers found in cache: %+v\n", reviewers)
+			}
 			return
 		}
 	}
@@ -1587,7 +1697,9 @@ func (j *DSGitHub) githubPullRequestedReviewers(ctx *Ctx, org, repo string, numb
 			e        error
 		)
 		revsObj, response, e = c.PullRequests.ListReviewers(j.Context, org, repo, number, opt)
-		// Printf("GET %s/%s/%s -> {%+v, %+v, %+v}\n", org, repo, number, revsObj, response, e)
+		if ctx.Debug > 2 {
+			Printf("GET %s/%s/%s -> {%+v, %+v, %+v}\n", org, repo, number, revsObj, response, e)
+		}
 		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
 			if CacheGitHubPullRequestedReviewers {
 				if j.GitHubPullRequestedReviewersMtx != nil {
@@ -1645,8 +1757,13 @@ func (j *DSGitHub) githubPullRequestedReviewers(ctx *Ctx, org, repo string, numb
 			break
 		}
 		opt.Page = response.NextPage
+		if ctx.Debug > 0 {
+			Printf("processing next pull requested reviewers page: %d\n", opt.Page)
+		}
 		retry = false
-		// Printf("pull requested reviewers got from API: %+v\n", reviewers)
+	}
+	if ctx.Debug > 2 {
+		Printf("pull requested reviewers got from API: %+v\n", reviewers)
 	}
 	if CacheGitHubPullRequestedReviewers {
 		if j.GitHubPullRequestedReviewersMtx != nil {
@@ -1673,7 +1790,9 @@ func (j *DSGitHub) githubPullCommits(ctx *Ctx, org, repo string, number int, dee
 			j.GitHubPullCommitsMtx.RUnlock()
 		}
 		if found {
-			// Printf("pull commits found in cache: %+v\n", commits)
+			if ctx.Debug > 2 {
+				Printf("pull commits found in cache: %+v\n", commits)
+			}
 			return
 		}
 	}
@@ -1695,7 +1814,9 @@ func (j *DSGitHub) githubPullCommits(ctx *Ctx, org, repo string, number int, dee
 			e        error
 		)
 		comms, response, e = c.PullRequests.ListCommits(j.Context, org, repo, number, opt)
-		// Printf("GET %s/%s/%s -> {%+v, %+v, %+v}\n", org, repo, number, comms, response, e)
+		if ctx.Debug > 2 {
+			Printf("GET %s/%s/%s -> {%+v, %+v, %+v}\n", org, repo, number, comms, response, e)
+		}
 		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
 			if CacheGitHubPullCommits {
 				if j.GitHubPullCommitsMtx != nil {
@@ -1763,8 +1884,13 @@ func (j *DSGitHub) githubPullCommits(ctx *Ctx, org, repo string, number int, dee
 			break
 		}
 		opt.Page = response.NextPage
+		if ctx.Debug > 0 {
+			Printf("processing next pull commits page: %d\n", opt.Page)
+		}
 		retry = false
-		// Printf("pull commits got from API: %+v\n", commits)
+	}
+	if ctx.Debug > 2 {
+		Printf("pull commits got from API: %+v\n", commits)
 	}
 	if CacheGitHubPullCommits {
 		if j.GitHubPullCommitsMtx != nil {
@@ -1790,7 +1916,9 @@ func (j *DSGitHub) githubUserOrgs(ctx *Ctx, login string) (orgsData []map[string
 			j.GitHubUserOrgsMtx.RUnlock()
 		}
 		if found {
-			// Printf("user orgs found in cache: %+v\n", orgsData)
+			if ctx.Debug > 2 {
+				Printf("user orgs found in cache: %+v\n", orgsData)
+			}
 			return
 		}
 	}
@@ -1812,7 +1940,9 @@ func (j *DSGitHub) githubUserOrgs(ctx *Ctx, login string) (orgsData []map[string
 			e             error
 		)
 		organizations, response, e = c.Organizations.List(j.Context, login, opt)
-		// Printf("GET %s -> {%+v, %+v, %+v}\n", login, organizations, response, e)
+		if ctx.Debug > 2 {
+			Printf("GET %s -> {%+v, %+v, %+v}\n", login, organizations, response, e)
+		}
 		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
 			if CacheGitHubUserOrgs {
 				if j.GitHubUserOrgsMtx != nil {
@@ -1864,8 +1994,13 @@ func (j *DSGitHub) githubUserOrgs(ctx *Ctx, login string) (orgsData []map[string
 			break
 		}
 		opt.Page = response.NextPage
+		if ctx.Debug > 0 {
+			Printf("processing next user orgs page: %d\n", opt.Page)
+		}
 		retry = false
-		// Printf("user orgs got from API: %+v\n", orgsData)
+	}
+	if ctx.Debug > 2 {
+		Printf("user orgs got from API: %+v\n", orgsData)
 	}
 	if CacheGitHubUserOrgs {
 		if j.GitHubUserOrgsMtx != nil {
@@ -2620,7 +2755,6 @@ func (j *DSGitHub) AddMetadata(ctx *Ctx, item interface{}) (mItem map[string]int
 		tag = origin
 	}
 	itemID := j.ItemID(item)
-	// fmt.Printf("id = %s\n", itemID)
 	updatedOn := j.ItemUpdatedOn(item)
 	uuid := UUIDNonEmpty(ctx, origin, itemID)
 	timestamp := time.Now()
@@ -3989,7 +4123,9 @@ func (j *DSGitHub) AffsItems(ctx *Ctx, item map[string]interface{}, roles []stri
 			Printf("no identity affiliation data for identity %+v, role %s\n", identity, role)
 			continue
 		}
-		// Printf("Identity affiliation data for %+v: %+v\n", identity, affsIdentity)
+		if ctx.Debug > 2 {
+			Printf("Identity affiliation data for %+v: %+v\n", identity, affsIdentity)
+		}
 		for prop, value := range affsIdentity {
 			affsItems[prop] = value
 		}
@@ -4024,11 +4160,13 @@ func (j *DSGitHub) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role s
 // dynamic roles will use item to get its roles
 func (j *DSGitHub) AllRoles(ctx *Ctx, rich map[string]interface{}) (roles []string, static bool) {
 	// xxx
-	defer func() {
-		id, _ := rich["id"]
-		uuid, _ := rich["uuid"]
-		fmt.Printf("AllRoles(%s, %s) --> {%v, %+v}\n", id, uuid, static, roles)
-	}()
+	if ctx.Debug > 1 {
+		defer func() {
+			id, _ := rich["id"]
+			uuid, _ := rich["uuid"]
+			fmt.Printf("AllRoles(%s, %s) --> {%v, %+v}\n", id, uuid, static, roles)
+		}()
+	}
 	var possibleRoles []string
 	switch j.Category {
 	case "repository":
