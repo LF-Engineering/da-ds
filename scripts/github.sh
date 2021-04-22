@@ -13,6 +13,7 @@ fi
 ary=(${ORGREPO//\// })
 ORG="${ary[0]}"
 REPO="${ary[1]}"
+# export AUTH0_DATA="`cat ../sync-data-sources/helm-charts/sds-helm/sds-helm/secrets/AUTH0_DATA.test.secret`"
 export AUTH0_DATA="`cat ../sync-data-sources/helm-charts/sds-helm/sds-helm/secrets/AUTH0_DATA.prod.secret`"
 export DA_DS=github
 export DA_GITHUB_AFFILIATION_API_URL='http://127.0.0.1:8080'
