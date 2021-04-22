@@ -68,6 +68,10 @@ const (
 	CacheGitHubUserOrgs = true
 	// WantEnrichIssueAssignees - do we want to create rich documents for issue assignees (it contains identity data too).
 	WantEnrichIssueAssignees = true
+	// WantEnrichIssueCommentReactions - do we want to create rich documents for issue comment reactions (it contains identity data too).
+	WantEnrichIssueCommentReactions = true
+	// WantEnrichIssueReactions - do we want to create rich documents for issue reactions (it contains identity data too).
+	WantEnrichIssueReactions = true
 )
 
 var (
@@ -85,6 +89,8 @@ var (
 	GitHubIssueCommentRoles = []string{"user_data"}
 	// GitHubIssueAssigneeRoles - roles to fetch affiliation data for github issue comment
 	GitHubIssueAssigneeRoles = []string{"assignee"}
+	// GitHubIssueReactionRoles - roles to fetch affiliation data for github issue reactions or issue comment reactions
+	GitHubIssueReactionRoles = []string{"user_data"}
 )
 
 // DSGitHub - DS implementation for GitHub
@@ -2977,6 +2983,34 @@ func (j *DSGitHub) GitHubIssueEnrichItemsFunc(ctx *Ctx, thrN int, items []interf
 						return
 					}
 					richItems = append(richItems, riches...)
+					if WantEnrichIssueCommentReactions {
+						var reacts []map[string]interface{}
+						for _, comment := range comms {
+							iReactions, ok := Dig(comment, []string{"reactions_data"}, false, true)
+							if ok && iReactions != nil {
+								reactions, ok := iReactions.([]interface{})
+								if ok {
+									for _, iReaction := range reactions {
+										reaction, ok := iReaction.(map[string]interface{})
+										if !ok {
+											continue
+										}
+										// Store parent comment (not present in issue)
+										reaction["parent"] = comment
+										reacts = append(reacts, reaction)
+									}
+								}
+							}
+						}
+						if len(reacts) > 0 {
+							var riches []interface{}
+							riches, e = j.EnrichIssueReactions(ctx, rich, reacts, dbConfigured)
+							if e != nil {
+								return
+							}
+							richItems = append(richItems, riches...)
+						}
+					}
 				}
 			}
 		}
@@ -3004,8 +3038,30 @@ func (j *DSGitHub) GitHubIssueEnrichItemsFunc(ctx *Ctx, thrN int, items []interf
 				}
 			}
 		}
-		// xxx
-		// Possibly enrich reactions items (on issue and maybe all its sub-comments)
+		if WantEnrichIssueReactions {
+			iReactions, ok := Dig(data, []string{"reactions_data"}, false, true)
+			if ok && iReactions != nil {
+				reactions, ok := iReactions.([]interface{})
+				if ok {
+					var reacts []map[string]interface{}
+					for _, iReaction := range reactions {
+						reaction, ok := iReaction.(map[string]interface{})
+						if !ok {
+							continue
+						}
+						reacts = append(reacts, reaction)
+					}
+					if len(reacts) > 0 {
+						var riches []interface{}
+						riches, e = j.EnrichIssueReactions(ctx, rich, reacts, dbConfigured)
+						if e != nil {
+							return
+						}
+						richItems = append(richItems, riches...)
+					}
+				}
+			}
+		}
 		return
 	}
 	nThreads := 0
@@ -3298,7 +3354,7 @@ func (j *DSGitHub) EnrichIssueComments(ctx *Ctx, issue map[string]interface{}, c
 		rich["issue_id"] = issueID
 		rich["issue_number"] = issueNumber
 		iCID, _ := comment["id"]
-		cid := int(iCID.(float64))
+		cid := int64(iCID.(float64))
 		rich["id_in_repo"] = cid
 		rich["issue_comment_id"] = cid
 		rich["id"] = id + "/issue_comment/" + fmt.Sprintf("%d", cid)
@@ -3409,9 +3465,9 @@ func (j *DSGitHub) EnrichIssueAssignees(ctx *Ctx, issue map[string]interface{}, 
 		rich["issue_assignee_login"] = login
 		rich["id"] = id + "/issue_assignee/" + login
 		rich["url_id"] = fmt.Sprintf("%s/issues/%d/assignees/%s", githubRepo, iNumber, login)
-		rich["assignee_login"] = login
 		rich["author_login"] = login
 		rich["author_name"], _ = assignee["name"]
+		rich["assignee_login"] = login
 		rich["assignee_name"], _ = assignee["name"]
 		rich["assignee_domain"] = nil
 		iEmail, ok := assignee["email"]
@@ -3452,6 +3508,136 @@ func (j *DSGitHub) EnrichIssueAssignees(ctx *Ctx, issue map[string]interface{}, 
 			rich[prop] = value
 		}
 		for prop, value := range CommonFields(j, createdAt, j.Category+"_assignee") {
+			rich[prop] = value
+		}
+		richItems = append(richItems, rich)
+	}
+	return
+}
+
+// EnrichIssueReactions - return rich reactions from raw issue and/or issue comment
+func (j *DSGitHub) EnrichIssueReactions(ctx *Ctx, issue map[string]interface{}, reactions []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
+	// type: category, type(_), item_type( ), issue_reaction=true | issue_comment_reaction=true
+	// copy issue: github_repo, repo_name, repository
+	// copy reaction: content
+	// identify: id, id_in_repo, issue_reaction_id | issue_comment_reaction_id, url_id
+	// standard: metadata..., origin, project, project_slug, uuid
+	// parent: issue_id, issue_number
+	// identity: author_... -> actor_...,
+	// common: is_github_issue=1, is_github_issue_reaction=1 | is_github_issue_comment_reaction=1
+	iID, _ := issue["id"]
+	id, _ := iID.(string)
+	iIssueID, _ := issue["issue_id"]
+	issueID := int(iIssueID.(float64))
+	issueNumber, _ := issue["id_in_repo"]
+	iNumber, _ := issueNumber.(int)
+	iGithubRepo, _ := issue["github_repo"]
+	githubRepo, _ := iGithubRepo.(string)
+	copyIssueFields := []string{"category", "github_repo", "repo_name", "repository"}
+	copyReactionFields := []string{"content"}
+	for _, reaction := range reactions {
+		rich := make(map[string]interface{})
+		for _, field := range RawFields {
+			v, _ := issue[field]
+			rich[field] = v
+		}
+		for _, field := range copyIssueFields {
+			rich[field], _ = issue[field]
+		}
+		for _, field := range copyReactionFields {
+			rich[field], _ = reaction[field]
+		}
+		rich["issue_id"] = issueID
+		rich["issue_number"] = issueNumber
+		iRID, _ := reaction["id"]
+		rid := int64(iRID.(float64))
+		var (
+			comment        map[string]interface{}
+			iCreatedAt     interface{}
+			reactionSuffix string
+		)
+		iComment, ok := reaction["parent"]
+		if ok {
+			comment, _ = iComment.(map[string]interface{})
+		}
+		if comment != nil {
+			reactionSuffix = "_comment_reaction"
+			iCID, _ := comment["id"]
+			cid := int64(iCID.(float64))
+			rich["type"] = "issue" + reactionSuffix
+			rich["item_type"] = "issue comment reaction"
+			rich["issue"+reactionSuffix] = true
+			rich["issue_comment_id"] = cid
+			rich["id_in_repo"] = rid
+			rich["id"] = id + "/issue_comment/" + fmt.Sprintf("%d", cid) + "/reaction/" + fmt.Sprintf("%d", rid)
+			rich["url_id"] = fmt.Sprintf("%s/issues/%d/comments/%d/reactions/%d", githubRepo, iNumber, cid, rid)
+			iCreatedAt, _ = comment["created_at"]
+		} else {
+			reactionSuffix = "_reaction"
+			rich["type"] = "issue" + reactionSuffix
+			rich["item_type"] = "issue reaction"
+			rich["issue"+reactionSuffix] = true
+			rich["id_in_repo"] = rid
+			rich["id"] = id + "/issue_reaction/" + fmt.Sprintf("%d", rid)
+			rich["url_id"] = fmt.Sprintf("%s/issues/%d/reactions/%d", githubRepo, iNumber, rid)
+			iCreatedAt, _ = issue["created_at"]
+		}
+		iUserData, ok := reaction["user_data"]
+		if ok && iUserData != nil {
+			user, _ := iUserData.(map[string]interface{})
+			rich["author_login"], _ = user["login"]
+			rich["actor_login"], _ = user["login"]
+			rich["author_name"], _ = user["name"]
+			rich["actor_name"], _ = user["name"]
+			rich["actor_domain"] = nil
+			iEmail, ok := user["email"]
+			if ok {
+				email, _ := iEmail.(string)
+				ary := strings.Split(email, "@")
+				if len(ary) > 1 {
+					rich["actor_domain"] = strings.TrimSpace(ary[1])
+				}
+			}
+			rich["actor_org"], _ = user["company"]
+			rich["actor_location"], _ = user["location"]
+			rich["actor_geolocation"] = nil
+		} else {
+			rich["author_login"] = nil
+			rich["author_name"] = nil
+			rich["actor_login"] = nil
+			rich["actor_name"] = nil
+			rich["actor_domain"] = nil
+			rich["actor_org"] = nil
+			rich["actor_location"] = nil
+			rich["actor_geolocation"] = nil
+		}
+		// createdAt is issue creation date for issue reactions and comment creation date for comment reactions
+		// reaction itself doesn't have any date in GH API
+		createdAt, _ := TimeParseInterfaceString(iCreatedAt)
+		if affs {
+			authorKey := "user_data"
+			var affsItems map[string]interface{}
+			affsItems, err = j.AffsItems(ctx, reaction, GitHubIssueReactionRoles, createdAt)
+			if err != nil {
+				return
+			}
+			for prop, value := range affsItems {
+				rich[prop] = value
+			}
+			for _, suff := range AffsFields {
+				rich[Author+suff] = rich[authorKey+suff]
+				rich["actor"+suff] = rich[authorKey+suff]
+			}
+			orgsKey := authorKey + MultiOrgNames
+			_, ok := Dig(rich, []string{orgsKey}, false, true)
+			if !ok {
+				rich[orgsKey] = []interface{}{}
+			}
+		}
+		for prop, value := range CommonFields(j, createdAt, j.Category) {
+			rich[prop] = value
+		}
+		for prop, value := range CommonFields(j, createdAt, j.Category+reactionSuffix) {
 			rich[prop] = value
 		}
 		richItems = append(richItems, rich)
@@ -3848,6 +4034,22 @@ func (j *DSGitHub) AllRoles(ctx *Ctx, rich map[string]interface{}) (roles []stri
 				possibleRoles = GitHubIssueCommentRoles
 			case "issue_assignee":
 				possibleRoles = GitHubIssueAssigneeRoles
+			case "issue_reaction":
+				possibleRoles = GitHubIssueReactionRoles
+			case "issue_comment_reaction":
+				possibleRoles = GitHubIssueReactionRoles
+			}
+		}
+	case "pull_request":
+		roles = []string{Author}
+		if rich == nil {
+			return
+		}
+		typ, ok := rich["type"]
+		if ok {
+			switch typ.(string) {
+			case "pull_request":
+				// possibleRoles = GitHubPullRequestRoles
 				// xxx
 			}
 		}
