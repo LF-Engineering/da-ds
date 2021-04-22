@@ -2528,7 +2528,9 @@ func (j *DSGitHub) DateField(*Ctx) string {
 
 // RichIDField - return rich ID field name
 func (j *DSGitHub) RichIDField(*Ctx) string {
-	// return UUID
+	if j.Category == "repository" {
+		return UUID
+	}
 	return DefaultIDField
 }
 
@@ -2698,14 +2700,14 @@ func (j *DSGitHub) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[
 		user, _ := Dig(item, []string{"user_data"}, true, false)
 		identities[j.IdentityForObject(ctx, user.(map[string]interface{}))] = struct{}{}
 		assignee, ok := Dig(item, []string{"assignee_data"}, false, true)
-		if ok && assignee != nil {
+		if ok && assignee != nil && len(assignee.(map[string]interface{})) > 0 {
 			identities[j.IdentityForObject(ctx, assignee.(map[string]interface{}))] = struct{}{}
 		}
 		assignees, ok := Dig(item, []string{"assignees_data"}, false, true)
 		if ok && assignees != nil {
 			ary, _ := assignees.([]interface{})
 			for _, assignee := range ary {
-				if assignee != nil {
+				if assignee != nil && len(assignee.(map[string]interface{})) > 0 {
 					identities[j.IdentityForObject(ctx, assignee.(map[string]interface{}))] = struct{}{}
 				}
 			}
@@ -2716,7 +2718,7 @@ func (j *DSGitHub) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[
 			for _, comment := range ary {
 				comm, _ := comment.(map[string]interface{})
 				user, ok := Dig(comm, []string{"user_data"}, false, true)
-				if ok && user != nil {
+				if ok && user != nil && len(user.(map[string]interface{})) > 0 {
 					identities[j.IdentityForObject(ctx, user.(map[string]interface{}))] = struct{}{}
 				}
 				reactions, ok2 := Dig(comm, []string{"reactions_data"}, false, true)
@@ -2725,7 +2727,7 @@ func (j *DSGitHub) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[
 					for _, reaction := range ary2 {
 						react, _ := reaction.(map[string]interface{})
 						user, ok := Dig(react, []string{"user_data"}, false, true)
-						if ok && user != nil {
+						if ok && user != nil && len(user.(map[string]interface{})) > 0 {
 							identities[j.IdentityForObject(ctx, user.(map[string]interface{}))] = struct{}{}
 						}
 					}
@@ -2738,7 +2740,7 @@ func (j *DSGitHub) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[
 			for _, reaction := range ary {
 				react, _ := reaction.(map[string]interface{})
 				user, ok := Dig(react, []string{"user_data"}, false, true)
-				if ok && user != nil {
+				if ok && user != nil && len(user.(map[string]interface{})) > 0 {
 					identities[j.IdentityForObject(ctx, user.(map[string]interface{}))] = struct{}{}
 				}
 			}
@@ -2759,18 +2761,18 @@ func (j *DSGitHub) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[
 		user, _ := Dig(item, []string{"user_data"}, true, false)
 		identities[j.IdentityForObject(ctx, user.(map[string]interface{}))] = struct{}{}
 		mergedBy, ok := Dig(item, []string{"merged_by_data"}, false, true)
-		if ok && mergedBy != nil {
+		if ok && mergedBy != nil && len(mergedBy.(map[string]interface{})) > 0 {
 			identities[j.IdentityForObject(ctx, mergedBy.(map[string]interface{}))] = struct{}{}
 		}
 		assignee, ok := Dig(item, []string{"assignee_data"}, false, true)
-		if ok && assignee != nil {
+		if ok && assignee != nil && len(assignee.(map[string]interface{})) > 0 {
 			identities[j.IdentityForObject(ctx, assignee.(map[string]interface{}))] = struct{}{}
 		}
 		assignees, ok := Dig(item, []string{"assignees_data"}, false, true)
 		if ok && assignees != nil {
 			ary, _ := assignees.([]interface{})
 			for _, assignee := range ary {
-				if assignee != nil {
+				if assignee != nil && len(assignee.(map[string]interface{})) > 0 {
 					identities[j.IdentityForObject(ctx, assignee.(map[string]interface{}))] = struct{}{}
 				}
 			}
@@ -2781,7 +2783,7 @@ func (j *DSGitHub) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[
 			for _, comment := range ary {
 				comm, _ := comment.(map[string]interface{})
 				user, ok := Dig(comm, []string{"user_data"}, false, true)
-				if ok && user != nil {
+				if ok && user != nil && len(user.(map[string]interface{})) > 0 {
 					identities[j.IdentityForObject(ctx, user.(map[string]interface{}))] = struct{}{}
 				}
 				reactions, ok2 := Dig(comm, []string{"reactions_data"}, false, true)
@@ -2790,7 +2792,7 @@ func (j *DSGitHub) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[
 					for _, reaction := range ary2 {
 						react, _ := reaction.(map[string]interface{})
 						user, ok := Dig(react, []string{"user_data"}, false, true)
-						if ok && user != nil {
+						if ok && user != nil && len(user.(map[string]interface{})) > 0 {
 							identities[j.IdentityForObject(ctx, user.(map[string]interface{}))] = struct{}{}
 						}
 					}
@@ -2803,7 +2805,7 @@ func (j *DSGitHub) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[
 			for _, review := range ary {
 				rev, _ := review.(map[string]interface{})
 				user, ok := Dig(rev, []string{"user_data"}, false, true)
-				if ok && user != nil {
+				if ok && user != nil && len(user.(map[string]interface{})) > 0 {
 					identities[j.IdentityForObject(ctx, user.(map[string]interface{}))] = struct{}{}
 				}
 			}
@@ -3257,7 +3259,13 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 	}
 	rich["repo_name"] = j.URL
 	rich["repository"] = j.URL
-	rich["id"], _ = issue["id"]
+	uuid, ok := rich[UUID].(string)
+	if !ok {
+		err = fmt.Errorf("cannot read string uuid from %+v", DumpPreview(rich, 100))
+		return
+	}
+	iid := uuid + j.ItemID(issue)
+	rich["id"] = iid
 	rich["issue_id"], _ = issue["id"]
 	iCreatedAt, _ := issue["created_at"]
 	createdAt, _ := TimeParseInterfaceString(iCreatedAt)
@@ -3396,7 +3404,7 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 		rich["time_to_first_attention"] = float64(firstAttention.Sub(createdAt).Seconds()) / 86400.0
 	}
 	if affs {
-		authorKey := "user"
+		authorKey := "user_data"
 		var affsItems map[string]interface{}
 		affsItems, err = j.AffsItems(ctx, issue, GitHubIssueRoles, createdAt)
 		if err != nil {
@@ -3540,8 +3548,6 @@ func (j *DSGitHub) AffsItems(ctx *Ctx, item map[string]interface{}, roles []stri
 	for _, role := range roles {
 		identity := j.GetRoleIdentity(ctx, item, role)
 		if len(identity) == 0 {
-			// yyy
-			fmt.Printf("cannot get identity for role %s from %+v\n", role, item)
 			continue
 		}
 		affsIdentity, empty, e := IdentityAffsData(ctx, j, identity, nil, dt, role)
@@ -3549,9 +3555,10 @@ func (j *DSGitHub) AffsItems(ctx *Ctx, item map[string]interface{}, roles []stri
 			Printf("AffsItems/IdentityAffsData: error: %v for %v,%v,%v\n", e, identity, dt, role)
 		}
 		if empty {
-			Printf("no identity affiliation data for identity %+v\n", identity)
+			Printf("no identity affiliation data for identity %+v, role %s\n", identity, role)
 			continue
 		}
+		// Printf("Identity affiliation data for %+v: %+v\n", identity, affsIdentity)
 		for prop, value := range affsIdentity {
 			affsItems[prop] = value
 		}
@@ -3569,7 +3576,7 @@ func (j *DSGitHub) AffsItems(ctx *Ctx, item map[string]interface{}, roles []stri
 // GetRoleIdentity - return identity data for a given role
 func (j *DSGitHub) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role string) (identity map[string]interface{}) {
 	user, ok := item[role]
-	if ok {
+	if ok && user != nil && len(user.(map[string]interface{})) > 0 {
 		ident := j.IdentityForObject(ctx, user.(map[string]interface{}))
 		identity = map[string]interface{}{
 			"name":     ident[0],

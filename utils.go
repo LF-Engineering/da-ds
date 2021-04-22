@@ -634,6 +634,7 @@ func Request(
 		isJSON bool
 		cache  bool
 	)
+	// fmt.Printf("url=%s method=%s headers=%+v payload=%+v cookies=%+v\n", url, method, headers, payload, cookies)
 	if cacheFor != nil && !ctx.NoCache {
 		// cacheKey is hash(method,url,headers,payload,cookies
 		b := []byte(method + url + fmt.Sprintf("%+v", headers))

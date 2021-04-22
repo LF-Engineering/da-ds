@@ -67,7 +67,7 @@ func InitializeAuth0() error {
 	if ds != "" {
 		appName += "-" + ds
 	}
-	commitID := build.GitCommit[7]
+	commitID := build.GitCommit
 	appNameVersion := fmt.Sprintf("%s-%v", appName, commitID)
 	slackProvider := slack.New(data["slack_webhook_url"])
 	gAuth0Client, err = auth0.NewAuth0Client(

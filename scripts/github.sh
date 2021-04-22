@@ -2,6 +2,9 @@
 # dev-analytics-import-sh-json/README.md: PASS=rootpwd ./mariadb_local_docker.sh
 # dev-analytics-import-sh-json/README.md: USR=root PASS=rootpwd SH_USR=shusername SH_PASS=shpwd SH_DB=shdb ./mariadb_init.sh
 # dev-analytics-import-bitergia-indexes/README.md: ./es_local_docker.sh
+# dev-analytics-affiliation: ./sh/psql.sh docker, then ./sh/psql.sh
+# dev-analytics-affiliation: ./sh/local_api.sh
+# DA_GITHUB_NO_AFFILIATION=1
 if [ -z "$ORGREPO" ]
 then
   ORGREPO='cncf/devstats'
@@ -9,6 +12,21 @@ fi
 ary=(${ORGREPO//\// })
 ORG="${ary[0]}"
 REPO="${ary[1]}"
+export AUTH0_DATA="`cat ../sync-data-sources/helm-charts/sds-helm/sds-helm/secrets/AUTH0_DATA.prod.secret`"
+export DA_DS=github
+export DA_GITHUB_AFFILIATION_API_URL='http://127.0.0.1:8080'
+export DA_GITHUB_DB_HOST=127.0.0.1 
+export DA_GITHUB_DB_NAME=shdb
+export DA_GITHUB_DB_USER=shusername
+export DA_GITHUB_DB_PASS=shpwd
+export DA_GITHUB_DB_PORT=13306
+export DA_GITHUB_ES_URL='http://127.0.0.1:19200' 
+export DA_GITHUB_TOKENS="`cat /etc/github/oauths`" 
+export DA_GITHUB_ORG="$ORG"
+export DA_GITHUB_REPO="$REPO"
+export DA_GITHUB_ENRICH=1
+export DA_GITHUB_DEBUG=1 
+export PROJECT_SLUG="$ORGREPO" 
 if [ ! -z "$CLEAN" ]
 then
   echo "delete from uidentities" | mysql -h127.0.0.1 -P13306 -prootpwd -uroot shdb || exit 1
@@ -18,7 +36,7 @@ fi
 echo 'da-ds github'
 if [ ! -z "$REPOSITORY" ]
 then
-  PROJECT_SLUG="$ORGREPO" DA_DS=github DA_GITHUB_NO_AFFILIATION=1 DA_GITHUB_DB_HOST=127.0.0.1 DA_GITHUB_DB_NAME=shdb DA_GITHUB_DB_PASS=shpwd DA_GITHUB_DB_PORT=13306 DA_GITHUB_DB_USER=shusername DA_GITHUB_ES_URL='http://127.0.0.1:19200' DA_GITHUB_PROJECT_SLUG="$ORGREPO" DA_GITHUB_RAW_INDEX=sds-da-ds-gh-api-github-repository-raw DA_GITHUB_RICH_INDEX=sds-da-ds-gh-api-github-repository DA_GITHUB_ORG="$ORG" DA_GITHUB_REPO="$REPO" DA_GITHUB_CATEGORY=repository DA_GITHUB_TOKENS="`cat /etc/github/oauths`" DA_GITHUB_ENRICH=1 DA_GITHUB_DEBUG=1 ./dads 2>&1 | tee run-repository.log
+  DA_GITHUB_RAW_INDEX=sds-da-ds-gh-api-github-repository-raw DA_GITHUB_RICH_INDEX=sds-da-ds-gh-api-github-repository DA_GITHUB_CATEGORY=repository ./dads 2>&1 | tee run-repository.log
   if [ ! -z "$CURL"]
   then
     curl -s 'http://127.0.0.1:19200/sds-da-ds-gh-api-github-repository-raw/_search?size=1000' | jq -S '.hits.hits[]._source' | tee github-repository-raw.json
@@ -27,8 +45,8 @@ then
 fi
 if [ ! -z "$ISSUE" ]
 then
-  #PROJECT_SLUG="$ORGREPO" DA_DS=github DA_GITHUB_DATE_FROM=2021-01-01 DA_GITHUB_NO_AFFILIATION=1 DA_GITHUB_DB_HOST=127.0.0.1 DA_GITHUB_DB_NAME=shdb DA_GITHUB_DB_PASS=shpwd DA_GITHUB_DB_PORT=13306 DA_GITHUB_DB_USER=shusername DA_GITHUB_ES_URL='http://127.0.0.1:19200' DA_GITHUB_PROJECT_SLUG="$ORGREPO" DA_GITHUB_RAW_INDEX=sds-da-ds-gh-api-github-issue-raw DA_GITHUB_RICH_INDEX=sds-da-ds-gh-api-github-issue DA_GITHUB_ORG="$ORG" DA_GITHUB_REPO="$REPO" DA_GITHUB_CATEGORY=issue DA_GITHUB_TOKENS="`cat /etc/github/oauths`" DA_GITHUB_ENRICH=1 DA_GITHUB_DEBUG=1 ./dads 2>&1 | tee run-issue.log
-  PROJECT_SLUG="$ORGREPO" DA_DS=github DA_GITHUB_NO_AFFILIATION=1 DA_GITHUB_DB_HOST=127.0.0.1 DA_GITHUB_DB_NAME=shdb DA_GITHUB_DB_PASS=shpwd DA_GITHUB_DB_PORT=13306 DA_GITHUB_DB_USER=shusername DA_GITHUB_ES_URL='http://127.0.0.1:19200' DA_GITHUB_PROJECT_SLUG="$ORGREPO" DA_GITHUB_RAW_INDEX=sds-da-ds-gh-api-github-issue-raw DA_GITHUB_RICH_INDEX=sds-da-ds-gh-api-github-issue DA_GITHUB_ORG="$ORG" DA_GITHUB_REPO="$REPO" DA_GITHUB_CATEGORY=issue DA_GITHUB_TOKENS="`cat /etc/github/oauths`" DA_GITHUB_ENRICH=1 DA_GITHUB_DEBUG=1 ./dads 2>&1 | tee run-issue.log
+  #DA_GITHUB_DATE_FROM=2021-01-01 DA_GITHUB_RAW_INDEX=sds-da-ds-gh-api-github-issue-raw DA_GITHUB_RICH_INDEX=sds-da-ds-gh-api-github-issue DA_GITHUB_CATEGORY=issue ./dads 2>&1 | tee run-issue.log
+  DA_GITHUB_RAW_INDEX=sds-da-ds-gh-api-github-issue-raw DA_GITHUB_RICH_INDEX=sds-da-ds-gh-api-github-issue DA_GITHUB_CATEGORY=issue ./dads 2>&1 | tee run-issue.log
   if [ ! -z "$CURL"]
   then
     curl -s -XPOST -H 'Content-Type: application/json' 'http://127.0.0.1:19200/sds-da-ds-gh-api-github-issue-raw/_search?size=1000' -d '{"query":{"term":{"is_github_issue":1}}}' | jq -S '.hits.hits[]._source' | tee github-issue-raw.json
@@ -37,7 +55,7 @@ then
 fi
 if [ ! -z "$PULLREQUEST" ]
 then
-  PROJECT_SLUG="$ORGREPO" DA_DS=github DA_GITHUB_NO_AFFILIATION=1 DA_GITHUB_DB_HOST=127.0.0.1 DA_GITHUB_DB_NAME=shdb DA_GITHUB_DB_PASS=shpwd DA_GITHUB_DB_PORT=13306 DA_GITHUB_DB_USER=shusername DA_GITHUB_ES_URL='http://127.0.0.1:19200' DA_GITHUB_PROJECT_SLUG="$ORGREPO" DA_GITHUB_RAW_INDEX=sds-da-ds-gh-api-github-issue-raw DA_GITHUB_RICH_INDEX=sds-da-ds-gh-api-github-issue DA_GITHUB_ORG="$ORG" DA_GITHUB_REPO="$REPO" DA_GITHUB_CATEGORY=pull_request DA_GITHUB_TOKENS="`cat /etc/github/oauths`" DA_GITHUB_ENRICH=1 DA_GITHUB_DEBUG=1 ./dads 2>&1 | tee run-pull-request.log
+  DA_GITHUB_RAW_INDEX=sds-da-ds-gh-api-github-issue-raw DA_GITHUB_RICH_INDEX=sds-da-ds-gh-api-github-issue DA_GITHUB_CATEGORY=pull_request ./dads 2>&1 | tee run-pull-request.log
   if [ ! -z "$CURL"]
   then
     curl -s -XPOST -H 'Content-Type: application/json' 'http://127.0.0.1:19200/sds-da-ds-gh-api-github-issue-raw/_search?size=1000' -d '{"query":{"term":{"is_github_pull_request":1}}}' | jq -S '.hits.hits[]._source' | tee github-pull-request-raw.json
