@@ -4078,6 +4078,30 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 		rich["assignees_data"] = assignees
 	}
 	rich["n_assignees"] = nAssignees
+	nCommenters := 0
+	nComments := 0
+	iComments, ok := issue["comments_data"]
+	if ok && iComments != nil {
+		ary, _ := iComments.([]interface{})
+		nComments = len(ary)
+		commenters := map[string]interface{}{}
+		for _, iComment := range ary {
+			comment, _ := iComment.(map[string]interface{})
+			iCommenter, _ := Dig(comment, []string{"user", "login"}, true, false)
+			commenter, _ := iCommenter.(string)
+			if commenter != "" {
+				commenters[commenter] = struct{}{}
+			}
+		}
+		nCommenters = len(commenters)
+		comms := []string{}
+		for commenter := range commenters {
+			comms = append(comms, commenter)
+		}
+		rich["commenters_data"] = comms
+	}
+	rich["n_commenters"] = nCommenters
+	rich["n_comments"] = nComments
 	_, hasHead := issue["head"]
 	_, hasPR := issue["pull_request"]
 	if !hasHead && !hasPR {
@@ -4097,12 +4121,12 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 	rich["github_repo"] = githubRepo
 	rich["url_id"] = fmt.Sprintf("%s/issues/%d", githubRepo, number)
 	rich["time_to_first_attention"] = nil
-	comments := 0
-	iComments, ok := issue["comments"]
+	commentsVal := 0
+	iCommentsVal, ok := issue["comments"]
 	if ok {
-		comments = int(iComments.(float64))
+		commentsVal = int(iCommentsVal.(float64))
 	}
-	rich["n_comments"] = comments
+	rich["n_total_comments"] = commentsVal
 	reactions := 0
 	iReactions, ok := Dig(issue, []string{"reactions", "total_count"}, false, true)
 	if ok {
@@ -4110,7 +4134,7 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 	}
 	rich["n_reactions"] = reactions
 	// if comments+reactions > 0 {
-	if comments > 0 {
+	if commentsVal > 0 || nComments > 0 {
 		firstAttention := j.GetFirstIssueAttention(issue)
 		rich["time_to_first_attention"] = float64(firstAttention.Sub(createdAt).Seconds()) / 86400.0
 	}
