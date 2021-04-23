@@ -5122,11 +5122,11 @@ func (j *DSGitHub) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role s
 // second return parameter is static mode (true/false)
 // dynamic roles will use item to get its roles
 func (j *DSGitHub) AllRoles(ctx *Ctx, rich map[string]interface{}) (roles []string, static bool) {
-	if ctx.Debug > 1 {
+	if ctx.Debug > 0 {
 		defer func() {
 			id, _ := rich["id"]
 			uuid, _ := rich["uuid"]
-			fmt.Printf("AllRoles(%s, %s) --> {%v, %+v}\n", id, uuid, static, roles)
+			fmt.Printf("AllRoles(%v, %v) --> {%v, %+v}\n", id, uuid, static, roles)
 		}()
 	}
 	var possibleRoles []string
