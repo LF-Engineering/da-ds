@@ -3912,13 +3912,13 @@ func (j *DSGitHub) EnrichPullRequestComments(ctx *Ctx, pull map[string]interface
 	// copy comment: created_at, updated_at, body, body_analyzed, author_association, url, html_url
 	// identify: id, id_in_repo, pull_request_comment_id, url_id
 	// standard: metadata..., origin, project, project_slug, uuid
-	// parent: pull_id, pull_number
+	// parent: pull_request_id, pull_request_number
 	// calc: n_reactions
 	// identity: author_... -> commenter_...,
 	// common: is_github_pull_request=1, is_github_pull_request_comment=1
 	iID, _ := pull["id"]
 	id, _ := iID.(string)
-	iPullID, _ := pull["pull_id"]
+	iPullID, _ := pull["pull_request_id"]
 	pullID := int(iPullID.(float64))
 	pullNumber, _ := pull["id_in_repo"]
 	iNumber, _ := pullNumber.(int)
@@ -3941,12 +3941,12 @@ func (j *DSGitHub) EnrichPullRequestComments(ctx *Ctx, pull map[string]interface
 		rich["type"] = "pull_request_comment"
 		rich["item_type"] = "pull request comment"
 		rich["pull_request_comment"] = true
-		rich["pull_id"] = pullID
-		rich["pull_number"] = pullNumber
+		rich["pull_request_id"] = pullID
+		rich["pull_request_number"] = pullNumber
 		iCID, _ := comment["id"]
 		cid := int64(iCID.(float64))
 		rich["id_in_repo"] = cid
-		rich["pull_comment_id"] = cid
+		rich["pull_request_comment_id"] = cid
 		rich["id"] = id + "/comment/" + fmt.Sprintf("%d", cid)
 		rich["url_id"] = fmt.Sprintf("%s/pulls/%d/comments/%d", githubRepo, iNumber, cid)
 		reactions := 0
@@ -4025,13 +4025,201 @@ func (j *DSGitHub) EnrichPullRequestReviews(ctx *Ctx, pull map[string]interface{
 
 // EnrichPullRequestAssignees - return rich assignees from raw pull request
 func (j *DSGitHub) EnrichPullRequestAssignees(ctx *Ctx, pull map[string]interface{}, assignees []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
-	// xxx
+	// type: category, type(_), item_type( ), pull_request_assignee=true
+	// copy pull request: github_repo, repo_name, repository
+	// identify: id, id_in_repo, pull_request_assignee_login, url_id
+	// standard: metadata..., origin, project, project_slug, uuid
+	// parent: pull_request_id, pull_request_number
+	// identity: author_... -> assignee_...,
+	// common: is_github_pull_request=1, is_github_pull_request_assignee=1
+	iID, _ := pull["id"]
+	id, _ := iID.(string)
+	iPullID, _ := pull["pull_request_id"]
+	pullID := int(iPullID.(float64))
+	pullNumber, _ := pull["id_in_repo"]
+	iNumber, _ := pullNumber.(int)
+	iGithubRepo, _ := pull["github_repo"]
+	githubRepo, _ := iGithubRepo.(string)
+	copyPullFields := []string{"category", "github_repo", "repo_name", "repository"}
+	for _, assignee := range assignees {
+		rich := make(map[string]interface{})
+		for _, field := range RawFields {
+			v, _ := pull[field]
+			rich[field] = v
+		}
+		for _, field := range copyPullFields {
+			rich[field], _ = pull[field]
+		}
+		rich["type"] = "pull_request_assignee"
+		rich["item_type"] = "pull request assignee"
+		rich["pull_request_assignee"] = true
+		rich["pull_request_id"] = pullID
+		rich["pull_request_number"] = pullNumber
+		iLogin, _ := assignee["login"]
+		login, _ := iLogin.(string)
+		rich["id_in_repo"], _ = assignee["id"]
+		rich["pull_request_assignee_login"] = login
+		rich["id"] = id + "/assignee/" + login
+		rich["url_id"] = fmt.Sprintf("%s/pulls/%d/assignees/%s", githubRepo, iNumber, login)
+		rich["author_login"] = login
+		rich["author_name"], _ = assignee["name"]
+		rich["assignee_login"] = login
+		rich["assignee_name"], _ = assignee["name"]
+		rich["assignee_domain"] = nil
+		iEmail, ok := assignee["email"]
+		if ok {
+			email, _ := iEmail.(string)
+			ary := strings.Split(email, "@")
+			if len(ary) > 1 {
+				rich["assignee_domain"] = strings.TrimSpace(ary[1])
+			}
+		}
+		rich["assignee_org"], _ = assignee["company"]
+		rich["assignee_location"], _ = assignee["location"]
+		rich["assignee_geolocation"] = nil
+		// We consider assignee enrollment at pull request creation date
+		iCreatedAt, _ := pull["created_at"]
+		createdAt, _ := TimeParseInterfaceString(iCreatedAt)
+		if affs {
+			authorKey := "assignee"
+			var affsItems map[string]interface{}
+			affsItems, err = j.AffsItems(ctx, map[string]interface{}{"assignee": assignee}, GitHubPullRequestAssigneeRoles, createdAt)
+			if err != nil {
+				return
+			}
+			for prop, value := range affsItems {
+				rich[prop] = value
+			}
+			for _, suff := range AffsFields {
+				rich[Author+suff] = rich[authorKey+suff]
+			}
+			orgsKey := authorKey + MultiOrgNames
+			_, ok := Dig(rich, []string{orgsKey}, false, true)
+			if !ok {
+				rich[orgsKey] = []interface{}{}
+			}
+		}
+		for prop, value := range CommonFields(j, createdAt, j.Category) {
+			rich[prop] = value
+		}
+		for prop, value := range CommonFields(j, createdAt, j.Category+"_assignee") {
+			rich[prop] = value
+		}
+		richItems = append(richItems, rich)
+	}
 	return
 }
 
 // EnrichPullRequestReactions - return rich reactions from raw pull request comment
 func (j *DSGitHub) EnrichPullRequestReactions(ctx *Ctx, pull map[string]interface{}, reactions []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
-	// xxx
+	// type: category, type(_), item_type( ), pull_request_comment_reaction=true
+	// copy pull request: github_repo, repo_name, repository
+	// copy reaction: content
+	// identify: id, id_in_repo, pull_request_comment_reaction_id, url_id
+	// standard: metadata..., origin, project, project_slug, uuid
+	// parent: pull_request_id, pull_request_number
+	// identity: author_... -> actor_...,
+	// common: is_github_pull_request=1, is_github_pull_request_comment_reaction=1
+	iID, _ := pull["id"]
+	id, _ := iID.(string)
+	iPullID, _ := pull["pull_request_id"]
+	pullID := int(iPullID.(float64))
+	pullNumber, _ := pull["id_in_repo"]
+	iNumber, _ := pullNumber.(int)
+	iGithubRepo, _ := pull["github_repo"]
+	githubRepo, _ := iGithubRepo.(string)
+	copyPullFields := []string{"category", "github_repo", "repo_name", "repository"}
+	copyReactionFields := []string{"content"}
+	reactionSuffix := "_comment_reaction"
+	for _, reaction := range reactions {
+		rich := make(map[string]interface{})
+		for _, field := range RawFields {
+			v, _ := pull[field]
+			rich[field] = v
+		}
+		for _, field := range copyPullFields {
+			rich[field], _ = pull[field]
+		}
+		for _, field := range copyReactionFields {
+			rich[field], _ = reaction[field]
+		}
+		rich["pull_request_id"] = pullID
+		rich["pull_request_number"] = pullNumber
+		iRID, _ := reaction["id"]
+		rid := int64(iRID.(float64))
+		iComment, _ := reaction["parent"]
+		comment, _ := iComment.(map[string]interface{})
+		iCID, _ := comment["id"]
+		cid := int64(iCID.(float64))
+		rich["type"] = "pull_request" + reactionSuffix
+		rich["item_type"] = "pull request comment reaction"
+		rich["pull_request"+reactionSuffix] = true
+		rich["pull_request_comment_id"] = cid
+		rich["pull_request_comment_reaction_id"] = rid
+		rich["id_in_repo"] = rid
+		rich["id"] = id + "/comment/" + fmt.Sprintf("%d", cid) + "/reaction/" + fmt.Sprintf("%d", rid)
+		rich["url_id"] = fmt.Sprintf("%s/pulls/%d/comments/%d/reactions/%d", githubRepo, iNumber, cid, rid)
+		iCreatedAt, _ := comment["created_at"]
+		iUserData, ok := reaction["user_data"]
+		if ok && iUserData != nil {
+			user, _ := iUserData.(map[string]interface{})
+			rich["author_login"], _ = user["login"]
+			rich["actor_login"], _ = user["login"]
+			rich["author_name"], _ = user["name"]
+			rich["actor_name"], _ = user["name"]
+			rich["actor_domain"] = nil
+			iEmail, ok := user["email"]
+			if ok {
+				email, _ := iEmail.(string)
+				ary := strings.Split(email, "@")
+				if len(ary) > 1 {
+					rich["actor_domain"] = strings.TrimSpace(ary[1])
+				}
+			}
+			rich["actor_org"], _ = user["company"]
+			rich["actor_location"], _ = user["location"]
+			rich["actor_geolocation"] = nil
+		} else {
+			rich["author_login"] = nil
+			rich["author_name"] = nil
+			rich["actor_login"] = nil
+			rich["actor_name"] = nil
+			rich["actor_domain"] = nil
+			rich["actor_org"] = nil
+			rich["actor_location"] = nil
+			rich["actor_geolocation"] = nil
+		}
+		// createdAt is pull request comment creation date
+		// reaction itself doesn't have any date in GH API
+		createdAt, _ := TimeParseInterfaceString(iCreatedAt)
+		if affs {
+			authorKey := "user_data"
+			var affsItems map[string]interface{}
+			affsItems, err = j.AffsItems(ctx, reaction, GitHubPullRequestReactionRoles, createdAt)
+			if err != nil {
+				return
+			}
+			for prop, value := range affsItems {
+				rich[prop] = value
+			}
+			for _, suff := range AffsFields {
+				rich[Author+suff] = rich[authorKey+suff]
+				rich["actor"+suff] = rich[authorKey+suff]
+			}
+			orgsKey := authorKey + MultiOrgNames
+			_, ok := Dig(rich, []string{orgsKey}, false, true)
+			if !ok {
+				rich[orgsKey] = []interface{}{}
+			}
+		}
+		for prop, value := range CommonFields(j, createdAt, j.Category) {
+			rich[prop] = value
+		}
+		for prop, value := range CommonFields(j, createdAt, j.Category+reactionSuffix) {
+			rich[prop] = value
+		}
+		richItems = append(richItems, rich)
+	}
 	return
 }
 
@@ -4347,7 +4535,7 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 	rich["repo_name"] = j.URL
 	rich["repository"] = j.URL
 	rich["id"] = j.ItemID(pull)
-	rich["pull_id"], _ = pull["id"]
+	rich["pull_request_id"], _ = pull["id"]
 	iCreatedAt, _ := pull["created_at"]
 	createdAt, _ := TimeParseInterfaceString(iCreatedAt)
 	updatedOn, _ := Dig(item, []string{j.DateField(ctx)}, true, false)
