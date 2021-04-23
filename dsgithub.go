@@ -3635,6 +3635,9 @@ func (j *DSGitHub) EnrichIssueComments(ctx *Ctx, issue map[string]interface{}, c
 		for _, field := range copyCommentFields {
 			rich[field], _ = comment[field]
 		}
+		if ctx.Project != "" {
+			rich["project"] = ctx.Project
+		}
 		rich["type"] = "issue_comment"
 		rich["item_type"] = "issue comment"
 		rich["issue_comment"] = true
@@ -3741,6 +3744,9 @@ func (j *DSGitHub) EnrichIssueAssignees(ctx *Ctx, issue map[string]interface{}, 
 		for _, field := range copyIssueFields {
 			rich[field], _ = issue[field]
 		}
+		if ctx.Project != "" {
+			rich["project"] = ctx.Project
+		}
 		rich["type"] = "issue_assignee"
 		rich["item_type"] = "issue assignee"
 		rich["issue_assignee"] = true
@@ -3832,6 +3838,9 @@ func (j *DSGitHub) EnrichIssueReactions(ctx *Ctx, issue map[string]interface{}, 
 		}
 		for _, field := range copyReactionFields {
 			rich[field], _ = reaction[field]
+		}
+		if ctx.Project != "" {
+			rich["project"] = ctx.Project
 		}
 		rich["issue_id"] = issueID
 		rich["issue_number"] = issueNumber
@@ -3966,6 +3975,9 @@ func (j *DSGitHub) EnrichPullRequestComments(ctx *Ctx, pull map[string]interface
 		for _, field := range copyCommentFields {
 			rich[field], _ = comment[field]
 		}
+		if ctx.Project != "" {
+			rich["project"] = ctx.Project
+		}
 		rich["type"] = "pull_request_comment"
 		rich["item_type"] = "pull request comment"
 		rich["pull_request_comment"] = true
@@ -4078,6 +4090,9 @@ func (j *DSGitHub) EnrichPullRequestReviews(ctx *Ctx, pull map[string]interface{
 		for _, field := range copyReviewFields {
 			rich[field], _ = review[field]
 		}
+		if ctx.Project != "" {
+			rich["project"] = ctx.Project
+		}
 		rich["type"] = "pull_request_review"
 		rich["item_type"] = "pull request review"
 		rich["pull_request_review"] = true
@@ -4178,6 +4193,9 @@ func (j *DSGitHub) EnrichPullRequestAssignees(ctx *Ctx, pull map[string]interfac
 		for _, field := range copyPullFields {
 			rich[field], _ = pull[field]
 		}
+		if ctx.Project != "" {
+			rich["project"] = ctx.Project
+		}
 		rich["type"] = "pull_request_assignee"
 		rich["item_type"] = "pull request assignee"
 		rich["pull_request_assignee"] = true
@@ -4270,6 +4288,9 @@ func (j *DSGitHub) EnrichPullRequestReactions(ctx *Ctx, pull map[string]interfac
 		}
 		for _, field := range copyReactionFields {
 			rich[field], _ = reaction[field]
+		}
+		if ctx.Project != "" {
+			rich["project"] = ctx.Project
 		}
 		rich["pull_request_id"] = pullID
 		rich["pull_request_number"] = pullNumber
@@ -4378,6 +4399,9 @@ func (j *DSGitHub) EnrichPullRequestRequestedReviewers(ctx *Ctx, pull map[string
 		for _, field := range copyPullFields {
 			rich[field], _ = pull[field]
 		}
+		if ctx.Project != "" {
+			rich["project"] = ctx.Project
+		}
 		rich["type"] = "pull_request_requested_reviewer"
 		rich["item_type"] = "pull request requested reviewer"
 		rich["pull_request_requested_reviewer"] = true
@@ -4449,6 +4473,9 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 	for _, field := range RawFields {
 		v, _ := item[field]
 		rich[field] = v
+	}
+	if ctx.Project != "" {
+		rich["project"] = ctx.Project
 	}
 	rich["repo_name"] = j.URL
 	rich["repository"] = j.URL
@@ -4740,6 +4767,9 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 	for _, field := range RawFields {
 		v, _ := item[field]
 		rich[field] = v
+	}
+	if ctx.Project != "" {
+		rich["project"] = ctx.Project
 	}
 	rich["repo_name"] = j.URL
 	rich["repository"] = j.URL
@@ -5073,6 +5103,9 @@ func (j *DSGitHub) EnrichRepositoryItem(ctx *Ctx, item map[string]interface{}, a
 	for _, field := range RawFields {
 		v, _ := item[field]
 		rich[field] = v
+	}
+	if ctx.Project != "" {
+		rich["project"] = ctx.Project
 	}
 	repoFields := []string{"forks_count", "subscribers_count", "stargazers_count", "fetched_on"}
 	for _, field := range repoFields {
