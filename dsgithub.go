@@ -342,6 +342,7 @@ func (j *DSGitHub) githubUser(ctx *Ctx, login string) (user map[string]interface
 		// Try file cache 2nd
 		if CacheGitHubUserFiles {
 			// IMPL: make sure EC2test & EC2prod both have j.cacheDir directory created
+			// Even more - copy those generated locally?
 			path := j.CacheDir + login + ".json"
 			lockPath := path + ".lock"
 			file, e := os.Stat(path)

@@ -455,7 +455,12 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 		}
 		return
 	}
-	Printf("%s(raw=%v,key=%s) ES bulk upload of %d items failed, falling back to one-by-one mode\n", ds.Name(), raw, key, len(items))
+	var sResp string
+	bResp, ok := result.([]byte)
+	if ok {
+		sResp = BytesToStringTrunc(bResp, MaxPayloadPrintfLen, true)
+	}
+	Printf("%s(raw=%v,key=%s) ES bulk upload of %d items failed, falling back to one-by-one mode, response: %s\n", ds.Name(), raw, key, len(items), sResp)
 	if ctx.Debug > 0 {
 		Printf("%s(raw=%v,key=%s) ES bulk upload error: %+v\n", ds.Name(), raw, key, err)
 	}

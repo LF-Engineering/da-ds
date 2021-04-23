@@ -723,6 +723,8 @@ func Request(
 			inf = fmt.Sprintf("%s.%s:%s=%d", method, url, BytesToStringTrunc(payload, MaxPayloadPrintfLen, true), status)
 			if ctx.Debug > 1 {
 				inf += fmt.Sprintf(" error: %+v", err)
+			} else {
+				inf += fmt.Sprintf(" error: %+v", StringTrunc(err.Error(), MaxPayloadPrintfLen, true))
 			}
 			return
 		}
