@@ -4,7 +4,7 @@
 # dev-analytics-import-bitergia-indexes/README.md: ./es_local_docker.sh
 # dev-analytics-affiliation: ./sh/psql.sh docker, then ./sh/psql.sh
 # dev-analytics-affiliation: ./sh/local_api.sh
-# Example: DA_GITHUB_RETRY=1 ORGREPO2='LF-Engineering/da-ds' CLEAN=1 REPOSITORY='' ISSUE=1 PULLREQUEST='' CURL=1 REFRESH='' ./scripts/github.sh
+# Example: DA_GITHUB_RETRY=1 PROJECT='my project' ORGREPO='LF-Engineering/da-ds' CLEAN=1 REPOSITORY='' ISSUE=1 PULLREQUEST='' CURL=1 REFRESH='' ./scripts/github.sh
 # DA_GITHUB_NO_AFFILIATION=1
 if [ -z "$ORGREPO" ]
 then
@@ -26,6 +26,7 @@ export DA_GITHUB_ES_URL='http://127.0.0.1:19200'
 export DA_GITHUB_TOKENS="`cat /etc/github/oauths`"
 export DA_GITHUB_ORG="$ORG"
 export DA_GITHUB_REPO="$REPO"
+export DA_GITHUB_PROJECT="$PROJECT"
 export DA_GITHUB_ENRICH=1
 export DA_GITHUB_DEBUG=1
 export PROJECT_SLUG="$ORGREPO"
