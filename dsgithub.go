@@ -72,6 +72,12 @@ const (
 	WantEnrichIssueCommentReactions = true
 	// WantEnrichIssueReactions - do we want to create rich documents for issue reactions (it contains identity data too).
 	WantEnrichIssueReactions = true
+	// WantEnrichPullRequestAssignees - do we want to create rich documents for pull request assignees (it contains identity data too).
+	WantEnrichPullRequestAssignees = true
+	// WantEnrichPullRequestCommentReactions - do we want to create rich documents for pull request comment reactions (it contains identity data too).
+	WantEnrichPullRequestCommentReactions = true
+	// WantEnrichPullRequestRequestedReviewers - do we want to create rich documents for pull request requested reviewers (it contains identity data too).
+	WantEnrichPullRequestRequestedReviewers = true
 )
 
 var (
@@ -2867,6 +2873,12 @@ func (j *DSGitHub) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[
 		identities = make(map[[3]string]struct{})
 		item, _ := Dig(doc, []string{"data"}, true, false)
 		user, _ := Dig(item, []string{"user_data"}, true, false)
+		if user == nil {
+			if ctx.Debug > 1 {
+				fmt.Printf("missing user_data property in item %+v\n", DumpPreview(item, 64))
+			}
+			return
+		}
 		identities[j.IdentityForObject(ctx, user.(map[string]interface{}))] = struct{}{}
 		assignee, ok := Dig(item, []string{"assignee_data"}, false, true)
 		if ok && assignee != nil && len(assignee.(map[string]interface{})) > 0 {
@@ -2928,6 +2940,9 @@ func (j *DSGitHub) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[
 		identities = make(map[[3]string]struct{})
 		item, _ := Dig(doc, []string{"data"}, true, false)
 		user, _ := Dig(item, []string{"user_data"}, true, false)
+		if user == nil {
+			return
+		}
 		identities[j.IdentityForObject(ctx, user.(map[string]interface{}))] = struct{}{}
 		mergedBy, ok := Dig(item, []string{"merged_by_data"}, false, true)
 		if ok && mergedBy != nil && len(mergedBy.(map[string]interface{})) > 0 {
@@ -3324,6 +3339,30 @@ func (j *DSGitHub) GitHubPullRequestEnrichItemsFunc(ctx *Ctx, thrN int, items []
 		// pr:    review_comments_data[].user_data
 		// pr:    review_comments_data[].reactions_data[].user_data
 		// pr:    requested_reviewers_data[].user_data
+		if WantEnrichPullRequestAssignees {
+			iAssignees, ok := Dig(data, []string{"assignees_data"}, false, true)
+			if ok && iAssignees != nil {
+				assignees, ok := iAssignees.([]interface{})
+				if ok {
+					var asgs []map[string]interface{}
+					for _, iAssignee := range assignees {
+						assignee, ok := iAssignee.(map[string]interface{})
+						if !ok {
+							continue
+						}
+						asgs = append(asgs, assignee)
+					}
+					if len(asgs) > 0 {
+						var riches []interface{}
+						riches, e = j.EnrichPullRequestAssignees(ctx, rich, asgs, dbConfigured)
+						if e != nil {
+							return
+						}
+						richItems = append(richItems, riches...)
+					}
+				}
+			}
+		}
 		iReviews, ok := Dig(data, []string{"reviews_data"}, false, true)
 		if ok && iReviews != nil {
 			reviews, ok := iReviews.([]interface{})
@@ -3365,13 +3404,60 @@ func (j *DSGitHub) GitHubPullRequestEnrichItemsFunc(ctx *Ctx, thrN int, items []
 						return
 					}
 					richItems = append(richItems, riches...)
+					if WantEnrichPullRequestCommentReactions {
+						var reacts []map[string]interface{}
+						for _, comment := range comms {
+							iReactions, ok := Dig(comment, []string{"reactions_data"}, false, true)
+							if ok && iReactions != nil {
+								reactions, ok := iReactions.([]interface{})
+								if ok {
+									for _, iReaction := range reactions {
+										reaction, ok := iReaction.(map[string]interface{})
+										if !ok {
+											continue
+										}
+										reaction["parent"] = comment
+										reacts = append(reacts, reaction)
+									}
+								}
+							}
+						}
+						if len(reacts) > 0 {
+							var riches []interface{}
+							riches, e = j.EnrichPullRequestReactions(ctx, rich, reacts, dbConfigured)
+							if e != nil {
+								return
+							}
+							richItems = append(richItems, riches...)
+						}
+					}
 				}
 			}
 		}
-		// xxx
-		// Possibly enrich assignees items
-		// Possibly enrich reactions items (on PR sub comments)
-		// Possibly enrich requested reviewers data
+		if WantEnrichPullRequestRequestedReviewers {
+			iReviewers, ok := Dig(data, []string{"requested_reviewers_data"}, false, true)
+			if ok && iReviewers != nil {
+				reviewers, ok := iReviewers.([]interface{})
+				if ok {
+					var revs []map[string]interface{}
+					for _, iReviewer := range reviewers {
+						reviewer, ok := iReviewer.(map[string]interface{})
+						if !ok {
+							continue
+						}
+						revs = append(revs, reviewer)
+					}
+					if len(revs) > 0 {
+						var riches []interface{}
+						riches, e = j.EnrichPullRequestRequestedReviewers(ctx, rich, revs, dbConfigured)
+						if e != nil {
+							return
+						}
+						richItems = append(richItems, riches...)
+					}
+				}
+			}
+		}
 		return
 	}
 	nThreads := 0
@@ -3643,7 +3729,6 @@ func (j *DSGitHub) EnrichIssueAssignees(ctx *Ctx, issue map[string]interface{}, 
 		if affs {
 			authorKey := "assignee"
 			var affsItems map[string]interface{}
-			// yyy
 			affsItems, err = j.AffsItems(ctx, map[string]interface{}{"assignee": assignee}, GitHubIssueAssigneeRoles, createdAt)
 			if err != nil {
 				return
@@ -3803,14 +3888,32 @@ func (j *DSGitHub) EnrichIssueReactions(ctx *Ctx, issue map[string]interface{}, 
 	return
 }
 
-// EnrichPullRequestComments - return rich comments from raw issue
+// EnrichPullRequestComments - return rich comments from raw pull request
 func (j *DSGitHub) EnrichPullRequestComments(ctx *Ctx, issue map[string]interface{}, comments []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
 	// xxx
 	return
 }
 
-// EnrichPullRequestReviews - return rich comments from raw issue
-func (j *DSGitHub) EnrichPullRequestReviews(ctx *Ctx, issue map[string]interface{}, comments []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
+// EnrichPullRequestReviews - return rich reviews from raw pull request
+func (j *DSGitHub) EnrichPullRequestReviews(ctx *Ctx, issue map[string]interface{}, reviews []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
+	// xxx
+	return
+}
+
+// EnrichPullRequestAssignees - return rich assignees from raw pull request
+func (j *DSGitHub) EnrichPullRequestAssignees(ctx *Ctx, issue map[string]interface{}, assignees []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
+	// xxx
+	return
+}
+
+// EnrichPullRequestReactions - return rich reactions from raw pull request comment
+func (j *DSGitHub) EnrichPullRequestReactions(ctx *Ctx, issue map[string]interface{}, reactions []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
+	// xxx
+	return
+}
+
+// EnrichPullRequestRequestedReviewers - return rich requested reviewers from raw pull request
+func (j *DSGitHub) EnrichPullRequestRequestedReviewers(ctx *Ctx, issue map[string]interface{}, reviews []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
 	// xxx
 	return
 }

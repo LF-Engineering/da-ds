@@ -194,7 +194,7 @@ func InterfaceToStringTrunc(iface interface{}, maxLen int, addLenInfo bool) (str
 		return lenInfo + data
 	}
 	half := maxLen >> 1
-	str = lenInfo + data[:half] + "(...)" + data[len(data)-half:]
+	str = "(" + strconv.Itoa(len(data)) + "): " + data[:half] + "(...)" + data[len(data)-half:]
 	return
 }
 
@@ -727,7 +727,7 @@ func Request(
 			inf = fmt.Sprintf("%s.%s:%s=%d", method, url, BytesToStringTrunc(payload, MaxPayloadPrintfLen, true), status)
 			if ctx.Debug > 1 {
 				inf += fmt.Sprintf(" error: %+v", err)
-			} else {
+			} else if err != nil {
 				inf += fmt.Sprintf(" error: %+v", StringTrunc(err.Error(), MaxPayloadPrintfLen, true))
 			}
 			return
