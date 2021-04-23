@@ -98,7 +98,7 @@ var (
 	// GitHubIssueReactionRoles - roles to fetch affiliation data for github issue reactions or issue comment reactions
 	GitHubIssueReactionRoles = []string{"user_data"}
 	// GitHubPullRequestRoles - roles to fetch affiliation data for github pull request
-	GitHubPullRequestRoles = []string{"user_data", "merged_by_data"}
+	GitHubPullRequestRoles = []string{"user_data", "assignee_data", "merged_by_data"}
 	// GitHubPullRequestCommentRoles - roles to fetch affiliation data for github pull request comment
 	GitHubPullRequestCommentRoles = []string{"user_data"}
 	// GitHubPullRequestAssigneeRoles - roles to fetch affiliation data for github pull request comment
@@ -2331,8 +2331,10 @@ func (j *DSGitHub) ProcessIssue(ctx *Ctx, inIssue map[string]interface{}) (issue
 func (j *DSGitHub) ProcessPull(ctx *Ctx, inPull map[string]interface{}) (pull map[string]interface{}, err error) {
 	pull = inPull
 	pull["user_data"] = map[string]interface{}{}
+	pull["assignee_data"] = map[string]interface{}{}
 	pull["merged_by_data"] = map[string]interface{}{}
-	pull["review_comments_data"] = map[string]interface{}{}
+	pull["review_comments_data"] = []interface{}{}
+	pull["assignees_data"] = []interface{}{}
 	pull["reviews_data"] = []interface{}{}
 	pull["requested_reviewers_data"] = []interface{}{}
 	pull["commits_data"] = []interface{}{}
@@ -2617,6 +2619,8 @@ func (j *DSGitHub) FetchItemsPullRequest(ctx *Ctx) (err error) {
 	}
 	var pulls []map[string]interface{}
 	// PullRequests.Lit doesn't return merged_by data, we need to use PullRequests.Get on each pull
+	// If it would we could use Pulls API to fetch all pulls when no date from is specified
+	// If there is a date from Pulls API doesn't support Since parameter
 	// if ctx.DateFrom != nil {
 	if 1 == 1 {
 		pulls, err = j.githubPullsFromIssues(ctx, j.Org, j.Repo, ctx.DateFrom)
@@ -2951,6 +2955,9 @@ func (j *DSGitHub) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[
 		item, _ := Dig(doc, []string{"data"}, true, false)
 		user, _ := Dig(item, []string{"user_data"}, true, false)
 		if user == nil {
+			if ctx.Debug > 1 {
+				fmt.Printf("missing user_data property in item %+v\n", DumpPreview(item, 64))
+			}
 			return
 		}
 		identities[j.IdentityForObject(ctx, user.(map[string]interface{}))] = struct{}{}
@@ -4054,6 +4061,23 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 		}
 		rich["labels"] = labels
 	}
+	nAssignees := 0
+	iAssignees, ok := issue["assignees_data"]
+	if ok && iAssignees != nil {
+		ary, _ := iAssignees.([]interface{})
+		nAssignees = len(ary)
+		assignees := []interface{}{}
+		for _, iAssignee := range ary {
+			assignee, _ := iAssignee.(map[string]interface{})
+			iAssigneeLogin, _ := assignee["login"]
+			assigneeLogin, _ := iAssigneeLogin.(string)
+			if assigneeLogin != "" {
+				assignees = append(assignees, assigneeLogin)
+			}
+		}
+		rich["assignees_data"] = assignees
+	}
+	rich["n_assignees"] = nAssignees
 	_, hasHead := issue["head"]
 	_, hasPR := issue["pull_request"]
 	if !hasHead && !hasPR {
@@ -4085,12 +4109,6 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 		reactions = int(iReactions.(float64))
 	}
 	rich["n_reactions"] = reactions
-	assignees := 0
-	iAssignees, ok := issue["assignees_data"]
-	if ok {
-		assignees = len(iAssignees.([]interface{}))
-	}
-	rich["n_assignees"] = assignees
 	// if comments+reactions > 0 {
 	if comments > 0 {
 		firstAttention := j.GetFirstIssueAttention(issue)
@@ -4194,15 +4212,232 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 		rich[field] = v
 	}
 	rich["repo_name"] = j.URL
+	rich["repository"] = j.URL
+	rich["id"] = j.ItemID(pull)
 	rich["pr_id"], _ = pull["id"]
+	iCreatedAt, _ := pull["created_at"]
+	createdAt, _ := TimeParseInterfaceString(iCreatedAt)
 	updatedOn, _ := Dig(item, []string{j.DateField(ctx)}, true, false)
-	for prop, value := range CommonFields(j, updatedOn, j.Category) {
-		rich[prop] = value
-	}
-	// xxx
 	rich["type"] = j.Category
 	rich["category"] = j.Category
+	now := time.Now()
+	rich["created_at"] = createdAt
+	rich["updated_at"] = updatedOn
+	iClosedAt, ok := pull["closed_at"]
+	rich["closed_at"] = iClosedAt
+	if ok && iClosedAt != nil {
+		closedAt, e := TimeParseInterfaceString(iClosedAt)
+		if e == nil {
+			rich["time_to_close_days"] = float64(closedAt.Sub(createdAt).Seconds()) / 86400.0
+		} else {
+			rich["time_to_close_days"] = nil
+		}
+	} else {
+		rich["time_to_close_days"] = nil
+	}
+	state, ok := pull["state"]
+	rich["state"] = state
+	if ok && state != nil && state.(string) == "closed" {
+		rich["time_open_days"] = rich["time_to_close_days"]
+	} else {
+		rich["time_open_days"] = float64(now.Sub(createdAt).Seconds()) / 86400.0
+	}
+	rich["user_login"], _ = Dig(pull, []string{"user", "login"}, true, false)
+	iUserData, ok := pull["user_data"]
+	if ok && iUserData != nil {
+		user, _ := iUserData.(map[string]interface{})
+		rich["author_login"], _ = user["login"]
+		rich["author_name"], _ = user["name"]
+		rich["user_name"], _ = user["name"]
+		rich["user_domain"] = nil
+		iEmail, ok := user["email"]
+		if ok {
+			email, _ := iEmail.(string)
+			ary := strings.Split(email, "@")
+			if len(ary) > 1 {
+				rich["user_domain"] = strings.TrimSpace(ary[1])
+			}
+		}
+		rich["user_org"], _ = user["company"]
+		rich["user_location"], _ = user["location"]
+		rich["user_geolocation"] = nil
+	} else {
+		rich["author_login"] = nil
+		rich["author_name"] = nil
+		rich["user_name"] = nil
+		rich["user_domain"] = nil
+		rich["user_org"] = nil
+		rich["user_location"] = nil
+		rich["user_geolocation"] = nil
+	}
+	iAssigneeData, ok := pull["assignee_data"]
+	if ok && iAssigneeData != nil {
+		assignee, _ := iAssigneeData.(map[string]interface{})
+		rich["assignee_login"], _ = assignee["login"]
+		rich["assignee_name"], _ = assignee["name"]
+		rich["assignee_domain"] = nil
+		iEmail, ok := assignee["email"]
+		if ok {
+			email, _ := iEmail.(string)
+			ary := strings.Split(email, "@")
+			if len(ary) > 1 {
+				rich["assignee_domain"] = strings.TrimSpace(ary[1])
+			}
+		}
+		rich["assignee_org"], _ = assignee["company"]
+		rich["assignee_location"], _ = assignee["location"]
+		rich["assignee_geolocation"] = nil
+	} else {
+		rich["assignee_login"] = nil
+		rich["assignee_name"] = nil
+		rich["assignee_domain"] = nil
+		rich["assignee_org"] = nil
+		rich["assignee_location"] = nil
+		rich["assignee_geolocation"] = nil
+	}
+	iMergedByData, ok := pull["merged_by_data"]
+	if ok && iMergedByData != nil {
+		mergedBy, _ := iMergedByData.(map[string]interface{})
+		rich["merged_by_login"], _ = mergedBy["login"]
+		rich["merged_by_name"], _ = mergedBy["name"]
+		rich["merged_by_domain"] = nil
+		iEmail, ok := mergedBy["email"]
+		if ok {
+			email, _ := iEmail.(string)
+			ary := strings.Split(email, "@")
+			if len(ary) > 1 {
+				rich["merged_by_domain"] = strings.TrimSpace(ary[1])
+			}
+		}
+		rich["merged_by_org"], _ = mergedBy["company"]
+		rich["merged_by_location"], _ = mergedBy["location"]
+		rich["merged_by_geolocation"] = nil
+	} else {
+		rich["merged_by_login"] = nil
+		rich["merged_by_name"] = nil
+		rich["merged_by_domain"] = nil
+		rich["merged_by_org"] = nil
+		rich["merged_by_location"] = nil
+		rich["merged_by_geolocation"] = nil
+	}
+	iNumber, _ := pull["number"]
+	number := int(iNumber.(float64))
+	rich["id_in_repo"] = number
+	rich["title"], _ = pull["title"]
+	rich["title_analyzed"], _ = pull["title"]
+	rich["url"], _ = pull["html_url"]
+	iLabels, ok := pull["labels"]
+	if ok && iLabels != nil {
+		ary, _ := iLabels.([]interface{})
+		labels := []interface{}{}
+		for _, iLabel := range ary {
+			label, _ := iLabel.(map[string]interface{})
+			iLabelName, _ := label["name"]
+			labelName, _ := iLabelName.(string)
+			if labelName != "" {
+				labels = append(labels, labelName)
+			}
+		}
+		rich["labels"] = labels
+	}
+	nAssignees := 0
+	iAssignees, ok := pull["assignees_data"]
+	if ok && iAssignees != nil {
+		ary, _ := iAssignees.([]interface{})
+		nAssignees = len(ary)
+		assignees := []interface{}{}
+		for _, iAssignee := range ary {
+			assignee, _ := iAssignee.(map[string]interface{})
+			iAssigneeLogin, _ := assignee["login"]
+			assigneeLogin, _ := iAssigneeLogin.(string)
+			if assigneeLogin != "" {
+				assignees = append(assignees, assigneeLogin)
+			}
+		}
+		rich["assignees_data"] = assignees
+	}
+	rich["n_assignees"] = nAssignees
+	nRequestedReviewers := 0
+	iRequestedReviewers, ok := pull["requested_reviewers_data"]
+	if ok && iRequestedReviewers != nil {
+		ary, _ := iRequestedReviewers.([]interface{})
+		nRequestedReviewers = len(ary)
+		requestedReviewers := []interface{}{}
+		for _, iRequestedReviewer := range ary {
+			requestedReviewer, _ := iRequestedReviewer.(map[string]interface{})
+			iRequestedReviewerLogin, _ := requestedReviewer["login"]
+			requestedReviewerLogin, _ := iRequestedReviewerLogin.(string)
+			if requestedReviewerLogin != "" {
+				requestedReviewers = append(requestedReviewers, requestedReviewerLogin)
+			}
+		}
+		rich["requested_reviewers_data"] = requestedReviewers
+	}
+	rich["n_requested_reviewers"] = nRequestedReviewers
+	/*
+	 */
 	return
+	/*
+		_, hasHead := issue["head"]
+		_, hasPR := issue["pull_request"]
+		if !hasHead && !hasPR {
+			rich["pull_request"] = false
+			rich["item_type"] = "issue"
+		} else {
+			rich["pull_request"] = true
+			rich["item_type"] = "pull request"
+		}
+		githubRepo := j.URL
+		if strings.HasSuffix(githubRepo, ".git") {
+			githubRepo = githubRepo[:len(githubRepo)-4]
+		}
+		if strings.Contains(githubRepo, GitHubURLRoot) {
+			githubRepo = strings.Replace(githubRepo, GitHubURLRoot, "", -1)
+		}
+		rich["github_repo"] = githubRepo
+		rich["url_id"] = fmt.Sprintf("%s/issues/%d", githubRepo, number)
+		rich["time_to_first_attention"] = nil
+		comments := 0
+		iComments, ok := issue["comments"]
+		if ok {
+			comments = int(iComments.(float64))
+		}
+		rich["n_comments"] = comments
+		reactions := 0
+		iReactions, ok := Dig(issue, []string{"reactions", "total_count"}, false, true)
+		if ok {
+			reactions = int(iReactions.(float64))
+		}
+		rich["n_reactions"] = reactions
+		// if comments+reactions > 0 {
+		if comments > 0 {
+			firstAttention := j.GetFirstIssueAttention(issue)
+			rich["time_to_first_attention"] = float64(firstAttention.Sub(createdAt).Seconds()) / 86400.0
+		}
+		if affs {
+			authorKey := "user_data"
+			var affsItems map[string]interface{}
+			affsItems, err = j.AffsItems(ctx, issue, GitHubIssueRoles, createdAt)
+			if err != nil {
+				return
+			}
+			for prop, value := range affsItems {
+				rich[prop] = value
+			}
+			for _, suff := range AffsFields {
+				rich[Author+suff] = rich[authorKey+suff]
+			}
+			orgsKey := authorKey + MultiOrgNames
+			_, ok := Dig(rich, []string{orgsKey}, false, true)
+			if !ok {
+				rich[orgsKey] = []interface{}{}
+			}
+		}
+		for prop, value := range CommonFields(j, createdAt, j.Category) {
+			rich[prop] = value
+		}
+		return
+	*/
 }
 
 // EnrichRepositoryItem - return rich item from raw item for a given author type
