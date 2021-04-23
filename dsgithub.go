@@ -3988,6 +3988,12 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 	} else {
 		rich["time_open_days"] = float64(now.Sub(createdAt).Seconds()) / 86400.0
 	}
+	iNumber, _ := issue["number"]
+	number := int(iNumber.(float64))
+	rich["id_in_repo"] = number
+	rich["title"], _ = issue["title"]
+	rich["title_analyzed"], _ = issue["title"]
+	rich["url"], _ = issue["html_url"]
 	rich["user_login"], _ = Dig(issue, []string{"user", "login"}, true, false)
 	iUserData, ok := issue["user_data"]
 	if ok && iUserData != nil {
@@ -4041,12 +4047,6 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 		rich["assignee_location"] = nil
 		rich["assignee_geolocation"] = nil
 	}
-	iNumber, _ := issue["number"]
-	number := int(iNumber.(float64))
-	rich["id_in_repo"] = number
-	rich["title"], _ = issue["title"]
-	rich["title_analyzed"], _ = issue["title"]
-	rich["url"], _ = issue["html_url"]
 	iLabels, ok := issue["labels"]
 	if ok && iLabels != nil {
 		ary, _ := iLabels.([]interface{})
@@ -4109,7 +4109,10 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 		rich["item_type"] = "issue"
 	} else {
 		rich["pull_request"] = true
-		rich["item_type"] = "pull request"
+		// "pull request" and "issue pull request" are different object
+		// one is an issue object that is also a pull request, while the another is a pull request object
+		// rich["item_type"] = "pull request"
+		rich["item_type"] = "issue pull request"
 	}
 	githubRepo := j.URL
 	if strings.HasSuffix(githubRepo, ".git") {
@@ -4266,6 +4269,15 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 	} else {
 		rich["time_open_days"] = float64(now.Sub(createdAt).Seconds()) / 86400.0
 	}
+	iNumber, _ := pull["number"]
+	number := int(iNumber.(float64))
+	rich["id_in_repo"] = number
+	rich["title"], _ = pull["title"]
+	rich["title_analyzed"], _ = pull["title"]
+	rich["url"], _ = pull["html_url"]
+	iMergedAt, _ := pull["merged_at"]
+	rich["merged_at"] = iMergedAt
+	rich["merged"], _ = pull["merged"]
 	rich["user_login"], _ = Dig(pull, []string{"user", "login"}, true, false)
 	iUserData, ok := pull["user_data"]
 	if ok && iUserData != nil {
@@ -4344,12 +4356,6 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 		rich["merged_by_location"] = nil
 		rich["merged_by_geolocation"] = nil
 	}
-	iNumber, _ := pull["number"]
-	number := int(iNumber.(float64))
-	rich["id_in_repo"] = number
-	rich["title"], _ = pull["title"]
-	rich["title_analyzed"], _ = pull["title"]
-	rich["url"], _ = pull["html_url"]
 	iLabels, ok := pull["labels"]
 	if ok && iLabels != nil {
 		ary, _ := iLabels.([]interface{})
@@ -4446,70 +4452,111 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 	}
 	rich["n_review_commenters"] = nReviewCommenters
 	rich["n_review_comments"] = nReviewComments
-	/*
-	 */
-	return
-	/*
-		_, hasHead := issue["head"]
-		_, hasPR := issue["pull_request"]
-		if !hasHead && !hasPR {
-			rich["pull_request"] = false
-			rich["item_type"] = "issue"
+	rich["pull_request"] = true
+	rich["item_type"] = "pull request"
+	githubRepo := j.URL
+	if strings.HasSuffix(githubRepo, ".git") {
+		githubRepo = githubRepo[:len(githubRepo)-4]
+	}
+	if strings.Contains(githubRepo, GitHubURLRoot) {
+		githubRepo = strings.Replace(githubRepo, GitHubURLRoot, "", -1)
+	}
+	rich["github_repo"] = githubRepo
+	rich["url_id"] = fmt.Sprintf("%s/pull/%d", githubRepo, number)
+	rich["forks"], _ = Dig(pull, []string{"base", "repo", "forks_count"}, true, false)
+	rich["num_review_comments"], _ = pull["review_comments"]
+	if iMergedAt != nil {
+		mergedAt, e := TimeParseInterfaceString(iMergedAt)
+		if e == nil {
+			rich["code_merge_duration"] = float64(mergedAt.Sub(createdAt).Seconds()) / 86400.0
 		} else {
-			rich["pull_request"] = true
-			rich["item_type"] = "pull request"
+			rich["code_merge_duration"] = nil
 		}
-		githubRepo := j.URL
-		if strings.HasSuffix(githubRepo, ".git") {
-			githubRepo = githubRepo[:len(githubRepo)-4]
+	} else {
+		rich["code_merge_duration"] = nil
+	}
+	commentsVal := 0
+	iCommentsVal, ok := pull["comments"]
+	if ok {
+		commentsVal = int(iCommentsVal.(float64))
+	}
+	rich["n_total_comments"] = commentsVal
+	reactions := 0
+	iReactions, ok := Dig(pull, []string{"reactions", "total_count"}, false, true)
+	if ok {
+		reactions = int(iReactions.(float64))
+	}
+	rich["n_reactions"] = reactions
+	rich["time_to_merge_request_response"] = nil
+	if nReviewComments > 0 {
+		firstReviewDate := j.GetFirstPullRequestReviewDate(pull)
+		rich["time_to_merge_request_response"] = float64(firstReviewDate.Sub(createdAt).Seconds()) / 86400.0
+	}
+	if affs {
+		authorKey := "user_data"
+		var affsItems map[string]interface{}
+		affsItems, err = j.AffsItems(ctx, pull, GitHubPullRequestRoles, createdAt)
+		if err != nil {
+			return
 		}
-		if strings.Contains(githubRepo, GitHubURLRoot) {
-			githubRepo = strings.Replace(githubRepo, GitHubURLRoot, "", -1)
-		}
-		rich["github_repo"] = githubRepo
-		rich["url_id"] = fmt.Sprintf("%s/issues/%d", githubRepo, number)
-		rich["time_to_first_attention"] = nil
-		comments := 0
-		iComments, ok := issue["comments"]
-		if ok {
-			comments = int(iComments.(float64))
-		}
-		rich["n_comments"] = comments
-		reactions := 0
-		iReactions, ok := Dig(issue, []string{"reactions", "total_count"}, false, true)
-		if ok {
-			reactions = int(iReactions.(float64))
-		}
-		rich["n_reactions"] = reactions
-		// if comments+reactions > 0 {
-		if comments > 0 {
-			firstAttention := j.GetFirstIssueAttention(issue)
-			rich["time_to_first_attention"] = float64(firstAttention.Sub(createdAt).Seconds()) / 86400.0
-		}
-		if affs {
-			authorKey := "user_data"
-			var affsItems map[string]interface{}
-			affsItems, err = j.AffsItems(ctx, issue, GitHubIssueRoles, createdAt)
-			if err != nil {
-				return
-			}
-			for prop, value := range affsItems {
-				rich[prop] = value
-			}
-			for _, suff := range AffsFields {
-				rich[Author+suff] = rich[authorKey+suff]
-			}
-			orgsKey := authorKey + MultiOrgNames
-			_, ok := Dig(rich, []string{orgsKey}, false, true)
-			if !ok {
-				rich[orgsKey] = []interface{}{}
-			}
-		}
-		for prop, value := range CommonFields(j, createdAt, j.Category) {
+		for prop, value := range affsItems {
 			rich[prop] = value
 		}
-		return
-	*/
+		for _, suff := range AffsFields {
+			rich[Author+suff] = rich[authorKey+suff]
+		}
+		orgsKey := authorKey + MultiOrgNames
+		_, ok := Dig(rich, []string{orgsKey}, false, true)
+		if !ok {
+			rich[orgsKey] = []interface{}{}
+		}
+	}
+	for prop, value := range CommonFields(j, createdAt, j.Category) {
+		rich[prop] = value
+	}
+	return
+}
+
+// GetFirstPullRequestReviewDate - get first review date on a pull request
+func (j *DSGitHub) GetFirstPullRequestReviewDate(pull map[string]interface{}) (dt time.Time) {
+	iUserLogin, _ := Dig(pull, []string{"user", "login"}, true, false)
+	userLogin, _ := iUserLogin.(string)
+	dts := []time.Time{}
+	udts := []time.Time{}
+	iReviews, ok := pull["review_comments_data"]
+	if ok && iReviews != nil {
+		ary, _ := iReviews.([]interface{})
+		for _, iReview := range ary {
+			review, _ := iReview.(map[string]interface{})
+			iReviewLogin, _ := Dig(review, []string{"user", "login"}, true, false)
+			reviewLogin, _ := iReviewLogin.(string)
+			iCreatedAt, _ := review["created_at"]
+			createdAt, _ := TimeParseInterfaceString(iCreatedAt)
+			if userLogin == reviewLogin {
+				udts = append(udts, createdAt)
+				continue
+			}
+			dts = append(dts, createdAt)
+		}
+	}
+	nDts := len(dts)
+	if nDts == 0 {
+		// If there was no review of anybody else that author's, then fallback to author's review
+		dts = udts
+		nDts = len(dts)
+	}
+	switch nDts {
+	case 0:
+		dt = time.Now()
+	case 1:
+		dt = dts[0]
+	default:
+		sort.Slice(dts, func(i, j int) bool {
+			return dts[i].Before(dts[j])
+		})
+		dt = dts[0]
+	}
+	return
 }
 
 // EnrichRepositoryItem - return rich item from raw item for a given author type
