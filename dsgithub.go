@@ -36,6 +36,9 @@ const (
 	MaxReviewCommentBodyLength = 4096
 	// ItemsPerPage - how many items in a page
 	ItemsPerPage = 100
+	// AbuseWaitSeconds - N - wait random(N:2N) seconds if GitHub detected abuse
+	// 7 means from 7 to 13 seconds, 10 on average
+	AbuseWaitSeconds = 7
 	// CacheGitHubRepo - cache this?
 	CacheGitHubRepo = true
 	// CacheGitHubIssues - cache this?
@@ -107,6 +110,8 @@ var (
 	GitHubPullRequestReactionRoles = []string{"user_data"}
 	// GitHubPullRequestRequestedReviewerRoles - roles to fetch affiliation data for github pull request requested reviewer
 	GitHubPullRequestRequestedReviewerRoles = []string{"requested_reviewer"}
+	// GitHubPullRequestReviewRoles - roles to fetch affiliation data for github pull request comment
+	GitHubPullRequestReviewRoles = []string{"user_data"}
 )
 
 // DSGitHub - DS implementation for GitHub
@@ -297,7 +302,7 @@ func (j *DSGitHub) githubRepo(ctx *Ctx, org, repo string) (repoData map[string]i
 			Printf("githubRepos: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {
-				sleepFor := 10 + rand.Intn(10)
+				sleepFor := AbuseWaitSeconds + rand.Intn(AbuseWaitSeconds)
 				Printf("GitHub detected abuse (get repo %s), waiting for %ds\n", origin, sleepFor)
 				time.Sleep(time.Duration(sleepFor) * time.Second)
 			}
@@ -496,7 +501,7 @@ func (j *DSGitHub) githubUser(ctx *Ctx, login string) (user map[string]interface
 			Printf("githubUser: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {
-				sleepFor := 10 + rand.Intn(10)
+				sleepFor := AbuseWaitSeconds + rand.Intn(AbuseWaitSeconds)
 				Printf("GitHub detected abuse (get user %s), waiting for %ds\n", login, sleepFor)
 				time.Sleep(time.Duration(sleepFor) * time.Second)
 			}
@@ -610,7 +615,7 @@ func (j *DSGitHub) githubIssues(ctx *Ctx, org, repo string, since *time.Time) (i
 			Printf("githubIssues: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {
-				sleepFor := 10 + rand.Intn(10)
+				sleepFor := AbuseWaitSeconds + rand.Intn(AbuseWaitSeconds)
 				Printf("GitHub detected abuse (get issues %s), waiting for %ds\n", origin, sleepFor)
 				time.Sleep(time.Duration(sleepFor) * time.Second)
 			}
@@ -729,7 +734,7 @@ func (j *DSGitHub) githubIssueComments(ctx *Ctx, org, repo string, number int) (
 			Printf("githubIssueComments: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {
-				sleepFor := 10 + rand.Intn(10)
+				sleepFor := AbuseWaitSeconds + rand.Intn(AbuseWaitSeconds)
 				Printf("GitHub detected abuse (get issue comments %s), waiting for %ds\n", key, sleepFor)
 				time.Sleep(time.Duration(sleepFor) * time.Second)
 			}
@@ -872,7 +877,7 @@ func (j *DSGitHub) githubCommentReactions(ctx *Ctx, org, repo string, cid int64)
 			Printf("githubCommentReactions: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {
-				sleepFor := 10 + rand.Intn(10)
+				sleepFor := AbuseWaitSeconds + rand.Intn(AbuseWaitSeconds)
 				Printf("GitHub detected abuse (get comment reactions %s), waiting for %ds\n", key, sleepFor)
 				time.Sleep(time.Duration(sleepFor) * time.Second)
 			}
@@ -993,7 +998,7 @@ func (j *DSGitHub) githubIssueReactions(ctx *Ctx, org, repo string, number int) 
 			Printf("githubIssueReactions: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {
-				sleepFor := 10 + rand.Intn(10)
+				sleepFor := AbuseWaitSeconds + rand.Intn(AbuseWaitSeconds)
 				Printf("GitHub detected abuse (get issue reactions %s), waiting for %ds\n", key, sleepFor)
 				time.Sleep(time.Duration(sleepFor) * time.Second)
 			}
@@ -1109,7 +1114,7 @@ func (j *DSGitHub) githubPull(ctx *Ctx, org, repo string, number int) (pullData 
 			Printf("githubPulls: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {
-				sleepFor := 10 + rand.Intn(10)
+				sleepFor := AbuseWaitSeconds + rand.Intn(AbuseWaitSeconds)
 				Printf("GitHub detected abuse (get pull %s), waiting for %ds\n", key, sleepFor)
 				time.Sleep(time.Duration(sleepFor) * time.Second)
 			}
@@ -1245,7 +1250,7 @@ func (j *DSGitHub) githubPulls(ctx *Ctx, org, repo string) (pullsData []map[stri
 			Printf("githubPulls: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {
-				sleepFor := 10 + rand.Intn(10)
+				sleepFor := AbuseWaitSeconds + rand.Intn(AbuseWaitSeconds)
 				Printf("GitHub detected abuse (get pulls %s), waiting for %ds\n", origin, sleepFor)
 				time.Sleep(time.Duration(sleepFor) * time.Second)
 			}
@@ -1363,7 +1368,7 @@ func (j *DSGitHub) githubPullReviews(ctx *Ctx, org, repo string, number int) (re
 			Printf("githubPullReviews: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {
-				sleepFor := 10 + rand.Intn(10)
+				sleepFor := AbuseWaitSeconds + rand.Intn(AbuseWaitSeconds)
 				Printf("GitHub detected abuse (get pull reviews %s), waiting for %ds\n", key, sleepFor)
 				time.Sleep(time.Duration(sleepFor) * time.Second)
 			}
@@ -1395,6 +1400,7 @@ func (j *DSGitHub) githubPullReviews(ctx *Ctx, org, repo string, number int) (re
 					rev["body"] = body.(string)[:MaxReviewBodyLength]
 				}
 			}
+			rev["body_analyzed"], _ = rev["body"]
 			userLogin, ok := Dig(rev, []string{"user", "login"}, false, true)
 			if ok {
 				rev["user_data"], _, err = j.githubUser(ctx, userLogin.(string))
@@ -1491,7 +1497,7 @@ func (j *DSGitHub) githubPullReviewComments(ctx *Ctx, org, repo string, number i
 			Printf("githubPullReviewComments: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {
-				sleepFor := 10 + rand.Intn(10)
+				sleepFor := AbuseWaitSeconds + rand.Intn(AbuseWaitSeconds)
 				Printf("GitHub detected abuse (get pull review comments %s), waiting for %ds\n", key, sleepFor)
 				time.Sleep(time.Duration(sleepFor) * time.Second)
 			}
@@ -1633,7 +1639,7 @@ func (j *DSGitHub) githubReviewCommentReactions(ctx *Ctx, org, repo string, cid 
 			Printf("githubReviewCommentReactions: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {
-				sleepFor := 10 + rand.Intn(10)
+				sleepFor := AbuseWaitSeconds + rand.Intn(AbuseWaitSeconds)
 				Printf("GitHub detected abuse (get comment reactions %s), waiting for %ds\n", key, sleepFor)
 				time.Sleep(time.Duration(sleepFor) * time.Second)
 			}
@@ -1751,7 +1757,7 @@ func (j *DSGitHub) githubPullRequestedReviewers(ctx *Ctx, org, repo string, numb
 			Printf("githubPullRequestedReviewers: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {
-				sleepFor := 10 + rand.Intn(10)
+				sleepFor := AbuseWaitSeconds + rand.Intn(AbuseWaitSeconds)
 				Printf("GitHub detected abuse (get pull requested reviewers %s), waiting for %ds\n", key, sleepFor)
 				time.Sleep(time.Duration(sleepFor) * time.Second)
 			}
@@ -1868,7 +1874,7 @@ func (j *DSGitHub) githubPullCommits(ctx *Ctx, org, repo string, number int, dee
 			Printf("githubPullCommits: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {
-				sleepFor := 10 + rand.Intn(10)
+				sleepFor := AbuseWaitSeconds + rand.Intn(AbuseWaitSeconds)
 				Printf("GitHub detected abuse (get pull commits %s), waiting for %ds\n", key, sleepFor)
 				time.Sleep(time.Duration(sleepFor) * time.Second)
 			}
@@ -1994,7 +2000,7 @@ func (j *DSGitHub) githubUserOrgs(ctx *Ctx, login string) (orgsData []map[string
 			Printf("githubUserOrgs: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {
-				sleepFor := 10 + rand.Intn(10)
+				sleepFor := AbuseWaitSeconds + rand.Intn(AbuseWaitSeconds)
 				Printf("GitHub detected abuse (get user orgs %s), waiting for %ds\n", login, sleepFor)
 				time.Sleep(time.Duration(sleepFor) * time.Second)
 			}
@@ -4019,7 +4025,107 @@ func (j *DSGitHub) EnrichPullRequestComments(ctx *Ctx, pull map[string]interface
 
 // EnrichPullRequestReviews - return rich reviews from raw pull request
 func (j *DSGitHub) EnrichPullRequestReviews(ctx *Ctx, pull map[string]interface{}, reviews []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
-	// xxx
+	// type: category, type(_), item_type( ), pull_request_review=true
+	// copy pull request: github_repo, repo_name, repository
+	// copy review: body, body_analyzed, submitted_at, commit_id, html_url, pull_request_url, state, author_association
+	// identify: id, id_in_repo, pull_request_comment_id, url_id
+	// standard: metadata..., origin, project, project_slug, uuid
+	// parent: pull_request_id, pull_request_number
+	// calc: n_reactions
+	// identity: author_... -> reviewer_...,
+	// common: is_github_pull_request=1, is_github_pull_request_review=1
+	iID, _ := pull["id"]
+	id, _ := iID.(string)
+	iPullID, _ := pull["pull_request_id"]
+	pullID := int(iPullID.(float64))
+	pullNumber, _ := pull["id_in_repo"]
+	iNumber, _ := pullNumber.(int)
+	iGithubRepo, _ := pull["github_repo"]
+	githubRepo, _ := iGithubRepo.(string)
+	copyPullFields := []string{"category", "github_repo", "repo_name", "repository"}
+	copyReviewFields := []string{"body", "body_analyzed", "submitted_at", "commit_id", "html_url", "pull_request_url", "state", "author_association"}
+	for _, review := range reviews {
+		rich := make(map[string]interface{})
+		for _, field := range RawFields {
+			v, _ := pull[field]
+			rich[field] = v
+		}
+		for _, field := range copyPullFields {
+			rich[field], _ = pull[field]
+		}
+		for _, field := range copyReviewFields {
+			rich[field], _ = review[field]
+		}
+		rich["type"] = "pull_request_review"
+		rich["item_type"] = "pull request review"
+		rich["pull_request_review"] = true
+		rich["pull_request_id"] = pullID
+		rich["pull_request_number"] = pullNumber
+		iRID, _ := review["id"]
+		rid := int64(iRID.(float64))
+		rich["id_in_repo"] = rid
+		rich["pull_request_review_id"] = rid
+		rich["id"] = id + "/review/" + fmt.Sprintf("%d", rid)
+		rich["url_id"] = fmt.Sprintf("%s/pulls/%d/reviews/%d", githubRepo, iNumber, rid)
+		rich["reviewer_association"], _ = review["author_association"]
+		rich["reviewer_login"], _ = Dig(review, []string{"user", "login"}, true, false)
+		iReviewerData, ok := review["user_data"]
+		if ok && iReviewerData != nil {
+			user, _ := iReviewerData.(map[string]interface{})
+			rich["author_login"], _ = user["login"]
+			rich["author_name"], _ = user["name"]
+			rich["reviewer_name"], _ = user["name"]
+			rich["reviewer_domain"] = nil
+			iEmail, ok := user["email"]
+			if ok {
+				email, _ := iEmail.(string)
+				ary := strings.Split(email, "@")
+				if len(ary) > 1 {
+					rich["reviewer_domain"] = strings.TrimSpace(ary[1])
+				}
+			}
+			rich["reviewer_org"], _ = user["company"]
+			rich["reviewer_location"], _ = user["location"]
+			rich["reviewer_geolocation"] = nil
+		} else {
+			rich["author_login"] = nil
+			rich["author_name"] = nil
+			rich["reviewer_name"] = nil
+			rich["reviewer_domain"] = nil
+			rich["reviewer_org"] = nil
+			rich["reviewer_location"] = nil
+			rich["reviewer_geolocation"] = nil
+		}
+		iSubmittedAt, _ := review["submitted_at"]
+		submittedAt, _ := TimeParseInterfaceString(iSubmittedAt)
+		if affs {
+			authorKey := "user_data"
+			var affsItems map[string]interface{}
+			affsItems, err = j.AffsItems(ctx, review, GitHubPullRequestReviewRoles, submittedAt)
+			if err != nil {
+				return
+			}
+			for prop, value := range affsItems {
+				rich[prop] = value
+			}
+			for _, suff := range AffsFields {
+				rich[Author+suff] = rich[authorKey+suff]
+				rich["reviewer"+suff] = rich[authorKey+suff]
+			}
+			orgsKey := authorKey + MultiOrgNames
+			_, ok := Dig(rich, []string{orgsKey}, false, true)
+			if !ok {
+				rich[orgsKey] = []interface{}{}
+			}
+		}
+		for prop, value := range CommonFields(j, submittedAt, j.Category) {
+			rich[prop] = value
+		}
+		for prop, value := range CommonFields(j, submittedAt, j.Category+"_review") {
+			rich[prop] = value
+		}
+		richItems = append(richItems, rich)
+	}
 	return
 }
 
@@ -5040,12 +5146,15 @@ func (j *DSGitHub) AllRoles(ctx *Ctx, rich map[string]interface{}) (roles []stri
 				possibleRoles = GitHubIssueRoles
 			case "issue_comment":
 				possibleRoles = GitHubIssueCommentRoles
+				possibleRoles = append(possibleRoles, "commenter")
 			case "issue_assignee":
 				possibleRoles = GitHubIssueAssigneeRoles
 			case "issue_reaction":
 				possibleRoles = GitHubIssueReactionRoles
+				possibleRoles = append(possibleRoles, "actor")
 			case "issue_comment_reaction":
 				possibleRoles = GitHubIssueReactionRoles
+				possibleRoles = append(possibleRoles, "actor")
 			}
 		}
 	case "pull_request":
@@ -5060,12 +5169,17 @@ func (j *DSGitHub) AllRoles(ctx *Ctx, rich map[string]interface{}) (roles []stri
 				possibleRoles = GitHubPullRequestRoles
 			case "pull_request_comment":
 				possibleRoles = GitHubPullRequestCommentRoles
+				possibleRoles = append(possibleRoles, "commenter")
 			case "pull_request_assignee":
 				possibleRoles = GitHubPullRequestAssigneeRoles
 			case "pull_request_comment_reaction":
 				possibleRoles = GitHubPullRequestReactionRoles
+				possibleRoles = append(possibleRoles, "actor")
 			case "pull_request_requested_reviewer":
 				possibleRoles = GitHubPullRequestRequestedReviewerRoles
+			case "pull_request_review":
+				possibleRoles = GitHubPullRequestReviewRoles
+				possibleRoles = append(possibleRoles, "reviewer")
 			}
 		}
 	}
