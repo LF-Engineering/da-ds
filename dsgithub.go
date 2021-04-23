@@ -3906,31 +3906,137 @@ func (j *DSGitHub) EnrichIssueReactions(ctx *Ctx, issue map[string]interface{}, 
 }
 
 // EnrichPullRequestComments - return rich comments from raw pull request
-func (j *DSGitHub) EnrichPullRequestComments(ctx *Ctx, issue map[string]interface{}, comments []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
-	// xxx
+func (j *DSGitHub) EnrichPullRequestComments(ctx *Ctx, pull map[string]interface{}, comments []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
+	// type: category, type(_), item_type( ), pull_request_comment=true
+	// copy pull request: github_repo, repo_name, repository
+	// copy comment: created_at, updated_at, body, body_analyzed, author_association, url, html_url
+	// identify: id, id_in_repo, pull_request_comment_id, url_id
+	// standard: metadata..., origin, project, project_slug, uuid
+	// parent: pull_id, pull_number
+	// calc: n_reactions
+	// identity: author_... -> commenter_...,
+	// common: is_github_pull_request=1, is_github_pull_request_comment=1
+	iID, _ := pull["id"]
+	id, _ := iID.(string)
+	iPullID, _ := pull["pull_id"]
+	pullID := int(iPullID.(float64))
+	pullNumber, _ := pull["id_in_repo"]
+	iNumber, _ := pullNumber.(int)
+	iGithubRepo, _ := pull["github_repo"]
+	githubRepo, _ := iGithubRepo.(string)
+	copyPullFields := []string{"category", "github_repo", "repo_name", "repository"}
+	copyCommentFields := []string{"created_at", "updated_at", "body", "body_analyzed", "author_association", "url", "html_url"}
+	for _, comment := range comments {
+		rich := make(map[string]interface{})
+		for _, field := range RawFields {
+			v, _ := pull[field]
+			rich[field] = v
+		}
+		for _, field := range copyPullFields {
+			rich[field], _ = pull[field]
+		}
+		for _, field := range copyCommentFields {
+			rich[field], _ = comment[field]
+		}
+		rich["type"] = "pull_request_comment"
+		rich["item_type"] = "pull request comment"
+		rich["pull_request_comment"] = true
+		rich["pull_id"] = pullID
+		rich["pull_number"] = pullNumber
+		iCID, _ := comment["id"]
+		cid := int64(iCID.(float64))
+		rich["id_in_repo"] = cid
+		rich["pull_comment_id"] = cid
+		rich["id"] = id + "/comment/" + fmt.Sprintf("%d", cid)
+		rich["url_id"] = fmt.Sprintf("%s/pulls/%d/comments/%d", githubRepo, iNumber, cid)
+		reactions := 0
+		iReactions, ok := Dig(comment, []string{"reactions", "total_count"}, false, true)
+		if ok {
+			reactions = int(iReactions.(float64))
+		}
+		rich["n_reactions"] = reactions
+		rich["commenter_association"], _ = comment["author_association"]
+		rich["commenter_login"], _ = Dig(comment, []string{"user", "login"}, true, false)
+		iCommenterData, ok := comment["user_data"]
+		if ok && iCommenterData != nil {
+			user, _ := iCommenterData.(map[string]interface{})
+			rich["author_login"], _ = user["login"]
+			rich["author_name"], _ = user["name"]
+			rich["commenter_name"], _ = user["name"]
+			rich["commenter_domain"] = nil
+			iEmail, ok := user["email"]
+			if ok {
+				email, _ := iEmail.(string)
+				ary := strings.Split(email, "@")
+				if len(ary) > 1 {
+					rich["commenter_domain"] = strings.TrimSpace(ary[1])
+				}
+			}
+			rich["commenter_org"], _ = user["company"]
+			rich["commenter_location"], _ = user["location"]
+			rich["commenter_geolocation"] = nil
+		} else {
+			rich["author_login"] = nil
+			rich["author_name"] = nil
+			rich["commenter_name"] = nil
+			rich["commenter_domain"] = nil
+			rich["commenter_org"] = nil
+			rich["commenter_location"] = nil
+			rich["commenter_geolocation"] = nil
+		}
+		iCreatedAt, _ := comment["created_at"]
+		createdAt, _ := TimeParseInterfaceString(iCreatedAt)
+		if affs {
+			authorKey := "user_data"
+			var affsItems map[string]interface{}
+			affsItems, err = j.AffsItems(ctx, comment, GitHubPullRequestCommentRoles, createdAt)
+			if err != nil {
+				return
+			}
+			for prop, value := range affsItems {
+				rich[prop] = value
+			}
+			for _, suff := range AffsFields {
+				rich[Author+suff] = rich[authorKey+suff]
+				rich["commenter"+suff] = rich[authorKey+suff]
+			}
+			orgsKey := authorKey + MultiOrgNames
+			_, ok := Dig(rich, []string{orgsKey}, false, true)
+			if !ok {
+				rich[orgsKey] = []interface{}{}
+			}
+		}
+		for prop, value := range CommonFields(j, createdAt, j.Category) {
+			rich[prop] = value
+		}
+		for prop, value := range CommonFields(j, createdAt, j.Category+"_comment") {
+			rich[prop] = value
+		}
+		richItems = append(richItems, rich)
+	}
 	return
 }
 
 // EnrichPullRequestReviews - return rich reviews from raw pull request
-func (j *DSGitHub) EnrichPullRequestReviews(ctx *Ctx, issue map[string]interface{}, reviews []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
+func (j *DSGitHub) EnrichPullRequestReviews(ctx *Ctx, pull map[string]interface{}, reviews []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
 	// xxx
 	return
 }
 
 // EnrichPullRequestAssignees - return rich assignees from raw pull request
-func (j *DSGitHub) EnrichPullRequestAssignees(ctx *Ctx, issue map[string]interface{}, assignees []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
+func (j *DSGitHub) EnrichPullRequestAssignees(ctx *Ctx, pull map[string]interface{}, assignees []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
 	// xxx
 	return
 }
 
 // EnrichPullRequestReactions - return rich reactions from raw pull request comment
-func (j *DSGitHub) EnrichPullRequestReactions(ctx *Ctx, issue map[string]interface{}, reactions []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
+func (j *DSGitHub) EnrichPullRequestReactions(ctx *Ctx, pull map[string]interface{}, reactions []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
 	// xxx
 	return
 }
 
 // EnrichPullRequestRequestedReviewers - return rich requested reviewers from raw pull request
-func (j *DSGitHub) EnrichPullRequestRequestedReviewers(ctx *Ctx, issue map[string]interface{}, reviews []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
+func (j *DSGitHub) EnrichPullRequestRequestedReviewers(ctx *Ctx, pull map[string]interface{}, reviews []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
 	// xxx
 	return
 }
@@ -4241,7 +4347,7 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 	rich["repo_name"] = j.URL
 	rich["repository"] = j.URL
 	rich["id"] = j.ItemID(pull)
-	rich["pr_id"], _ = pull["id"]
+	rich["pull_id"], _ = pull["id"]
 	iCreatedAt, _ := pull["created_at"]
 	createdAt, _ := TimeParseInterfaceString(iCreatedAt)
 	updatedOn, _ := Dig(item, []string{j.DateField(ctx)}, true, false)
