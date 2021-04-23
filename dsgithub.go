@@ -2634,7 +2634,7 @@ func (j *DSGitHub) FetchItemsPullRequest(ctx *Ctx) (err error) {
 		return
 	}
 	var pulls []map[string]interface{}
-	// PullRequests.Lit doesn't return merged_by data, we need to use PullRequests.Get on each pull
+	// PullRequests.List doesn't return merged_by data, we need to use PullRequests.Get on each pull
 	// If it would we could use Pulls API to fetch all pulls when no date from is specified
 	// If there is a date from Pulls API doesn't support Since parameter
 	// if ctx.DateFrom != nil {
@@ -4825,27 +4825,27 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 	iMergedByData, ok := pull["merged_by_data"]
 	if ok && iMergedByData != nil {
 		mergedBy, _ := iMergedByData.(map[string]interface{})
-		rich["merged_by_login"], _ = mergedBy["login"]
-		rich["merged_by_name"], _ = mergedBy["name"]
-		rich["merged_by_domain"] = nil
+		rich["merge_author_login"], _ = mergedBy["login"]
+		rich["merge_author_name"], _ = mergedBy["name"]
+		rich["merge_author_domain"] = nil
 		iEmail, ok := mergedBy["email"]
 		if ok {
 			email, _ := iEmail.(string)
 			ary := strings.Split(email, "@")
 			if len(ary) > 1 {
-				rich["merged_by_domain"] = strings.TrimSpace(ary[1])
+				rich["merge_author_domain"] = strings.TrimSpace(ary[1])
 			}
 		}
-		rich["merged_by_org"], _ = mergedBy["company"]
-		rich["merged_by_location"], _ = mergedBy["location"]
-		rich["merged_by_geolocation"] = nil
+		rich["merge_author_org"], _ = mergedBy["company"]
+		rich["merge_author_location"], _ = mergedBy["location"]
+		rich["merge_author_geolocation"] = nil
 	} else {
-		rich["merged_by_login"] = nil
-		rich["merged_by_name"] = nil
-		rich["merged_by_domain"] = nil
-		rich["merged_by_org"] = nil
-		rich["merged_by_location"] = nil
-		rich["merged_by_geolocation"] = nil
+		rich["merge_author_login"] = nil
+		rich["merge_author_name"] = nil
+		rich["merge_author_domain"] = nil
+		rich["merge_author_org"] = nil
+		rich["merge_author_location"] = nil
+		rich["merge_author_geolocation"] = nil
 	}
 	iLabels, ok := pull["labels"]
 	if ok && iLabels != nil {
