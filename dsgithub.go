@@ -1172,7 +1172,7 @@ func (j *DSGitHub) githubPullsFromIssues(ctx *Ctx, org, repo string, since *time
 	}
 	i := 0
 	nIssues := len(issues)
-	Printf("processing issues (to filter for PRs)\n", nIssues)
+	Printf("processing %d issues (to filter for PRs)\n", nIssues)
 	for _, issue := range issues {
 		i++
 		if i%ItemsPerPage == 0 {
