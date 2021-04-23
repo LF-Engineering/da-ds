@@ -97,6 +97,16 @@ var (
 	GitHubIssueAssigneeRoles = []string{"assignee"}
 	// GitHubIssueReactionRoles - roles to fetch affiliation data for github issue reactions or issue comment reactions
 	GitHubIssueReactionRoles = []string{"user_data"}
+	// GitHubPullRequestRoles - roles to fetch affiliation data for github pull request
+	GitHubPullRequestRoles = []string{"user_data", "merged_by_data"}
+	// GitHubPullRequestCommentRoles - roles to fetch affiliation data for github pull request comment
+	GitHubPullRequestCommentRoles = []string{"user_data"}
+	// GitHubPullRequestAssigneeRoles - roles to fetch affiliation data for github pull request comment
+	GitHubPullRequestAssigneeRoles = []string{"assignee"}
+	// GitHubPullRequestReactionRoles - roles to fetch affiliation data for github pull request comment reactions
+	GitHubPullRequestReactionRoles = []string{"user_data"}
+	// GitHubPullRequestRequestedReviewerRoles - roles to fetch affiliation data for github pull request requested reviewer
+	GitHubPullRequestRequestedReviewerRoles = []string{"requested_reviewer"}
 )
 
 // DSGitHub - DS implementation for GitHub
@@ -4277,7 +4287,6 @@ func (j *DSGitHub) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role s
 // second return parameter is static mode (true/false)
 // dynamic roles will use item to get its roles
 func (j *DSGitHub) AllRoles(ctx *Ctx, rich map[string]interface{}) (roles []string, static bool) {
-	// xxx
 	if ctx.Debug > 1 {
 		defer func() {
 			id, _ := rich["id"]
@@ -4319,8 +4328,15 @@ func (j *DSGitHub) AllRoles(ctx *Ctx, rich map[string]interface{}) (roles []stri
 		if ok {
 			switch typ.(string) {
 			case "pull_request":
-				// possibleRoles = GitHubPullRequestRoles
-				// xxx
+				possibleRoles = GitHubPullRequestRoles
+			case "pull_request_comment":
+				possibleRoles = GitHubPullRequestCommentRoles
+			case "pull_request_assignee":
+				possibleRoles = GitHubPullRequestAssigneeRoles
+			case "pull_request_comment_reaction":
+				possibleRoles = GitHubPullRequestReactionRoles
+			case "pull_request_requested_reviewer":
+				possibleRoles = GitHubPullRequestRequestedReviewerRoles
 			}
 		}
 	}
