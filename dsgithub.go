@@ -4224,8 +4224,89 @@ func (j *DSGitHub) EnrichPullRequestReactions(ctx *Ctx, pull map[string]interfac
 }
 
 // EnrichPullRequestRequestedReviewers - return rich requested reviewers from raw pull request
-func (j *DSGitHub) EnrichPullRequestRequestedReviewers(ctx *Ctx, pull map[string]interface{}, reviews []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
-	// xxx
+func (j *DSGitHub) EnrichPullRequestRequestedReviewers(ctx *Ctx, pull map[string]interface{}, requestedReviewers []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
+	// type: category, type(_), item_type( ), pull_request_requested_reviewer=true
+	// copy pull request: github_repo, repo_name, repository
+	// identify: id, id_in_repo, pull_request_requested_reviewer_login, url_id
+	// standard: metadata..., origin, project, project_slug, uuid
+	// parent: pull_request_id, pull_request_number
+	// identity: author_... -> requested_reviewer_...,
+	// common: is_github_pull_request=1, is_github_pull_request_requested_reviewer=1
+	iID, _ := pull["id"]
+	id, _ := iID.(string)
+	iPullID, _ := pull["pull_request_id"]
+	pullID := int(iPullID.(float64))
+	pullNumber, _ := pull["id_in_repo"]
+	iNumber, _ := pullNumber.(int)
+	iGithubRepo, _ := pull["github_repo"]
+	githubRepo, _ := iGithubRepo.(string)
+	copyPullFields := []string{"category", "github_repo", "repo_name", "repository"}
+	for _, reviewer := range requestedReviewers {
+		rich := make(map[string]interface{})
+		for _, field := range RawFields {
+			v, _ := pull[field]
+			rich[field] = v
+		}
+		for _, field := range copyPullFields {
+			rich[field], _ = pull[field]
+		}
+		rich["type"] = "pull_request_requested_reviewer"
+		rich["item_type"] = "pull request requested reviewer"
+		rich["pull_request_requested_reviewer"] = true
+		rich["pull_request_id"] = pullID
+		rich["pull_request_number"] = pullNumber
+		iLogin, _ := reviewer["login"]
+		login, _ := iLogin.(string)
+		rich["id_in_repo"], _ = reviewer["id"]
+		rich["pull_request_requested_reviewer_login"] = login
+		rich["id"] = id + "/requested_reviewer/" + login
+		rich["url_id"] = fmt.Sprintf("%s/pulls/%d/requested_reviewers/%s", githubRepo, iNumber, login)
+		rich["author_login"] = login
+		rich["author_name"], _ = reviewer["name"]
+		rich["requested_reviewer_login"] = login
+		rich["requested_reviewer_name"], _ = reviewer["name"]
+		rich["requested_reviewer_domain"] = nil
+		iEmail, ok := reviewer["email"]
+		if ok {
+			email, _ := iEmail.(string)
+			ary := strings.Split(email, "@")
+			if len(ary) > 1 {
+				rich["requested_reviewer_domain"] = strings.TrimSpace(ary[1])
+			}
+		}
+		rich["requested_reviewer_org"], _ = reviewer["company"]
+		rich["requested_reviewer_location"], _ = reviewer["location"]
+		rich["requested_reviewer_geolocation"] = nil
+		// We consider requested reviewer enrollment at pull request creation date
+		iCreatedAt, _ := pull["created_at"]
+		createdAt, _ := TimeParseInterfaceString(iCreatedAt)
+		if affs {
+			authorKey := "requested_reviewer"
+			var affsItems map[string]interface{}
+			affsItems, err = j.AffsItems(ctx, map[string]interface{}{"requested_reviewer": reviewer}, GitHubPullRequestRequestedReviewerRoles, createdAt)
+			if err != nil {
+				return
+			}
+			for prop, value := range affsItems {
+				rich[prop] = value
+			}
+			for _, suff := range AffsFields {
+				rich[Author+suff] = rich[authorKey+suff]
+			}
+			orgsKey := authorKey + MultiOrgNames
+			_, ok := Dig(rich, []string{orgsKey}, false, true)
+			if !ok {
+				rich[orgsKey] = []interface{}{}
+			}
+		}
+		for prop, value := range CommonFields(j, createdAt, j.Category) {
+			rich[prop] = value
+		}
+		for prop, value := range CommonFields(j, createdAt, j.Category+"_requested_reviewer") {
+			rich[prop] = value
+		}
+		richItems = append(richItems, rich)
+	}
 	return
 }
 
