@@ -4098,7 +4098,7 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 		for commenter := range commenters {
 			comms = append(comms, commenter)
 		}
-		rich["commenters_data"] = comms
+		rich["commenters"] = comms
 	}
 	rich["n_commenters"] = nCommenters
 	rich["n_comments"] = nComments
@@ -4398,6 +4398,54 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 		rich["requested_reviewers_data"] = requestedReviewers
 	}
 	rich["n_requested_reviewers"] = nRequestedReviewers
+	nCommenters := 0
+	nComments := 0
+	iComments, ok := pull["review_comments_data"]
+	if ok && iComments != nil {
+		ary, _ := iComments.([]interface{})
+		nComments = len(ary)
+		commenters := map[string]interface{}{}
+		for _, iComment := range ary {
+			comment, _ := iComment.(map[string]interface{})
+			iCommenter, _ := Dig(comment, []string{"user", "login"}, true, false)
+			commenter, _ := iCommenter.(string)
+			if commenter != "" {
+				commenters[commenter] = struct{}{}
+			}
+		}
+		nCommenters = len(commenters)
+		comms := []string{}
+		for commenter := range commenters {
+			comms = append(comms, commenter)
+		}
+		rich["commenters"] = comms
+	}
+	rich["n_commenters"] = nCommenters
+	rich["n_comments"] = nComments
+	nReviewCommenters := 0
+	nReviewComments := 0
+	iReviewComments, ok := pull["reviews_data"]
+	if ok && iReviewComments != nil {
+		ary, _ := iReviewComments.([]interface{})
+		nReviewComments = len(ary)
+		reviewCommenters := map[string]interface{}{}
+		for _, iReviewComment := range ary {
+			reviewComment, _ := iReviewComment.(map[string]interface{})
+			iReviewCommenter, _ := Dig(reviewComment, []string{"user", "login"}, true, false)
+			reviewCommenter, _ := iReviewCommenter.(string)
+			if reviewCommenter != "" {
+				reviewCommenters[reviewCommenter] = struct{}{}
+			}
+		}
+		nReviewCommenters = len(reviewCommenters)
+		revComms := []string{}
+		for reviewCommenter := range reviewCommenters {
+			revComms = append(revComms, reviewCommenter)
+		}
+		rich["review_commenters"] = revComms
+	}
+	rich["n_review_commenters"] = nReviewCommenters
+	rich["n_review_comments"] = nReviewComments
 	/*
 	 */
 	return
