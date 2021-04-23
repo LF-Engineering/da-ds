@@ -2902,13 +2902,19 @@ func (j *DSGitHub) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[
 		// issue: reactions_data[].user_data
 		identities = make(map[[3]string]struct{})
 		item, _ := Dig(doc, []string{"data"}, true, false)
-		user, _ := Dig(item, []string{"user_data"}, true, false)
-		if user == nil {
-			if ctx.Debug > 1 {
-				fmt.Printf("missing user_data property in item %+v\n", DumpPreview(item, 64))
-			}
-			return
+		user, ok := Dig(item, []string{"user_data"}, false, true)
+		if ok && user != nil && len(user.(map[string]interface{})) > 0 {
+			identities[j.IdentityForObject(ctx, user.(map[string]interface{}))] = struct{}{}
 		}
+		/*
+			user, _ := Dig(item, []string{"user_data"}, true, false)
+			if user == nil {
+				if ctx.Debug > 1 {
+					fmt.Printf("missing user_data property in an issue item %+v\n", DumpPreview(item, 64))
+				}
+				return
+			}
+		*/
 		identities[j.IdentityForObject(ctx, user.(map[string]interface{}))] = struct{}{}
 		assignee, ok := Dig(item, []string{"assignee_data"}, false, true)
 		if ok && assignee != nil && len(assignee.(map[string]interface{})) > 0 {
@@ -2969,13 +2975,19 @@ func (j *DSGitHub) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[
 		// pr:    commits_data[].committer_data (not used)
 		identities = make(map[[3]string]struct{})
 		item, _ := Dig(doc, []string{"data"}, true, false)
-		user, _ := Dig(item, []string{"user_data"}, true, false)
-		if user == nil {
-			if ctx.Debug > 1 {
-				fmt.Printf("missing user_data property in item %+v\n", DumpPreview(item, 64))
-			}
-			return
+		user, ok := Dig(item, []string{"user_data"}, false, true)
+		if ok && user != nil && len(user.(map[string]interface{})) > 0 {
+			identities[j.IdentityForObject(ctx, user.(map[string]interface{}))] = struct{}{}
 		}
+		/*
+			user, _ := Dig(item, []string{"user_data"}, true, false)
+			if user == nil {
+				if ctx.Debug > 1 {
+					fmt.Printf("missing user_data property in a pull request item %+v\n", DumpPreview(item, 64))
+				}
+				return
+			}
+		*/
 		identities[j.IdentityForObject(ctx, user.(map[string]interface{}))] = struct{}{}
 		mergedBy, ok := Dig(item, []string{"merged_by_data"}, false, true)
 		if ok && mergedBy != nil && len(mergedBy.(map[string]interface{})) > 0 {
