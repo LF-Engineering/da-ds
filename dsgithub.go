@@ -1170,7 +1170,14 @@ func (j *DSGitHub) githubPullsFromIssues(ctx *Ctx, org, repo string, since *time
 	if err != nil {
 		return
 	}
+	i := 0
+	nIssues := len(issues)
+	Printf("processing issues (to filter for PRs)\n", nIssues)
 	for _, issue := range issues {
+		i++
+		if i%ItemsPerPage == 0 {
+			Printf("processed %d/%d issues\n", i, nIssues)
+		}
 		isPR, _ := issue["is_pull"]
 		if !isPR.(bool) {
 			continue
@@ -2258,6 +2265,9 @@ func (j *DSGitHub) FetchItemsRepository(ctx *Ctx) (err error) {
 	items := []interface{}{}
 	item, err := j.githubRepo(ctx, j.Org, j.Repo)
 	FatalOnError(err)
+	if item == nil {
+		Fatalf("there is no such repo %s/%s", j.Org, j.Repo)
+	}
 	item["fetched_on"] = fmt.Sprintf("%.6f", float64(time.Now().UnixNano())/1.0e9)
 	esItem := j.AddMetadata(ctx, item)
 	if ctx.Project != "" {
