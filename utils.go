@@ -541,6 +541,10 @@ func RequestNoRetry(
 	if err != nil {
 		sPayload := BytesToStringTrunc(payload, MaxPayloadPrintfLen, true)
 		err = fmt.Errorf("do request error:%+v for method:%s url:%s headers:%v payload:%s", err, method, url, headers, sPayload)
+		if strings.Contains(err.Error(), "socket: too many open files") {
+			Printf("too many open socets detected, sleeping for 3 seconds\n")
+			time.Sleep(time.Duration(3) * time.Second)
+		}
 		return
 	}
 	var body []byte

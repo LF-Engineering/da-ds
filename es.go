@@ -496,9 +496,15 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 			Printf("SendToElastic: error: %+v for %+v\n", err, item)
 			switch ctx.AllowFail {
 			case 0:
-				err = SendToGAP(ctx, doc)
-				if err != nil {
-					return
+				// send to gap handler if configured
+				if ctx.GapURL != "" {
+					err = SendToGAP(ctx, doc)
+					if err != nil {
+						return
+					}
+				} else {
+					// continue normally, so next items will attempt retry too
+					err = nil
 				}
 			case 1:
 				// return error

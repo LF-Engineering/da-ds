@@ -150,7 +150,7 @@ func (j *DSGitHub) getRateLimits(gctx context.Context, ctx *Ctx, gcs []*github.C
 		if err != nil {
 			rem, ok := PeriodParse(err.Error())
 			if ok {
-				Printf("Parsed wait time from error message: %v: %s\n", rem, err.Error())
+				Printf("Parsed wait time from api non-success response message: %v: %s\n", rem, err.Error())
 				limits = append(limits, -1)
 				remainings = append(remainings, -1)
 				durations = append(durations, rem)
@@ -277,7 +277,7 @@ func (j *DSGitHub) githubRepo(ctx *Ctx, org, repo string) (repoData map[string]i
 			return
 		}
 		if e != nil && !retry {
-			Printf("Error getting %s repo: response: %+v, error: %+v, retrying rate\n", origin, response, e)
+			Printf("Unable to get %s repo: response: %+v, error: %+v, retrying rate\n", origin, response, e)
 			Printf("githubRepos: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {
@@ -476,7 +476,7 @@ func (j *DSGitHub) githubUser(ctx *Ctx, login string) (user map[string]interface
 			return
 		}
 		if e != nil && !retry {
-			Printf("Error getting %s user: response: %+v, error: %+v, retrying rate\n", login, response, e)
+			Printf("Unable to get %s user: response: %+v, error: %+v, retrying rate\n", login, response, e)
 			Printf("githubUser: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {
@@ -590,7 +590,7 @@ func (j *DSGitHub) githubIssues(ctx *Ctx, org, repo string, since *time.Time) (i
 			return
 		}
 		if e != nil && !retry {
-			Printf("Error getting %s issues: response: %+v, error: %+v, retrying rate\n", origin, response, e)
+			Printf("Unable to get %s issues: response: %+v, error: %+v, retrying rate\n", origin, response, e)
 			Printf("githubIssues: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {
@@ -709,7 +709,7 @@ func (j *DSGitHub) githubIssueComments(ctx *Ctx, org, repo string, number int) (
 			return
 		}
 		if e != nil && !retry {
-			Printf("Error getting %s issue comments: response: %+v, error: %+v, retrying rate\n", key, response, e)
+			Printf("Unable to get %s issue comments: response: %+v, error: %+v, retrying rate\n", key, response, e)
 			Printf("githubIssueComments: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {
@@ -852,7 +852,7 @@ func (j *DSGitHub) githubCommentReactions(ctx *Ctx, org, repo string, cid int64)
 			return
 		}
 		if e != nil && !retry {
-			Printf("Error getting %s comment reactions: response: %+v, error: %+v, retrying rate\n", key, response, e)
+			Printf("Unable to get %s comment reactions: response: %+v, error: %+v, retrying rate\n", key, response, e)
 			Printf("githubCommentReactions: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {
@@ -973,7 +973,7 @@ func (j *DSGitHub) githubIssueReactions(ctx *Ctx, org, repo string, number int) 
 			return
 		}
 		if e != nil && !retry {
-			Printf("Error getting %s issue reactions: response: %+v, error: %+v, retrying rate\n", key, response, e)
+			Printf("Unable to get %s issue reactions: response: %+v, error: %+v, retrying rate\n", key, response, e)
 			Printf("githubIssueReactions: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {
@@ -1089,7 +1089,7 @@ func (j *DSGitHub) githubPull(ctx *Ctx, org, repo string, number int) (pullData 
 			return
 		}
 		if e != nil && !retry {
-			Printf("Error getting %s pull: response: %+v, error: %+v, retrying rate\n", key, response, e)
+			Printf("Unable to get %s pull: response: %+v, error: %+v, retrying rate\n", key, response, e)
 			Printf("githubPulls: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {
@@ -1225,7 +1225,7 @@ func (j *DSGitHub) githubPulls(ctx *Ctx, org, repo string) (pullsData []map[stri
 			return
 		}
 		if e != nil && !retry {
-			Printf("Error getting %s pulls: response: %+v, error: %+v, retrying rate\n", origin, response, e)
+			Printf("Unable to get %s pulls: response: %+v, error: %+v, retrying rate\n", origin, response, e)
 			Printf("githubPulls: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {
@@ -1343,7 +1343,7 @@ func (j *DSGitHub) githubPullReviews(ctx *Ctx, org, repo string, number int) (re
 			return
 		}
 		if e != nil && !retry {
-			Printf("Error getting %s pull reviews: response: %+v, error: %+v, retrying rate\n", key, response, e)
+			Printf("Unable to get %s pull reviews: response: %+v, error: %+v, retrying rate\n", key, response, e)
 			Printf("githubPullReviews: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {
@@ -1471,7 +1471,7 @@ func (j *DSGitHub) githubPullReviewComments(ctx *Ctx, org, repo string, number i
 			return
 		}
 		if e != nil && !retry {
-			Printf("Error getting %s pull review comments: response: %+v, error: %+v, retrying rate\n", key, response, e)
+			Printf("Unable to get %s pull review comments: response: %+v, error: %+v, retrying rate\n", key, response, e)
 			Printf("githubPullReviewComments: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {
@@ -1613,7 +1613,7 @@ func (j *DSGitHub) githubReviewCommentReactions(ctx *Ctx, org, repo string, cid 
 			return
 		}
 		if e != nil && !retry {
-			Printf("Error getting %s comment reactions: response: %+v, error: %+v, retrying rate\n", key, response, e)
+			Printf("Unable to get %s comment reactions: response: %+v, error: %+v, retrying rate\n", key, response, e)
 			Printf("githubReviewCommentReactions: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {
@@ -1731,7 +1731,7 @@ func (j *DSGitHub) githubPullRequestedReviewers(ctx *Ctx, org, repo string, numb
 			return
 		}
 		if e != nil && !retry {
-			Printf("Error getting %s pull requested reviewers: response: %+v, error: %+v, retrying rate\n", key, response, e)
+			Printf("Unable to get %s pull requested reviewers: response: %+v, error: %+v, retrying rate\n", key, response, e)
 			Printf("githubPullRequestedReviewers: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {
@@ -1848,7 +1848,7 @@ func (j *DSGitHub) githubPullCommits(ctx *Ctx, org, repo string, number int, dee
 			return
 		}
 		if e != nil && !retry {
-			Printf("Error getting %s pull commits: response: %+v, error: %+v, retrying rate\n", key, response, e)
+			Printf("Unable to get %s pull commits: response: %+v, error: %+v, retrying rate\n", key, response, e)
 			Printf("githubPullCommits: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {
@@ -1974,7 +1974,7 @@ func (j *DSGitHub) githubUserOrgs(ctx *Ctx, login string) (orgsData []map[string
 			return
 		}
 		if e != nil && !retry {
-			Printf("Error getting %s user orgs: response: %+v, error: %+v, retrying rate\n", login, response, e)
+			Printf("Unable to get %s user orgs: response: %+v, error: %+v, retrying rate\n", login, response, e)
 			Printf("githubUserOrgs: handle rate\n")
 			abuse := j.isAbuse(e)
 			if abuse {

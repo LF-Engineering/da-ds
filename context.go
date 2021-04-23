@@ -257,7 +257,7 @@ func (ctx *Ctx) Init() {
 			ctx.ESBulkSize = bulkSize
 		}
 	} else {
-		ctx.ESBulkSize = 1000
+		ctx.ESBulkSize = 500
 	}
 	if ctx.Env("ES_SCROLL_SIZE") != "" {
 		scrollSize, err := strconv.Atoi(ctx.Env("ES_SCROLL_SIZE"))
