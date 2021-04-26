@@ -2075,8 +2075,9 @@ func (j *DSGitHub) Validate(ctx *Ctx) (err error) {
 		return
 	}
 	j.Repo = strings.TrimSpace(j.Repo)
-	if strings.Contains(j.Repo, ".git") {
-		j.Repo = strings.Replace(j.Repo, ".git", "", -1)
+	if strings.HasSuffix(j.Repo, ".git") {
+		lRepo := len(j.Repo)
+		j.Repo = j.Repo[:lRepo-4]
 	}
 	if j.Repo == "" {
 		err = fmt.Errorf("github repo must be set")
