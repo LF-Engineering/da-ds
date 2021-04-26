@@ -2913,7 +2913,6 @@ func (j *DSGitHub) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[
 				return
 			}
 		*/
-		identities[j.IdentityForObject(ctx, user.(map[string]interface{}))] = struct{}{}
 		assignee, ok := Dig(item, []string{"assignee_data"}, false, true)
 		if ok && assignee != nil && len(assignee.(map[string]interface{})) > 0 {
 			identities[j.IdentityForObject(ctx, assignee.(map[string]interface{}))] = struct{}{}
@@ -2986,7 +2985,6 @@ func (j *DSGitHub) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[
 				return
 			}
 		*/
-		identities[j.IdentityForObject(ctx, user.(map[string]interface{}))] = struct{}{}
 		mergedBy, ok := Dig(item, []string{"merged_by_data"}, false, true)
 		if ok && mergedBy != nil && len(mergedBy.(map[string]interface{})) > 0 {
 			identities[j.IdentityForObject(ctx, mergedBy.(map[string]interface{}))] = struct{}{}

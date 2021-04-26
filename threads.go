@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	// MT -are we running in multiple threading mode?
+	// MT - are we running in multiple threading mode?
 	MT      = false
 	thrN    = 0
 	thrNMtx = &sync.Mutex{}

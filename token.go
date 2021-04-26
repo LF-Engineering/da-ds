@@ -43,14 +43,14 @@ func InitializeAuth0() error {
 		Printf("unmarshal error: %+v\n", err)
 		return err
 	}
-	AddRedacted(data["es_url"], false)
-	AddRedacted(data["es_user"], false)
-	AddRedacted(data["es_pass"], false)
-	AddRedacted(data["client_id"], false)
-	AddRedacted(data["client_secret"], false)
-	AddRedacted(data["audience"], false)
-	AddRedacted(data["url"], false)
-	AddRedacted(data["slack_webhook_url"], false)
+	AddRedacted(data["es_url"], true)
+	AddRedacted(data["es_user"], true)
+	AddRedacted(data["es_pass"], true)
+	AddRedacted(data["client_id"], true)
+	AddRedacted(data["client_secret"], true)
+	AddRedacted(data["audience"], true)
+	AddRedacted(data["url"], true)
+	AddRedacted(data["slack_webhook_url"], true)
 	// Providers
 	httpClientProvider := http.NewClientProvider(60 * time.Second)
 	esCacheClientProvider, err := elastic.NewClientProvider(
