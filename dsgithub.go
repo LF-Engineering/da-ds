@@ -1785,7 +1785,7 @@ func (j *DSGitHub) githubPullRequestedReviewers(ctx *Ctx, org, repo string, numb
 		}
 		users := revsObj.Users
 		for _, reviewer := range users {
-			if reviewer.Login == nil {
+			if reviewer == nil || reviewer.Login == nil {
 				continue
 			}
 			var userData map[string]interface{}
@@ -2905,7 +2905,7 @@ func (j *DSGitHub) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[
 			identities[j.IdentityForObject(ctx, user.(map[string]interface{}))] = struct{}{}
 		}
 		/*
-			user, _ := Dig(item, []string{"user_data"}, true, false)
+			user, _ := Dig(item, []string{"user_data"}, false, true)
 			if user == nil {
 				if ctx.Debug > 1 {
 					fmt.Printf("missing user_data property in an issue item %+v\n", DumpPreview(item, 64))
@@ -2977,7 +2977,7 @@ func (j *DSGitHub) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[
 			identities[j.IdentityForObject(ctx, user.(map[string]interface{}))] = struct{}{}
 		}
 		/*
-			user, _ := Dig(item, []string{"user_data"}, true, false)
+			user, _ := Dig(item, []string{"user_data"}, false, true)
 			if user == nil {
 				if ctx.Debug > 1 {
 					fmt.Printf("missing user_data property in a pull request item %+v\n", DumpPreview(item, 64))
@@ -3652,7 +3652,7 @@ func (j *DSGitHub) EnrichIssueComments(ctx *Ctx, issue map[string]interface{}, c
 		}
 		rich["n_reactions"] = reactions
 		rich["commenter_association"], _ = comment["author_association"]
-		rich["commenter_login"], _ = Dig(comment, []string{"user", "login"}, true, false)
+		rich["commenter_login"], _ = Dig(comment, []string{"user", "login"}, false, true)
 		iCommenterData, ok := comment["user_data"]
 		if ok && iCommenterData != nil {
 			user, _ := iCommenterData.(map[string]interface{})
@@ -3992,7 +3992,7 @@ func (j *DSGitHub) EnrichPullRequestComments(ctx *Ctx, pull map[string]interface
 		}
 		rich["n_reactions"] = reactions
 		rich["commenter_association"], _ = comment["author_association"]
-		rich["commenter_login"], _ = Dig(comment, []string{"user", "login"}, true, false)
+		rich["commenter_login"], _ = Dig(comment, []string{"user", "login"}, false, true)
 		iCommenterData, ok := comment["user_data"]
 		if ok && iCommenterData != nil {
 			user, _ := iCommenterData.(map[string]interface{})
@@ -4101,7 +4101,7 @@ func (j *DSGitHub) EnrichPullRequestReviews(ctx *Ctx, pull map[string]interface{
 		rich["id"] = id + "/review/" + fmt.Sprintf("%d", rid)
 		rich["url_id"] = fmt.Sprintf("%s/pulls/%d/reviews/%d", githubRepo, iNumber, rid)
 		rich["reviewer_association"], _ = review["author_association"]
-		rich["reviewer_login"], _ = Dig(review, []string{"user", "login"}, true, false)
+		rich["reviewer_login"], _ = Dig(review, []string{"user", "login"}, false, true)
 		iReviewerData, ok := review["user_data"]
 		if ok && iReviewerData != nil {
 			user, _ := iReviewerData.(map[string]interface{})
@@ -4520,7 +4520,7 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 	rich["title"], _ = issue["title"]
 	rich["title_analyzed"], _ = issue["title"]
 	rich["url"], _ = issue["html_url"]
-	rich["user_login"], _ = Dig(issue, []string{"user", "login"}, true, false)
+	rich["user_login"], _ = Dig(issue, []string{"user", "login"}, false, true)
 	iUserData, ok := issue["user_data"]
 	if ok && iUserData != nil {
 		user, _ := iUserData.(map[string]interface{})
@@ -4613,7 +4613,7 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 		commenters := map[string]interface{}{}
 		for _, iComment := range ary {
 			comment, _ := iComment.(map[string]interface{})
-			iCommenter, _ := Dig(comment, []string{"user", "login"}, true, false)
+			iCommenter, _ := Dig(comment, []string{"user", "login"}, false, true)
 			commenter, _ := iCommenter.(string)
 			if commenter != "" {
 				commenters[commenter] = struct{}{}
@@ -4694,7 +4694,7 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 
 // GetFirstIssueAttention - get first non-author action date on the issue
 func (j *DSGitHub) GetFirstIssueAttention(issue map[string]interface{}) (dt time.Time) {
-	iUserLogin, _ := Dig(issue, []string{"user", "login"}, true, false)
+	iUserLogin, _ := Dig(issue, []string{"user", "login"}, false, true)
 	userLogin, _ := iUserLogin.(string)
 	dts := []time.Time{}
 	udts := []time.Time{}
@@ -4703,7 +4703,7 @@ func (j *DSGitHub) GetFirstIssueAttention(issue map[string]interface{}) (dt time
 		ary, _ := iComments.([]interface{})
 		for _, iComment := range ary {
 			comment, _ := iComment.(map[string]interface{})
-			iCommentLogin, _ := Dig(comment, []string{"user", "login"}, true, false)
+			iCommentLogin, _ := Dig(comment, []string{"user", "login"}, false, true)
 			commentLogin, _ := iCommentLogin.(string)
 			iCreatedAt, _ := comment["created_at"]
 			createdAt, _ := TimeParseInterfaceString(iCreatedAt)
@@ -4721,7 +4721,7 @@ func (j *DSGitHub) GetFirstIssueAttention(issue map[string]interface{}) (dt time
 			ary, _ := iReactions.([]interface{})
 			for _, iReaction := range ary {
 				reaction, _ := iReaction.(map[string]interface{})
-				iReactionLogin, _ := Dig(reaction, []string{"user", "login"}, true, false)
+				iReactionLogin, _ := Dig(reaction, []string{"user", "login"}, false, true)
 				reactionLogin, _ := iReactionLogin.(string)
 				if userLogin == reactionLogin {
 					continue
@@ -4807,7 +4807,7 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 	iMergedAt, _ := pull["merged_at"]
 	rich["merged_at"] = iMergedAt
 	rich["merged"], _ = pull["merged"]
-	rich["user_login"], _ = Dig(pull, []string{"user", "login"}, true, false)
+	rich["user_login"], _ = Dig(pull, []string{"user", "login"}, false, true)
 	iUserData, ok := pull["user_data"]
 	if ok && iUserData != nil {
 		user, _ := iUserData.(map[string]interface{})
@@ -4942,7 +4942,7 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 		commenters := map[string]interface{}{}
 		for _, iComment := range ary {
 			comment, _ := iComment.(map[string]interface{})
-			iCommenter, _ := Dig(comment, []string{"user", "login"}, true, false)
+			iCommenter, _ := Dig(comment, []string{"user", "login"}, false, true)
 			commenter, _ := iCommenter.(string)
 			if commenter != "" {
 				commenters[commenter] = struct{}{}
@@ -4966,7 +4966,7 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 		reviewCommenters := map[string]interface{}{}
 		for _, iReviewComment := range ary {
 			reviewComment, _ := iReviewComment.(map[string]interface{})
-			iReviewCommenter, _ := Dig(reviewComment, []string{"user", "login"}, true, false)
+			iReviewCommenter, _ := Dig(reviewComment, []string{"user", "login"}, false, true)
 			reviewCommenter, _ := iReviewCommenter.(string)
 			if reviewCommenter != "" {
 				reviewCommenters[reviewCommenter] = struct{}{}
@@ -4992,7 +4992,7 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 	}
 	rich["github_repo"] = githubRepo
 	rich["url_id"] = fmt.Sprintf("%s/pull/%d", githubRepo, number)
-	rich["forks"], _ = Dig(pull, []string{"base", "repo", "forks_count"}, true, false)
+	rich["forks"], _ = Dig(pull, []string{"base", "repo", "forks_count"}, false, true)
 	rich["num_review_comments"], _ = pull["review_comments"]
 	if iMergedAt != nil {
 		mergedAt, e := TimeParseInterfaceString(iMergedAt)
@@ -5048,7 +5048,7 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 
 // GetFirstPullRequestReviewDate - get first review date on a pull request
 func (j *DSGitHub) GetFirstPullRequestReviewDate(pull map[string]interface{}) (dt time.Time) {
-	iUserLogin, _ := Dig(pull, []string{"user", "login"}, true, false)
+	iUserLogin, _ := Dig(pull, []string{"user", "login"}, false, true)
 	userLogin, _ := iUserLogin.(string)
 	dts := []time.Time{}
 	udts := []time.Time{}
@@ -5057,7 +5057,7 @@ func (j *DSGitHub) GetFirstPullRequestReviewDate(pull map[string]interface{}) (d
 		ary, _ := iReviews.([]interface{})
 		for _, iReview := range ary {
 			review, _ := iReview.(map[string]interface{})
-			iReviewLogin, _ := Dig(review, []string{"user", "login"}, true, false)
+			iReviewLogin, _ := Dig(review, []string{"user", "login"}, false, true)
 			reviewLogin, _ := iReviewLogin.(string)
 			iCreatedAt, _ := review["created_at"]
 			createdAt, _ := TimeParseInterfaceString(iCreatedAt)
