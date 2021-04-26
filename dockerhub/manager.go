@@ -260,7 +260,7 @@ func (m *Manager) Sync() error {
 					return fmt.Errorf("could not enrich data from repository: %s-%s", repo.Owner, repo.Repository)
 				}
 				data = append(data, elastic.BulkData{IndexName: repo.ESIndex, ID: enriched.UUID, Data: enriched})
-				_ := enricher.HandleMapping(repo.ESIndex)
+				_ = enricher.HandleMapping(repo.ESIndex)
 				id = enriched.ID
 			}
 			mustTerm2 := map[string]interface{}{
