@@ -1166,6 +1166,7 @@ func (j *DSGitHub) githubPullsFromIssues(ctx *Ctx, org, repo string, since *time
 	var (
 		issues []map[string]interface{}
 		pull   map[string]interface{}
+		ok     bool
 	)
 	issues, err = j.githubIssues(ctx, org, repo, ctx.DateFrom)
 	if err != nil {
@@ -1174,23 +1175,68 @@ func (j *DSGitHub) githubPullsFromIssues(ctx *Ctx, org, repo string, since *time
 	i, pulls := 0, 0
 	nIssues := len(issues)
 	Printf("%s/%s: processing %d issues (to filter for PRs)\n", j.URL, j.Category, nIssues)
-	for _, issue := range issues {
-		i++
-		if i%ItemsPerPage == 0 {
-			runtime.GC()
-			Printf("%s/%s: processed %d/%d issues, %d pulls so far\n", j.URL, j.Category, i, nIssues, pulls)
+	if j.ThrN > 1 {
+		nThreads := 0
+		ch := make(chan interface{})
+		for _, issue := range issues {
+			i++
+			if i%ItemsPerPage == 0 {
+				runtime.GC()
+				Printf("%s/%s: processing %d/%d issues, %d pulls so far\n", j.URL, j.Category, i, nIssues, pulls)
+			}
+			isPR, _ := issue["is_pull"]
+			if !isPR.(bool) {
+				continue
+			}
+			pulls++
+			number, _ := issue["number"]
+			go func(ch chan interface{}, num int) {
+				pr, e := j.githubPull(ctx, org, repo, num)
+				if e != nil {
+					ch <- e
+					return
+				}
+				ch <- pr
+			}(ch, int(number.(float64)))
+			nThreads++
+			if nThreads == j.ThrN {
+				obj := <-ch
+				nThreads--
+				err, ok = obj.(error)
+				if ok {
+					return
+				}
+				pullsData = append(pullsData, obj.(map[string]interface{}))
+			}
 		}
-		isPR, _ := issue["is_pull"]
-		if !isPR.(bool) {
-			continue
+		for nThreads > 0 {
+			obj := <-ch
+			nThreads--
+			err, ok = obj.(error)
+			if ok {
+				return
+			}
+			pullsData = append(pullsData, obj.(map[string]interface{}))
 		}
-		pulls++
-		number, _ := issue["number"]
-		pull, err = j.githubPull(ctx, org, repo, int(number.(float64)))
-		if err != nil {
-			return
+	} else {
+		for _, issue := range issues {
+			i++
+			if i%ItemsPerPage == 0 {
+				runtime.GC()
+				Printf("%s/%s: processed %d/%d issues, %d pulls so far\n", j.URL, j.Category, i, nIssues, pulls)
+			}
+			isPR, _ := issue["is_pull"]
+			if !isPR.(bool) {
+				continue
+			}
+			pulls++
+			number, _ := issue["number"]
+			pull, err = j.githubPull(ctx, org, repo, int(number.(float64)))
+			if err != nil {
+				return
+			}
+			pullsData = append(pullsData, pull)
 		}
-		pullsData = append(pullsData, pull)
 	}
 	return
 }
