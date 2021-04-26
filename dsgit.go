@@ -2266,7 +2266,7 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 	}
 	rich["origin"] = AnonymizeURL(rich["origin"].(string))
 	rich["tag"] = AnonymizeURL(rich["tag"].(string))
-	rich["commit_url"] = AnonymizeURL(rich["tag"].(string))
+	rich["commit_url"] = AnonymizeURL(rich["commit_url"].(string))
 	rich["git_author_domain"] = rich["author_domain"]
 	rich["type"] = Commit
 	return
