@@ -653,7 +653,7 @@ func (j *DSGitHub) githubIssues(ctx *Ctx, org, repo string, since *time.Time) (i
 		}
 		opt.Page = response.NextPage
 		if ctx.Debug > 0 {
-			Printf("%s: processing next issues page: %d\n", j.URL, opt.Page)
+			Printf("%s/%s: processing next issues page: %d\n", j.URL, j.Category, opt.Page)
 		}
 		retry = false
 	}
@@ -1170,11 +1170,11 @@ func (j *DSGitHub) githubPullsFromIssues(ctx *Ctx, org, repo string, since *time
 	}
 	i := 0
 	nIssues := len(issues)
-	Printf("%s: processing %d issues (to filter for PRs)\n", j.URL, nIssues)
+	Printf("%s/%s: processing %d issues (to filter for PRs)\n", j.URL, j.Category, nIssues)
 	for _, issue := range issues {
 		i++
 		if i%ItemsPerPage == 0 {
-			Printf("processed %d/%d issues\n", i, nIssues)
+			Printf("%s/%s: processed %d/%d issues\n", j.URL, j.Category, i, nIssues)
 		}
 		isPR, _ := issue["is_pull"]
 		if !isPR.(bool) {
@@ -1294,7 +1294,7 @@ func (j *DSGitHub) githubPulls(ctx *Ctx, org, repo string) (pullsData []map[stri
 		}
 		opt.Page = response.NextPage
 		if ctx.Debug > 0 {
-			Printf("%s: processing next pulls page: %d\n", j.URL, opt.Page)
+			Printf("%s/%s: processing next pulls page: %d\n", j.URL, j.Category, opt.Page)
 		}
 		retry = false
 	}
@@ -2276,7 +2276,7 @@ func (j *DSGitHub) FetchItemsRepository(ctx *Ctx) (err error) {
 	items = append(items, esItem)
 	err = SendToElastic(ctx, j, true, UUID, items)
 	if err != nil {
-		Printf("Error %v sending %d messages to ES\n", err, len(items))
+		Printf("%s/%s: Error %v sending %d messages to ES\n", j.URL, j.Category, err, len(items))
 	}
 	return
 }
@@ -2469,7 +2469,7 @@ func (j *DSGitHub) FetchItemsIssue(ctx *Ctx) (err error) {
 				}()
 				ee = SendToElastic(ctx, j, true, UUID, allIssues)
 				if ee != nil {
-					Printf("error %v sending %d issues to ElasticSearch\n", ee, len(allIssues))
+					Printf("%s/%s: error %v sending %d issues to ElasticSearch\n", j.URL, j.Category, ee, len(allIssues))
 				}
 				allIssues = []interface{}{}
 				if allIssuesMtx != nil {
@@ -2497,7 +2497,7 @@ func (j *DSGitHub) FetchItemsIssue(ctx *Ctx) (err error) {
 	}
 	issues, err := j.githubIssues(ctx, j.Org, j.Repo, ctx.DateFrom)
 	FatalOnError(err)
-	Printf("got %d issues\n", len(issues))
+	Printf("%s/%s: got %d issues\n", j.URL, j.Category, len(issues))
 	if j.ThrN > 1 {
 		for _, issue := range issues {
 			go func(iss map[string]interface{}) {
@@ -2507,7 +2507,7 @@ func (j *DSGitHub) FetchItemsIssue(ctx *Ctx) (err error) {
 				)
 				esch, e = processIssue(ch, iss)
 				if e != nil {
-					Printf("process error: %v\n", e)
+					Printf("%s/%s: issues process error: %v\n", j.URL, j.Category, e)
 					return
 				}
 				if esch != nil {
@@ -2557,7 +2557,7 @@ func (j *DSGitHub) FetchItemsIssue(ctx *Ctx) (err error) {
 	if nIssues > 0 {
 		err = SendToElastic(ctx, j, true, UUID, allIssues)
 		if err != nil {
-			Printf("Error %v sending %d issues to ES\n", err, len(allIssues))
+			Printf("%s/%s: error %v sending %d issues to ES\n", j.URL, j.Category, err, len(allIssues))
 		}
 	}
 	return
@@ -2606,7 +2606,7 @@ func (j *DSGitHub) FetchItemsPullRequest(ctx *Ctx) (err error) {
 				}()
 				ee = SendToElastic(ctx, j, true, UUID, allPulls)
 				if ee != nil {
-					Printf("error %v sending %d pulls to ElasticSearch\n", ee, len(allPulls))
+					Printf("%s/%s: error %v sending %d pulls to ElasticSearch\n", j.URL, j.Category, ee, len(allPulls))
 				}
 				allPulls = []interface{}{}
 				if allPullsMtx != nil {
@@ -2643,7 +2643,7 @@ func (j *DSGitHub) FetchItemsPullRequest(ctx *Ctx) (err error) {
 		pulls, err = j.githubPulls(ctx, j.Org, j.Repo)
 	}
 	FatalOnError(err)
-	Printf("got %d pulls\n", len(pulls))
+	Printf("%s/%s: got %d pulls\n", j.URL, j.Category, len(pulls))
 	if j.ThrN > 1 {
 		for _, pull := range pulls {
 			go func(pr map[string]interface{}) {
@@ -2653,7 +2653,7 @@ func (j *DSGitHub) FetchItemsPullRequest(ctx *Ctx) (err error) {
 				)
 				esch, e = processPull(ch, pr)
 				if e != nil {
-					Printf("process error: %v\n", e)
+					Printf("%s/%s: pulls process error: %v\n", j.URL, j.Category, e)
 					return
 				}
 				if esch != nil {
@@ -2703,7 +2703,7 @@ func (j *DSGitHub) FetchItemsPullRequest(ctx *Ctx) (err error) {
 	if nPulls > 0 {
 		err = SendToElastic(ctx, j, true, UUID, allPulls)
 		if err != nil {
-			Printf("Error %v sending %d pulls to ES\n", err, len(allPulls))
+			Printf("%s/%s: error %v sending %d pulls to ES\n", j.URL, j.Category, err, len(allPulls))
 		}
 	}
 	return
@@ -2868,7 +2868,7 @@ func (j *DSGitHub) ElasticRichMapping() []byte {
 func (j *DSGitHub) IdentityForObject(ctx *Ctx, item map[string]interface{}) (identity [3]string) {
 	if ctx.Debug > 1 {
 		defer func() {
-			Printf("IdentityForObject: %+v -> %+v\n", item, identity)
+			Printf("%s/%s: IdentityForObject: %+v -> %+v\n", j.URL, j.Category, item, identity)
 		}()
 	}
 	for i, prop := range []string{"name", "login", "email"} {
@@ -3065,7 +3065,7 @@ func GitHubEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs 
 // docs is a pointer to where extracted identities will be stored
 func (j *DSGitHub) GitHubRepositoryEnrichItemsFunc(ctx *Ctx, thrN int, items []interface{}, docs *[]interface{}) (err error) {
 	if ctx.Debug > 0 {
-		Printf("github enrich repository items %d/%d func\n", len(items), len(*docs))
+		Printf("%s/%s: github enrich repository items %d/%d func\n", j.URL, j.Category, len(items), len(*docs))
 	}
 	var (
 		mtx *sync.RWMutex
@@ -3154,7 +3154,7 @@ func (j *DSGitHub) GitHubRepositoryEnrichItemsFunc(ctx *Ctx, thrN int, items []i
 // docs is a pointer to where extracted identities will be stored
 func (j *DSGitHub) GitHubIssueEnrichItemsFunc(ctx *Ctx, thrN int, items []interface{}, docs *[]interface{}) (err error) {
 	if ctx.Debug > 0 {
-		Printf("github enrich issue items %d/%d func\n", len(items), len(*docs))
+		Printf("%s/%s: github enrich issue items %d/%d func\n", j.URL, j.Category, len(items), len(*docs))
 	}
 	var (
 		mtx *sync.RWMutex
@@ -3357,7 +3357,7 @@ func (j *DSGitHub) GitHubIssueEnrichItemsFunc(ctx *Ctx, thrN int, items []interf
 // docs is a pointer to where extracted identities will be stored
 func (j *DSGitHub) GitHubPullRequestEnrichItemsFunc(ctx *Ctx, thrN int, items []interface{}, docs *[]interface{}) (err error) {
 	if ctx.Debug > 0 {
-		Printf("github enrich pull request items %d/%d func\n", len(items), len(*docs))
+		Printf("%s/%s: github enrich pull request items %d/%d func\n", j.URL, j.Category, len(items), len(*docs))
 	}
 	var (
 		mtx *sync.RWMutex
@@ -3579,7 +3579,7 @@ func (j *DSGitHub) GitHubPullRequestEnrichItemsFunc(ctx *Ctx, thrN int, items []
 
 // EnrichItems - perform the enrichment
 func (j *DSGitHub) EnrichItems(ctx *Ctx) (err error) {
-	Printf("enriching items\n")
+	Printf("%s/%s: enriching items\n", j.URL, j.Category)
 	err = ForEachESItem(ctx, j, true, ESBulkUploadFunc, GitHubEnrichItemsFunc, nil, true)
 	return
 }
@@ -5132,14 +5132,14 @@ func (j *DSGitHub) AffsItems(ctx *Ctx, item map[string]interface{}, roles []stri
 		}
 		affsIdentity, empty, e := IdentityAffsData(ctx, j, identity, nil, dt, role)
 		if e != nil {
-			Printf("AffsItems/IdentityAffsData: error: %v for %v,%v,%v\n", e, identity, dt, role)
+			Printf("%s/%s: AffsItems/IdentityAffsData: error: %v for %v,%v,%v\n", j.URL, j.Category, e, identity, dt, role)
 		}
 		if empty {
-			Printf("no identity affiliation data for identity %+v, role %s\n", identity, role)
+			Printf("%s/%s: no identity affiliation data for identity %+v, role %s\n", j.URL, j.Category, identity, role)
 			continue
 		}
 		if ctx.Debug > 2 {
-			Printf("Identity affiliation data for %+v: %+v\n", identity, affsIdentity)
+			Printf("%s/%s: Identity affiliation data for %+v: %+v\n", j.URL, j.Category, identity, affsIdentity)
 		}
 		for prop, value := range affsIdentity {
 			affsItems[prop] = value
