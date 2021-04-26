@@ -212,7 +212,7 @@ func TestInit(t *testing.T) {
 		RichIndex:         "",
 		ESURL:             "",
 		AffiliationAPIURL: "",
-		ESBulkSize:        1000,
+		ESBulkSize:        500,
 		ESScrollSize:      1000,
 		ESScrollWait:      "10m",
 		DBHost:            "",

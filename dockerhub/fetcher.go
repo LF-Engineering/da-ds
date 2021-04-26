@@ -147,12 +147,6 @@ func (f *Fetcher) FetchItem(owner string, repository string, now time.Time) (*Re
 	return raw, nil
 }
 
-// HandleMapping updates dockerhub raw mapping
-func (f *Fetcher) HandleMapping(index string) error {
-	_, err := f.ElasticSearchProvider.CreateIndex(index, DockerhubRawMapping)
-	return err
-}
-
 // GetLastDate gets fetching lastDate
 func (f *Fetcher) GetLastDate(repo *Repository, now time.Time) (time.Time, error) {
 	lastDate, err := f.ElasticSearchProvider.GetStat(fmt.Sprintf("%s-raw", repo.ESIndex), "metadata__updated_on", "max", nil, nil)
