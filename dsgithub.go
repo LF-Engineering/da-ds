@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -653,6 +654,7 @@ func (j *DSGitHub) githubIssues(ctx *Ctx, org, repo string, since *time.Time) (i
 		}
 		opt.Page = response.NextPage
 		if ctx.Debug > 0 {
+			runtime.GC()
 			Printf("%s/%s: processing next issues page: %d\n", j.URL, j.Category, opt.Page)
 		}
 		retry = false
@@ -1174,6 +1176,7 @@ func (j *DSGitHub) githubPullsFromIssues(ctx *Ctx, org, repo string, since *time
 	for _, issue := range issues {
 		i++
 		if i%ItemsPerPage == 0 {
+			runtime.GC()
 			Printf("%s/%s: processed %d/%d issues\n", j.URL, j.Category, i, nIssues)
 		}
 		isPR, _ := issue["is_pull"]
@@ -2497,6 +2500,7 @@ func (j *DSGitHub) FetchItemsIssue(ctx *Ctx) (err error) {
 	}
 	issues, err := j.githubIssues(ctx, j.Org, j.Repo, ctx.DateFrom)
 	FatalOnError(err)
+	runtime.GC()
 	Printf("%s/%s: got %d issues\n", j.URL, j.Category, len(issues))
 	if j.ThrN > 1 {
 		for _, issue := range issues {
@@ -2643,6 +2647,7 @@ func (j *DSGitHub) FetchItemsPullRequest(ctx *Ctx) (err error) {
 		pulls, err = j.githubPulls(ctx, j.Org, j.Repo)
 	}
 	FatalOnError(err)
+	runtime.GC()
 	Printf("%s/%s: got %d pulls\n", j.URL, j.Category, len(pulls))
 	if j.ThrN > 1 {
 		for _, pull := range pulls {
