@@ -653,7 +653,7 @@ func (j *DSGitHub) githubIssues(ctx *Ctx, org, repo string, since *time.Time) (i
 		}
 		opt.Page = response.NextPage
 		if ctx.Debug > 0 {
-			Printf("processing next issues page: %d\n", opt.Page)
+			Printf("%s: processing next issues page: %d\n", j.URL, opt.Page)
 		}
 		retry = false
 	}
@@ -1170,7 +1170,7 @@ func (j *DSGitHub) githubPullsFromIssues(ctx *Ctx, org, repo string, since *time
 	}
 	i := 0
 	nIssues := len(issues)
-	Printf("processing %d issues (to filter for PRs)\n", nIssues)
+	Printf("%s: processing %d issues (to filter for PRs)\n", j.URL, nIssues)
 	for _, issue := range issues {
 		i++
 		if i%ItemsPerPage == 0 {
@@ -1294,7 +1294,7 @@ func (j *DSGitHub) githubPulls(ctx *Ctx, org, repo string) (pullsData []map[stri
 		}
 		opt.Page = response.NextPage
 		if ctx.Debug > 0 {
-			Printf("processing next pulls page: %d\n", opt.Page)
+			Printf("%s: processing next pulls page: %d\n", j.URL, opt.Page)
 		}
 		retry = false
 	}
