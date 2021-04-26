@@ -109,7 +109,7 @@ func ESBulkUploadFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interface{}, l
 	run := func() (err error) {
 		nItems := len(*outDocs)
 		if ctx.Debug > 0 {
-			Printf("bulk uploading %d items to ES\n", nItems)
+			Printf("ES bulk uploading %d items to ES\n", nItems)
 		}
 		nPacks := nItems / bulkSize
 		if nItems%bulkSize != 0 {
@@ -122,7 +122,7 @@ func ESBulkUploadFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interface{}, l
 				to = nItems
 			}
 			if ctx.Debug > 0 {
-				Printf("bulk uploading pack #%d %d-%d (%d/%d) to ES\n", i+1, from, to, to-from, nPacks)
+				Printf("ES bulk upload: bulk uploading pack #%d %d-%d (%d/%d) to ES\n", i+1, from, to, to-from, nPacks)
 			}
 			err = SendToElastic(ctx, ds, false, itemID, (*outDocs)[from:to])
 			if err != nil {
@@ -178,7 +178,7 @@ func ESBulkUploadFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interface{}, l
 //         there can be no items in input pack in the last flush call
 func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interface{}, last bool) (e error) {
 	if ctx.Debug > 0 {
-		Printf("bulk uploading %d/%d identities func\n", len(*docs), len(*outDocs))
+		Printf("DB bulk uploading %d/%d identities func\n", len(*docs), len(*outDocs))
 	}
 	bulkSize := ctx.DBBulkSize / 6
 	run := func() (err error) {
@@ -205,7 +205,7 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 		nIdents := len(identsAry)
 		source := ds.Name()
 		runOneByOne := func() (err error) {
-			Printf("falling back to one-by-one mode for %d items\n", nIdents)
+			Printf("DB bulk upload: falling back to one-by-one mode for %d items\n", nIdents)
 			var (
 				er   error
 				errs []error
@@ -214,7 +214,7 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 			defer func() {
 				nErrs := len(errs)
 				if nErrs == 0 {
-					Printf("one-by-one mode for %d items - all succeeded\n", nIdents)
+					Printf("DB bulk upload: one-by-one mode for %d items - all succeeded\n", nIdents)
 					return
 				}
 				s := fmt.Sprintf("%d errors: ", nErrs)
@@ -223,7 +223,7 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				}
 				s = s[:len(s)-2]
 				err = fmt.Errorf("%s", s)
-				Printf("one-by-one mode for %d items: %d errors\n", nIdents, nErrs)
+				Printf("DB bulk upload: one-by-one mode for %d items: %d errors\n", nIdents, nErrs)
 			}()
 			for i := 0; i < nIdents; i++ {
 				ident := identsAry[i]
@@ -272,7 +272,7 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				uuid := UUIDAffs(ctx, source, email, name, username)
 				if uuid == "" {
 					er := fmt.Errorf("error: uploadToDB: failed to generate uuid for (%s,%s,%s,%s)", source, email, name, username)
-					Printf("one-by-one(%d/%d): %v\n", i+1, nIdents, er)
+					Printf("DB bulk upload: one-by-one(%d/%d): %v\n", i+1, nIdents, er)
 					errs = append(errs, er)
 					continue
 				}
@@ -288,21 +288,21 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				}
 				_, er = ExecSQL(ctx, itx, queryU, argsU...)
 				if er != nil {
-					Printf("one-by-one(%d/%d): %s[%+v]: %v\n", i+1, nIdents, queryU, argsU, er)
+					Printf("DB bulk upload: one-by-one(%d/%d): %s[%+v]: %v\n", i+1, nIdents, queryU, argsU, er)
 					_ = itx.Rollback()
 					errs = append(errs, er)
 					continue
 				}
 				_, er = ExecSQL(ctx, itx, queryP, argsP...)
 				if er != nil {
-					Printf("one-by-one(%d/%d): %s[%+v]: %v\n", i+1, nIdents, queryP, argsP, er)
+					Printf("DB bulk upload: one-by-one(%d/%d): %s[%+v]: %v\n", i+1, nIdents, queryP, argsP, er)
 					_ = itx.Rollback()
 					errs = append(errs, er)
 					continue
 				}
 				_, er = ExecSQL(ctx, itx, queryI, argsI...)
 				if er != nil {
-					Printf("one-by-one(%d/%d): %s[%+v]: %v\n", i+1, nIdents, queryI, argsI, er)
+					Printf("DB bulk upload: one-by-one(%d/%d): %s[%+v]: %v\n", i+1, nIdents, queryI, argsI, er)
 					_ = itx.Rollback()
 					errs = append(errs, er)
 					continue
@@ -318,16 +318,16 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 		defer func() {
 			if tx != nil {
 				if ctx.DryRun {
-					Printf("dry-run: rolling back %d identities insert (possibly due to dry-run mode)\n", nIdents)
+					Printf("DB bulk upload: dry-run: rolling back %d identities insert (possibly due to dry-run mode)\n", nIdents)
 				} else {
-					Printf("rolling back %d identities insert\n", nIdents)
+					Printf("DB bulk upload: rolling back %d identities insert\n", nIdents)
 				}
 				_ = tx.Rollback()
 				err = runOneByOne()
 			}
 		}()
 		if ctx.Debug > 0 {
-			Printf("bulk adding %d (%d unique) idents\n", nNonUni, nIdents)
+			Printf("DB bulk upload: bulk adding %d (%d unique) idents\n", nNonUni, nIdents)
 		}
 		nPacks := nIdents / bulkSize
 		if nIdents%bulkSize != 0 {
@@ -346,7 +346,7 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 			argsI := []interface{}{}
 			argsP := []interface{}{}
 			if ctx.Debug > 0 {
-				Printf("bulk adding idents pack #%d %d-%d (%d/%d)\n", i+1, from, to, to-from, nIdents)
+				Printf("DB bulk upload: bulk adding idents pack #%d %d-%d (%d/%d)\n", i+1, from, to, to-from, nIdents)
 			}
 			for j := from; j < to; j++ {
 				ident := identsAry[j]
@@ -428,14 +428,14 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 	nDocs := len(*docs)
 	nOutDocs := len(*outDocs)
 	if ctx.Debug > 0 {
-		Printf("upload idents pack size %d/%d last %v\n", nDocs, nOutDocs, last)
+		Printf("DB bulk upload: upload idents pack size %d/%d last %v\n", nDocs, nOutDocs, last)
 	}
 	for _, doc := range *docs {
 		*outDocs = append(*outDocs, doc)
 		nOutDocs = len(*outDocs)
 		if nOutDocs >= bulkSize {
 			if ctx.Debug > 0 {
-				Printf("upload idents pack size %d/%d reached, flushing\n", nOutDocs, bulkSize)
+				Printf("DB bulk upload: upload idents pack size %d/%d reached, flushing\n", nOutDocs, bulkSize)
 			}
 			e = run()
 			if e != nil {
@@ -457,7 +457,7 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 	*docs = []interface{}{}
 	if ctx.Debug > 0 {
 		nOutDocs = len(*outDocs)
-		Printf("upload idents %d items left (last %v)\n", nOutDocs, last)
+		Printf("DB bulk upload: upload idents %d items left (last %v)\n", nOutDocs, last)
 	}
 	return
 }
