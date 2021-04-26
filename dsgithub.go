@@ -1161,6 +1161,7 @@ func (j *DSGitHub) githubPull(ctx *Ctx, org, repo string, number int) (pullData 
 	return
 }
 
+// githubPullsFromIssues - consider fetching this data in a stream-like mode to avoid a need of pulling all data and then of everything at once
 func (j *DSGitHub) githubPullsFromIssues(ctx *Ctx, org, repo string, since *time.Time) (pullsData []map[string]interface{}, err error) {
 	var (
 		issues []map[string]interface{}
@@ -1170,19 +1171,20 @@ func (j *DSGitHub) githubPullsFromIssues(ctx *Ctx, org, repo string, since *time
 	if err != nil {
 		return
 	}
-	i := 0
+	i, pulls := 0, 0
 	nIssues := len(issues)
 	Printf("%s/%s: processing %d issues (to filter for PRs)\n", j.URL, j.Category, nIssues)
 	for _, issue := range issues {
 		i++
 		if i%ItemsPerPage == 0 {
 			runtime.GC()
-			Printf("%s/%s: processed %d/%d issues\n", j.URL, j.Category, i, nIssues)
+			Printf("%s/%s: processed %d/%d issues, %d pulls so far\n", j.URL, j.Category, i, nIssues, pulls)
 		}
 		isPR, _ := issue["is_pull"]
 		if !isPR.(bool) {
 			continue
 		}
+		pulls++
 		number, _ := issue["number"]
 		pull, err = j.githubPull(ctx, org, repo, int(number.(float64)))
 		if err != nil {
