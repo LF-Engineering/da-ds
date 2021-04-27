@@ -480,6 +480,11 @@ func IdentityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, aid inte
 			isBot = 1
 		}
 	}
+	if err != nil {
+		e = err
+		empty = true
+		return
+	}
 	/*
 		gender, ok := outItem[role+"_gender"]
 		if !ok || gender == nil {
