@@ -589,7 +589,14 @@ func RequestNoRetry(
 	if hit {
 		sPayload := BytesToStringTrunc(payload, MaxPayloadPrintfLen, true)
 		sBody := BytesToStringTrunc(body, MaxPayloadPrintfLen, true)
-		err = fmt.Errorf("status error:%+v for method:%s url:%s headers:%v status:%d payload:%s body:%s result:%+v", err, method, url, headers, status, sPayload, sBody, result)
+		var sResult string
+		bResult, bOK := result.([]byte)
+		if bOK {
+			sResult = BytesToStringTrunc(bResult, MaxPayloadPrintfLen, true)
+		} else {
+			sResult = InterfaceToStringTrunc(result, MaxPayloadPrintfLen, true)
+		}
+		err = fmt.Errorf("status error:%+v for method:%s url:%s headers:%v status:%d payload:%s body:%s result:%+v", err, method, url, headers, status, sPayload, sBody, sResult)
 	}
 	if len(okStatuses) > 0 {
 		hit = false
@@ -602,7 +609,14 @@ func RequestNoRetry(
 		if !hit {
 			sPayload := BytesToStringTrunc(payload, MaxPayloadPrintfLen, true)
 			sBody := BytesToStringTrunc(body, MaxPayloadPrintfLen, true)
-			err = fmt.Errorf("status not success:%+v for method:%s url:%s headers:%v status:%d payload:%s body:%s result:%+v", err, method, url, headers, status, sPayload, sBody, result)
+			var sResult string
+			bResult, bOK := result.([]byte)
+			if bOK {
+				sResult = BytesToStringTrunc(bResult, MaxPayloadPrintfLen, true)
+			} else {
+				sResult = InterfaceToStringTrunc(result, MaxPayloadPrintfLen, true)
+			}
+			err = fmt.Errorf("status not success:%+v for method:%s url:%s headers:%v status:%d payload:%s body:%s result:%+v", err, method, url, headers, status, sPayload, sBody, sResult)
 		}
 	}
 	if err == nil {
