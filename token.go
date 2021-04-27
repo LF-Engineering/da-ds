@@ -85,6 +85,7 @@ func InitializeAuth0() error {
 	if err == nil {
 		gTokenEnv = data["env"]
 	}
+	Printf("initialized %s auth0\n", gTokenEnv)
 	return err
 }
 

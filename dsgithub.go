@@ -2590,7 +2590,7 @@ func (j *DSGitHub) FetchItemsIssue(ctx *Ctx) (err error) {
 		allIssuesMtx = &sync.Mutex{}
 		eschaMtx = &sync.Mutex{}
 	}
-	nThreads := 0
+	nThreads, nIss, issProcessed := 0, 0, 0
 	processIssue := func(c chan error, issue map[string]interface{}) (wch chan error, e error) {
 		defer func() {
 			if c != nil {
@@ -2604,6 +2604,9 @@ func (j *DSGitHub) FetchItemsIssue(ctx *Ctx) (err error) {
 			item["project"] = ctx.Project
 		}
 		esItem["data"] = item
+		if issProcessed%ItemsPerPage == 0 {
+			Printf("%s/%s: processed %d/%d issues\n", j.URL, j.Category, issProcessed, nIss)
+		}
 		if allIssuesMtx != nil {
 			allIssuesMtx.Lock()
 		}
@@ -2647,7 +2650,8 @@ func (j *DSGitHub) FetchItemsIssue(ctx *Ctx) (err error) {
 	issues, err := j.githubIssues(ctx, j.Org, j.Repo, ctx.DateFrom)
 	FatalOnError(err)
 	runtime.GC()
-	Printf("%s/%s: got %d issues\n", j.URL, j.Category, len(issues))
+	nIss = len(issues)
+	Printf("%s/%s: got %d issues\n", j.URL, j.Category, nIss)
 	if j.ThrN > 1 {
 		for _, issue := range issues {
 			go func(iss map[string]interface{}) {
@@ -2676,6 +2680,7 @@ func (j *DSGitHub) FetchItemsIssue(ctx *Ctx) (err error) {
 				if err != nil {
 					return
 				}
+				issProcessed++
 				nThreads--
 			}
 		}
@@ -2685,6 +2690,7 @@ func (j *DSGitHub) FetchItemsIssue(ctx *Ctx) (err error) {
 			if err != nil {
 				return
 			}
+			issProcessed++
 		}
 	} else {
 		for _, issue := range issues {
@@ -2692,6 +2698,7 @@ func (j *DSGitHub) FetchItemsIssue(ctx *Ctx) (err error) {
 			if err != nil {
 				return
 			}
+			issProcessed++
 		}
 	}
 	for _, esch := range escha {
@@ -2728,7 +2735,7 @@ func (j *DSGitHub) FetchItemsPullRequest(ctx *Ctx) (err error) {
 		allPullsMtx = &sync.Mutex{}
 		eschaMtx = &sync.Mutex{}
 	}
-	nThreads := 0
+	nThreads, pullsProcessed, nPRs := 0, 0, 0
 	processPull := func(c chan error, pull map[string]interface{}) (wch chan error, e error) {
 		defer func() {
 			if c != nil {
@@ -2742,6 +2749,9 @@ func (j *DSGitHub) FetchItemsPullRequest(ctx *Ctx) (err error) {
 			item["project"] = ctx.Project
 		}
 		esItem["data"] = item
+		if pullsProcessed%ItemsPerPage == 0 {
+			Printf("%s/%s: processed %d/%d pulls\n", j.URL, j.Category, pullsProcessed, nPRs)
+		}
 		if allPullsMtx != nil {
 			allPullsMtx.Lock()
 		}
@@ -2794,7 +2804,8 @@ func (j *DSGitHub) FetchItemsPullRequest(ctx *Ctx) (err error) {
 	}
 	FatalOnError(err)
 	runtime.GC()
-	Printf("%s/%s: got %d pulls\n", j.URL, j.Category, len(pulls))
+	nPRs = len(pulls)
+	Printf("%s/%s: got %d pulls\n", j.URL, j.Category, nPRs)
 	if j.ThrN > 1 {
 		for _, pull := range pulls {
 			go func(pr map[string]interface{}) {
@@ -2823,6 +2834,7 @@ func (j *DSGitHub) FetchItemsPullRequest(ctx *Ctx) (err error) {
 				if err != nil {
 					return
 				}
+				pullsProcessed++
 				nThreads--
 			}
 		}
@@ -2832,6 +2844,7 @@ func (j *DSGitHub) FetchItemsPullRequest(ctx *Ctx) (err error) {
 			if err != nil {
 				return
 			}
+			pullsProcessed++
 		}
 	} else {
 		for _, pull := range pulls {
@@ -2839,6 +2852,7 @@ func (j *DSGitHub) FetchItemsPullRequest(ctx *Ctx) (err error) {
 			if err != nil {
 				return
 			}
+			pullsProcessed++
 		}
 	}
 	for _, esch := range escha {

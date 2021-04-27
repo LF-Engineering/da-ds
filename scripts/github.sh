@@ -28,7 +28,7 @@ export DA_GITHUB_ORG="$ORG"
 export DA_GITHUB_REPO="$REPO"
 export DA_GITHUB_PROJECT="$PROJECT"
 export DA_GITHUB_ENRICH=1
-export DA_GITHUB_DEBUG=2
+export DA_GITHUB_DEBUG=1
 export PROJECT_SLUG="$ORGREPO"
 if [ ! -z "$REFRESH" ]
 then

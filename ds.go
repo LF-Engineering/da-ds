@@ -180,7 +180,9 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 	if ctx.Debug > 0 {
 		Printf("DB bulk uploading %d/%d identities func\n", len(*docs), len(*outDocs))
 	}
-	bulkSize := ctx.DBBulkSize / 6
+	//bulkSize := ctx.DBBulkSize / 6
+	// We don't insert 1000 parameters into one () but 100 times (?,?,?,?,?,?)
+	bulkSize := ctx.DBBulkSize
 	run := func() (err error) {
 		var tx *sql.Tx
 		err = SetDBSessionOrigin(ctx)
