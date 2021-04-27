@@ -699,6 +699,7 @@ func (j *DSGitHub) githubIssues(ctx *Ctx, org, repo string, since *time.Time) (i
 					iss["body"] = body.(string)[:MaxIssueBodyLength]
 				}
 			}
+			iss["body_analyzed"], _ = iss["body"]
 			iss["is_pull"] = issue.IsPullRequest()
 			issuesData = append(issuesData, iss)
 		}
@@ -1213,6 +1214,7 @@ func (j *DSGitHub) githubPull(ctx *Ctx, org, repo string, number int) (pullData 
 				pullData["body"] = body.(string)[:MaxPullBodyLength]
 			}
 		}
+		pullData["body_analyzed"], _ = pullData["body"]
 		if ctx.Debug > 2 {
 			Printf("pull got from API: %+v\n", pullData)
 		}
@@ -1411,6 +1413,7 @@ func (j *DSGitHub) githubPulls(ctx *Ctx, org, repo string) (pullsData []map[stri
 					pr["body"] = body.(string)[:MaxPullBodyLength]
 				}
 			}
+			pr["body_analyzed"], _ = pr["body"]
 			pullsData = append(pullsData, pr)
 		}
 		if response.NextPage == 0 {
@@ -1666,6 +1669,7 @@ func (j *DSGitHub) githubPullReviewComments(ctx *Ctx, org, repo string, number i
 					revComm["body"] = body.(string)[:MaxReviewCommentBodyLength]
 				}
 			}
+			revComm["body_analyzed"], _ = revComm["body"]
 			userLogin, ok := Dig(revComm, []string{"user", "login"}, false, true)
 			if ok {
 				revComm["user_data"], _, err = j.githubUser(ctx, userLogin.(string))
@@ -4685,6 +4689,8 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 	rich["id_in_repo"] = number
 	rich["title"], _ = issue["title"]
 	rich["title_analyzed"], _ = issue["title"]
+	rich["body"], _ = issue["body"]
+	rich["body_analyzed"], _ = issue["body"]
 	rich["url"], _ = issue["html_url"]
 	rich["user_login"], _ = Dig(issue, []string{"user", "login"}, false, true)
 	iUserData, ok := issue["user_data"]
@@ -4969,6 +4975,8 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 	rich["id_in_repo"] = number
 	rich["title"], _ = pull["title"]
 	rich["title_analyzed"], _ = pull["title"]
+	rich["body"], _ = pull["body"]
+	rich["body_analyzed"], _ = pull["body"]
 	rich["url"], _ = pull["html_url"]
 	iMergedAt, _ := pull["merged_at"]
 	rich["merged_at"] = iMergedAt
