@@ -665,6 +665,7 @@ func ItemsRefreshIdentitiesFunc(ctx *Ctx, ds DS, thrN int, richItems []interface
 func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 	Printf("uploading identities\n")
 	err = ForEachESItem(ctx, ds, true, DBUploadIdentitiesFunc, ItemsIdentitiesFunc, nil, true)
+	Printf("identities uploaded\n")
 	return
 }
 
@@ -673,6 +674,7 @@ func UploadIdentities(ctx *Ctx, ds DS) (err error) {
 func RefreshIdentities(ctx *Ctx, ds DS) (err error) {
 	Printf("refreshing identities\n")
 	err = ForEachESItem(ctx, ds, false, ESBulkUploadFunc, ItemsRefreshIdentitiesFunc, nil, true)
+	Printf("identities refreshed\n")
 	return
 }
 

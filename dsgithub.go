@@ -3750,6 +3750,7 @@ func (j *DSGitHub) GitHubPullRequestEnrichItemsFunc(ctx *Ctx, thrN int, items []
 func (j *DSGitHub) EnrichItems(ctx *Ctx) (err error) {
 	Printf("%s/%s: enriching items\n", j.URL, j.Category)
 	err = ForEachESItem(ctx, j, true, ESBulkUploadFunc, GitHubEnrichItemsFunc, nil, true)
+	Printf("%s/%s: enriched items\n", j.URL, j.Category)
 	return
 }
 
