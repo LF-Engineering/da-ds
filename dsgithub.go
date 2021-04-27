@@ -128,6 +128,8 @@ type DSGitHub struct {
 	OAuthKeys                       []string
 	ThrN                            int
 	Hint                            int
+	RateHandled                     bool
+	CanCache                        bool
 	CacheDir                        string
 	GitHubMtx                       *sync.RWMutex
 	GitHubRepoMtx                   *sync.RWMutex
@@ -144,6 +146,7 @@ type DSGitHub struct {
 	GitHubPullRequestedReviewersMtx *sync.RWMutex
 	GitHubPullCommitsMtx            *sync.RWMutex
 	GitHubUserOrgsMtx               *sync.RWMutex
+	GitHubRateMtx                   *sync.RWMutex
 	GitHubRepo                      map[string]map[string]interface{}
 	GitHubIssues                    map[string][]map[string]interface{}
 	GitHubUser                      map[string]map[string]interface{}
@@ -212,6 +215,25 @@ func (j *DSGitHub) getRateLimits(gctx context.Context, ctx *Ctx, gcs []*github.C
 }
 
 func (j *DSGitHub) handleRate(ctx *Ctx) (aHint int, canCache bool) {
+	if j.GitHubRateMtx != nil {
+		j.GitHubRateMtx.RLock()
+	}
+	handled := j.RateHandled
+	if handled {
+		aHint = j.Hint
+		canCache = j.CanCache
+	}
+	if j.GitHubRateMtx != nil {
+		j.GitHubRateMtx.RUnlock()
+	}
+	if handled {
+		Printf("%s/%s: rate is already handled elsewhere, returning #%d token\n", j.URL, j.Category, aHint)
+		return
+	}
+	if j.GitHubRateMtx != nil {
+		j.GitHubRateMtx.Lock()
+		defer j.GitHubRateMtx.Unlock()
+	}
 	h, _, rem, wait := j.getRateLimits(j.Context, ctx, j.Clients, true)
 	for {
 		if ctx.Debug > 1 {
@@ -231,18 +253,37 @@ func (j *DSGitHub) handleRate(ctx *Ctx) (aHint int, canCache bool) {
 	}
 	aHint = h
 	j.Hint = aHint
+	j.CanCache = canCache
 	if ctx.Debug > 1 {
 		Printf("Found usable token %d/%d/%v, cache enabled: %v\n", aHint, rem[h], wait[h], canCache)
 	}
+	j.RateHandled = true
+	Printf("%s/%s: selected new token #%d\n", j.URL, j.Category, j.Hint)
 	return
 }
 
-func (j *DSGitHub) isAbuse(e error) bool {
+func (j *DSGitHub) isAbuse(e error) (abuse, rateLimit bool) {
 	if e == nil {
-		return false
+		return
 	}
+	defer func() {
+		// if abuse || rateLimit {
+		// Clear rate handled flag on every error - chances are that next rate handle will recover
+		Printf("%s/%s: GitHub error: abuse:%v, rate limit:%v\n", j.URL, j.Category, abuse, rateLimit)
+		if e != nil {
+			if j.GitHubRateMtx != nil {
+				j.GitHubRateMtx.Lock()
+			}
+			j.RateHandled = false
+			if j.GitHubRateMtx != nil {
+				j.GitHubRateMtx.Unlock()
+			}
+		}
+	}()
 	errStr := e.Error()
-	return strings.Contains(errStr, "403 You have triggered an abuse detection mechanism") || strings.Contains(errStr, "403 API rate limit")
+	abuse = strings.Contains(errStr, "403 You have triggered an abuse detection mechanism")
+	rateLimit = strings.Contains(errStr, "403 API rate limit")
+	return
 }
 
 func (j *DSGitHub) githubRepo(ctx *Ctx, org, repo string) (repoData map[string]interface{}, err error) {
@@ -301,11 +342,15 @@ func (j *DSGitHub) githubRepo(ctx *Ctx, org, repo string) (repoData map[string]i
 		if e != nil && !retry {
 			Printf("Unable to get %s repo: response: %+v, because: %+v, retrying rate\n", origin, response, e)
 			Printf("githubRepos: handle rate\n")
-			abuse := j.isAbuse(e)
+			abuse, rateLimit := j.isAbuse(e)
 			if abuse {
 				sleepFor := AbuseWaitSeconds + rand.Intn(AbuseWaitSeconds)
 				Printf("GitHub detected abuse (get repo %s), waiting for %ds\n", origin, sleepFor)
 				time.Sleep(time.Duration(sleepFor) * time.Second)
+			}
+			if rateLimit {
+				Printf("Rate limit reached on a token (get repo %s) waiting 1s before token switch\n", origin)
+				time.Sleep(time.Duration(1) * time.Second)
 			}
 			if j.GitHubMtx != nil {
 				j.GitHubMtx.Lock()
@@ -315,7 +360,7 @@ func (j *DSGitHub) githubRepo(ctx *Ctx, org, repo string) (repoData map[string]i
 			if j.GitHubMtx != nil {
 				j.GitHubMtx.Unlock()
 			}
-			if !abuse {
+			if !abuse && !rateLimit {
 				retry = true
 			}
 			continue
@@ -498,11 +543,15 @@ func (j *DSGitHub) githubUser(ctx *Ctx, login string) (user map[string]interface
 		if e != nil && !retry {
 			Printf("Unable to get %s user: response: %+v, because: %+v, retrying rate\n", login, response, e)
 			Printf("githubUser: handle rate\n")
-			abuse := j.isAbuse(e)
+			abuse, rateLimit := j.isAbuse(e)
 			if abuse {
 				sleepFor := AbuseWaitSeconds + rand.Intn(AbuseWaitSeconds)
 				Printf("GitHub detected abuse (get user %s), waiting for %ds\n", login, sleepFor)
 				time.Sleep(time.Duration(sleepFor) * time.Second)
+			}
+			if rateLimit {
+				Printf("Rate limit reached on a token (get user %s) waiting 1s before token switch\n", login)
+				time.Sleep(time.Duration(1) * time.Second)
 			}
 			if j.GitHubMtx != nil {
 				j.GitHubMtx.Lock()
@@ -512,7 +561,7 @@ func (j *DSGitHub) githubUser(ctx *Ctx, login string) (user map[string]interface
 			if j.GitHubMtx != nil {
 				j.GitHubMtx.Unlock()
 			}
-			if !abuse {
+			if !abuse && !rateLimit {
 				retry = true
 			}
 			continue
@@ -612,11 +661,15 @@ func (j *DSGitHub) githubIssues(ctx *Ctx, org, repo string, since *time.Time) (i
 		if e != nil && !retry {
 			Printf("Unable to get %s issues: response: %+v, because: %+v, retrying rate\n", origin, response, e)
 			Printf("githubIssues: handle rate\n")
-			abuse := j.isAbuse(e)
+			abuse, rateLimit := j.isAbuse(e)
 			if abuse {
 				sleepFor := AbuseWaitSeconds + rand.Intn(AbuseWaitSeconds)
 				Printf("GitHub detected abuse (get issues %s), waiting for %ds\n", origin, sleepFor)
 				time.Sleep(time.Duration(sleepFor) * time.Second)
+			}
+			if rateLimit {
+				Printf("Rate limit reached on a token (get issues %s) waiting 1s before token switch\n", origin)
+				time.Sleep(time.Duration(1) * time.Second)
 			}
 			if j.GitHubMtx != nil {
 				j.GitHubMtx.Lock()
@@ -626,7 +679,7 @@ func (j *DSGitHub) githubIssues(ctx *Ctx, org, repo string, since *time.Time) (i
 			if j.GitHubMtx != nil {
 				j.GitHubMtx.Unlock()
 			}
-			if !abuse {
+			if !abuse && !rateLimit {
 				retry = true
 			}
 			continue
@@ -732,11 +785,15 @@ func (j *DSGitHub) githubIssueComments(ctx *Ctx, org, repo string, number int) (
 		if e != nil && !retry {
 			Printf("Unable to get %s issue comments: response: %+v, because: %+v, retrying rate\n", key, response, e)
 			Printf("githubIssueComments: handle rate\n")
-			abuse := j.isAbuse(e)
+			abuse, rateLimit := j.isAbuse(e)
 			if abuse {
 				sleepFor := AbuseWaitSeconds + rand.Intn(AbuseWaitSeconds)
 				Printf("GitHub detected abuse (get issue comments %s), waiting for %ds\n", key, sleepFor)
 				time.Sleep(time.Duration(sleepFor) * time.Second)
+			}
+			if rateLimit {
+				Printf("Rate limit reached on a token (get issue comments %s) waiting 1s before token switch\n", key)
+				time.Sleep(time.Duration(1) * time.Second)
 			}
 			if j.GitHubMtx != nil {
 				j.GitHubMtx.Lock()
@@ -746,7 +803,7 @@ func (j *DSGitHub) githubIssueComments(ctx *Ctx, org, repo string, number int) (
 			if j.GitHubMtx != nil {
 				j.GitHubMtx.Unlock()
 			}
-			if !abuse {
+			if !abuse && !rateLimit {
 				retry = true
 			}
 			continue
@@ -875,11 +932,15 @@ func (j *DSGitHub) githubCommentReactions(ctx *Ctx, org, repo string, cid int64)
 		if e != nil && !retry {
 			Printf("Unable to get %s comment reactions: response: %+v, because: %+v, retrying rate\n", key, response, e)
 			Printf("githubCommentReactions: handle rate\n")
-			abuse := j.isAbuse(e)
+			abuse, rateLimit := j.isAbuse(e)
 			if abuse {
 				sleepFor := AbuseWaitSeconds + rand.Intn(AbuseWaitSeconds)
 				Printf("GitHub detected abuse (get comment reactions %s), waiting for %ds\n", key, sleepFor)
 				time.Sleep(time.Duration(sleepFor) * time.Second)
+			}
+			if rateLimit {
+				Printf("Rate limit reached on a token (get comment reactions %s) waiting 1s before token switch\n", key)
+				time.Sleep(time.Duration(1) * time.Second)
 			}
 			if j.GitHubMtx != nil {
 				j.GitHubMtx.Lock()
@@ -889,7 +950,7 @@ func (j *DSGitHub) githubCommentReactions(ctx *Ctx, org, repo string, cid int64)
 			if j.GitHubMtx != nil {
 				j.GitHubMtx.Unlock()
 			}
-			if !abuse {
+			if !abuse && !rateLimit {
 				retry = true
 			}
 			continue
@@ -996,11 +1057,15 @@ func (j *DSGitHub) githubIssueReactions(ctx *Ctx, org, repo string, number int) 
 		if e != nil && !retry {
 			Printf("Unable to get %s issue reactions: response: %+v, because: %+v, retrying rate\n", key, response, e)
 			Printf("githubIssueReactions: handle rate\n")
-			abuse := j.isAbuse(e)
+			abuse, rateLimit := j.isAbuse(e)
 			if abuse {
 				sleepFor := AbuseWaitSeconds + rand.Intn(AbuseWaitSeconds)
 				Printf("GitHub detected abuse (get issue reactions %s), waiting for %ds\n", key, sleepFor)
 				time.Sleep(time.Duration(sleepFor) * time.Second)
+			}
+			if rateLimit {
+				Printf("Rate limit reached on a token (get issue reactions %s) waiting 1s before token switch\n", key)
+				time.Sleep(time.Duration(1) * time.Second)
 			}
 			if j.GitHubMtx != nil {
 				j.GitHubMtx.Lock()
@@ -1010,7 +1075,7 @@ func (j *DSGitHub) githubIssueReactions(ctx *Ctx, org, repo string, number int) 
 			if j.GitHubMtx != nil {
 				j.GitHubMtx.Unlock()
 			}
-			if !abuse {
+			if !abuse && !rateLimit {
 				retry = true
 			}
 			continue
@@ -1112,11 +1177,15 @@ func (j *DSGitHub) githubPull(ctx *Ctx, org, repo string, number int) (pullData 
 		if e != nil && !retry {
 			Printf("Unable to get %s pull: response: %+v, because: %+v, retrying rate\n", key, response, e)
 			Printf("githubPulls: handle rate\n")
-			abuse := j.isAbuse(e)
+			abuse, rateLimit := j.isAbuse(e)
 			if abuse {
 				sleepFor := AbuseWaitSeconds + rand.Intn(AbuseWaitSeconds)
 				Printf("GitHub detected abuse (get pull %s), waiting for %ds\n", key, sleepFor)
 				time.Sleep(time.Duration(sleepFor) * time.Second)
+			}
+			if rateLimit {
+				Printf("Rate limit reached on a token (get pull %s) waiting 1s before token switch\n", key)
+				time.Sleep(time.Duration(1) * time.Second)
 			}
 			if j.GitHubMtx != nil {
 				j.GitHubMtx.Lock()
@@ -1126,7 +1195,7 @@ func (j *DSGitHub) githubPull(ctx *Ctx, org, repo string, number int) (pullData 
 			if j.GitHubMtx != nil {
 				j.GitHubMtx.Unlock()
 			}
-			if !abuse {
+			if !abuse && !rateLimit {
 				retry = true
 			}
 			continue
@@ -1304,11 +1373,15 @@ func (j *DSGitHub) githubPulls(ctx *Ctx, org, repo string) (pullsData []map[stri
 		if e != nil && !retry {
 			Printf("Unable to get %s pulls: response: %+v, because: %+v, retrying rate\n", origin, response, e)
 			Printf("githubPulls: handle rate\n")
-			abuse := j.isAbuse(e)
+			abuse, rateLimit := j.isAbuse(e)
 			if abuse {
 				sleepFor := AbuseWaitSeconds + rand.Intn(AbuseWaitSeconds)
 				Printf("GitHub detected abuse (get pulls %s), waiting for %ds\n", origin, sleepFor)
 				time.Sleep(time.Duration(sleepFor) * time.Second)
+			}
+			if rateLimit {
+				Printf("Rate limit reached on a token (get pulls %s) waiting 1s before token switch\n", origin)
+				time.Sleep(time.Duration(1) * time.Second)
 			}
 			if j.GitHubMtx != nil {
 				j.GitHubMtx.Lock()
@@ -1318,7 +1391,7 @@ func (j *DSGitHub) githubPulls(ctx *Ctx, org, repo string) (pullsData []map[stri
 			if j.GitHubMtx != nil {
 				j.GitHubMtx.Unlock()
 			}
-			if !abuse {
+			if !abuse && !rateLimit {
 				retry = true
 			}
 			continue
@@ -1402,7 +1475,7 @@ func (j *DSGitHub) githubPullReviews(ctx *Ctx, org, repo string, number int) (re
 		)
 		revs, response, e = c.PullRequests.ListReviews(j.Context, org, repo, number, opt)
 		if ctx.Debug > 2 {
-			Printf("GET %s/%s/%s -> {%+v, %+v, %+v}\n", org, repo, number, revs, response, e)
+			Printf("GET %s/%s/%d -> {%+v, %+v, %+v}\n", org, repo, number, revs, response, e)
 		}
 		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
 			if CacheGitHubPullReviews {
@@ -1422,11 +1495,15 @@ func (j *DSGitHub) githubPullReviews(ctx *Ctx, org, repo string, number int) (re
 		if e != nil && !retry {
 			Printf("Unable to get %s pull reviews: response: %+v, because: %+v, retrying rate\n", key, response, e)
 			Printf("githubPullReviews: handle rate\n")
-			abuse := j.isAbuse(e)
+			abuse, rateLimit := j.isAbuse(e)
 			if abuse {
 				sleepFor := AbuseWaitSeconds + rand.Intn(AbuseWaitSeconds)
 				Printf("GitHub detected abuse (get pull reviews %s), waiting for %ds\n", key, sleepFor)
 				time.Sleep(time.Duration(sleepFor) * time.Second)
+			}
+			if rateLimit {
+				Printf("Rate limit reached on a token (get pull reviews %s) waiting 1s before token switch\n", key)
+				time.Sleep(time.Duration(1) * time.Second)
 			}
 			if j.GitHubMtx != nil {
 				j.GitHubMtx.Lock()
@@ -1436,7 +1513,7 @@ func (j *DSGitHub) githubPullReviews(ctx *Ctx, org, repo string, number int) (re
 			if j.GitHubMtx != nil {
 				j.GitHubMtx.Unlock()
 			}
-			if !abuse {
+			if !abuse && !rateLimit {
 				retry = true
 			}
 			continue
@@ -1531,7 +1608,7 @@ func (j *DSGitHub) githubPullReviewComments(ctx *Ctx, org, repo string, number i
 		)
 		revComms, response, e = c.PullRequests.ListComments(j.Context, org, repo, number, opt)
 		if ctx.Debug > 2 {
-			Printf("GET %s/%s/%s -> {%+v, %+v, %+v}\n", org, repo, number, revComms, response, e)
+			Printf("GET %s/%s/%d -> {%+v, %+v, %+v}\n", org, repo, number, revComms, response, e)
 		}
 		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
 			if CacheGitHubPullReviewComments {
@@ -1551,11 +1628,15 @@ func (j *DSGitHub) githubPullReviewComments(ctx *Ctx, org, repo string, number i
 		if e != nil && !retry {
 			Printf("Unable to get %s pull review comments: response: %+v, because: %+v, retrying rate\n", key, response, e)
 			Printf("githubPullReviewComments: handle rate\n")
-			abuse := j.isAbuse(e)
+			abuse, rateLimit := j.isAbuse(e)
 			if abuse {
 				sleepFor := AbuseWaitSeconds + rand.Intn(AbuseWaitSeconds)
 				Printf("GitHub detected abuse (get pull review comments %s), waiting for %ds\n", key, sleepFor)
 				time.Sleep(time.Duration(sleepFor) * time.Second)
+			}
+			if rateLimit {
+				Printf("Rate limit reached on a token (get pull review comments %s) waiting 1s before token switch\n", key)
+				time.Sleep(time.Duration(1) * time.Second)
 			}
 			if j.GitHubMtx != nil {
 				j.GitHubMtx.Lock()
@@ -1565,7 +1646,7 @@ func (j *DSGitHub) githubPullReviewComments(ctx *Ctx, org, repo string, number i
 			if j.GitHubMtx != nil {
 				j.GitHubMtx.Unlock()
 			}
-			if !abuse {
+			if !abuse && !rateLimit {
 				retry = true
 			}
 			continue
@@ -1693,11 +1774,15 @@ func (j *DSGitHub) githubReviewCommentReactions(ctx *Ctx, org, repo string, cid 
 		if e != nil && !retry {
 			Printf("Unable to get %s comment reactions: response: %+v, because: %+v, retrying rate\n", key, response, e)
 			Printf("githubReviewCommentReactions: handle rate\n")
-			abuse := j.isAbuse(e)
+			abuse, rateLimit := j.isAbuse(e)
 			if abuse {
 				sleepFor := AbuseWaitSeconds + rand.Intn(AbuseWaitSeconds)
-				Printf("GitHub detected abuse (get comment reactions %s), waiting for %ds\n", key, sleepFor)
+				Printf("GitHub detected abuse (get pull comment reactions %s), waiting for %ds\n", key, sleepFor)
 				time.Sleep(time.Duration(sleepFor) * time.Second)
+			}
+			if rateLimit {
+				Printf("Rate limit reached on a token (get pull comment reactions %s) waiting 1s before token switch\n", key)
+				time.Sleep(time.Duration(1) * time.Second)
 			}
 			if j.GitHubMtx != nil {
 				j.GitHubMtx.Lock()
@@ -1707,7 +1792,7 @@ func (j *DSGitHub) githubReviewCommentReactions(ctx *Ctx, org, repo string, cid 
 			if j.GitHubMtx != nil {
 				j.GitHubMtx.Unlock()
 			}
-			if !abuse {
+			if !abuse && !rateLimit {
 				retry = true
 			}
 			continue
@@ -1791,7 +1876,7 @@ func (j *DSGitHub) githubPullRequestedReviewers(ctx *Ctx, org, repo string, numb
 		)
 		revsObj, response, e = c.PullRequests.ListReviewers(j.Context, org, repo, number, opt)
 		if ctx.Debug > 2 {
-			Printf("GET %s/%s/%s -> {%+v, %+v, %+v}\n", org, repo, number, revsObj, response, e)
+			Printf("GET %s/%s/%d -> {%+v, %+v, %+v}\n", org, repo, number, revsObj, response, e)
 		}
 		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
 			if CacheGitHubPullRequestedReviewers {
@@ -1811,11 +1896,15 @@ func (j *DSGitHub) githubPullRequestedReviewers(ctx *Ctx, org, repo string, numb
 		if e != nil && !retry {
 			Printf("Unable to get %s pull requested reviewers: response: %+v, because: %+v, retrying rate\n", key, response, e)
 			Printf("githubPullRequestedReviewers: handle rate\n")
-			abuse := j.isAbuse(e)
+			abuse, rateLimit := j.isAbuse(e)
 			if abuse {
 				sleepFor := AbuseWaitSeconds + rand.Intn(AbuseWaitSeconds)
 				Printf("GitHub detected abuse (get pull requested reviewers %s), waiting for %ds\n", key, sleepFor)
 				time.Sleep(time.Duration(sleepFor) * time.Second)
+			}
+			if rateLimit {
+				Printf("Rate limit reached on a token (get pull requested reviewers %s) waiting 1s before token switch\n", key)
+				time.Sleep(time.Duration(1) * time.Second)
 			}
 			if j.GitHubMtx != nil {
 				j.GitHubMtx.Lock()
@@ -1825,7 +1914,7 @@ func (j *DSGitHub) githubPullRequestedReviewers(ctx *Ctx, org, repo string, numb
 			if j.GitHubMtx != nil {
 				j.GitHubMtx.Unlock()
 			}
-			if !abuse {
+			if !abuse && !rateLimit {
 				retry = true
 			}
 			continue
@@ -1908,7 +1997,7 @@ func (j *DSGitHub) githubPullCommits(ctx *Ctx, org, repo string, number int, dee
 		)
 		comms, response, e = c.PullRequests.ListCommits(j.Context, org, repo, number, opt)
 		if ctx.Debug > 2 {
-			Printf("GET %s/%s/%s -> {%+v, %+v, %+v}\n", org, repo, number, comms, response, e)
+			Printf("GET %s/%s/%d -> {%+v, %+v, %+v}\n", org, repo, number, comms, response, e)
 		}
 		if e != nil && strings.Contains(e.Error(), "404 Not Found") {
 			if CacheGitHubPullCommits {
@@ -1928,11 +2017,15 @@ func (j *DSGitHub) githubPullCommits(ctx *Ctx, org, repo string, number int, dee
 		if e != nil && !retry {
 			Printf("Unable to get %s pull commits: response: %+v, because: %+v, retrying rate\n", key, response, e)
 			Printf("githubPullCommits: handle rate\n")
-			abuse := j.isAbuse(e)
+			abuse, rateLimit := j.isAbuse(e)
 			if abuse {
 				sleepFor := AbuseWaitSeconds + rand.Intn(AbuseWaitSeconds)
 				Printf("GitHub detected abuse (get pull commits %s), waiting for %ds\n", key, sleepFor)
 				time.Sleep(time.Duration(sleepFor) * time.Second)
+			}
+			if rateLimit {
+				Printf("Rate limit reached on a token (get pull commits %s) waiting 1s before token switch\n", key)
+				time.Sleep(time.Duration(1) * time.Second)
 			}
 			if j.GitHubMtx != nil {
 				j.GitHubMtx.Lock()
@@ -1942,7 +2035,7 @@ func (j *DSGitHub) githubPullCommits(ctx *Ctx, org, repo string, number int, dee
 			if j.GitHubMtx != nil {
 				j.GitHubMtx.Unlock()
 			}
-			if !abuse {
+			if !abuse && !rateLimit {
 				retry = true
 			}
 			continue
@@ -2054,11 +2147,15 @@ func (j *DSGitHub) githubUserOrgs(ctx *Ctx, login string) (orgsData []map[string
 		if e != nil && !retry {
 			Printf("Unable to get %s user orgs: response: %+v, because: %+v, retrying rate\n", login, response, e)
 			Printf("githubUserOrgs: handle rate\n")
-			abuse := j.isAbuse(e)
+			abuse, rateLimit := j.isAbuse(e)
 			if abuse {
 				sleepFor := AbuseWaitSeconds + rand.Intn(AbuseWaitSeconds)
 				Printf("GitHub detected abuse (get user orgs %s), waiting for %ds\n", login, sleepFor)
 				time.Sleep(time.Duration(sleepFor) * time.Second)
+			}
+			if rateLimit {
+				Printf("Rate limit reached on a token (get user orgs %s) waiting 1s before token switch\n", login)
+				time.Sleep(time.Duration(1) * time.Second)
 			}
 			if j.GitHubMtx != nil {
 				j.GitHubMtx.Lock()
@@ -2068,7 +2165,7 @@ func (j *DSGitHub) githubUserOrgs(ctx *Ctx, login string) (orgsData []map[string
 			if j.GitHubMtx != nil {
 				j.GitHubMtx.Unlock()
 			}
-			if !abuse {
+			if !abuse && !rateLimit {
 				retry = true
 			}
 			continue
@@ -2214,6 +2311,7 @@ func (j *DSGitHub) Validate(ctx *Ctx) (err error) {
 	j.ThrN = GetThreadsNum(ctx)
 	if j.ThrN > 1 {
 		j.GitHubMtx = &sync.RWMutex{}
+		j.GitHubRateMtx = &sync.RWMutex{}
 		if CacheGitHubRepo {
 			j.GitHubRepoMtx = &sync.RWMutex{}
 		}
