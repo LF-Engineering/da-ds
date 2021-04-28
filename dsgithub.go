@@ -4242,6 +4242,7 @@ func (j *DSGitHub) EnrichPullRequestReviews(ctx *Ctx, pull map[string]interface{
 	pullNumber, _ := pull["id_in_repo"]
 	iNumber, _ := pullNumber.(int)
 	iGithubRepo, _ := pull["github_repo"]
+	pullCreatedAt, _ := pull["created_at"]
 	githubRepo, _ := iGithubRepo.(string)
 	copyPullFields := []string{"category", "github_repo", "repo_name", "repository"}
 	copyReviewFields := []string{"body", "body_analyzed", "submitted_at", "commit_id", "html_url", "pull_request_url", "state", "author_association"}
@@ -4269,6 +4270,7 @@ func (j *DSGitHub) EnrichPullRequestReviews(ctx *Ctx, pull map[string]interface{
 		rid := int64(iRID.(float64))
 		rich["id_in_repo"] = rid
 		rich["pull_request_review_id"] = rid
+		rich["pull_request_created_at"] = pullCreatedAt
 		rich["id"] = id + "/review/" + fmt.Sprintf("%d", rid)
 		rich["url_id"] = fmt.Sprintf("%s/pulls/%d/reviews/%d", githubRepo, iNumber, rid)
 		rich["reviewer_association"], _ = review["author_association"]
