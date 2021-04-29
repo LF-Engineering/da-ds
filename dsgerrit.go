@@ -1585,7 +1585,7 @@ func (j *DSGerrit) EnrichPatchsets(ctx *Ctx, review map[string]interface{}, patc
 				}
 				if len(approvals) > 0 {
 					var riches []interface{}
-					riches, err = j.EnrichApprovals(ctx, rich, approvals, affs)
+					riches, err = j.EnrichApprovals(ctx, review, rich, approvals, affs)
 					if err != nil {
 						return
 					}
@@ -1598,7 +1598,7 @@ func (j *DSGerrit) EnrichPatchsets(ctx *Ctx, review map[string]interface{}, patc
 }
 
 // EnrichApprovals - return rich items from raw approvals
-func (j *DSGerrit) EnrichApprovals(ctx *Ctx, patchSet map[string]interface{}, approvals []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
+func (j *DSGerrit) EnrichApprovals(ctx *Ctx, review, patchSet map[string]interface{}, approvals []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
 	iPatchSetID, ok := patchSet["id"]
 	if !ok {
 		err = fmt.Errorf("cannot get id property of patchset: %+v", patchSet)
@@ -1660,6 +1660,7 @@ func (j *DSGerrit) EnrichApprovals(ctx *Ctx, patchSet map[string]interface{}, ap
 		rich["approval_description"] = desc
 		rich["type"] = Approval
 		rich["id"] = patchSetID + "_approval_" + fmt.Sprintf("%d.0", created.Unix())
+		rich["changeset_created_on"], _ = review["created_on"]
 		if affs {
 			sCreated := ToYMDTHMSZDate(created)
 			authorKey := "by"
