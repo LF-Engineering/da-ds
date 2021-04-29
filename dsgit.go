@@ -26,10 +26,11 @@ const (
 	// GitDefaultCachePath - default path where gitops cache files are stored
 	GitDefaultCachePath = "$HOME/.perceval/cache"
 	// GitOpsCommand - command that maintains git stats cache
-	GitOpsCommand = "gitops.py"
+	// GitOpsCommand = "gitops.py"
+	GitOpsCommand = "gitops"
 	// OrphanedCommitsCommand - command to list orphaned commits
 	OrphanedCommitsCommand = "detect-removed-commits.sh"
-	// GitOpsNoCleanup - if set, it will skip gitops.py repo cleanup
+	// GitOpsNoCleanup - if set, it will skip gitops repo cleanup
 	GitOpsNoCleanup = false
 	// GitParseStateInit - init parser state
 	GitParseStateInit = 0
