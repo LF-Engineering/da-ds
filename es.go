@@ -2,7 +2,6 @@ package dads
 
 import (
 	"bytes"
-	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -406,8 +405,9 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 	payloads := []byte{}
 	newLine := []byte("\n")
 	var (
-		doc []byte
-		hdr []byte
+		doc    []byte
+		hdr    []byte
+		status int
 	)
 	for _, item := range items {
 		doc, err = jsoniter.Marshal(item)
@@ -425,7 +425,7 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 		payloads = append(payloads, newLine...)
 	}
 	var result interface{}
-	result, _, _, _, err = Request(
+	result, status, _, _, err = Request(
 		ctx,
 		url,
 		Post,
@@ -466,18 +466,47 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 	}
 	err = nil
 	// Fallback to one-by-one inserts
+	var indexName string
 	if raw {
-		url = ctx.ESURL + "/" + ctx.RawIndex + "/_doc/"
+		indexName = ctx.RawIndex
 	} else {
-		url = ctx.ESURL + "/" + ctx.RichIndex + "/_doc/"
+		indexName = ctx.RichIndex
 	}
+	// On ES server errors (not client errors) and when GAP URL is configured
+	if status >= 500 && ctx.GapURL != "" {
+		docs := [][]byte{}
+		ids := []string{}
+		indices := []string{}
+		for _, item := range items {
+			doc, err = jsoniter.Marshal(item)
+			if err != nil {
+				return
+			}
+			id, ok := item.(map[string]interface{})[key].(string)
+			if !ok {
+				err = fmt.Errorf("missing %s property in %+v", key, DumpKeys(item))
+				return
+			}
+			indices = append(indices, indexName)
+			ids = append(ids, id)
+			docs = append(docs, doc)
+		}
+		err = SendMultipleDocumentsToGAP(ctx, indices, ids, docs, true)
+		if err == nil {
+			Printf("Sent bulk request to GAP handler in response to http code %d\n", status)
+			return
+		}
+		Printf("Sending multiple documents to GAP handler in response to %d HTTP code failed, fall back to one-by-one: %+v\n", status, err)
+	}
+	url = ctx.ESURL + "/" + indexName + "/_doc/"
 	headers := map[string]string{"Content-Type": "application/json"}
 	retry := true
+	var itemStatus int
 	for _, item := range items {
 		doc, _ = jsoniter.Marshal(item)
 		id, _ := item.(map[string]interface{})[key].(string)
 		id = urlLib.PathEscape(id)
-		_, _, _, _, err = Request(
+		_, itemStatus, _, _, err = Request(
 			ctx,
 			url+id,
 			Put,
@@ -496,9 +525,9 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 			Printf("SendToElastic: error: %+v for %+v\n", err, item)
 			switch ctx.AllowFail {
 			case 0:
-				// send to gap handler if configured
-				if ctx.GapURL != "" {
-					err = SendToGAP(ctx, doc)
+				// send to gap handler if configured only for 5xx HTTP error codes - they mean server side issue
+				if itemStatus >= 500 && ctx.GapURL != "" {
+					err = SendSingleDocumentToGAP(ctx, indexName, id, doc, true)
 					if err != nil {
 						return
 					}
@@ -545,40 +574,6 @@ func printObj(data interface{}) string {
 		return fmt.Sprintf("%+v", data)
 	}
 	return string(pretty)
-}
-
-// SendToGAP - send failed ES item to GAP API
-func SendToGAP(ctx *Ctx, doc []byte) (err error) {
-	if ctx.GapURL == "" {
-		return
-	}
-	dataEnc := base64.StdEncoding.EncodeToString(doc)
-	Printf("Sending item (%d bytes) to the GAP API\n", len(dataEnc))
-	gapBody := map[string]string{"payload": dataEnc}
-	var bData []byte
-	bData, err = jsoniter.Marshal(gapBody)
-	if err != nil {
-		Printf("Cannot marshal GAP body: %v: %v\n", gapBody, err)
-		return
-	}
-	payloadBody := bytes.NewReader(bData)
-	method := "POST"
-	url := ctx.GapURL
-	var req *http.Request
-	req, err = http.NewRequest(method, url, payloadBody)
-	if err != nil {
-		Printf("new request error: %+v for %s url: %s, body: %s\n", err, method, url, prettyPrint(bData))
-		return
-	}
-	req.Header.Set("Content-Type", "application/json")
-	var resp *http.Response
-	resp, err = http.DefaultClient.Do(req)
-	if err != nil {
-		Printf("do request error: %+v for %s url: %s, doc: %s\n", err, method, url, prettyPrint(bData))
-		return
-	}
-	Printf("Sent item (%d bytes) to the GAP API: status: %d\n", len(dataEnc), resp.StatusCode)
-	return
 }
 
 // GetLastUpdate - get last update date from ElasticSearch
