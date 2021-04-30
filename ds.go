@@ -741,7 +741,7 @@ func ForEachESItem(
 			false,                               // skip in dry-run mode
 		)
 		if err != nil {
-			Printf("Error releasing scroll %s: %+v\n", *scroll, err)
+			Printf("Error releasing scroll %s: %+v, ignored\n", *scroll, err)
 			err = nil
 		}
 	}()
