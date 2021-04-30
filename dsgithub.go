@@ -5354,7 +5354,7 @@ func (j *DSGitHub) AllRoles(ctx *Ctx, rich map[string]interface{}) (roles []stri
 		defer func() {
 			id, _ := rich["id"]
 			uuid, _ := rich["uuid"]
-			fmt.Printf("AllRoles(%v, %v) --> {%v, %+v}\n", id, uuid, static, roles)
+			fmt.Printf("%s/%s: AllRoles(%v, %v) --> {%v, %+v}\n", j.URL, j.Category, id, uuid, static, roles)
 		}()
 	}
 	var possibleRoles []string
