@@ -67,6 +67,7 @@ type DS interface {
 	GetRoleIdentity(*Ctx, map[string]interface{}, string) map[string]interface{}
 	AllRoles(*Ctx, map[string]interface{}) ([]string, bool)
 	CalculateTimeToReset(*Ctx, int, int) int
+	HasIdentities() bool
 }
 
 // CommonFields - common rich item fields
@@ -663,18 +664,26 @@ func ItemsRefreshIdentitiesFunc(ctx *Ctx, ds DS, thrN int, richItems []interface
 // We assume here that docs maintained my iterator func contains a list of [3]string
 // Each identity is [3]string [name, username, email]
 func UploadIdentities(ctx *Ctx, ds DS) (err error) {
-	Printf("uploading identities\n")
-	err = ForEachESItem(ctx, ds, true, DBUploadIdentitiesFunc, ItemsIdentitiesFunc, nil, true)
-	Printf("identities uploaded\n")
+	Printf("%s: uploading identities\n", ds.Name())
+	if ds.HasIdentities() {
+		err = ForEachESItem(ctx, ds, true, DBUploadIdentitiesFunc, ItemsIdentitiesFunc, nil, true)
+		Printf("%s: identities uploaded\n", ds.Name())
+	} else {
+		Printf("%s: identities not defined for the current datasource (no upload needed)\n", ds.Name())
+	}
 	return
 }
 
 // RefreshIdentities - refresh identities
 // We iterate over rich index to refresh its affiliation data
 func RefreshIdentities(ctx *Ctx, ds DS) (err error) {
-	Printf("refreshing identities\n")
-	err = ForEachESItem(ctx, ds, false, ESBulkUploadFunc, ItemsRefreshIdentitiesFunc, nil, true)
-	Printf("identities refreshed\n")
+	Printf("%s: refreshing identities\n", ds.Name())
+	if ds.HasIdentities() {
+		err = ForEachESItem(ctx, ds, false, ESBulkUploadFunc, ItemsRefreshIdentitiesFunc, nil, true)
+		Printf("%s: identities refreshed\n", ds.Name())
+	} else {
+		Printf("%s: identities not defined for the current datasource (no refresh needed)\n", ds.Name())
+	}
 	return
 }
 

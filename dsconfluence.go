@@ -933,3 +933,8 @@ func (j *DSConfluence) CalculateTimeToReset(ctx *Ctx, rateLimit, rateLimitReset 
 	seconds = rateLimitReset
 	return
 }
+
+// HasIdentities - does this data source support identity data
+func (j *DSConfluence) HasIdentities() bool {
+	return true
+}

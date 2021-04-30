@@ -471,3 +471,9 @@ func (j *DSStub) CalculateTimeToReset(ctx *Ctx, rateLimit, rateLimitReset int) (
 	seconds = rateLimitReset
 	return
 }
+
+// HasIdentities - does this data source support identity data
+func (j *DSStub) HasIdentities() bool {
+	// IMPL
+	return true
+}

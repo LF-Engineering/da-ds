@@ -1436,3 +1436,8 @@ func (j *DSJira) CalculateTimeToReset(ctx *Ctx, rateLimit, rateLimitReset int) (
 	seconds = rateLimitReset
 	return
 }
+
+// HasIdentities - does this data source support identity data
+func (j *DSJira) HasIdentities() bool {
+	return true
+}

@@ -1880,3 +1880,8 @@ func (j *DSGerrit) CalculateTimeToReset(ctx *Ctx, rateLimit, rateLimitReset int)
 	seconds = rateLimitReset
 	return
 }
+
+// HasIdentities - does this data source support identity data
+func (j *DSGerrit) HasIdentities() bool {
+	return true
+}

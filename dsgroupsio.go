@@ -1210,3 +1210,8 @@ func (j *DSGroupsio) CalculateTimeToReset(ctx *Ctx, rateLimit, rateLimitReset in
 	seconds = rateLimitReset
 	return
 }
+
+// HasIdentities - does this data source support identity data
+func (j *DSGroupsio) HasIdentities() bool {
+	return true
+}

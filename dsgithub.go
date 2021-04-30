@@ -5350,7 +5350,7 @@ func (j *DSGitHub) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, role s
 // second return parameter is static mode (true/false)
 // dynamic roles will use item to get its roles
 func (j *DSGitHub) AllRoles(ctx *Ctx, rich map[string]interface{}) (roles []string, static bool) {
-	if ctx.Debug > 0 {
+	if ctx.Debug > 0 && j.Category != "repository" {
 		defer func() {
 			id, _ := rich["id"]
 			uuid, _ := rich["uuid"]
@@ -5424,4 +5424,9 @@ func (j *DSGitHub) AllRoles(ctx *Ctx, rich map[string]interface{}) (roles []stri
 func (j *DSGitHub) CalculateTimeToReset(ctx *Ctx, rateLimit, rateLimitReset int) (seconds int) {
 	seconds = rateLimitReset
 	return
+}
+
+// HasIdentities - does this data source support identity data
+func (j *DSGitHub) HasIdentities() bool {
+	return j.Category != "repository"
 }

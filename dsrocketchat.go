@@ -956,3 +956,8 @@ func (j *DSRocketchat) GetRoleIdentity(ctx *Ctx, item map[string]interface{}, ro
 func (j *DSRocketchat) AllRoles(ctx *Ctx, item map[string]interface{}) ([]string, bool) {
 	return []string{"u"}, true
 }
+
+// HasIdentities - does this data source support identity data
+func (j *DSRocketchat) HasIdentities() bool {
+	return true
+}

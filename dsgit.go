@@ -2409,3 +2409,8 @@ func (j *DSGit) CalculateTimeToReset(ctx *Ctx, rateLimit, rateLimitReset int) (s
 	seconds = rateLimitReset
 	return
 }
+
+// HasIdentities - does this data source support identity data
+func (j *DSGit) HasIdentities() bool {
+	return true
+}
