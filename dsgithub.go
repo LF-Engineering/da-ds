@@ -4244,7 +4244,7 @@ func (j *DSGitHub) EnrichPullRequestReviews(ctx *Ctx, pull map[string]interface{
 	iGithubRepo, _ := pull["github_repo"]
 	pullCreatedAt, _ := pull["created_at"]
 	githubRepo, _ := iGithubRepo.(string)
-	copyPullFields := []string{"category", "github_repo", "repo_name", "repository"}
+	copyPullFields := []string{"category", "github_repo", "repo_name", "repository", "url"}
 	copyReviewFields := []string{"body", "body_analyzed", "submitted_at", "commit_id", "html_url", "pull_request_url", "state", "author_association"}
 	for _, review := range reviews {
 		rich := make(map[string]interface{})
