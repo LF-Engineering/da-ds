@@ -2,6 +2,7 @@ package googlegroups
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	httpNative "net/http"
@@ -92,7 +93,7 @@ func (f *Fetcher) Fetch(fromDate, now *time.Time) ([]*RawMessage, error) {
 			message *gmail.Message
 			err     error
 		}
-		results := make(chan result, 1024)
+		results := make(chan result, 0)
 
 		var wgFiles, wgProcess sync.WaitGroup
 		wgFiles.Add(1)
@@ -151,9 +152,12 @@ func (f *Fetcher) getMessage(msg *gmail.Message, fromDate, now *time.Time) (rawM
 	references := headers.References
 	subject := headers.Subject
 	messageBody := msg.Snippet
+	mailingList := headers.MailingList
 
-	if sender != f.GroupName {
-		return nil, err
+	if sender != f.GroupName || mailingList != f.GroupName {
+		errString := fmt.Sprintf("skipping subject [%+v] for group [%+v] & mailinglist [%+v]", subject, sender, mailingList)
+		log.Println(errString)
+		return nil, errors.New(errString)
 	}
 
 	if fromDate.After(date) {
@@ -295,6 +299,10 @@ func getHeadersData(msg *gmail.Message) *HeadersData {
 			data.To = append(data.To, v.Value)
 		case "Delivered-To":
 			data.DeliveredTo = append(data.DeliveredTo, v.Value)
+		case "Mailing-list":
+			mlList := strings.Split(v.Value, ";")
+			mlValue := strings.Split(mlList[0], "list ")
+			data.MailingList = strings.TrimSpace(mlValue[1])
 		}
 	}
 	return data

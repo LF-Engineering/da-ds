@@ -123,4 +123,5 @@ type HeadersData struct {
 	// DeliveredTo is to whom the email was sent to. This can contain multiple
 	// addresses if the email was forwarded.
 	DeliveredTo []string
+	MailingList string
 }
