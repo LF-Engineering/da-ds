@@ -3788,7 +3788,7 @@ func (j *DSGitHub) EnrichIssueComments(ctx *Ctx, issue map[string]interface{}, c
 	iNumber, _ := issueNumber.(int)
 	iGithubRepo, _ := issue["github_repo"]
 	githubRepo, _ := iGithubRepo.(string)
-	copyIssueFields := []string{"category", "github_repo", "repo_name", "repository"}
+	copyIssueFields := []string{"category", "github_repo", "repo_name", "repository", "repo_short_name"}
 	copyCommentFields := []string{"created_at", "updated_at", "body", "body_analyzed", "author_association", "url", "html_url"}
 	for _, comment := range comments {
 		rich := make(map[string]interface{})
@@ -3901,7 +3901,7 @@ func (j *DSGitHub) EnrichIssueAssignees(ctx *Ctx, issue map[string]interface{}, 
 	iNumber, _ := issueNumber.(int)
 	iGithubRepo, _ := issue["github_repo"]
 	githubRepo, _ := iGithubRepo.(string)
-	copyIssueFields := []string{"category", "github_repo", "repo_name", "repository"}
+	copyIssueFields := []string{"category", "github_repo", "repo_name", "repository", "repo_short_name"}
 	for _, assignee := range assignees {
 		rich := make(map[string]interface{})
 		for _, field := range RawFields {
@@ -3992,7 +3992,7 @@ func (j *DSGitHub) EnrichIssueReactions(ctx *Ctx, issue map[string]interface{}, 
 	iNumber, _ := issueNumber.(int)
 	iGithubRepo, _ := issue["github_repo"]
 	githubRepo, _ := iGithubRepo.(string)
-	copyIssueFields := []string{"category", "github_repo", "repo_name", "repository"}
+	copyIssueFields := []string{"category", "github_repo", "repo_name", "repository", "repo_short_name"}
 	copyReactionFields := []string{"content"}
 	for _, reaction := range reactions {
 		rich := make(map[string]interface{})
@@ -4128,7 +4128,7 @@ func (j *DSGitHub) EnrichPullRequestComments(ctx *Ctx, pull map[string]interface
 	iNumber, _ := pullNumber.(int)
 	iGithubRepo, _ := pull["github_repo"]
 	githubRepo, _ := iGithubRepo.(string)
-	copyPullFields := []string{"category", "github_repo", "repo_name", "repository"}
+	copyPullFields := []string{"category", "github_repo", "repo_name", "repository", "repo_short_name"}
 	copyCommentFields := []string{"created_at", "updated_at", "body", "body_analyzed", "author_association", "url", "html_url"}
 	for _, comment := range comments {
 		rich := make(map[string]interface{})
@@ -4244,7 +4244,7 @@ func (j *DSGitHub) EnrichPullRequestReviews(ctx *Ctx, pull map[string]interface{
 	iGithubRepo, _ := pull["github_repo"]
 	pullCreatedAt, _ := pull["created_at"]
 	githubRepo, _ := iGithubRepo.(string)
-	copyPullFields := []string{"category", "github_repo", "repo_name", "repository", "url"}
+	copyPullFields := []string{"category", "github_repo", "repo_name", "repository", "url", "repo_short_name"}
 	copyReviewFields := []string{"body", "body_analyzed", "submitted_at", "commit_id", "html_url", "pull_request_url", "state", "author_association"}
 	for _, review := range reviews {
 		rich := make(map[string]interface{})
@@ -4352,7 +4352,7 @@ func (j *DSGitHub) EnrichPullRequestAssignees(ctx *Ctx, pull map[string]interfac
 	iNumber, _ := pullNumber.(int)
 	iGithubRepo, _ := pull["github_repo"]
 	githubRepo, _ := iGithubRepo.(string)
-	copyPullFields := []string{"category", "github_repo", "repo_name", "repository"}
+	copyPullFields := []string{"category", "github_repo", "repo_name", "repository", "repo_short_name"}
 	for _, assignee := range assignees {
 		rich := make(map[string]interface{})
 		for _, field := range RawFields {
@@ -4443,7 +4443,7 @@ func (j *DSGitHub) EnrichPullRequestReactions(ctx *Ctx, pull map[string]interfac
 	iNumber, _ := pullNumber.(int)
 	iGithubRepo, _ := pull["github_repo"]
 	githubRepo, _ := iGithubRepo.(string)
-	copyPullFields := []string{"category", "github_repo", "repo_name", "repository"}
+	copyPullFields := []string{"category", "github_repo", "repo_name", "repository", "repo_short_name"}
 	copyReactionFields := []string{"content"}
 	reactionSuffix := "_comment_reaction"
 	for _, reaction := range reactions {
@@ -4558,7 +4558,7 @@ func (j *DSGitHub) EnrichPullRequestRequestedReviewers(ctx *Ctx, pull map[string
 	iNumber, _ := pullNumber.(int)
 	iGithubRepo, _ := pull["github_repo"]
 	githubRepo, _ := iGithubRepo.(string)
-	copyPullFields := []string{"category", "github_repo", "repo_name", "repository"}
+	copyPullFields := []string{"category", "github_repo", "repo_name", "repository", "repo_short_name"}
 	for _, reviewer := range requestedReviewers {
 		rich := make(map[string]interface{})
 		for _, field := range RawFields {
@@ -4822,6 +4822,12 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 	if strings.Contains(githubRepo, GitHubURLRoot) {
 		githubRepo = strings.Replace(githubRepo, GitHubURLRoot, "", -1)
 	}
+	var repoShortName string
+	arr := strings.Split(githubRepo, "/")
+	if len(arr) > 1 {
+		repoShortName = arr[1]
+	}
+	rich["repo_short_name"] = repoShortName
 	rich["github_repo"] = githubRepo
 	rich["url_id"] = fmt.Sprintf("%s/issues/%d", githubRepo, number)
 	rich["time_to_first_attention"] = nil
@@ -5167,6 +5173,12 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 	if strings.Contains(githubRepo, GitHubURLRoot) {
 		githubRepo = strings.Replace(githubRepo, GitHubURLRoot, "", -1)
 	}
+	var repoShortName string
+	arr := strings.Split(githubRepo, "/")
+	if len(arr) > 1 {
+		repoShortName = arr[1]
+	}
+	rich["repo_short_name"] = repoShortName
 	rich["github_repo"] = githubRepo
 	rich["url_id"] = fmt.Sprintf("%s/pull/%d", githubRepo, number)
 	rich["forks"], _ = Dig(pull, []string{"base", "repo", "forks_count"}, false, true)
