@@ -78,7 +78,8 @@ func (f *Fetcher) Fetch(fromDate, now *time.Time) ([]*RawMessage, error) {
 
 	user := "me"
 	messageIDS := make([]string, 0)
-	messages, err := srv.Users.Messages.List(user).Do()
+	sender := fmt.Sprintf("list: %+v", f.GroupName)
+	messages, err := srv.Users.Messages.List(user).MaxResults(MaxNumberOfMessages).IncludeSpamTrash(true).Q(sender).Do()
 	if err != nil {
 		log.Fatalf("Error: %v", err)
 	}
@@ -87,15 +88,15 @@ func (f *Fetcher) Fetch(fromDate, now *time.Time) ([]*RawMessage, error) {
 	}
 	rawMessages := make([]*RawMessage, 0)
 
-	for _, messageID := range messageIDS {
-		type result struct {
-			path    string
-			message *gmail.Message
-			err     error
-		}
-		results := make(chan result, 0)
+	type result struct {
+		path    string
+		message *gmail.Message
+		err     error
+	}
+	results := make(chan result, 0)
+	var wgFiles, wgProcess sync.WaitGroup
 
-		var wgFiles, wgProcess sync.WaitGroup
+	for _, messageID := range messageIDS {
 		wgFiles.Add(1)
 		go func() {
 			defer wgFiles.Done()
@@ -103,34 +104,38 @@ func (f *Fetcher) Fetch(fromDate, now *time.Time) ([]*RawMessage, error) {
 			go func(messageId string) {
 				defer wgFiles.Done()
 				msg, err := srv.Users.Messages.Get(user, messageId).Do()
+				// rate limiting
+				time.Sleep(time.Second * 10)
 				results <- result{messageId, msg, err}
 			}(messageID)
 		}()
-
-		var nEnvs, nErr int
-		wgProcess.Add(1)
-		go func() {
-			defer wgProcess.Done()
-			for res := range results {
-				if res.err != nil {
-					log.Printf("processing %s: %v", res.path, res.err)
-					nErr++
-					continue
-				}
-				msg, err := f.getMessage(res.message, fromDate, now)
-				if err != nil {
-					return
-				}
-				if msg != nil {
-					rawMessages = append(rawMessages, msg)
-				}
-				nEnvs++
-			}
-		}()
-		wgFiles.Wait()
-		close(results)
-		wgProcess.Wait()
 	}
+
+	var nEnvs, nErr int
+	wgProcess.Add(1)
+	go func() {
+		defer wgProcess.Done()
+		for res := range results {
+			if res.err != nil {
+				log.Printf("processing %v: %v", res.path, res.err)
+				nErr++
+				continue
+			}
+			msg, err := f.getMessage(res.message, fromDate, now)
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			if msg != nil {
+				rawMessages = append(rawMessages, msg)
+			}
+			nEnvs++
+		}
+	}()
+	wgFiles.Wait()
+	close(results)
+	wgProcess.Wait()
+
 	return rawMessages, err
 }
 
@@ -143,7 +148,7 @@ func (f *Fetcher) getMessage(msg *gmail.Message, fromDate, now *time.Time) (rawM
 		log.Println(err)
 		return nil, err
 	}
-	//now := time.Now()
+
 	from := headers.From
 	to := headers.To
 	sender := headers.Sender
