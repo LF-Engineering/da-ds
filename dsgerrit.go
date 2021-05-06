@@ -1351,6 +1351,7 @@ func (j *DSGerrit) EnrichItem(ctx *Ctx, item map[string]interface{}, author stri
 	}
 	rich["opened"] = createdOn
 	rich["repository"], _ = review["project"]
+	rich["repo_short_name"], _ = rich["repository"]
 	rich["changeset_number"], _ = review["number"]
 	uuid, ok := rich[UUID].(string)
 	if !ok {
@@ -1470,7 +1471,7 @@ func (j *DSGerrit) EnrichItem(ctx *Ctx, item map[string]interface{}, author stri
 
 // EnrichPatchsets - return rich items from raw patch sets
 func (j *DSGerrit) EnrichPatchsets(ctx *Ctx, review map[string]interface{}, patchSets []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
-	copyFields := []string{"wip", "open", "url", "summary", "repository", "branch", "changeset_number", "changeset_status", "changeset_status_value"}
+	copyFields := []string{"wip", "open", "url", "summary", "repository", "branch", "changeset_number", "changeset_status", "changeset_status_value", "repo_short_name"}
 	iReviewID, ok := review["id"]
 	if !ok {
 		err = fmt.Errorf("cannot get id property of review: %+v", review)
@@ -1609,7 +1610,7 @@ func (j *DSGerrit) EnrichApprovals(ctx *Ctx, review, patchSet map[string]interfa
 		err = fmt.Errorf("cannot get string id property of patchset: %+v", iPatchSetID)
 		return
 	}
-	copyFields := []string{"wip", "open", "url", "summary", "repository", "branch", "changeset_number", "changeset_status", "changeset_status_value", "patchset_number", "patchset_revision", "patchset_ref"}
+	copyFields := []string{"wip", "open", "url", "summary", "repository", "branch", "changeset_number", "changeset_status", "changeset_status_value", "patchset_number", "patchset_revision", "patchset_ref", "repo_short_name"}
 	for _, approval := range approvals {
 		rich := make(map[string]interface{})
 		for _, field := range RawFields {
@@ -1696,7 +1697,7 @@ func (j *DSGerrit) EnrichApprovals(ctx *Ctx, review, patchSet map[string]interfa
 
 // EnrichComments - return rich items from raw patch sets
 func (j *DSGerrit) EnrichComments(ctx *Ctx, review map[string]interface{}, comments []map[string]interface{}, affs bool) (richItems []interface{}, err error) {
-	copyFields := []string{"wip", "open", "url", "summary", "repository", "branch", "changeset_number"}
+	copyFields := []string{"wip", "open", "url", "summary", "repository", "branch", "changeset_number", "repo_short_name"}
 	iReviewID, ok := review["id"]
 	if !ok {
 		err = fmt.Errorf("cannot get id property of review: %+v", review)

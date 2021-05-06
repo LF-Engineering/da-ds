@@ -2157,6 +2157,7 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 		rich["program_language_summary"] = []interface{}{}
 	}
 	rich["commit_url"] = j.GetCommitURL(origin, hsh)
+	rich["repo_short_name"] = j.GetRepoShortURL(origin)
 	// Printf("commit_url: %+v\n", rich["commit_url"])
 	project, ok := Dig(commit, []string{"project"}, false, true)
 	if ok {
@@ -2319,6 +2320,43 @@ func (j *DSGit) PairProgrammingMetrics(ctx *Ctx, rich, commit map[string]interfa
 	if ctx.Debug > 2 {
 		Printf("(%d,%d,%d,%d,%f,%f,%f,%f,%f)\n", files, linesAdded, linesRemoved, linesChanged, ppCount, ppFiles, ppLinesAdded, ppLinesRemoved, ppLinesChanged)
 	}
+	return
+}
+
+// GetRepoShortURL - return git commit URL for a given path and SHA
+func (j *DSGit) GetRepoShortURL(origin string) (repoShortName string) {
+	lastSlashItem := func(arg string) string {
+		arg = strings.TrimSuffix(arg, "/")
+		arr := strings.Split(arg, "/")
+		lArr := len(arr)
+		if lArr > 1 {
+			return arr[lArr-1]
+		}
+		return arg
+	}
+	if strings.Contains(origin, "/github.com/") {
+		// https://github.com/org/repo.git --> repo
+		arg := strings.TrimSuffix(origin, ".git")
+		repoShortName = lastSlashItem(arg)
+		return
+	} else if strings.Contains(origin, "/gerrit.") {
+		// https://gerrit.xyz/r/org/repo -> repo
+		repoShortName = lastSlashItem(origin)
+		return
+	} else if strings.Contains(origin, "/gitlab.com") {
+		// https://gitlab.com/org/repo -> repo
+		repoShortName = lastSlashItem(origin)
+		return
+	} else if strings.Contains(origin, "/bitbucket.org/") {
+		// https://bitbucket.org/org/repo.git/src/
+		arg := strings.TrimSuffix(origin, "/")
+		arg = strings.TrimSuffix(arg, "/src")
+		arg = strings.TrimSuffix(arg, ".git")
+		repoShortName = lastSlashItem(arg)
+		return
+	}
+	// Fall back
+	repoShortName = lastSlashItem(origin)
 	return
 }
 
