@@ -98,17 +98,17 @@ func (f *Fetcher) Fetch(fromDate, now *time.Time) ([]*RawMessage, error) {
 
 	for _, messageID := range messageIDS {
 		wgFiles.Add(1)
-		go func() {
+		go func(messageID string) {
 			defer wgFiles.Done()
 			wgFiles.Add(1)
-			go func(messageId string) {
+			go func(messageID string) {
 				defer wgFiles.Done()
-				msg, err := srv.Users.Messages.Get(user, messageId).Do()
+				msg, err := srv.Users.Messages.Get(user, messageID).Do()
 				// rate limiting
 				time.Sleep(time.Second * 10)
-				results <- result{messageId, msg, err}
+				results <- result{messageID, msg, err}
 			}(messageID)
-		}()
+		}(messageID)
 	}
 
 	var nEnvs, nErr int
