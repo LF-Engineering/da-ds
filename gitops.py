@@ -215,45 +215,50 @@ class GitOps:
 
         return ''.encode('utf-8')
 
-    def _pls(self, result, force=False):
+    def _pls(self, result):
         """
         Get the programing language summary
         """
-        def extract_program_language_summary(value, force=False):
+        def extract_program_language_summary(value):
             stats = list()
+            language = False
             try:
                 lan_smry_lst = value.split('\n')
-                if len(lan_smry_lst) > 0 and ('SUM:' in value or force):
-                    for smry in lan_smry_lst[::-1]:
+                if len(lan_smry_lst) > 0 and ('SUM:' in value
+                                              or 'Language:' in value):
+                    for smry in lan_smry_lst:
                         if smry.startswith('---') or len(smry) == 0:
                             continue
                         elif smry.startswith('Language'):
-                            break
+                            language = True
+                            continue
                         else:
-                            smry_result = smry.split()
-                            stats.append({
-                                'language': smry_result[0].replace('SUM:', 'Total'),
-                                'files': smry_result[1],
-                                'blank': smry_result[2],
-                                'comment': smry_result[3],
-                                'code': smry_result[4]
-                            })
+                            if language:
+                                smry_result = smry.split()
+                                stats.append({
+                                    'language': smry_result[0].replace('SUM:', 'Total'),
+                                    'files': smry_result[1],
+                                    'blank': smry_result[2],
+                                    'comment': smry_result[3],
+                                    'code': smry_result[4]
+                                })
             except (Exception, RuntimeError) as re:
                 # logger.error('Extract program language summary : %s', str(re))
                 pass
             finally:
                 return stats
 
-        return extract_program_language_summary(self.sanitize_os_output(result), force)
+        return extract_program_language_summary(self.sanitize_os_output(result))
 
-    def _loc(self, result, force=False):
+    def _loc(self, result):
         """
         Get the total lines of code from the default branch
         """
-        def extract_lines_of_code(value, force=False):
+        def extract_lines_of_code(value):
             loc_value = 0
             try:
-                if len(value) > 0 and ('SUM:' in value or force):
+                if len(value) > 0 and ('SUM:' in value
+                                       or 'Language:' in value):
                     loc_value = int((value.split('\n')[-3]).split(' ')[-1])
             except (Exception, RuntimeError) as re:
                 # logger.error('Extract lines of code : %s', str(re))
@@ -261,7 +266,7 @@ class GitOps:
             finally:
                 return loc_value
 
-        return extract_lines_of_code(self.sanitize_os_output(result), force)
+        return extract_lines_of_code(self.sanitize_os_output(result))
 
     def _clone(self):
         """
@@ -479,9 +484,6 @@ class GitOps:
             # extract new the loc and pls
             loc = self._loc(result)
             pls = self._pls(result)
-            if loc == 0 and len(pls) == 0:
-                loc = self._loc(result, force=True)
-                pls = self._pls(result, force=True)
 
             logger.debug('Cache loc value %s', cache_loc)
             logger.debug('New loc value %s', loc)
