@@ -3788,7 +3788,7 @@ func (j *DSGitHub) EnrichIssueComments(ctx *Ctx, issue map[string]interface{}, c
 	iNumber, _ := issueNumber.(int)
 	iGithubRepo, _ := issue["github_repo"]
 	githubRepo, _ := iGithubRepo.(string)
-	copyIssueFields := []string{"category", "github_repo", "repo_name", "repository", "repo_short_name"}
+	copyIssueFields := []string{"category", "github_repo", "repo_name", "repository", "repo_short_name", "pull_request"}
 	copyCommentFields := []string{"created_at", "updated_at", "body", "body_analyzed", "author_association", "url", "html_url"}
 	for _, comment := range comments {
 		rich := make(map[string]interface{})
