@@ -3808,6 +3808,7 @@ func (j *DSGitHub) EnrichIssueComments(ctx *Ctx, issue map[string]interface{}, c
 		rich["type"] = "issue_comment"
 		rich["item_type"] = "issue comment"
 		rich["issue_comment"] = true
+		rich["issue_created_at"], _ = issue["created_at"]
 		rich["issue_id"] = issueID
 		rich["issue_number"] = issueNumber
 		iCID, _ := comment["id"]
@@ -4148,6 +4149,7 @@ func (j *DSGitHub) EnrichPullRequestComments(ctx *Ctx, pull map[string]interface
 		rich["type"] = "pull_request_comment"
 		rich["item_type"] = "pull request comment"
 		rich["pull_request_comment"] = true
+		rich["pull_request_created_at"], _ = pull["created_at"]
 		rich["pull_request_id"] = pullID
 		rich["pull_request_number"] = pullNumber
 		iCID, _ := comment["id"]
