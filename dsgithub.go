@@ -4246,8 +4246,18 @@ func (j *DSGitHub) EnrichPullRequestReviews(ctx *Ctx, pull map[string]interface{
 	iGithubRepo, _ := pull["github_repo"]
 	pullCreatedAt, _ := pull["created_at"]
 	githubRepo, _ := iGithubRepo.(string)
-	copyPullFields := []string{"category", "github_repo", "repo_name", "repository", "url", "repo_short_name"}
+	copyPullFields := []string{"category", "github_repo", "repo_name", "repository", "url", "repo_short_name", "merged"}
 	copyReviewFields := []string{"body", "body_analyzed", "submitted_at", "commit_id", "html_url", "pull_request_url", "state", "author_association"}
+	bApproved := false
+	for _, review := range reviews {
+		approved, ok := review["state"]
+		if !ok {
+			continue
+		}
+		if approved.(string) == "APPROVED" {
+			bApproved = true
+		}
+	}
 	for _, review := range reviews {
 		rich := make(map[string]interface{})
 		for _, field := range RawFields {
@@ -4268,6 +4278,7 @@ func (j *DSGitHub) EnrichPullRequestReviews(ctx *Ctx, pull map[string]interface{
 		rich["pull_request_review"] = true
 		rich["pull_request_id"] = pullID
 		rich["pull_request_number"] = pullNumber
+		rich["is_approved"] = bApproved
 		iRID, _ := review["id"]
 		rid := int64(iRID.(float64))
 		rich["id_in_repo"] = rid
