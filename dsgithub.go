@@ -4350,6 +4350,7 @@ func (j *DSGitHub) EnrichPullRequestReviews(ctx *Ctx, pull map[string]interface{
 		}
 		richItems = append(richItems, rich)
 	}
+	pull["is_approved"] = bApproved
 	return
 }
 
