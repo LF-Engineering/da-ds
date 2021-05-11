@@ -3854,6 +3854,7 @@ func (j *DSGitHub) EnrichIssueComments(ctx *Ctx, issue map[string]interface{}, c
 		}
 		iCreatedAt, _ := comment["created_at"]
 		createdAt, _ := TimeParseInterfaceString(iCreatedAt)
+		rich[j.DateField(ctx)] = createdAt
 		if affs {
 			authorKey := "user_data"
 			var affsItems map[string]interface{}
@@ -3945,6 +3946,7 @@ func (j *DSGitHub) EnrichIssueAssignees(ctx *Ctx, issue map[string]interface{}, 
 		// We consider assignee enrollment at issue creation date
 		iCreatedAt, _ := issue["created_at"]
 		createdAt, _ := TimeParseInterfaceString(iCreatedAt)
+		rich[j.DateField(ctx)] = createdAt
 		if affs {
 			authorKey := "assignee"
 			var affsItems map[string]interface{}
@@ -4079,6 +4081,7 @@ func (j *DSGitHub) EnrichIssueReactions(ctx *Ctx, issue map[string]interface{}, 
 		// createdAt is issue creation date for issue reactions and comment creation date for comment reactions
 		// reaction itself doesn't have any date in GH API
 		createdAt, _ := TimeParseInterfaceString(iCreatedAt)
+		rich[j.DateField(ctx)] = createdAt
 		if affs {
 			authorKey := "user_data"
 			var affsItems map[string]interface{}
@@ -4195,6 +4198,7 @@ func (j *DSGitHub) EnrichPullRequestComments(ctx *Ctx, pull map[string]interface
 		}
 		iCreatedAt, _ := comment["created_at"]
 		createdAt, _ := TimeParseInterfaceString(iCreatedAt)
+		rich[j.DateField(ctx)] = createdAt
 		if affs {
 			authorKey := "user_data"
 			var affsItems map[string]interface{}
@@ -4317,6 +4321,7 @@ func (j *DSGitHub) EnrichPullRequestReviews(ctx *Ctx, pull map[string]interface{
 		}
 		iSubmittedAt, _ := review["submitted_at"]
 		submittedAt, _ := TimeParseInterfaceString(iSubmittedAt)
+		rich[j.DateField(ctx)] = submittedAt
 		if affs {
 			authorKey := "user_data"
 			var affsItems map[string]interface{}
@@ -4408,6 +4413,7 @@ func (j *DSGitHub) EnrichPullRequestAssignees(ctx *Ctx, pull map[string]interfac
 		// We consider assignee enrollment at pull request creation date
 		iCreatedAt, _ := pull["created_at"]
 		createdAt, _ := TimeParseInterfaceString(iCreatedAt)
+		rich[j.DateField(ctx)] = createdAt
 		if affs {
 			authorKey := "assignee"
 			var affsItems map[string]interface{}
@@ -4523,6 +4529,7 @@ func (j *DSGitHub) EnrichPullRequestReactions(ctx *Ctx, pull map[string]interfac
 		// createdAt is pull request comment creation date
 		// reaction itself doesn't have any date in GH API
 		createdAt, _ := TimeParseInterfaceString(iCreatedAt)
+		rich[j.DateField(ctx)] = createdAt
 		if affs {
 			authorKey := "user_data"
 			var affsItems map[string]interface{}
@@ -4614,6 +4621,7 @@ func (j *DSGitHub) EnrichPullRequestRequestedReviewers(ctx *Ctx, pull map[string
 		// We consider requested reviewer enrollment at pull request creation date
 		iCreatedAt, _ := pull["created_at"]
 		createdAt, _ := TimeParseInterfaceString(iCreatedAt)
+		rich[j.DateField(ctx)] = createdAt
 		if affs {
 			authorKey := "requested_reviewer"
 			var affsItems map[string]interface{}
@@ -4861,6 +4869,7 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 		firstAttention := j.GetFirstIssueAttention(issue)
 		rich["time_to_first_attention"] = float64(firstAttention.Sub(createdAt).Seconds()) / 86400.0
 	}
+	rich[j.DateField(ctx)] = createdAt
 	if affs {
 		authorKey := "user_data"
 		var affsItems map[string]interface{}
@@ -5223,6 +5232,7 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 		firstReviewDate := j.GetFirstPullRequestReviewDate(pull)
 		rich["time_to_merge_request_response"] = float64(firstReviewDate.Sub(createdAt).Seconds()) / 86400.0
 	}
+	rich[j.DateField(ctx)] = createdAt
 	if affs {
 		authorKey := "user_data"
 		var affsItems map[string]interface{}
@@ -5314,6 +5324,7 @@ func (j *DSGitHub) EnrichRepositoryItem(ctx *Ctx, item map[string]interface{}, a
 	rich["url"] = v
 	rich["repo_name"] = j.URL
 	updatedOn, _ := Dig(item, []string{j.DateField(ctx)}, true, false)
+	rich[j.DateField(ctx)] = updatedOn
 	for prop, value := range CommonFields(j, updatedOn, j.Category) {
 		rich[prop] = value
 	}
