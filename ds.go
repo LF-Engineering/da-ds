@@ -983,7 +983,6 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 		url = ctx.ESURL + "/" + ctx.RichIndex
 	}
 	Printf("index: %s\n", url)
-	url += "?wait_for_active_shards=all"
 	var (
 		result interface{}
 		status int
@@ -1001,7 +1000,7 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 	}
 	result, status, _, _, err = Request(
 		ctx,
-		url,
+		url+"?wait_for_active_shards=all",
 		Put,
 		nil,                                 // headers
 		[]byte{},                            // payload
