@@ -982,7 +982,23 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 	} else {
 		url = ctx.ESURL + "/" + ctx.RichIndex
 	}
-	_, _, _, _, err = Request(
+	Printf("index: %s\n", url)
+	var (
+		result interface{}
+		status int
+	)
+	stringResult := func(r interface{}) string {
+		bR, ok := r.([]byte)
+		if ok {
+			return string(bR)
+		}
+		iR, ok := r.(map[string]interface{})
+		if ok {
+			return fmt.Sprintf("%+v", iR)
+		}
+		return fmt.Sprintf("%+v", r)
+	}
+	result, status, _, _, err = Request(
 		ctx,
 		url,
 		Put,
@@ -997,6 +1013,7 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 		nil,                                 // cache duration
 		true,                                // skip in dry run
 	)
+	Printf("index create: status=%d, result: %+v\n", url, status, stringResult(result))
 	FatalOnError(err)
 	// DS specific raw index mapping
 	var mapping []byte
@@ -1006,7 +1023,7 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 		mapping = ds.ElasticRichMapping()
 	}
 	url += "/_mapping"
-	_, _, _, _, err = Request(
+	result, status, _, _, err = Request(
 		ctx,
 		url,
 		Put,
@@ -1021,9 +1038,13 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 		nil,
 		true,
 	)
+	if ctx.Debug > 0 {
+		Printf("index mapping %s -> status=%d, result: %+v\n", url, status, stringResult(result))
+		Printf("mapping: %+v\n", string(mapping))
+	}
 	FatalOnError(err)
 	// Global not analyze string mapping
-	_, _, _, _, err = Request(
+	result, status, _, _, err = Request(
 		ctx,
 		url,
 		Put,
@@ -1038,6 +1059,9 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 		nil,
 		true,
 	)
+	if ctx.Debug > 0 {
+		Printf("index not analyze string mapping %s -> status=%d, result: %+v\n", url, status, stringResult(result))
+	}
 	FatalOnError(err)
 	return
 }
