@@ -63,6 +63,7 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 		AuthorMultiOrgNames:  []string{Unknown},
 		AuthorOrgName:        Unknown,
 		Timezone:             rawMessage.Timezone,
+		ViaCommunityGroup:    false,
 	}
 
 	if rawMessage.InReplyTo == "" {
@@ -74,9 +75,32 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 	enrichedMessage.From = e.GetUserName(rawMessage.From)
 	enrichedMessage.AuthorName = e.GetUserName(rawMessage.From)
 
-	userData, err := e.affiliationsClientProvider.GetIdentityByUser("email", userAffiliationsEmail)
-	if err != nil {
-		log.Println(err)
+	var userData *affiliation.AffIdentity
+	var err error
+	if strings.Contains(enrichedMessage.AuthorName, " via ") {
+		enrichedMessage.AuthorName = strings.Split(enrichedMessage.AuthorName, " via ")[0]
+		enrichedMessage.ViaCommunityGroup = true
+	}
+
+	if strings.Contains(enrichedMessage.AuthorName, "(Jira)") {
+		enrichedMessage.AuthorName = strings.Replace(enrichedMessage.AuthorName, "(Jira)", "", -1)
+		enrichedMessage.ViaCommunityGroup = true
+	}
+
+	if strings.Contains(enrichedMessage.From, " via ") || strings.Contains(enrichedMessage.From, "(Jira)") {
+		name := enrichedMessage.AuthorName
+		source := GoogleGroups
+		authorUUID, _ := uuid.GenerateIdentity(&source, &userAffiliationsEmail, &name, nil)
+		userData, err = e.affiliationsClientProvider.GetIdentityByUser("id", authorUUID)
+		if err != nil {
+			log.Println(err)
+		}
+
+	} else {
+		userData, err = e.affiliationsClientProvider.GetIdentityByUser("email", userAffiliationsEmail)
+		if err != nil {
+			log.Println(err)
+		}
 	}
 
 	if userData != nil {

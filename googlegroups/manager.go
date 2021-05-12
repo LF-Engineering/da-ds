@@ -135,7 +135,7 @@ func (m *Manager) Sync() error {
 	fetchCh := m.fetch(m.fetcher, lastActionCachePostfix)
 
 	var err error
-	if status["doneFetch"] == false {
+	if !status["doneFetch"] {
 		err = <-fetchCh
 		if err == nil {
 			status["doneFetch"] = true
@@ -143,7 +143,7 @@ func (m *Manager) Sync() error {
 		time.Sleep(5 * time.Second)
 	}
 
-	if status["doneEnrich"] == false {
+	if !status["doneEnrich"] {
 		err = <-m.enrich(m.enricher, lastActionCachePostfix)
 		if err == nil {
 			status["doneEnrich"] = true

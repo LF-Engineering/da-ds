@@ -58,6 +58,7 @@ type EnrichedMessage struct {
 	MboxAuthorDomain     string    `json:"mbox_author_domain"`
 	IsGoogleGroupMessage int       `json:"is_google_group_message"`
 	Timezone             int       `json:"timezone"`
+	ViaCommunityGroup    bool      `json:"via_community_group"`
 }
 
 // RawMessage represents GoogleGroups raw message

@@ -2,7 +2,6 @@ package googlegroups
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	httpNative "net/http"
@@ -78,8 +77,10 @@ func (f *Fetcher) Fetch(fromDate, now *time.Time) ([]*RawMessage, error) {
 
 	user := "me"
 	messageIDS := make([]string, 0)
-	sender := fmt.Sprintf("list: %+v", f.GroupName)
-	messages, err := srv.Users.Messages.List(user).MaxResults(MaxNumberOfMessages).IncludeSpamTrash(true).Q(sender).Do()
+	sender := fmt.Sprintf("list:%+v", f.GroupName)
+	fetchStartDate := fmt.Sprintf("after:%+v", fromDate.Format("2006/01/02"))
+	fetchQuery := fmt.Sprintf("%s %s", sender, fetchStartDate)
+	messages, err := srv.Users.Messages.List(user).MaxResults(MaxNumberOfMessages).IncludeSpamTrash(false).Q(fetchQuery).Do()
 	if err != nil {
 		log.Fatalf("Error: %v", err)
 	}
@@ -93,7 +94,7 @@ func (f *Fetcher) Fetch(fromDate, now *time.Time) ([]*RawMessage, error) {
 		message *gmail.Message
 		err     error
 	}
-	results := make(chan result, 0)
+	results := make(chan result)
 	var wgFiles, wgProcess sync.WaitGroup
 
 	for _, messageID := range messageIDS {
@@ -149,21 +150,13 @@ func (f *Fetcher) getMessage(msg *gmail.Message, fromDate, now *time.Time) (rawM
 		return nil, err
 	}
 
-	from := headers.From
+	from := cleanupFrom(headers.From)
 	to := headers.To
-	sender := headers.Sender
 	messageID := headers.MessageID
 	inReplyTo := headers.InReplyTo
 	references := headers.References
 	subject := headers.Subject
 	messageBody := msg.Snippet
-	mailingList := headers.MailingList
-
-	if sender != f.GroupName || mailingList != f.GroupName {
-		errString := fmt.Sprintf("skipping subject [%+v] for group [%+v] & mailinglist [%+v]", subject, sender, mailingList)
-		log.Println(errString)
-		return nil, errors.New(errString)
-	}
 
 	if fromDate.After(date) {
 		fmt.Println(fromDate, " > ", date)
@@ -402,4 +395,41 @@ func updateTokenInSSM(ssmKey string, token *oauth2.Token) error {
 	}
 	log.Println(message)
 	return nil
+}
+
+//cleanup from name
+func cleanupFrom(rawMailString string) (newFrom string) {
+	trimBraces := strings.Split(rawMailString, " <")
+	username := ""
+	viaCommunity := ""
+
+	if len(trimBraces) > 1 {
+		username = strings.TrimSpace(trimBraces[0])
+
+		if strings.Contains(username, " via ") {
+			name := strings.Split(username, " via ")[0]
+			viaCommunity = strings.Replace(fmt.Sprintf(" %s %s", "via", strings.Split(username, " via ")[1]), "\"", "", -1)
+			username = name
+		}
+
+		username = strings.Trim(username, "\"")
+		username = strings.Replace(username, "'", "", -1)
+		username = strings.Replace(username, ",", "", -1)
+		username = strings.Replace(username, "<", " <", -1)
+
+		newFrom = fmt.Sprintf("%s%s <%s", username, viaCommunity, trimBraces[1])
+		return
+	} else {
+		if strings.HasPrefix(rawMailString, "<") {
+			username = strings.Replace(rawMailString, "<", " <", -1)
+		} else {
+			username = trimBraces[0]
+		}
+
+		newFrom = username
+
+	}
+
+	return
+
 }
