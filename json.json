@@ -1,0 +1,68 @@
+{
+  "dynamic": true,
+  "properties": {
+    "file_data": {
+      "type": "nested"
+    },
+    "authors_signed": {
+      "type": "nested"
+    },
+    "authors_co_authored": {
+      "type": "nested"
+    },
+    "authors_tested": {
+      "type": "nested"
+    },
+    "authors_approved": {
+      "type": "nested"
+    },
+    "authors_reviewed": {
+      "type": "nested"
+    },
+    "authors_reported": {
+      "type": "nested"
+    },
+    "authors_informed": {
+      "type": "nested"
+    },
+    "authors_resolved": {
+      "type": "nested"
+    },
+    "authors_influenced": {
+      "type": "nested"
+    },
+    "author_name": {
+      "type": "keyword"
+    },
+    "metadata__updated_on": {
+      "type": "date",
+      "format": "strict_date_optional_time||epoch_millis"
+    },
+    "message_analyzed": {
+      "type": "text",
+      "index": true
+    }
+  },
+  "dynamic_templates": [
+    {
+      "notanalyzed": {
+        "match": "*",
+        "unmatch": "message_analyzed",
+        "match_mapping_type": "string",
+        "mapping": {
+          "type": "keyword"
+        }
+      }
+    },
+    {
+      "formatdate": {
+        "match": "*",
+        "match_mapping_type": "date",
+        "mapping": {
+          "format": "strict_date_optional_time||epoch_millis",
+          "type": "date"
+        }
+      }
+    }
+  ]
+}

@@ -58,7 +58,7 @@ var (
 	// GitRawMapping - Git raw index mapping
 	GitRawMapping = []byte(`{"dynamic":true,"properties":{"metadata__updated_on":{"type":"date"},"data":{"properties":{"message":{"type":"text","index":true}}}}}`)
 	// GitRichMapping - Git rich index mapping
-	GitRichMapping = []byte(`{"properties":{"file_data":{"type":"nested"},"authors_signed":{"type":"nested"},"authors_co_authored":{"type":"nested"},"authors_tested":{"type":"nested"},"authors_approved":{"type":"nested"},"authors_reviewed":{"type":"nested"},"authors_reported":{"type":"nested"},"authors_informed":{"type":"nested"},"authors_resolved":{"type":"nested"},"authors_influenced":{"type":"nested"},"author_name":{"type":"keyword"},"metadata__updated_on":{"type":"date"},"message_analyzed":{"type":"text","index":true}}}`)
+	GitRichMapping = []byte(`{"dynamic":true,"properties":{"file_data":{"type":"nested"},"authors_signed":{"type":"nested"},"authors_co_authored":{"type":"nested"},"authors_tested":{"type":"nested"},"authors_approved":{"type":"nested"},"authors_reviewed":{"type":"nested"},"authors_reported":{"type":"nested"},"authors_informed":{"type":"nested"},"authors_resolved":{"type":"nested"},"authors_influenced":{"type":"nested"},"author_name":{"type":"keyword"},"metadata__updated_on":{"type":"date","format":"strict_date_optional_time||epoch_millis"},"message_analyzed":{"type":"text","index":true}},"dynamic_templates":[{"notanalyzed":{"match":"*","unmatch":"message_analyzed","match_mapping_type":"string","mapping":{"type":"keyword"}}},{"formatdate":{"match":"*","match_mapping_type":"date","mapping":{"format":"strict_date_optional_time||epoch_millis","type":"date"}}}]}`)
 	// GitCategories - categories defined for git
 	GitCategories = map[string]struct{}{Commit: {}}
 	// GitDefaultEnv - default git command environment
@@ -1849,6 +1849,7 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 			return
 		}
 	} else {
+		// Non PP
 		getRichItems = func(doc map[string]interface{}) (richItems []interface{}, e error) {
 			var rich map[string]interface{}
 			rich, e = ds.EnrichItem(ctx, doc, "", dbConfigured, nil)
