@@ -1013,7 +1013,7 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 		nil,                                 // cache duration
 		true,                                // skip in dry run
 	)
-	Printf("index create: status=%d, result: %+v\n", url, status, stringResult(result))
+	Printf("index %s created: status=%d, result: %+v\n", url, status, stringResult(result))
 	FatalOnError(err)
 	// DS specific raw index mapping
 	var mapping []byte
