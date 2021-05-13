@@ -2453,3 +2453,8 @@ func (j *DSGit) CalculateTimeToReset(ctx *Ctx, rateLimit, rateLimitReset int) (s
 func (j *DSGit) HasIdentities() bool {
 	return true
 }
+
+// UseDefaultMapping - apply MappingNotAnalyzeString for raw/rich (raw=fals/true) index in this DS?
+func (j *DSGit) UseDefaultMapping(ctx *Ctx, raw bool) bool {
+	return false
+}

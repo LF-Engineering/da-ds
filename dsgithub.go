@@ -5467,3 +5467,8 @@ func (j *DSGitHub) CalculateTimeToReset(ctx *Ctx, rateLimit, rateLimitReset int)
 func (j *DSGitHub) HasIdentities() bool {
 	return j.Category != "repository"
 }
+
+// UseDefaultMapping - apply MappingNotAnalyzeString for raw/rich (raw=fals/true) index in this DS?
+func (j *DSGitHub) UseDefaultMapping(ctx *Ctx, raw bool) bool {
+	return false
+}

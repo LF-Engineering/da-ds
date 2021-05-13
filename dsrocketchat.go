@@ -961,3 +961,8 @@ func (j *DSRocketchat) AllRoles(ctx *Ctx, item map[string]interface{}) ([]string
 func (j *DSRocketchat) HasIdentities() bool {
 	return true
 }
+
+// UseDefaultMapping - apply MappingNotAnalyzeString for raw/rich (raw=fals/true) index in this DS?
+func (j *DSRocketchat) UseDefaultMapping(ctx *Ctx, raw bool) bool {
+	return true
+}

@@ -1886,3 +1886,8 @@ func (j *DSGerrit) CalculateTimeToReset(ctx *Ctx, rateLimit, rateLimitReset int)
 func (j *DSGerrit) HasIdentities() bool {
 	return true
 }
+
+// UseDefaultMapping - apply MappingNotAnalyzeString for raw/rich (raw=fals/true) index in this DS?
+func (j *DSGerrit) UseDefaultMapping(ctx *Ctx, raw bool) bool {
+	return true
+}

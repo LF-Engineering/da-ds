@@ -1441,3 +1441,8 @@ func (j *DSJira) CalculateTimeToReset(ctx *Ctx, rateLimit, rateLimitReset int) (
 func (j *DSJira) HasIdentities() bool {
 	return true
 }
+
+// UseDefaultMapping - apply MappingNotAnalyzeString for raw/rich (raw=fals/true) index in this DS?
+func (j *DSJira) UseDefaultMapping(ctx *Ctx, raw bool) bool {
+	return false
+}

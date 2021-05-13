@@ -1215,3 +1215,8 @@ func (j *DSGroupsio) CalculateTimeToReset(ctx *Ctx, rateLimit, rateLimitReset in
 func (j *DSGroupsio) HasIdentities() bool {
 	return true
 }
+
+// UseDefaultMapping - apply MappingNotAnalyzeString for raw/rich (raw=fals/true) index in this DS?
+func (j *DSGroupsio) UseDefaultMapping(ctx *Ctx, raw bool) bool {
+	return true
+}

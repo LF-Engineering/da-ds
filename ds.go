@@ -68,6 +68,7 @@ type DS interface {
 	AllRoles(*Ctx, map[string]interface{}) ([]string, bool)
 	CalculateTimeToReset(*Ctx, int, int) int
 	HasIdentities() bool
+	UseDefaultMapping(*Ctx, bool) bool
 }
 
 // CommonFields - common rich item fields
@@ -1043,26 +1044,28 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 		Printf("mapping: %+v\n", string(mapping))
 	}
 	FatalOnError(err)
-	// Global not analyze string mapping
-	result, status, _, _, err = Request(
-		ctx,
-		url,
-		Put,
-		map[string]string{"Content-Type": "application/json"},
-		MappingNotAnalyzeString,
-		[]string{},
-		nil,
-		nil,
-		map[[2]int]struct{}{{200, 200}: {}},
-		nil,
-		true,
-		nil,
-		true,
-	)
-	if ctx.Debug > 0 {
-		Printf("index not analyze string mapping %s -> status=%d, result: %+v\n", url, status, stringResult(result))
+	if ds.UseDefaultMapping(ctx, raw) {
+		// Global not analyze string mapping
+		result, status, _, _, err = Request(
+			ctx,
+			url,
+			Put,
+			map[string]string{"Content-Type": "application/json"},
+			MappingNotAnalyzeString,
+			[]string{},
+			nil,
+			nil,
+			map[[2]int]struct{}{{200, 200}: {}},
+			nil,
+			true,
+			nil,
+			true,
+		)
+		if ctx.Debug > 0 {
+			Printf("index not analyze string mapping %s -> status=%d, result: %+v\n", url, status, stringResult(result))
+		}
+		FatalOnError(err)
 	}
-	FatalOnError(err)
 	return
 }
 

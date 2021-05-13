@@ -477,3 +477,8 @@ func (j *DSStub) HasIdentities() bool {
 	// IMPL
 	return true
 }
+
+// UseDefaultMapping - apply MappingNotAnalyzeString for raw/rich (raw=fals/true) index in this DS?
+func (j *DSStub) UseDefaultMapping(ctx *Ctx, raw bool) bool {
+	return true
+}

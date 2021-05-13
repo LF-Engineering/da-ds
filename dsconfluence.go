@@ -938,3 +938,8 @@ func (j *DSConfluence) CalculateTimeToReset(ctx *Ctx, rateLimit, rateLimitReset 
 func (j *DSConfluence) HasIdentities() bool {
 	return true
 }
+
+// UseDefaultMapping - apply MappingNotAnalyzeString for raw/rich (raw=fals/true) index in this DS?
+func (j *DSConfluence) UseDefaultMapping(ctx *Ctx, raw bool) bool {
+	return true
+}
