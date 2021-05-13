@@ -414,9 +414,14 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 		if err != nil {
 			return
 		}
-		id, ok := item.(map[string]interface{})[key].(string)
+		iID, ok := item.(map[string]interface{})[key]
 		if !ok {
 			err = fmt.Errorf("missing %s property in %+v", key, DumpKeys(item))
+			return
+		}
+		id, ok := iID.(string)
+		if !ok {
+			err = fmt.Errorf("%s property is %T not string %+v", key, iID, iID)
 			return
 		}
 		hdr = []byte(`{"index":{"_id":"` + id + "\"}}\n")
@@ -482,9 +487,14 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 			if err != nil {
 				return
 			}
-			id, ok := item.(map[string]interface{})[key].(string)
+			iID, ok := item.(map[string]interface{})[key]
 			if !ok {
 				err = fmt.Errorf("missing %s property in %+v", key, DumpKeys(item))
+				return
+			}
+			id, ok := iID.(string)
+			if !ok {
+				err = fmt.Errorf("%s property is %T not string %+v", key, iID, iID)
 				return
 			}
 			indices = append(indices, indexName)
