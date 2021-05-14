@@ -13,8 +13,10 @@ import (
 // DA_DS=jira DA_JIRA_ENRICH=1 DA_JIRA_ES_URL=... DA_JIRA_RAW_INDEX=proj-raw DA_JIRA_RICH_INDEX=proj DA_JIRA_URL=https://jira.xyz.org DA_JIRA_DEBUG=1 DA_JIRA_PROJECT=proj DA_JIRA_DB_NAME=db DA_JIRA_DB_USER=u DA_JIRA_DB_PASS=p DA_JIRA_MULTI_ORIGIN=1 ./dads
 
 const (
-	// BulkRefreshMode - bulk upload refresh mode, can be: false, true, wait_for
+	// BulkRefreshMode - bulk upload refresh mode, can be: false, true, wait_for (ES defaults to false)
 	BulkRefreshMode = "true"
+	// BulkWaitForActiveShardsMode - bulk upload wait_for_active_shards mode, can be: 1, 2, ..., all (ES defaults to 1)
+	BulkWaitForActiveShardsMode = "all"
 	// KeywordMaxlength - max description length
 	KeywordMaxlength = 1000
 	// DefaultRateLimitHeader - default value for rate limit header

@@ -397,9 +397,9 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 	}
 	var url string
 	if raw {
-		url = ctx.ESURL + "/" + ctx.RawIndex + "/_bulk?refresh=" + BulkRefreshMode
+		url = ctx.ESURL + "/" + ctx.RawIndex + "/_bulk?refresh=" + BulkRefreshMode + "&wait_for_active_shards=" + BulkWaitForActiveShardsMode
 	} else {
-		url = ctx.ESURL + "/" + ctx.RichIndex + "/_bulk?refresh=" + BulkRefreshMode
+		url = ctx.ESURL + "/" + ctx.RichIndex + "/_bulk?refresh=" + BulkRefreshMode + "&wait_for_active_shards=" + BulkWaitForActiveShardsMode
 	}
 	// {"index":{"_id":"uuid"}}
 	payloads := []byte{}
