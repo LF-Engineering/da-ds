@@ -281,7 +281,8 @@ func (j *DSGitHub) isAbuse(e error) (abuse, rateLimit bool) {
 		}
 	}()
 	errStr := e.Error()
-	abuse = strings.Contains(errStr, "403 You have triggered an abuse detection mechanism")
+	// GitHub can return '401 Bad credentials' when you abuse API very heavy
+	abuse = strings.Contains(errStr, "403 You have triggered an abuse detection mechanism") || strings.Contains(errStr, "401 Bad credentials")
 	rateLimit = strings.Contains(errStr, "403 API rate limit")
 	return
 }
