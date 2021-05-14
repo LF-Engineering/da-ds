@@ -3903,7 +3903,7 @@ func (j *DSGitHub) EnrichIssueAssignees(ctx *Ctx, issue map[string]interface{}, 
 	iNumber, _ := issueNumber.(int)
 	iGithubRepo, _ := issue["github_repo"]
 	githubRepo, _ := iGithubRepo.(string)
-	copyIssueFields := []string{"category", "github_repo", "repo_name", "repository", "repo_short_name"}
+	copyIssueFields := []string{"category", "github_repo", "repo_name", "repository", "repo_short_name", "pull_request"}
 	for _, assignee := range assignees {
 		rich := make(map[string]interface{})
 		for _, field := range RawFields {
@@ -3995,7 +3995,7 @@ func (j *DSGitHub) EnrichIssueReactions(ctx *Ctx, issue map[string]interface{}, 
 	iNumber, _ := issueNumber.(int)
 	iGithubRepo, _ := issue["github_repo"]
 	githubRepo, _ := iGithubRepo.(string)
-	copyIssueFields := []string{"category", "github_repo", "repo_name", "repository", "repo_short_name"}
+	copyIssueFields := []string{"category", "github_repo", "repo_name", "repository", "repo_short_name", "pull_request"}
 	copyReactionFields := []string{"content"}
 	for _, reaction := range reactions {
 		rich := make(map[string]interface{})
