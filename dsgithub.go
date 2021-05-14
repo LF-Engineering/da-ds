@@ -3943,9 +3943,9 @@ func (j *DSGitHub) EnrichIssueAssignees(ctx *Ctx, issue map[string]interface{}, 
 		rich["assignee_org"], _ = assignee["company"]
 		rich["assignee_location"], _ = assignee["location"]
 		rich["assignee_geolocation"] = nil
-		// We consider assignee enrollment at issue creation date
+		// We consider assignee assignment at issue creation date
 		iCreatedAt, _ := issue["created_at"]
-		createdAt, _ := TimeParseInterfaceString(iCreatedAt)
+		createdAt, _ := iCreatedAt.(time.Time)
 		rich[j.DateField(ctx)] = createdAt
 		if affs {
 			authorKey := "assignee"
@@ -4018,7 +4018,7 @@ func (j *DSGitHub) EnrichIssueReactions(ctx *Ctx, issue map[string]interface{}, 
 		rid := int64(iRID.(float64))
 		var (
 			comment        map[string]interface{}
-			iCreatedAt     interface{}
+			createdAt      time.Time
 			reactionSuffix string
 		)
 		iComment, ok := reaction["parent"]
@@ -4037,7 +4037,10 @@ func (j *DSGitHub) EnrichIssueReactions(ctx *Ctx, issue map[string]interface{}, 
 			rich["id_in_repo"] = rid
 			rich["id"] = id + "/comment/" + fmt.Sprintf("%d", cid) + "/reaction/" + fmt.Sprintf("%d", rid)
 			rich["url_id"] = fmt.Sprintf("%s/issues/%d/comments/%d/reactions/%d", githubRepo, iNumber, cid, rid)
-			iCreatedAt, _ = comment["created_at"]
+			iCreatedAt, _ := comment["created_at"]
+			// createdAt is comment creation date for comment reactions
+			// reaction itself doesn't have any date in GH API
+			createdAt, _ = TimeParseInterfaceString(iCreatedAt)
 		} else {
 			reactionSuffix = "_reaction"
 			rich["type"] = "issue" + reactionSuffix
@@ -4047,7 +4050,10 @@ func (j *DSGitHub) EnrichIssueReactions(ctx *Ctx, issue map[string]interface{}, 
 			rich["id_in_repo"] = rid
 			rich["id"] = id + "/reaction/" + fmt.Sprintf("%d", rid)
 			rich["url_id"] = fmt.Sprintf("%s/issues/%d/reactions/%d", githubRepo, iNumber, rid)
-			iCreatedAt, _ = issue["created_at"]
+			iCreatedAt, _ := issue["created_at"]
+			// createdAt is issue creation date for issue reactions
+			// reaction itself doesn't have any date in GH API
+			createdAt, _ = iCreatedAt.(time.Time)
 		}
 		iUserData, ok := reaction["user_data"]
 		if ok && iUserData != nil {
@@ -4078,9 +4084,6 @@ func (j *DSGitHub) EnrichIssueReactions(ctx *Ctx, issue map[string]interface{}, 
 			rich["actor_location"] = nil
 			rich["actor_geolocation"] = nil
 		}
-		// createdAt is issue creation date for issue reactions and comment creation date for comment reactions
-		// reaction itself doesn't have any date in GH API
-		createdAt, _ := TimeParseInterfaceString(iCreatedAt)
 		rich[j.DateField(ctx)] = createdAt
 		if affs {
 			authorKey := "user_data"
@@ -4413,7 +4416,7 @@ func (j *DSGitHub) EnrichPullRequestAssignees(ctx *Ctx, pull map[string]interfac
 		rich["assignee_geolocation"] = nil
 		// We consider assignee enrollment at pull request creation date
 		iCreatedAt, _ := pull["created_at"]
-		createdAt, _ := TimeParseInterfaceString(iCreatedAt)
+		createdAt, _ := iCreatedAt.(time.Time)
 		rich[j.DateField(ctx)] = createdAt
 		if affs {
 			authorKey := "assignee"
@@ -4621,7 +4624,7 @@ func (j *DSGitHub) EnrichPullRequestRequestedReviewers(ctx *Ctx, pull map[string
 		rich["requested_reviewer_geolocation"] = nil
 		// We consider requested reviewer enrollment at pull request creation date
 		iCreatedAt, _ := pull["created_at"]
-		createdAt, _ := TimeParseInterfaceString(iCreatedAt)
+		createdAt, _ := iCreatedAt.(time.Time)
 		rich[j.DateField(ctx)] = createdAt
 		if affs {
 			authorKey := "requested_reviewer"
