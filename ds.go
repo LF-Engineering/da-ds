@@ -26,6 +26,8 @@ const (
 )
 
 var (
+	// SettingsFieldsNumberLimit - make maximum number of index fields bigger (some raw indices have a lot of fields and we don't control this)
+	SettingsFieldsNumberLimit = []byte(`{"index.mapping.total_fields.limit":50000}`)
 	// MappingNotAnalyzeString - make all string keywords by default (not analyze them)
 	MappingNotAnalyzeString = []byte(`{"dynamic_templates":[{"notanalyzed":{"match":"*","match_mapping_type":"string","mapping":{"type":"keyword"}}},{"formatdate":{"match":"*","match_mapping_type":"date","mapping":{"type":"date","format":"strict_date_optional_time||epoch_millis"}}}]}`)
 	// RawFields - standard raw fields
@@ -1025,10 +1027,9 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 	} else {
 		mapping = ds.ElasticRichMapping()
 	}
-	url += "/_mapping"
 	result, status, _, _, err = Request(
 		ctx,
-		url,
+		url+"/_mapping",
 		Put,
 		map[string]string{"Content-Type": "application/json"},
 		mapping,
@@ -1050,7 +1051,7 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 		// Global not analyze string mapping
 		result, status, _, _, err = Request(
 			ctx,
-			url,
+			url+"/_mapping",
 			Put,
 			map[string]string{"Content-Type": "application/json"},
 			MappingNotAnalyzeString,
@@ -1065,6 +1066,27 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 		)
 		if ctx.Debug > 0 {
 			Printf("index not analyze string mapping %s -> status=%d, result: %+v\n", url, status, stringResult(result))
+		}
+		FatalOnError(err)
+	}
+	if raw {
+		result, status, _, _, err = Request(
+			ctx,
+			url+"/_settings",
+			Put,
+			map[string]string{"Content-Type": "application/json"},
+			SettingsFieldsNumberLimit,
+			[]string{},
+			nil,
+			nil,
+			map[[2]int]struct{}{{200, 200}: {}},
+			nil,
+			true,
+			nil,
+			true,
+		)
+		if ctx.Debug > 0 {
+			Printf("index settings %s -> status=%d, result: %+v\n", url, status, stringResult(result))
 		}
 		FatalOnError(err)
 	}
