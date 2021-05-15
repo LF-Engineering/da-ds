@@ -4256,16 +4256,38 @@ func (j *DSGitHub) EnrichPullRequestReviews(ctx *Ctx, pull map[string]interface{
 	pullCreatedAt, _ := pull["created_at"]
 	githubRepo, _ := iGithubRepo.(string)
 	copyPullFields := []string{"category", "github_repo", "repo_name", "repository", "url", "repo_short_name", "merged"}
-	copyReviewFields := []string{"body", "body_analyzed", "submitted_at", "commit_id", "html_url", "pull_request_url", "state", "author_association"}
+	copyReviewFields := []string{"body", "body_analyzed", "submitted_at", "commit_id", "html_url", "pull_request_url", "state", "author_association", "is_first_review", "is_first_approval"}
 	bApproved := false
-	for _, review := range reviews {
+	firstReview := time.Now()
+	firstApproval := time.Now()
+	firstReviewIdx := -1
+	firstApprovalIdx := -1
+	for i, review := range reviews {
+		review["is_first_review"] = false
+		review["is_first_approval"] = false
+		iSubmittedAt, _ := review["submitted_at"]
+		submittedAt, _ := TimeParseInterfaceString(iSubmittedAt)
+		if submittedAt.Before(firstReview) {
+			firstReview = submittedAt
+			firstReviewIdx = i
+		}
 		approved, ok := review["state"]
 		if !ok {
 			continue
 		}
 		if approved.(string) == "APPROVED" {
 			bApproved = true
+			if submittedAt.Before(firstApproval) {
+				firstApproval = submittedAt
+				firstApprovalIdx = i
+			}
 		}
+	}
+	if firstReviewIdx >= 0 {
+		reviews[firstReviewIdx]["is_first_review"] = true
+	}
+	if firstApprovalIdx >= 0 {
+		reviews[firstApprovalIdx]["is_first_approval"] = true
 	}
 	for _, review := range reviews {
 		rich := make(map[string]interface{})
