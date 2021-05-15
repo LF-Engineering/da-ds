@@ -2456,5 +2456,5 @@ func (j *DSGit) HasIdentities() bool {
 
 // UseDefaultMapping - apply MappingNotAnalyzeString for raw/rich (raw=fals/true) index in this DS?
 func (j *DSGit) UseDefaultMapping(ctx *Ctx, raw bool) bool {
-	return false
+	return raw
 }
