@@ -245,7 +245,7 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, Auth0Clie
 		&slackProvider,
 		appNameVersion)
 
-	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(m.AffBaseURL, m.Slug, httpClientProvider, esCacheClientProvider, auth0Client, &slackProvider)
+	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(m.AffBaseURL, m.Project, httpClientProvider, esCacheClientProvider, auth0Client, &slackProvider)
 
 	// Initialize enrich object to enrich raw data
 	enricher := NewEnricher(m.EnricherBackendVersion, m.Project, affiliationsClientProvider)

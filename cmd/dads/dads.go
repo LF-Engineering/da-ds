@@ -387,7 +387,7 @@ func buildBugzillaRestMgrServices(p *bugzillarest.MgrParams) (*bugzillarest.Fetc
 		&slackProvider,
 		appNameVersion)
 
-	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(p.AffBaseURL, p.Slug, httpClientProvider, esCacheClientProvider, auth0Client, &slackProvider)
+	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(p.AffBaseURL, p.Project, httpClientProvider, esCacheClientProvider, auth0Client, &slackProvider)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
