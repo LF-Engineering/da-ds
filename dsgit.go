@@ -2096,9 +2096,9 @@ func (j *DSGit) TrailerDoc(ctx *Ctx, rich, item map[string]interface{}, author s
 	for _, field := range RawFields {
 		v, _ := rich[field]
 		if field == UUID {
-			fmt.Printf("rich: %+v\n", rich)
-			fmt.Printf("item: %+v\n", item)
-			fmt.Printf("itemID: %+v\n", itemID)
+			// fmt.Printf("rich: %+v\n", rich)
+			// fmt.Printf("item: %+v\n", item)
+			// fmt.Printf("itemID: %+v\n", itemID)
 			trailer[field] = v.(string) + itemID
 			continue
 		}
