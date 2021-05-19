@@ -52,12 +52,15 @@ const (
 	GitHubURL = "https://github.com/"
 	// GitMaxCommitProperties - maximum properties that can be set on the commit object
 	GitMaxCommitProperties = 300
+	// GitGenerateFlatDocs - do we want to generate flat commit co-authors docs, like docs with type: commit_co_author, commit_signer etc.?
+	GitGenerateFlatDocs = true
 )
 
 var (
 	// GitRawMapping - Git raw index mapping
 	GitRawMapping = []byte(`{"dynamic":true,"properties":{"metadata__updated_on":{"type":"date"},"data":{"properties":{"message":{"type":"text","index":true}}}}}`)
 	// GitRichMapping - Git rich index mapping
+	// GitRichMapping = []byte(`{"dynamic":true,"properties":{"file_data":{"type":"nested"},"author_name":{"type":"keyword"},"metadata__updated_on":{"type":"date","format":"strict_date_optional_time||epoch_millis"},"message_analyzed":{"type":"text","index":true}},"dynamic_templates":[{"notanalyzed":{"match":"*","unmatch":"message_analyzed","match_mapping_type":"string","mapping":{"type":"keyword"}}},{"formatdate":{"match":"*","match_mapping_type":"date","mapping":{"format":"strict_date_optional_time||epoch_millis","type":"date"}}}]}`)
 	GitRichMapping = []byte(`{"dynamic":true,"properties":{"file_data":{"type":"nested"},"authors_signed":{"type":"nested"},"authors_co_authored":{"type":"nested"},"authors_tested":{"type":"nested"},"authors_approved":{"type":"nested"},"authors_reviewed":{"type":"nested"},"authors_reported":{"type":"nested"},"authors_informed":{"type":"nested"},"authors_resolved":{"type":"nested"},"authors_influenced":{"type":"nested"},"author_name":{"type":"keyword"},"metadata__updated_on":{"type":"date","format":"strict_date_optional_time||epoch_millis"},"message_analyzed":{"type":"text","index":true}},"dynamic_templates":[{"notanalyzed":{"match":"*","unmatch":"message_analyzed","match_mapping_type":"string","mapping":{"type":"keyword"}}},{"formatdate":{"match":"*","match_mapping_type":"date","mapping":{"format":"strict_date_optional_time||epoch_millis","type":"date"}}}]}`)
 	// GitCategories - categories defined for git
 	GitCategories = map[string]struct{}{Commit: {}}
@@ -851,7 +854,7 @@ func (j *DSGit) ParseCommit(ctx *Ctx, line string) (parsed bool, err error) {
 		}
 	}
 	j.Commit = make(map[string]interface{})
-	j.Commit["commit"] = m["commit"]
+	j.Commit[Commit] = m[Commit]
 	j.Commit["parents"] = parentsAry
 	j.Commit["refs"] = refsAry
 	j.CommitFiles = make(map[string]map[string]interface{})
@@ -1645,6 +1648,7 @@ func (j *DSGit) GetOtherPPAuthors(ctx *Ctx, doc interface{}) (othersMap map[stri
 }
 
 // GetOtherTrailersAuthors - get others authors - from other trailers fields (mostly for korg)
+// This works on a raw document
 func (j *DSGit) GetOtherTrailersAuthors(ctx *Ctx, doc interface{}) (othersMap map[string]map[[2]string]struct{}) {
 	for otherKey, otherRichKey := range GitTrailerOtherAuthors {
 		iothers, ok := Dig(doc, []string{"data", otherKey}, false, true)
@@ -1672,6 +1676,7 @@ func (j *DSGit) GetOtherTrailersAuthors(ctx *Ctx, doc interface{}) (othersMap ma
 // GetItemIdentities return list of item's identities, each one is [3]string
 // (name, username, email) tripples, special value Nil "none" means null
 // we use string and not *string which allows nil to allow usage as a map key
+// this is for raw items
 func (j *DSGit) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[[3]string]struct{}, err error) {
 	if ctx.Debug > 2 {
 		defer func() {
@@ -1830,12 +1835,24 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 				data[flag] = 1
 			}
 			// Normal enrichment
-			var rich map[string]interface{}
+			var (
+				rich        map[string]interface{}
+				trailerDocs []map[string]interface{}
+			)
 			rich, e = ds.EnrichItem(ctx, doc, "", dbConfigured, nil)
 			if e != nil {
 				return
 			}
 			richItems = append(richItems, rich)
+			if GitGenerateFlatDocs {
+				trailerDocs, e = git.TrailerDocs(ctx, rich)
+				if e != nil {
+					return
+				}
+				for _, trailerDoc := range trailerDocs {
+					richItems = append(richItems, trailerDoc)
+				}
+			}
 			// additional authors, committers, signers and co-authors
 			for auth, gitUUID := range auth2UUID {
 				data["Author"] = auth
@@ -1845,18 +1862,39 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 				}
 				rich[GitUUID] = gitUUID
 				richItems = append(richItems, rich)
+				if GitGenerateFlatDocs {
+					trailerDocs, e = git.TrailerDocs(ctx, rich)
+					if e != nil {
+						return
+					}
+					for _, trailerDoc := range trailerDocs {
+						richItems = append(richItems, trailerDoc)
+					}
+				}
 			}
 			return
 		}
 	} else {
 		// Non PP
 		getRichItems = func(doc map[string]interface{}) (richItems []interface{}, e error) {
-			var rich map[string]interface{}
+			var (
+				rich        map[string]interface{}
+				trailerDocs []map[string]interface{}
+			)
 			rich, e = ds.EnrichItem(ctx, doc, "", dbConfigured, nil)
 			if e != nil {
 				return
 			}
 			richItems = append(richItems, rich)
+			if GitGenerateFlatDocs {
+				trailerDocs, e = git.TrailerDocs(ctx, rich)
+				if e != nil {
+					return
+				}
+				for _, trailerDoc := range trailerDocs {
+					richItems = append(richItems, trailerDoc)
+				}
+			}
 			return
 		}
 	}
@@ -2006,6 +2044,76 @@ func (j *DSGit) MarkOrphanedCommits(ctx *Ctx) (err error) {
 	return
 }
 
+// TrailerDocs - return flat trailer docs for already generated rich item
+func (j *DSGit) TrailerDocs(ctx *Ctx, rich map[string]interface{}) (trailers []map[string]interface{}, err error) {
+	// "Signed-off-by":  {"authors_signed", "signer"},
+	var trailer map[string]interface{}
+	for _, data := range GitTrailerOtherAuthors {
+		aryName := data[0]
+		authorName := data[1]
+		iAry, ok := rich[aryName]
+		if ok {
+			ary, _ := iAry.([]interface{})
+			for _, iItem := range ary {
+				trailer, err = j.TrailerDoc(ctx, rich, iItem.(map[string]interface{}), authorName)
+				if err != nil {
+					return
+				}
+				trailers = append(trailers, trailer)
+			}
+		}
+	}
+	return
+}
+
+// TrailerDoc - return flat trailer doc for already generated rich item's nested trailer
+func (j *DSGit) TrailerDoc(ctx *Ctx, rich, item map[string]interface{}, author string) (trailer map[string]interface{}, err error) {
+	trailer = make(map[string]interface{})
+	copyRichFields := []string{
+		"git_author_domain",
+		"grimoire_creation_date", "tz", "url_id", "origin", "tag",
+		"author_date", "author_date_weekday", "author_date_hour",
+		"utc_author", "utc_author_date_weekday", "utc_author_date_hour",
+		"commit_tz", "commit_date", "commit_date_weekday", "commit_date_hour",
+		"utc_commit", "utc_commit_date_weekday", "utc_commit_date_hour",
+		"hash", "hash_short", "repo_name", "files", "doc_commit", "orphaned",
+		"lines_added", "lines_removed", "lines_changed", "total_lines_of_code",
+		"commit_url", "repo_short_name", "github_repo", "project", "project_ts",
+	}
+	authorID, ok := item[author+"_id"].(string)
+	if !ok {
+		err = fmt.Errorf("cannot extract %s from %+v", author+"_id", DumpKeys(item))
+		return
+	}
+	itemID := "/" + author + "/" + authorID
+	trailer["type"] = "commit_" + author
+	trailer["is_git_commit_"+author] = 1
+	trailer["is_git_commit"] = 1
+	gitUUID, ok := rich[GitUUID]
+	if ok {
+		trailer[GitUUID] = gitUUID.(string) + itemID
+	}
+	rich = make(map[string]interface{})
+	for _, field := range RawFields {
+		v, _ := rich[field]
+		if field == UUID {
+			trailer[field] = v.(string) + itemID
+			continue
+		}
+		trailer[field] = v
+	}
+	for _, field := range copyRichFields {
+		trailer[field], _ = rich[field]
+	}
+	// trailer <- item: "signer_*" <- "signer_*"
+	CopyAffsRoleData(trailer, item, author, author)
+	// trailer: "author_*" <- "signer_*"
+	CopyAffsRoleData(trailer, trailer, Author, author)
+	// trailer: "Author_*" <- "signer_*"
+	CopyAffsRoleData(trailer, trailer, "Author", author)
+	return
+}
+
 // EnrichItem - return rich item from raw item for a given author type
 func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, affs bool, extra interface{}) (rich map[string]interface{}, err error) {
 	rich = make(map[string]interface{})
@@ -2061,7 +2169,7 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 		rich["message_analyzed"] = nil
 		rich["message"] = nil
 	}
-	comm, ok := Dig(commit, []string{"commit"}, false, true)
+	comm, ok := Dig(commit, []string{Commit}, false, true)
 	var hsh string
 	if ok {
 		hsh, _ = comm.(string)
@@ -2439,8 +2547,26 @@ func (j *DSGit) GetRoleIdentity(ctx *Ctx, commit map[string]interface{}, role st
 // roles can be static (always the same) or dynamic (per item)
 // second return parameter is static mode (true/false)
 // dynamic roles will use item to get its roles
-func (j *DSGit) AllRoles(ctx *Ctx, item map[string]interface{}) ([]string, bool) {
-	return append(GitCommitRoles, Author), true
+func (j *DSGit) AllRoles(ctx *Ctx, item map[string]interface{}) (roles []string, static bool) {
+	roles = append(GitCommitRoles, Author)
+	if !GitGenerateFlatDocs {
+		static = true
+		return
+	}
+	iType, ok := item["type"]
+	if ok {
+		typ, _ := iType.(string)
+		switch typ {
+		case Commit:
+			return
+		default:
+			ary := strings.Split(typ, "_")
+			if len(ary) > 1 {
+				roles = append([]string{Author, "Author"}, strings.Join(ary[1:], "_"))
+			}
+		}
+	}
+	return
 }
 
 // CalculateTimeToReset - calculate time to reset rate limits based on rate limit value and rate limit reset value
