@@ -2082,7 +2082,9 @@ func (j *DSGit) TrailerDoc(ctx *Ctx, rich, item map[string]interface{}, author s
 	}
 	authorID, ok := item[author+"_id"].(string)
 	if !ok {
-		err = fmt.Errorf("cannot extract %s from %+v", author+"_id", DumpKeys(item))
+		if ctx.Debug > 0 {
+			Printf("cannot extract %s from %+v", author+"_id", DumpKeys(item))
+		}
 		return
 	}
 	itemID := "/" + author + "/" + authorID
