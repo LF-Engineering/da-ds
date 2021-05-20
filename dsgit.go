@@ -2092,7 +2092,9 @@ func (j *DSGit) TrailerDoc(ctx *Ctx, rich, item map[string]interface{}, author s
 	gitUUID, ok := rich[GitUUID]
 	if ok {
 		trailer[GitUUID] = gitUUID.(string) + itemID
+		trailer["commit_"+GitUUID] = gitUUID
 	}
+	trailer["commit_"+UUID], _ = rich[UUID]
 	for _, field := range RawFields {
 		v, _ := rich[field]
 		if field == UUID {
@@ -2563,7 +2565,7 @@ func (j *DSGit) AllRoles(ctx *Ctx, item map[string]interface{}) (roles []string,
 			return
 		default:
 			ary := strings.Split(typ, "_")
-			if len(ary) > 1 {
+			if len(ary) > 1 && ary[0] == Commit {
 				roles = append([]string{Author, "Author"}, strings.Join(ary[1:], "_"))
 			}
 		}
