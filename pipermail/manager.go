@@ -17,8 +17,6 @@ import (
 
 	"github.com/LF-Engineering/dev-analytics-libraries/http"
 
-	"github.com/LF-Engineering/da-ds/affiliation"
-	"github.com/LF-Engineering/da-ds/db"
 	libAffiliations "github.com/LF-Engineering/dev-analytics-libraries/affiliation"
 )
 
@@ -430,12 +428,6 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 
 	// Initialize fetcher object to get data from piper mail archive link
 	fetcher := NewFetcher(params, httpClientProvider, esClientProvider)
-
-	dataBase, err := db.NewConnector("mysql", m.SHConnString)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	identityProvider := affiliation.NewIdentityProvider(dataBase)
 	slackProvider := slack.New(m.WebHookURL)
 
 	appNameVersion := fmt.Sprintf("%s-%v", build.AppName, strconv.FormatInt(time.Now().Unix(), 10))
@@ -457,7 +449,7 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 	}
 
 	//Initialize enrich object to enrich raw data
-	enricher := NewEnricher(identityProvider, m.EnricherBackendVersion, esClientProvider, affiliationsClientProvider)
+	enricher := NewEnricher(m.EnricherBackendVersion, esClientProvider, affiliationsClientProvider)
 
 	return fetcher, enricher, esClientProvider, err
 }
