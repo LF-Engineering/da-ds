@@ -2047,7 +2047,10 @@ func (j *DSGit) MarkOrphanedCommits(ctx *Ctx) (err error) {
 // TrailerDocs - return flat trailer docs for already generated rich item
 func (j *DSGit) TrailerDocs(ctx *Ctx, rich map[string]interface{}) (trailers []map[string]interface{}, err error) {
 	// "Signed-off-by":  {"authors_signed", "signer"},
-	var trailer map[string]interface{}
+	var (
+		trailer map[string]interface{}
+		skip    bool
+	)
 	for _, data := range GitTrailerOtherAuthors {
 		aryName := data[0]
 		authorName := data[1]
@@ -2055,9 +2058,12 @@ func (j *DSGit) TrailerDocs(ctx *Ctx, rich map[string]interface{}) (trailers []m
 		if ok {
 			ary, _ := iAry.([]interface{})
 			for _, iItem := range ary {
-				trailer, err = j.TrailerDoc(ctx, rich, iItem.(map[string]interface{}), authorName)
+				trailer, skip, err = j.TrailerDoc(ctx, rich, iItem.(map[string]interface{}), authorName)
 				if err != nil {
 					return
+				}
+				if skip {
+					continue
 				}
 				trailers = append(trailers, trailer)
 			}
@@ -2067,7 +2073,7 @@ func (j *DSGit) TrailerDocs(ctx *Ctx, rich map[string]interface{}) (trailers []m
 }
 
 // TrailerDoc - return flat trailer doc for already generated rich item's nested trailer
-func (j *DSGit) TrailerDoc(ctx *Ctx, rich, item map[string]interface{}, author string) (trailer map[string]interface{}, err error) {
+func (j *DSGit) TrailerDoc(ctx *Ctx, rich, item map[string]interface{}, author string) (trailer map[string]interface{}, skip bool, err error) {
 	trailer = make(map[string]interface{})
 	copyRichFields := []string{
 		"git_author_domain",
@@ -2085,6 +2091,7 @@ func (j *DSGit) TrailerDoc(ctx *Ctx, rich, item map[string]interface{}, author s
 		if ctx.Debug > 0 {
 			Printf("cannot extract %s from %+v", author+"_id", DumpKeys(item))
 		}
+		skip = true
 		return
 	}
 	itemID := "/" + author + "/" + authorID
