@@ -6,28 +6,27 @@ import (
 	"strings"
 	"time"
 
-	"github.com/LF-Engineering/da-ds/affiliation"
-	libAffiliations "github.com/LF-Engineering/dev-analytics-libraries/affiliation"
+	"github.com/LF-Engineering/dev-analytics-libraries/affiliation"
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 )
+
+// AffiliationClient manages user identity
+type AffiliationClient interface {
+	GetIdentityByUser(key string, value string) (*affiliation.AffIdentity, error)
+	AddIdentity(identity *affiliation.Identity) bool
+	GetOrganizations(uuid string, projectSlug string) *[]affiliation.Enrollment
+}
 
 // Enricher contains pipermail datasource enrich logic
 type Enricher struct {
 	DSName                     string // Datasource will be used as key for ES
 	ElasticSearchProvider      ESClientProvider
 	BackendVersion             string
-	affiliationsClientProvider *libAffiliations.Affiliation
-}
-
-// AffiliationClient manages user identity
-type AffiliationClient interface {
-	GetIdentity(key string, val string) (*affiliation.Identity, error)
-	AddIdentity(identity *affiliation.Identity) bool
-	GetOrganizations(uuid string, date time.Time) ([]string, error)
+	affiliationsClientProvider AffiliationClient
 }
 
 // NewEnricher initiates a new Enricher
-func NewEnricher(backendVersion string, esClientProvider ESClientProvider, affiliationsClientProvider *libAffiliations.Affiliation) *Enricher {
+func NewEnricher(backendVersion string, esClientProvider ESClientProvider, affiliationsClientProvider *affiliation.Affiliation) *Enricher {
 	return &Enricher{
 		DSName:                     Pipermail,
 		ElasticSearchProvider:      esClientProvider,
@@ -38,7 +37,7 @@ func NewEnricher(backendVersion string, esClientProvider ESClientProvider, affil
 
 // EnrichMessage enriches raw message
 func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*EnrichMessage, error) {
-
+	log.Println("In EnrichMessage")
 	enriched := EnrichMessage{
 		ID:                   rawMessage.Data.MessageID,
 		ProjectTS:            0,
@@ -49,7 +48,6 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 		AuthorName:           "",
 		Root:                 false,
 		FromUUID:             "",
-		AuthorGenderACC:      0,
 		FromName:             "",
 		AuthorOrgName:        Unknown,
 		AuthorUserName:       "",
@@ -63,7 +61,6 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 		MboxAuthorDomain:     "",
 		Date:                 rawMessage.Data.Date,
 		IsPipermailMessage:   1,
-		FromGender:           Unknown,
 		FromMultipleOrgNames: []string{Unknown},
 		FromOrgName:          Unknown,
 		FromDomain:           "",
@@ -144,7 +141,7 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 				return nil, err
 			}
 
-			userIdentity := libAffiliations.Identity{
+			userIdentity := affiliation.Identity{
 				LastModified: time.Now(),
 				Name:         name,
 				Source:       source,

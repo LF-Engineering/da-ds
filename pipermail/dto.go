@@ -65,7 +65,6 @@ type EnrichMessage struct {
 	AuthorName           string    `json:"author_name"`
 	Root                 bool      `json:"root"`
 	FromUUID             string    `json:"from_uuid"`
-	AuthorGenderACC      int64     `json:"author_gender_acc"`
 	FromName             string    `json:"from_name"`
 	AuthorOrgName        string    `json:"author_org_name"`
 	AuthorUserName       string    `json:"author_user_name"`
@@ -78,7 +77,6 @@ type EnrichMessage struct {
 	MboxAuthorDomain     string    `json:"mbox_author_domain"`
 	Date                 string    `json:"date"`
 	IsPipermailMessage   int       `json:"is_pipermail_message"`
-	FromGender           string    `json:"from_gender"`
 	FromMultipleOrgNames []string  `json:"from_multiple_org_names"`
 	FromOrgName          string    `json:"from_org_name"`
 	FromDomain           string    `json:"from_domain"`
@@ -90,8 +88,6 @@ type EnrichMessage struct {
 	Tag                  string    `json:"tag"`
 	Subject              string    `json:"subject"`
 	FromID               string    `json:"from_id"`
-	AuthorGender         string    `json:"author_gender"`
-	FromGenderAcc        int       `json:"from_gender_acc"`
 	EmailDate            string    `json:"email_date"`
 	MetadataTimestamp    time.Time `json:"metadata__timestamp"`
 	MetadataBackendName  string    `json:"metadata__backend_name"`
