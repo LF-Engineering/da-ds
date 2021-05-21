@@ -5,13 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/LF-Engineering/dev-analytics-libraries/http"
-
 	"github.com/LF-Engineering/da-ds/pipermail/mocks"
-	"github.com/stretchr/testify/mock"
-
+	"github.com/LF-Engineering/dev-analytics-libraries/http"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestFetchAll(t *testing.T) {

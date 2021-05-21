@@ -6,31 +6,28 @@ import (
 	"strings"
 	"time"
 
+	"github.com/LF-Engineering/dev-analytics-libraries/affiliation"
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
-
-	"github.com/LF-Engineering/da-ds/affiliation"
-	libAffiliations "github.com/LF-Engineering/dev-analytics-libraries/affiliation"
 )
+
+// AffiliationClient manages user identity
+type AffiliationClient interface {
+	GetIdentityByUser(key string, value string) (*affiliation.AffIdentity, error)
+	AddIdentity(identity *affiliation.Identity) bool
+	GetOrganizations(uuid string, projectSlug string) *[]affiliation.Enrollment
+}
 
 // Enricher contains pipermail datasource enrich logic
 type Enricher struct {
-	identityProvider           IdentityProvider
 	DSName                     string // Datasource will be used as key for ES
 	ElasticSearchProvider      ESClientProvider
 	BackendVersion             string
-	affiliationsClientProvider *libAffiliations.Affiliation
-}
-
-// IdentityProvider manages user identity
-type IdentityProvider interface {
-	GetIdentity(key string, val string) (*affiliation.Identity, error)
-	GetOrganizations(uuid string, date time.Time) ([]string, error)
+	affiliationsClientProvider AffiliationClient
 }
 
 // NewEnricher initiates a new Enricher
-func NewEnricher(identProvider IdentityProvider, backendVersion string, esClientProvider ESClientProvider, affiliationsClientProvider *libAffiliations.Affiliation) *Enricher {
+func NewEnricher(backendVersion string, esClientProvider ESClientProvider, affiliationsClientProvider *affiliation.Affiliation) *Enricher {
 	return &Enricher{
-		identityProvider:           identProvider,
 		DSName:                     Pipermail,
 		ElasticSearchProvider:      esClientProvider,
 		BackendVersion:             backendVersion,
@@ -40,7 +37,7 @@ func NewEnricher(identProvider IdentityProvider, backendVersion string, esClient
 
 // EnrichMessage enriches raw message
 func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*EnrichMessage, error) {
-
+	log.Println("In EnrichMessage")
 	enriched := EnrichMessage{
 		ID:                   rawMessage.Data.MessageID,
 		ProjectTS:            0,
@@ -51,9 +48,8 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 		AuthorName:           "",
 		Root:                 false,
 		FromUUID:             "",
-		AuthorGenderACC:      0,
 		FromName:             "",
-		AuthorOrgName:        "",
+		AuthorOrgName:        Unknown,
 		AuthorUserName:       "",
 		AuthorBot:            false,
 		BodyExtract:          rawMessage.Data.Data.Text.Plain[0].Data,
@@ -65,31 +61,31 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 		MboxAuthorDomain:     "",
 		Date:                 rawMessage.Data.Date,
 		IsPipermailMessage:   1,
-		FromGender:           Unknown,
-		FromMultipleOrgNames: nil,
-		FromOrgName:          "",
+		FromMultipleOrgNames: []string{Unknown},
+		FromOrgName:          Unknown,
 		FromDomain:           "",
 		List:                 rawMessage.Origin,
 		AuthorUUID:           "",
-		AuthorMultiOrgNames:  nil,
+		AuthorMultiOrgNames:  []string{Unknown},
 		Origin:               rawMessage.Origin,
 		Size:                 rawMessage.Data.MboxByteLength,
 		Tag:                  rawMessage.Origin,
 		Subject:              rawMessage.Data.Subject,
 		FromID:               "",
-		AuthorGender:         Unknown,
-		FromGenderAcc:        0,
 		EmailDate:            rawMessage.Data.Date,
 		MetadataTimestamp:    rawMessage.MetadataTimestamp,
 		MetadataBackendName:  fmt.Sprintf("%sEnrich", strings.Title(e.DSName)),
 		MetadataUpdatedOn:    rawMessage.MetadataUpdatedOn,
 		MetadataEnrichedOn:   now,
-		BackendVersion:       rawMessage.BackendVersion,
 		ChangedDate:          rawMessage.ChangedAt,
 	}
 
+	if rawMessage.Data.InReplyTo != "" {
+		enriched.Root = true
+	}
+
 	userAffiliationsEmail := e.HandleObfuscatedEmail(rawMessage.Data.From)
-	userData, err := e.identityProvider.GetIdentity("email", userAffiliationsEmail)
+	userData, err := e.affiliationsClientProvider.GetIdentityByUser("email", userAffiliationsEmail)
 	if err != nil {
 		fmt.Println(err)
 		return nil, err
@@ -97,84 +93,87 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 	enriched.MboxAuthorDomain = e.GetEmailDomain(userAffiliationsEmail)
 	// if user is already affiliated
 	if userData != nil {
-		if userData.ID.Valid {
-			enriched.AuthorID = userData.ID.String
-			enriched.FromID = userData.ID.String
+		if userData.ID != nil {
+			enriched.AuthorID = *userData.ID
+			enriched.FromID = *userData.ID
 		}
-		if userData.Name.Valid {
-			enriched.AuthorName = userData.Name.String
-			enriched.FromName = userData.Name.String
+		if userData.Name != "" {
+			enriched.AuthorName = userData.Name
+			enriched.FromName = userData.Name
 		}
-		if userData.Username.Valid {
-			enriched.FromUserName = userData.Username.String
+		if userData.Username != "" {
+			enriched.FromUserName = userData.Username
 		}
-		if userData.OrgName.Valid {
-			enriched.FromOrgName = userData.OrgName.String
+		if userData.OrgName != nil {
+			enriched.FromOrgName = *userData.OrgName
+			enriched.AuthorOrgName = *userData.OrgName
 		}
-		if userData.UUID.Valid {
-			enriched.AuthorUUID = userData.UUID.String
-			enriched.FromUUID = userData.UUID.String
-		}
-		if userData.Gender.Valid {
-			enriched.AuthorGender = userData.Gender.String
-			enriched.FromGender = userData.Gender.String
+		if userData.UUID != nil {
+			enriched.AuthorUUID = *userData.UUID
+			enriched.FromUUID = *userData.UUID
 		}
 
-		assignedToMultiOrg, err := e.identityProvider.GetOrganizations(userData.UUID.String, rawMessage.MetadataUpdatedOn)
-		if err == nil {
-			if len(assignedToMultiOrg) != 0 {
-				enriched.AuthorMultiOrgNames = assignedToMultiOrg
+		enrollments := e.affiliationsClientProvider.GetOrganizations(*userData.UUID, rawMessage.ProjectSlug)
+		if enrollments != nil {
+			organizations := make([]string, 0)
+			for _, enrollment := range *enrollments {
+				organizations = append(organizations, enrollment.Organization.Name)
+			}
+
+			if len(organizations) != 0 {
+				enriched.AuthorMultiOrgNames = organizations
 			}
 		}
 
-		enriched.FromBot = userData.IsBot
+		if userData.IsBot != nil {
+			if *userData.IsBot == 1 {
+				enriched.FromBot = true
+			}
+		}
 	} else {
-		name := e.GetUserName(rawMessage.Data.From)
-		source := Pipermail
-		authorUUID, err := uuid.GenerateIdentity(&source, &userAffiliationsEmail, &name, nil)
-		if err != nil {
-			fmt.Println(err)
-			return nil, err
-		}
+		// add new affiliation if email format is valid
+		if ok := e.IsValidEmail(userAffiliationsEmail); ok {
+			name := e.GetUserName(rawMessage.Data.From)
+			source := Pipermail
+			authorUUID, err := uuid.GenerateIdentity(&source, &userAffiliationsEmail, &name, nil)
+			if err != nil {
+				fmt.Println(err)
+				return nil, err
+			}
 
-		userIdentity := libAffiliations.Identity{
-			LastModified: time.Now(),
-			Name:         name,
-			Source:       Pipermail,
-			Email:        userAffiliationsEmail,
-			UUID:         authorUUID,
-		}
-		fmt.Println(userIdentity)
-		if ok := e.affiliationsClientProvider.AddIdentity(&userIdentity); !ok {
-			log.Printf("failed to add identity for [%+v]", userAffiliationsEmail)
-		} else {
-			log.Printf("added identity for [%+v]", name)
-			multipleOrganizations := []string{Unknown}
+			userIdentity := affiliation.Identity{
+				LastModified: time.Now(),
+				Name:         name,
+				Source:       source,
+				Email:        userAffiliationsEmail,
+				UUID:         authorUUID,
+			}
+			fmt.Println(userIdentity)
+			if ok := e.affiliationsClientProvider.AddIdentity(&userIdentity); !ok {
+				log.Printf("failed to add identity for [%+v]", userAffiliationsEmail)
+			}
 
-			// add user data to enriched object
 			enriched.AuthorID = authorUUID
-			enriched.FromID = authorUUID
 			enriched.AuthorName = name
-			enriched.FromUserName = name
-			enriched.FromName = name
-			enriched.FromOrgName = Unknown
-			enriched.AuthorGender = Unknown
-			enriched.AuthorMultiOrgNames = multipleOrganizations
 			enriched.AuthorUUID = authorUUID
+			enriched.FromID = authorUUID
+			enriched.FromName = name
 			enriched.FromUUID = authorUUID
 		}
-	}
-
-	if rawMessage.Data.InReplyTo != "" {
-		enriched.Root = true
+		log.Println(err)
 	}
 
 	return &enriched, nil
 }
 
-// EnrichAffiliation gets author Affiliations identity data
-func (e *Enricher) EnrichAffiliation(key string, val string) (*affiliation.Identity, error) {
-	return e.identityProvider.GetIdentity(key, val)
+// IsValidEmail validates email string
+func (e *Enricher) IsValidEmail(rawMailString string) bool {
+	if strings.Contains(rawMailString, "...") {
+		log.Println("email contains ellipsis")
+		return false
+	}
+
+	return true
 }
 
 // HandleMapping creates rich mapping

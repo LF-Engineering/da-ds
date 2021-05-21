@@ -270,8 +270,8 @@ func buildPipermailManager(ctx *lib.Ctx) (*pipermail.Manager, error) {
 	fetchSize := ctx.PiperMail.FetchSize.Int()
 	enrichSize := ctx.PiperMail.EnrichSize.Int()
 	project := ctx.PiperMail.Project.String()
-	esIndex := ctx.PiperMail.EsIndex.String()
-	affBaseURL := ctx.Env("AFFILIATION_API_URL")
+	esIndex := ctx.Env("RICH_INDEX")
+	affBaseURL := ctx.Env("AFFILIATIONS_API_BASE_URL")
 	esCacheURL := ctx.Env("ES_CACHE_URL")
 	esCacheUsername := ctx.Env("ES_CACHE_USERNAME")
 	esCachePassword := ctx.Env("ES_CACHE_PASSWORD")
@@ -279,12 +279,12 @@ func buildPipermailManager(ctx *lib.Ctx) (*pipermail.Manager, error) {
 	authClientID := ctx.Env("AUTH0_CLIENT_ID")
 	authClientSecret := ctx.Env("AUTH0_CLIENT_SECRET")
 	authAudience := ctx.Env("AUTH0_AUDIENCE")
-	auth0URL := ctx.Env("AUTH0_URL")
-	env := ctx.Env("BRANCH")
+	authURL := ctx.Env("AUTH0_URL")
+	env := os.Getenv("ENVIRONMENT")
 
 	mgr, err := pipermail.NewManager(origin, slug, groupName, ctx.DBConn, fetcherBackendVersion, enricherBackendVersion,
 		doFetch, doEnrich, ctx.ESURL, "", "", esIndex, fromDate, project,
-		fetchSize, enrichSize, affBaseURL, esCacheURL, esCacheUsername, esCachePassword, authGrantType, authClientID, authClientSecret, authAudience, auth0URL, env, ctx.SlackWebHookURL)
+		fetchSize, enrichSize, affBaseURL, esCacheURL, esCacheUsername, esCachePassword, authGrantType, authClientID, authClientSecret, authAudience, authURL, env, ctx.SlackWebHookURL)
 
 	return mgr, err
 }

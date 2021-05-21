@@ -8,29 +8,27 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net/http"
+	httpNative "net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
-
-	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
-
-	"github.com/LF-Engineering/da-ds/mbox"
-	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
-
 	lib "github.com/LF-Engineering/da-ds"
+	"github.com/LF-Engineering/da-ds/mbox"
+	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
+	"github.com/LF-Engineering/dev-analytics-libraries/http"
+	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
+	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 )
 
 // Fetcher contains piper mail datasource fetch logic
 type Fetcher struct {
 	DSName                string
 	IncludeArchived       bool
-	HTTPClientProvider    HTTPClientProvider
-	ElasticSearchProvider ESClientProvider
+	HTTPClientProvider    *http.ClientProvider
+	ElasticSearchProvider *elastic.ClientProvider
 	BackendVersion        string
 	Debug                 int
 	DateFrom              time.Time
@@ -62,7 +60,7 @@ type ESClientProvider interface {
 }
 
 // NewFetcher initiates a new pipermail fetcher
-func NewFetcher(params *Params, httpClientProvider HTTPClientProvider, esClientProvider ESClientProvider) *Fetcher {
+func NewFetcher(params *Params, httpClientProvider *http.ClientProvider, esClientProvider *elastic.ClientProvider) *Fetcher {
 	return &Fetcher{
 		DSName:                Pipermail,
 		HTTPClientProvider:    httpClientProvider,
@@ -93,7 +91,7 @@ func (f *Fetcher) Fetch(url string, fromDate *time.Time) (map[string]string, err
 	lib.Printf("\nDownloading mboxes from %s since %s\n", url, fromDate.String())
 
 	statusCode, _, err := f.HTTPClientProvider.Request(url, "GET", nil, nil, nil)
-	if err != nil || statusCode != http.StatusOK {
+	if err != nil || statusCode != httpNative.StatusOK {
 		return nil, err
 	}
 
@@ -136,11 +134,10 @@ func (f *Fetcher) FetchItem(slug, groupName, project, endpoint string, fromDate 
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("\n\n %+v \n\n", archives)
 	var messages [][]byte
 
 	statusCode, _, err := f.HTTPClientProvider.Request(endpoint, "GET", nil, nil, nil)
-	if err != nil || statusCode != http.StatusOK {
+	if err != nil || statusCode != httpNative.StatusOK {
 		return nil, err
 	}
 
@@ -154,7 +151,6 @@ func (f *Fetcher) FetchItem(slug, groupName, project, endpoint string, fromDate 
 		filename := filepath.Base(filePath)
 		baseExtension := filepath.Ext(filePath)
 		filename = strings.TrimSuffix(filename, filepath.Ext(filename))
-		fmt.Printf("\n\n filename: %+v\n\n", filename)
 
 		var decompressedFileContentReader *gzip.Reader
 		var content []byte
@@ -164,14 +160,11 @@ func (f *Fetcher) FetchItem(slug, groupName, project, endpoint string, fromDate 
 		if baseExtension == ".gz" {
 			decompressedFileContentReader, err = gzip.NewReader(fl)
 			if err != nil {
-				lib.Printf("\nfilePath: %+v\n", filePath)
-				lib.Printf("\ngzip.NewReader: %+v\n", err)
 				return nil, err
 			}
 		} else {
 			content, err = ioutil.ReadFile(filePath)
 			if err != nil {
-				lib.Printf("content ioutil.ReadFile: %+v", err)
 				continue
 			}
 
@@ -181,14 +174,12 @@ func (f *Fetcher) FetchItem(slug, groupName, project, endpoint string, fromDate 
 			// Read in data.
 			byts, err = ioutil.ReadAll(decompressedFileContentReader)
 			if err != nil {
-				lib.Printf("decompressedFileContentReader ioutil.ReadAll: %+v", err)
 				return nil, err
 			}
 		} else {
 			// Read in data.
 			byts, err = ioutil.ReadAll(bytes.NewReader(content))
 			if err != nil {
-				lib.Printf("content ioutil.ReadAll: %+v", err)
 				return nil, err
 			}
 		}
@@ -197,28 +188,24 @@ func (f *Fetcher) FetchItem(slug, groupName, project, endpoint string, fromDate 
 		buf := new(bytes.Buffer)
 		zipWriter := zip.NewWriter(buf)
 		zipFile, err := zipWriter.Create(filename)
+		lib.Printf("%+v",filename)
 		if err != nil {
-			lib.Printf("zipWriter.Create: %+v", err)
 			return nil, err
 		}
 		_, err = zipFile.Write(byts)
 		if err != nil {
-			lib.Printf("zipFile.Write: %+v", err)
 			return nil, err
 		}
 		err = zipWriter.Close()
 		if err != nil {
-			lib.Printf("zipWriter.Close: %+v", err)
 			return nil, err
 		}
-		//ioutil.WriteFile(filename+".zip", buf.Bytes(), 0777)
 
 		nBytes := int64(len(buf.Bytes()))
 		bytesReader := bytes.NewReader(buf.Bytes())
 		var zipReader *zip.Reader
 		zipReader, err = zip.NewReader(bytesReader, nBytes)
 		if err != nil {
-			lib.Printf("zip.NewReader: %+v", err)
 			return nil, err
 		}
 
@@ -226,14 +213,12 @@ func (f *Fetcher) FetchItem(slug, groupName, project, endpoint string, fromDate 
 			var rc io.ReadCloser
 			rc, err = file.Open()
 			if err != nil {
-				lib.Printf("file.Open: %+v", err)
 				return nil, err
 			}
 			var data []byte
 			data, err = ioutil.ReadAll(rc)
 			err = rc.Close()
 			if err != nil {
-				lib.Printf("rc.Close: %+v", err)
 				return nil, err
 			}
 			fmt.Printf("%s uncompressed %d bytes\n", file.Name, len(data))

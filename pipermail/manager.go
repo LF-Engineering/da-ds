@@ -1,6 +1,7 @@
 package pipermail
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"strconv"
@@ -17,8 +18,6 @@ import (
 
 	"github.com/LF-Engineering/dev-analytics-libraries/http"
 
-	"github.com/LF-Engineering/da-ds/affiliation"
-	"github.com/LF-Engineering/da-ds/db"
 	libAffiliations "github.com/LF-Engineering/dev-analytics-libraries/affiliation"
 )
 
@@ -138,18 +137,21 @@ func (m *Manager) Sync() error {
 
 	fetchCh := m.fetch(m.fetcher, lastActionCachePostfix)
 
-	for status["doneFetch"] == false || status["doneEnrich"] == false {
-		select {
-		case err := <-fetchCh:
-			if err == nil {
-				status["doneFetch"] = true
-			}
-		case err := <-m.enrich(m.enricher, lastActionCachePostfix):
-			if err == nil {
-				status["doneEnrich"] = true
-			}
-			time.Sleep(5 * time.Second)
+	var err error
+	if status["doneFetch"] == false {
+		err = <-fetchCh
+		if err == nil {
+			status["doneFetch"] = true
 		}
+		time.Sleep(5 * time.Second)
+	}
+
+	if status["doneEnrich"] == false {
+		err = <-m.enrich(m.enricher, lastActionCachePostfix)
+		if err == nil {
+			status["doneEnrich"] = true
+		}
+		time.Sleep(5 * time.Second)
 	}
 
 	return nil
@@ -168,7 +170,6 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 				},
 			},
 		}
-		result := m.FetchSize
 
 		val := &TopHits{}
 		err := m.esClientProvider.Get(fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), query, val)
@@ -187,110 +188,95 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 
 		from := timeLib.GetOldestDate(fromDate, lastFetch)
 
-		round := false
-		for result == m.FetchSize {
-			data := make([]elastic.BulkData, 0)
-			raw, err := fetcher.FetchItem(m.Slug, m.GroupName, m.Project, m.Endpoint, *from, m.FetchSize, now)
-			if err != nil {
-				ch <- err
-				return
+		data := make([]elastic.BulkData, 0)
+		raw, err := fetcher.FetchItem(m.Slug, m.GroupName, m.Project, m.Endpoint, *from, m.FetchSize, now)
+		if err != nil {
+			ch <- err
+			return
+		}
+
+		result := len(raw)
+		if result != 0 {
+			from = &raw[len(raw)-1].ChangedAt
+		}
+
+		for _, message := range raw {
+			data = append(data, elastic.BulkData{IndexName: fmt.Sprintf("%s-raw", m.ESIndex), ID: message.UUID, Data: message})
+		}
+
+		// set mapping and create index if not exists
+		_, err = m.esClientProvider.CreateIndex(fmt.Sprintf("%s-raw", m.ESIndex), PipermailRawMapping)
+		if err != nil {
+			ch <- err
+			return
+		}
+		if len(data) > 0 {
+			// Update changed at in elastic cache index
+			cacheDoc, _ := data[len(data)-1].Data.(*RawMessage)
+			updateChan := HitSource{ID: fetchID, ChangedAt: cacheDoc.ChangedAt}
+			data = append(data, elastic.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: fetchID, Data: updateChan})
+
+			// Insert raw data to elasticsearch
+			sizeOfData := len(data)
+
+			limit := 1000
+			if m.EnrichSize <= 1000 {
+				limit = m.EnrichSize
 			}
 
-			result = len(raw)
-			if result != 0 {
-				from = &raw[len(raw)-1].ChangedAt
-			}
-
-			if result < 2 {
-				raw = nil
-			} else if round {
-				for _, message := range raw {
-					data = append(data, elastic.BulkData{IndexName: fmt.Sprintf("%s-raw", m.ESIndex), ID: message.UUID, Data: message})
-				}
-				round = true
-			} else {
-				raw = raw[1:result]
-				for _, message := range raw {
-					data = append(data, elastic.BulkData{IndexName: fmt.Sprintf("%s-raw", m.ESIndex), ID: message.UUID, Data: message})
-				}
-			}
-
-			// set mapping and create index if not exists
-			_, err = m.esClientProvider.CreateIndex(fmt.Sprintf("%s-raw", m.ESIndex), PiperRawMapping)
-			if err != nil {
-				ch <- err
-				return
-			}
-
-			if len(data) > 0 {
-				// Update changed at in elastic cache index
-				cacheDoc, _ := data[len(data)-1].Data.(*RawMessage)
-				updateChan := HitSource{ID: fetchID, ChangedAt: cacheDoc.ChangedAt}
-				data = append(data, elastic.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: fetchID, Data: updateChan})
-
-				// Insert raw data to elasticsearch
-				sizeOfData := len(data)
-
-				limit := 1000
-				if m.EnrichSize <= 1000 {
-					limit = m.EnrichSize
-				}
-
-				lastIndex := 0
-				remainingItemsLength := 0
-				log.Println("LEN DATA: ", len(data))
-				log.Println("LEN EN SIZE: ", m.EnrichSize)
-				// rate limit items to push to es to avoid the 413 error
-				if len(data) > m.EnrichSize {
-					for lastIndex < sizeOfData {
-						if lastIndex == 0 && limit <= len(data) {
-							_, err = m.esClientProvider.BulkInsert(data[:limit])
-							if err != nil {
-								ch <- err
-								return
-							}
-							lastIndex = limit
-							continue
-						}
-						if lastIndex > 0 && limit <= len(data[lastIndex:]) && remainingItemsLength == 0 {
-							_, err = m.esClientProvider.BulkInsert(data[lastIndex : lastIndex+limit])
-							if err != nil {
-								ch <- err
-								return
-							}
-
-							if lastIndex+limit < len(data[lastIndex:]) {
-								lastIndex += limit
-							} else {
-								remainingItemsLength = len(data[lastIndex:])
-							}
-						} else {
-							// handle cases where remaining messages are less than the limit
-							_, err = m.esClientProvider.BulkInsert(data[lastIndex:])
-							if err != nil {
-								ch <- err
-								return
-							}
-							// invalidate loop
-							lastIndex = sizeOfData + 1
-						}
-					}
-
-				}
-
-				// handle data for small docs
-				// es bulk upload limit is 1000
-				if m.EnrichSize >= sizeOfData {
-					if sizeOfData <= 1000 {
-						_, err = m.esClientProvider.BulkInsert(data)
+			lastIndex := 0
+			remainingItemsLength := 0
+			log.Println("LEN RAW DATA : ", len(data))
+			// rate limit items to push to es to avoid the 413 error
+			if len(data) > m.EnrichSize {
+				for lastIndex < sizeOfData {
+					if lastIndex == 0 && limit <= len(data) {
+						_, err = m.esClientProvider.BulkInsert(data[:limit])
 						if err != nil {
 							ch <- err
 							return
 						}
+						lastIndex = limit
+						continue
+					}
+					if lastIndex > 0 && limit <= len(data[lastIndex:]) && remainingItemsLength == 0 {
+						_, err = m.esClientProvider.BulkInsert(data[lastIndex : lastIndex+limit])
+						if err != nil {
+							ch <- err
+							return
+						}
+
+						if lastIndex+limit < len(data[lastIndex:]) {
+							lastIndex += limit
+						} else {
+							remainingItemsLength = len(data[lastIndex:])
+						}
+					} else {
+						// handle cases where remaining messages are less than the limit
+						_, err = m.esClientProvider.BulkInsert(data[lastIndex:])
+						if err != nil {
+							ch <- err
+							return
+						}
+						// invalidate loop
+						lastIndex = sizeOfData + 1
 					}
 				}
-				log.Println("DONE WITH RAW ENRICHMENT")
+
 			}
+
+			// handle data for small docs
+			// es bulk upload limit is 1000
+			if m.EnrichSize >= sizeOfData {
+				if sizeOfData <= 1000 {
+					_, err = m.esClientProvider.BulkInsert(data)
+					if err != nil {
+						ch <- err
+						return
+					}
+				}
+			}
+			log.Println("DONE WITH RAW ENRICHMENT")
 		}
 		ch <- nil
 	}()
@@ -317,7 +303,7 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 		err := m.esClientProvider.Get(fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), query, val)
 
 		query = map[string]interface{}{
-			"size": 10000,
+			"size": 100000,
 			"query": map[string]interface{}{
 				"bool": map[string]interface{}{
 					"must": []map[string]interface{}{},
@@ -332,13 +318,13 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 			},
 		}
 
-		var topHits *RawHits
 		var lastEnrich time.Time
 		if err == nil && len(val.Hits.Hits) > 0 {
 			lastEnrich = val.Hits.Hits[0].Source.ChangedAt
 		}
 
 		from := timeLib.GetOldestDate(m.FromDate, &lastEnrich)
+		log.Println("From: ", from)
 
 		conditions := map[string]interface{}{
 			"range": map[string]interface{}{
@@ -355,10 +341,15 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 		query["size"] = m.EnrichSize
 
 		for results == m.EnrichSize {
-
 			// make pagination to get the specified size of documents with offset
 			query["from"] = offset
-			topHits, err = m.fetcher.Query(fmt.Sprintf("%s-raw", m.ESIndex), query)
+			bites, err := m.fetcher.ElasticSearchProvider.Search(fmt.Sprintf("%s-raw", m.ESIndex), query)
+			if err != nil {
+				ch <- nil
+				return
+			}
+			var topHits *RawHits
+			err = json.Unmarshal(bites, &topHits)
 			if err != nil {
 				ch <- nil
 				return
@@ -366,14 +357,17 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 
 			data := make([]elastic.BulkData, 0)
 			for _, hit := range topHits.Hits.Hits {
-				enrichedItem, err := enricher.EnrichMessage(&hit.Source, time.Now().UTC())
-				if err != nil {
-					ch <- err
-					return
+				if lastEnrich.Before(hit.Source.ChangedAt) {
+					enrichedItem, err := enricher.EnrichMessage(&hit.Source, time.Now().UTC())
+					if err != nil {
+						ch <- err
+						return
+					}
+					data = append(data, elastic.BulkData{IndexName: m.ESIndex, ID: enrichedItem.UUID, Data: enrichedItem})
 				}
-				data = append(data, elastic.BulkData{IndexName: m.ESIndex, ID: enrichedItem.UUID, Data: enrichedItem})
 			}
 
+			log.Println("LEN ENRICH DATA : ", len(data))
 			results = len(data)
 			offset += results
 
@@ -399,9 +393,8 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 					return
 				}
 			}
-
 		}
-
+		log.Println("DONE WITH RICH ENRICHMENT")
 		ch <- nil
 	}()
 
@@ -430,12 +423,6 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 
 	// Initialize fetcher object to get data from piper mail archive link
 	fetcher := NewFetcher(params, httpClientProvider, esClientProvider)
-
-	dataBase, err := db.NewConnector("mysql", m.SHConnString)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	identityProvider := affiliation.NewIdentityProvider(dataBase)
 	slackProvider := slack.New(m.WebHookURL)
 
 	appNameVersion := fmt.Sprintf("%s-%v", build.AppName, strconv.FormatInt(time.Now().Unix(), 10))
@@ -457,7 +444,7 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 	}
 
 	//Initialize enrich object to enrich raw data
-	enricher := NewEnricher(identityProvider, m.EnricherBackendVersion, esClientProvider, affiliationsClientProvider)
+	enricher := NewEnricher(m.EnricherBackendVersion, esClientProvider, affiliationsClientProvider)
 
 	return fetcher, enricher, esClientProvider, err
 }
