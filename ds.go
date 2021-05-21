@@ -980,7 +980,6 @@ func ForEachESItem(
 
 // HandleMapping - create/update mapping for raw or rich index
 func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
-	// Create index, ignore if exists (see status 400 is not in error statuses)
 	var url string
 	if raw {
 		url = ctx.ESURL + "/" + ctx.RawIndex
@@ -1003,6 +1002,30 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 		}
 		return fmt.Sprintf("%+v", r)
 	}
+	// Drop raw/rich if that flag is set
+	if (raw && ctx.DropRaw) || (!raw && ctx.DropRich) {
+		result, status, _, _, err = Request(
+			ctx,
+			url+"?expand_wildcards=none&allow_no_indices=true&ignore_unavailable=true",
+			Delete,
+			nil,                                 // headers
+			[]byte{},                            // payload
+			[]string{},                          // cookies
+			nil,                                 // JSON statuses
+			map[[2]int]struct{}{{400, 599}: {}}, // error statuses: 401-599
+			nil,                                 // OK statuses
+			nil,                                 // Cache statuses
+			true,                                // retry
+			nil,                                 // cache duration
+			true,                                // skip in dry run
+		)
+		if err == nil {
+			Printf("index %s deleted: status=%d, result: %+v\n", url, status, stringResult(result))
+		} else {
+			Printf("index %s not deleted: status=%d, err=%+v, result: %+v\n", url, status, err, stringResult(result))
+		}
+	}
+	// Create index, ignore if exists (see status 400 is not in error statuses)
 	result, status, _, _, err = Request(
 		ctx,
 		url+"?wait_for_active_shards=all",

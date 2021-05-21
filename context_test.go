@@ -48,6 +48,8 @@ func copyContext(in *Ctx) *Ctx {
 		OnlyIdentities:    in.OnlyIdentities,
 		ForceFull:         in.ForceFull,
 		LegacyUUID:        in.LegacyUUID,
+		DropRich:          in.DropRich,
+		DropRaw:           in.DropRaw,
 		AllowFail:         in.AllowFail,
 		Project:           in.Project,
 		ProjectSlug:       in.ProjectSlug,
@@ -232,6 +234,8 @@ func TestInit(t *testing.T) {
 		OnlyIdentities:    false,
 		ForceFull:         false,
 		LegacyUUID:        false,
+		DropRich:          false,
+		DropRaw:           false,
 		AllowFail:         0,
 		Project:           "",
 		ProjectSlug:       "",
@@ -438,6 +442,21 @@ func TestInit(t *testing.T) {
 				copyContext(&defaultContext),
 				map[string]interface{}{
 					"LegacyUUID": true,
+				},
+			),
+		},
+		{
+			"Setting drop raw/rich modes",
+			map[string]string{
+				"DA_DS_DROP_RICH": "1",
+				"DA_DS_DROP_RAW":  "1",
+			},
+			dynamicSetFields(
+				t,
+				copyContext(&defaultContext),
+				map[string]interface{}{
+					"DropRich": true,
+					"DropRaw":  true,
 				},
 			),
 		},
