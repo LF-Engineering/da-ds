@@ -188,7 +188,7 @@ func (f *Fetcher) FetchItem(slug, groupName, project, endpoint string, fromDate 
 		buf := new(bytes.Buffer)
 		zipWriter := zip.NewWriter(buf)
 		zipFile, err := zipWriter.Create(filename)
-		lib.Printf("%+v",filename)
+		lib.Printf("%+v", filename)
 		if err != nil {
 			return nil, err
 		}
