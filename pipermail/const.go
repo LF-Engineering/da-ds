@@ -1,6 +1,10 @@
 package pipermail
 
-import "time"
+import (
+	"os"
+	"strings"
+	"time"
+)
 
 const (
 	// ModMboxThreadStr ...
@@ -9,8 +13,6 @@ const (
 	Pipermail = "pipermail"
 	// PiperBackendVersion ...
 	PiperBackendVersion = "0.0.1"
-	// ArchiveDownloadsPath ...
-	ArchiveDownloadsPath = "/Users/code/.dads/mailinglists/"
 	// MessageDateField ...
 	MessageDateField = "date"
 	// Message ...
@@ -40,4 +42,6 @@ var (
 	PiperRichMapping = []byte(`{"mappings":{"dynamic_templates":[{"notanalyzed":{"match":"*","match_mapping_type":"string","mapping":{"type":"keyword"}}},{"int_to_float":{"match":"*","match_mapping_type":"long","mapping":{"type":"float"}}},{"formatdate":{"match":"*","match_mapping_type":"date","mapping":{"format":"strict_date_optional_time||epoch_millis","type":"date"}}}]}}`)
 	// EmailObfuscationPatterns ...
 	EmailObfuscationPatterns = []string{" at ", "_at_", " en "}
+	// ArchiveDownloadsPath ...
+	ArchiveDownloadsPath =  strings.TrimSpace(os.Getenv("HOME") + "/.perceval/mailinglists/")
 )
