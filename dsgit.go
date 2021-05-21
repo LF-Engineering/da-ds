@@ -28,8 +28,12 @@ const (
 	// GitOpsCommand - command that maintains git stats cache
 	// GitOpsCommand = "gitops.py"
 	GitOpsCommand = "gitops"
+	// GitOpsFailureFatal - is GitOpsCommand failure fatal?
+	GitOpsFailureFatal = false
 	// OrphanedCommitsCommand - command to list orphaned commits
 	OrphanedCommitsCommand = "detect-removed-commits.sh"
+	// OrphanedCommitsFailureFatal - is OrphanedCommitsCommand failure fatal?
+	OrphanedCommitsFailureFatal = true
 	// GitOpsNoCleanup - if set, it will skip gitops repo cleanup
 	GitOpsNoCleanup = false
 	// GitParseStateInit - init parser state
@@ -608,7 +612,12 @@ func (j *DSGit) GetOrphanedCommits(ctx *Ctx, thrN int) (ch chan error, err error
 		cmdLine := []string{OrphanedCommitsCommand}
 		sout, serr, e = ExecCommand(ctx, cmdLine, j.GitPath, GitDefaultEnv)
 		if e != nil {
-			Printf("error executing %v: %v\n%s\n%s\n", cmdLine, e, sout, serr)
+			if OrphanedCommitsFailureFatal {
+				Printf("error executing %v: %v\n%s\n%s\n", cmdLine, e, sout, serr)
+			} else {
+				Printf("WARNING: error executing %v: %v\n%s\n%s\n", cmdLine, e, sout, serr)
+				e = nil
+			}
 			return
 		}
 		ary := strings.Split(sout, " ")
@@ -652,7 +661,12 @@ func (j *DSGit) GetGitOps(ctx *Ctx, thrN int) (ch chan error, err error) {
 		}
 		sout, serr, e = ExecCommand(ctx, cmdLine, "", env)
 		if e != nil {
-			Printf("error executing %v: %v\n%s\n%s\n", cmdLine, e, sout, serr)
+			if GitOpsFailureFatal {
+				Printf("error executing %v: %v\n%s\n%s\n", cmdLine, e, sout, serr)
+			} else {
+				Printf("WARNING: error executing %v: %v\n%s\n%s\n", cmdLine, e, sout, serr)
+				e = nil
+			}
 			return
 		}
 		type resultType struct {
@@ -662,7 +676,12 @@ func (j *DSGit) GetGitOps(ctx *Ctx, thrN int) (ch chan error, err error) {
 		var data resultType
 		e = jsoniter.Unmarshal([]byte(sout), &data)
 		if e != nil {
-			Printf("error unmarshaling from %v\n", sout)
+			if GitOpsFailureFatal {
+				Printf("error unmarshaling from %v\n", sout)
+			} else {
+				Printf("WARNING: error unmarshaling from %v\n", sout)
+				e = nil
+			}
 			return
 		}
 		j.Loc = data.Loc
