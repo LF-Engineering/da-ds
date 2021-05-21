@@ -96,18 +96,12 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 
 	unknown := "Unknown"
 	multiOrgs := []string{unknown}
-	if rawItem.Data.AssignedToDetail != nil && rawItem.Data.AssignedToDetail.RealName != "" {
+	if rawItem.Data.AssignedToDetail != nil {
 		enriched.AssignedTo = rawItem.Data.AssignedToDetail.RealName
+		key, value := getCont(rawItem.Data.AssignedToDetail)
 
-		// Enrich assigned to
-		assignedToFieldName := "username"
-		if rawItem.Data.AssignedToDetail != nil {
-			if strings.Contains(rawItem.Data.AssignedToDetail.Name, "@") {
-				assignedToFieldName = "email"
-			}
-		}
-		assignedTo, err := e.affiliationsClient.GetIdentityByUser(assignedToFieldName, enriched.AssignedTo)
-		if err == nil {
+		assignedTo, err := e.affiliationsClient.GetIdentityByUser(key, value)
+		if err == nil && assignedTo != nil {
 			enriched.AssignedToDetailID = *assignedTo.ID
 			enriched.AssignedToDetailUUID = *assignedTo.UUID
 			enriched.AssignedToDetailName = assignedTo.Name
@@ -184,14 +178,9 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 		enriched.Creator = rawItem.Data.CreatorDetail.RealName
 		enriched.AuthorName = rawItem.Data.CreatorDetail.RealName
 
-		// Enrich reporter
-		reporterFieldName := "username"
-		if strings.Contains(enriched.Creator, "@") {
-			reporterFieldName = "email"
-		}
-
-		creator, err := e.affiliationsClient.GetIdentityByUser(reporterFieldName, enriched.Creator)
-		if err == nil {
+		key, value := getCont(rawItem.Data.CreatorDetail)
+		creator, err := e.affiliationsClient.GetIdentityByUser(key, value)
+		if err == nil && creator != nil {
 			enriched.CreatorDetailID = *creator.ID
 			enriched.CreatorDetailUUID = *creator.UUID
 			enriched.CreatorDetailName = creator.Name
@@ -296,4 +285,26 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 	enriched.RepositoryLabels = nil
 
 	return enriched, nil
+}
+
+func getCont(con *PersonDetail) (string, string) {
+	key := "username"
+	val := ""
+
+	if con.Name != "" {
+		val = con.Name
+		if strings.Contains(con.Name, "@") {
+			key = "email"
+		}
+		return key, val
+	}
+
+	if con.RealName != "" {
+		val = con.RealName
+		if strings.Contains(con.RealName, "@") {
+			key = "email"
+		}
+	}
+
+	return key, val
 }
