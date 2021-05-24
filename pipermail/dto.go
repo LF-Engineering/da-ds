@@ -54,48 +54,40 @@ type RawMessageData struct {
 	DateTZ   float64 `json:"date_tz"`
 }
 
-// EnrichMessage represents piper mail enriched message
-type EnrichMessage struct {
-	ID                   string    `json:"id"`
-	ProjectTS            int64     `json:"project_ts"`
-	FromUserName         string    `json:"from_user_name"`
-	TZ                   float64   `json:"tz"`
-	MessageID            string    `json:"Message-ID"`
-	UUID                 string    `json:"uuid"`
-	AuthorName           string    `json:"author_name"`
-	Root                 bool      `json:"root"`
-	FromUUID             string    `json:"from_uuid"`
-	FromName             string    `json:"from_name"`
-	AuthorOrgName        string    `json:"author_org_name"`
-	AuthorUserName       string    `json:"author_user_name"`
-	AuthorBot            bool      `json:"author_bot"`
-	BodyExtract          string    `json:"body_extract"`
-	AuthorID             string    `json:"author_id"`
-	SubjectAnalyzed      string    `json:"subject_analyzed"`
-	FromBot              bool      `json:"from_bot"`
-	Project              string    `json:"project"`
-	MboxAuthorDomain     string    `json:"mbox_author_domain"`
-	Date                 string    `json:"date"`
-	IsPipermailMessage   int       `json:"is_pipermail_message"`
-	FromMultipleOrgNames []string  `json:"from_multiple_org_names"`
-	FromOrgName          string    `json:"from_org_name"`
-	FromDomain           string    `json:"from_domain"`
-	List                 string    `json:"list"`
-	AuthorUUID           string    `json:"author_uuid"`
-	AuthorMultiOrgNames  []string  `json:"author_multi_org_names"`
-	Origin               string    `json:"origin"`
-	Size                 int64     `json:"size"`
-	Tag                  string    `json:"tag"`
-	Subject              string    `json:"subject"`
-	FromID               string    `json:"from_id"`
-	EmailDate            string    `json:"email_date"`
-	MetadataTimestamp    time.Time `json:"metadata__timestamp"`
-	MetadataBackendName  string    `json:"metadata__backend_name"`
-	MetadataUpdatedOn    time.Time `json:"metadata__updated_on"`
-	MetadataEnrichedOn   time.Time `json:"metadata__enriched_on"`
-	BackendVersion       string    `json:"backend_version"`
-	ProjectSlug          string    `json:"project_slug"`
-	ChangedDate          time.Time `json:"changed_date"`
+// EnrichedMessage represents piper mail enriched message
+type EnrichedMessage struct {
+	ID                  string    `json:"id"`
+	ProjectTS           int64     `json:"project_ts"`
+	TZ                  float64   `json:"tz"`
+	MessageID           string    `json:"Message-ID"`
+	UUID                string    `json:"uuid"`
+	AuthorName          string    `json:"author_name"`
+	Root                bool      `json:"root"`
+	AuthorOrgName       string    `json:"author_org_name"`
+	AuthorBot           bool      `json:"author_bot"`
+	BodyExtract         string    `json:"body_extract"`
+	AuthorID            string    `json:"author_id"`
+	SubjectAnalyzed     string    `json:"subject_analyzed"`
+	Project             string    `json:"project"`
+	MboxAuthorDomain    string    `json:"mbox_author_domain"`
+	Date                string    `json:"date"`
+	IsPipermailMessage  int       `json:"is_pipermail_message"`
+	List                string    `json:"list"`
+	AuthorUUID          string    `json:"author_uuid"`
+	AuthorMultiOrgNames []string  `json:"author_multi_org_names"`
+	Origin              string    `json:"origin"`
+	Size                int64     `json:"size"`
+	Tag                 string    `json:"tag"`
+	Subject             string    `json:"subject"`
+	FromID              string    `json:"from_id"`
+	EmailDate           string    `json:"email_date"`
+	MetadataTimestamp   time.Time `json:"metadata__timestamp"`
+	MetadataBackendName string    `json:"metadata__backend_name"`
+	MetadataUpdatedOn   time.Time `json:"metadata__updated_on"`
+	MetadataEnrichedOn  time.Time `json:"metadata__enriched_on"`
+	ProjectSlug         string    `json:"project_slug"`
+	ChangedAt           time.Time `json:"changed_at"`
+	GroupName           string    `json:"group_name"`
 }
 
 // RawHits result

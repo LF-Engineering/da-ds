@@ -39,7 +39,7 @@ func TestEnrichMessage(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    *EnrichMessage
+		want    *EnrichedMessage
 		wantErr bool
 	}{
 		{
@@ -108,8 +108,8 @@ func TestEnrichMessage(t *testing.T) {
 	}
 }
 
-func toPipermailEnrich(b string) (EnrichMessage, error) {
-	expectedEnrich := EnrichMessage{}
+func toPipermailEnrich(b string) (EnrichedMessage, error) {
+	expectedEnrich := EnrichedMessage{}
 	err := jsoniter.Unmarshal([]byte(b), &expectedEnrich)
 	return expectedEnrich, err
 }

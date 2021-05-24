@@ -36,48 +36,43 @@ func NewEnricher(backendVersion string, esClientProvider ESClientProvider, affil
 }
 
 // EnrichMessage enriches raw message
-func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*EnrichMessage, error) {
-	log.Println("In EnrichMessage")
-	enriched := EnrichMessage{
-		ID:                   rawMessage.Data.MessageID,
-		ProjectTS:            0,
-		FromUserName:         "",
-		TZ:                   rawMessage.Data.DateTZ,
-		MessageID:            rawMessage.Data.MessageID,
-		UUID:                 rawMessage.UUID,
-		AuthorName:           "",
-		Root:                 false,
-		FromUUID:             "",
-		FromName:             "",
-		AuthorOrgName:        Unknown,
-		AuthorUserName:       "",
-		AuthorBot:            false,
-		BodyExtract:          rawMessage.Data.Data.Text.Plain[0].Data,
-		AuthorID:             "",
-		SubjectAnalyzed:      rawMessage.Data.Subject,
-		FromBot:              false,
-		Project:              rawMessage.Project,
-		ProjectSlug:          rawMessage.ProjectSlug,
-		MboxAuthorDomain:     "",
-		Date:                 rawMessage.Data.Date,
-		IsPipermailMessage:   1,
-		FromMultipleOrgNames: []string{Unknown},
-		FromOrgName:          Unknown,
-		FromDomain:           "",
-		List:                 rawMessage.Origin,
-		AuthorUUID:           "",
-		AuthorMultiOrgNames:  []string{Unknown},
-		Origin:               rawMessage.Origin,
-		Size:                 rawMessage.Data.MboxByteLength,
-		Tag:                  rawMessage.Origin,
-		Subject:              rawMessage.Data.Subject,
-		FromID:               "",
-		EmailDate:            rawMessage.Data.Date,
-		MetadataTimestamp:    rawMessage.MetadataTimestamp,
-		MetadataBackendName:  fmt.Sprintf("%sEnrich", strings.Title(e.DSName)),
-		MetadataUpdatedOn:    rawMessage.MetadataUpdatedOn,
-		MetadataEnrichedOn:   now,
-		ChangedDate:          rawMessage.ChangedAt,
+func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*EnrichedMessage, error) {
+	log.Println("In EnrichedMessage")
+	var bodyExtract string
+	if len(rawMessage.Data.Data.Text.Plain) > 0 {
+		bodyExtract = rawMessage.Data.Data.Text.Plain[0].Data
+	}
+	enriched := EnrichedMessage{
+		ID:                  rawMessage.Data.MessageID,
+		TZ:                  rawMessage.Data.DateTZ,
+		MessageID:           rawMessage.Data.MessageID,
+		UUID:                rawMessage.UUID,
+		Root:                false,
+		AuthorName:          "",
+		AuthorUUID:          "",
+		AuthorID:            "",
+		AuthorBot:           false,
+		AuthorOrgName:       Unknown,
+		AuthorMultiOrgNames: []string{Unknown},
+		MboxAuthorDomain:    "",
+		BodyExtract:         bodyExtract,
+		SubjectAnalyzed:     rawMessage.Data.Subject,
+		Project:             rawMessage.Project,
+		ProjectSlug:         rawMessage.ProjectSlug,
+		Date:                rawMessage.Data.Date,
+		IsPipermailMessage:  1,
+		List:                rawMessage.Origin,
+		Origin:              rawMessage.Origin,
+		Tag:                 rawMessage.Origin,
+		GroupName:           rawMessage.GroupName,
+		Size:                rawMessage.Data.MboxByteLength,
+		Subject:             rawMessage.Data.Subject,
+		EmailDate:           rawMessage.Data.Date,
+		MetadataTimestamp:   rawMessage.MetadataTimestamp,
+		MetadataBackendName: fmt.Sprintf("%sEnrich", strings.Title(e.DSName)),
+		MetadataUpdatedOn:   rawMessage.MetadataUpdatedOn,
+		MetadataEnrichedOn:  now,
+		ChangedAt:           rawMessage.ChangedAt,
 	}
 
 	if rawMessage.Data.InReplyTo != "" {
@@ -95,22 +90,15 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 	if userData != nil {
 		if userData.ID != nil {
 			enriched.AuthorID = *userData.ID
-			enriched.FromID = *userData.ID
 		}
 		if userData.Name != "" {
 			enriched.AuthorName = userData.Name
-			enriched.FromName = userData.Name
-		}
-		if userData.Username != "" {
-			enriched.FromUserName = userData.Username
 		}
 		if userData.OrgName != nil {
-			enriched.FromOrgName = *userData.OrgName
 			enriched.AuthorOrgName = *userData.OrgName
 		}
 		if userData.UUID != nil {
 			enriched.AuthorUUID = *userData.UUID
-			enriched.FromUUID = *userData.UUID
 		}
 
 		enrollments := e.affiliationsClientProvider.GetOrganizations(*userData.UUID, rawMessage.ProjectSlug)
@@ -127,7 +115,7 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 
 		if userData.IsBot != nil {
 			if *userData.IsBot == 1 {
-				enriched.FromBot = true
+				enriched.AuthorBot = true
 			}
 		}
 	} else {
@@ -156,9 +144,6 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 			enriched.AuthorID = authorUUID
 			enriched.AuthorName = name
 			enriched.AuthorUUID = authorUUID
-			enriched.FromID = authorUUID
-			enriched.FromName = name
-			enriched.FromUUID = authorUUID
 		}
 		log.Println(err)
 	}

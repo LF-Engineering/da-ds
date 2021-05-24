@@ -16,7 +16,6 @@ import (
 	"time"
 
 	lib "github.com/LF-Engineering/da-ds"
-	"github.com/LF-Engineering/da-ds/mbox"
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
 	"github.com/LF-Engineering/dev-analytics-libraries/http"
 	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
@@ -128,7 +127,7 @@ func (f *Fetcher) Fetch(url string, fromDate *time.Time) (map[string]string, err
 }
 
 // FetchItem extracts data from archives
-func (f *Fetcher) FetchItem(slug, groupName, project, endpoint string, fromDate time.Time, limit int, now time.Time) ([]*RawMessage, error) {
+func (f *Fetcher) FetchItem(slug, groupName, endpoint string, fromDate time.Time, limit int, now time.Time) ([]*RawMessage, error) {
 	var allMsgs []*RawMessage
 	archives, err := f.Fetch(endpoint, &fromDate)
 	if err != nil {
@@ -188,7 +187,7 @@ func (f *Fetcher) FetchItem(slug, groupName, project, endpoint string, fromDate 
 		buf := new(bytes.Buffer)
 		zipWriter := zip.NewWriter(buf)
 		zipFile, err := zipWriter.Create(filename)
-		lib.Printf("%+v",filename)
+		lib.Printf("%+v", filename)
 		if err != nil {
 			return nil, err
 		}
@@ -278,7 +277,7 @@ func (f *Fetcher) FetchItem(slug, groupName, project, endpoint string, fromDate 
 				warn    bool
 				message map[string]interface{}
 			)
-			message, valid, warn = mbox.ParseMBoxMsg(2, groupName, msg)
+			message, valid, warn = ParseMBoxMsg(2, groupName, msg)
 			stat(false, warn, valid, false)
 			if !valid {
 				return
