@@ -247,7 +247,7 @@ func TestEnrichItem(t *testing.T) {
           "assigned_to_detail_domain" : "",
           "origin" : "https://bugs.dpdk.org/",
           "metadata__backend_version" : "0.18",
-          "creator_detail_name" : "Qian",
+          "creator_detail_name" : "qian.q.xu@intel.com",
           "component" : "doc",
           "summary" : "Test bug",
           "assigned_to_detail_gender_acc" : 0,
@@ -255,7 +255,7 @@ func TestEnrichItem(t *testing.T) {
           "creator_detail_bot" : false,
           "assigned_to_detail_id" : "756be8209f265138d271a6223fa0d85085e308db",
           "summary_analyzed" : "Test bug",
-          "author_name" : "Qian",
+          "author_name" : "qian.q.xu@intel.com",
           "metadata__updated_on" : "2017-09-14T09:46:38Z",
           "author_multi_org_names" : [
             "Unknown"
@@ -270,7 +270,7 @@ func TestEnrichItem(t *testing.T) {
           "assigned_to_detail_uuid" : "756be8209f265138d271a6223fa0d85085e308db",
           "creation_date" : "2017-09-14T09:41:31Z",
           "creator_detail_gender_acc" : 0,
-          "assigned_to_detail_name" : "Qian",
+          "assigned_to_detail_name" : "qian.q.xu",
           "author_domain" : "",
           "creator_detail_id" : "756be8209f265138d271a6223fa0d85085e308db",
           "time_to_last_update_days" : 0,
@@ -317,11 +317,15 @@ func TestEnrichItem(t *testing.T) {
 
 		aff1UUID := "756be8209f265138d271a6223fa0d85085e308db"
 		fakeAff1 := &libAffiliations.AffIdentity{ID: &aff1UUID,
-			UUID: &aff1UUID, Name: "Qian", IsBot: &zero,
+			UUID: &aff1UUID, Name: "qian.q.xu", IsBot: &zero,
 			Domain: "", OrgName: nil, Username: "", GenderACC: &zero,
 			MultiOrgNames: []string{}, Gender: &unknown,
 		}
-
+		fakeAff3 := &libAffiliations.AffIdentity{ID: &aff1UUID,
+			UUID: &aff1UUID, Name: "qian.q.xu@intel.com", IsBot: &zero,
+			Domain: "", OrgName: nil, Username: "", GenderACC: &zero,
+			MultiOrgNames: []string{}, Gender: &unknown,
+		}
 		dd := "MontaVista Software, LLC"
 		aff2UUID := "a89364af9818412b8c59193ca83b30dd67b20e35"
 		aff2ID := "5d408e590365763c3927084d746071fa84dc8e52"
@@ -330,8 +334,9 @@ func TestEnrichItem(t *testing.T) {
 			Domain: "", OrgName: &dd, Username: "", GenderACC: &zero,
 			MultiOrgNames: []string{"MontaVista Software, LLC"}, Gender: &unknown,
 		}
-		affProviderMock.On("GetIdentityByUser", "username", "Qian").Return(fakeAff1, nil)
+		affProviderMock.On("GetIdentityByUser", "username", "qian.q.xu").Return(fakeAff1, nil)
 		affProviderMock.On("GetIdentityByUser", "username", "akuster808").Return(fakeAff2, nil)
+		affProviderMock.On("GetIdentityByUser", "email", "qian.q.xu@intel.com").Return(fakeAff3, nil)
 
 		params := &EnricherParams{
 			Project:        "dpdk-common",

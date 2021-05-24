@@ -978,9 +978,35 @@ func ForEachESItem(
 	return
 }
 
+// IsOldFormat - is this an old format index (bitergia one)?
+func IsOldFormat(ctx *Ctx, idx string) (old bool) {
+	result, _, _, _, _ := Request(
+		ctx,
+		idx+"/_mapping",
+		Get,
+		nil,        // headers
+		[]byte{},   // payload
+		[]string{}, // cookies
+		nil,        // JSON statuses
+		nil,        // Error statuses
+		nil,        // OK statuses
+		nil,        // Cache statuses
+		false,      // retry
+		nil,        // cache duration
+		true,       // skip in dry run
+	)
+	bResult, ok := result.([]byte)
+	if !ok {
+		return
+	}
+	sResult := string(bResult)
+	// Printf("sResult:\n%s\n", sResult)
+	old = strings.Contains(sResult, `"metadata__gelk_backend_name"`) || strings.Contains(sResult, `"metadata__gelk_version"`) || strings.Contains(sResult, `"perceval_version"`)
+	return
+}
+
 // HandleMapping - create/update mapping for raw or rich index
 func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
-	// Create index, ignore if exists (see status 400 is not in error statuses)
 	var url string
 	if raw {
 		url = ctx.ESURL + "/" + ctx.RawIndex
@@ -1003,6 +1029,33 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 		}
 		return fmt.Sprintf("%+v", r)
 	}
+	// Drop raw/rich if that flag is set
+	if (raw && ctx.DropRaw) || (!raw && ctx.DropRich) {
+		// If we want o drop raw or rich and if raw or rich is in old format
+		if IsOldFormat(ctx, url) {
+			result, status, _, _, err = Request(
+				ctx,
+				url+"?expand_wildcards=none&allow_no_indices=true&ignore_unavailable=true",
+				Delete,
+				nil,                                 // headers
+				[]byte{},                            // payload
+				[]string{},                          // cookies
+				nil,                                 // JSON statuses
+				map[[2]int]struct{}{{400, 599}: {}}, // error statuses: 401-599
+				nil,                                 // OK statuses
+				nil,                                 // Cache statuses
+				true,                                // retry
+				nil,                                 // cache duration
+				true,                                // skip in dry run
+			)
+			if err == nil {
+				Printf("index %s deleted: status=%d, result: %+v\n", url, status, stringResult(result))
+			} else {
+				Printf("index %s not deleted: status=%d, err=%+v, result: %+v\n", url, status, err, stringResult(result))
+			}
+		}
+	}
+	// Create index, ignore if exists (see status 400 is not in error statuses)
 	result, status, _, _, err = Request(
 		ctx,
 		url+"?wait_for_active_shards=all",

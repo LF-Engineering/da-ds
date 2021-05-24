@@ -211,8 +211,8 @@ func buildJenkinsManager(ctx *lib.Ctx) (*jenkins.Manager, error) {
 func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 	var params bugzilla.Param
 	params.EndPoint = ctx.BugZilla.Origin.String()
-	params.FetcherBackendVersion = "0.1.0"
-	params.EnricherBackendVersion = "0.1.0"
+	params.FetcherBackendVersion = "0.1.1"
+	params.EnricherBackendVersion = "0.1.1"
 	params.ESUrl = ctx.ESURL
 	params.EsUser = ""
 	params.EsPassword = ""
@@ -291,8 +291,8 @@ func buildPipermailManager(ctx *lib.Ctx) (*pipermail.Manager, error) {
 func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
 	params := &bugzillarest.MgrParams{}
 	params.EndPoint = ctx.BugZilla.Origin.String()
-	params.FetcherBackendVersion = "0.1.0"
-	params.EnricherBackendVersion = "0.1.0"
+	params.FetcherBackendVersion = "0.1.1"
+	params.EnricherBackendVersion = "0.1.1"
 	params.ESUrl = ctx.ESURL
 	params.EsUser = ""
 	params.EsPassword = ""
