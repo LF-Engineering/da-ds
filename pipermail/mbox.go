@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"log"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -89,8 +91,14 @@ func ParseMBoxMsg(Debug int, groupName string, msg []byte) (item map[string]inte
 	item["MBox-Bytes-Length"] = len(msg)
 	item["MBox-Project-Name"] = groupName
 	dumpMBox := func() {
+		if _, err := os.Stat(DumpsPath); os.IsNotExist(err) {
+			err := os.MkdirAll(DumpsPath, os.ModePerm)
+			if err != nil {
+				log.Println(err)
+			}
+		}
 		fn := DumpsPath + groupName + "_" + strconv.Itoa(len(msg)) + ".mbox"
-		_ = ioutil.WriteFile(fn, msg, 0644)
+		_ = ioutil.WriteFile(fn, msg, os.ModePerm)
 	}
 	addRaw := func(k string, v []byte, replace int) {
 		// replace: 0-add new item, 1-replace current, 2-replace all

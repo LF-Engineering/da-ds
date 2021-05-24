@@ -57,7 +57,6 @@ type RawMessageData struct {
 // EnrichedMessage represents piper mail enriched message
 type EnrichedMessage struct {
 	ID                  string    `json:"id"`
-	ProjectTS           int64     `json:"project_ts"`
 	TZ                  float64   `json:"tz"`
 	MessageID           string    `json:"Message-ID"`
 	UUID                string    `json:"uuid"`
