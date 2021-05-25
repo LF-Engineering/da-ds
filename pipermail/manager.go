@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/url"
+	"path"
 	"strconv"
 	"time"
 
@@ -80,11 +82,10 @@ type Manager struct {
 }
 
 // NewManager initiates piper mail manager instance
-func NewManager(endPoint, slug, groupName, shConnStr, fetcherBackendVersion, enricherBackendVersion string, fetch bool, enrich bool, eSUrl string, esUser string, esPassword string, esIndex string, fromDate *time.Time, project string, fetchSize int, enrichSize int, affBaseURL, esCacheURL, esCacheUsername, esCachePassword, authGrantType, authClientID, authClientSecret, authAudience, auth0URL, env, webHookURL string) (*Manager, error) {
+func NewManager(endPoint, slug, shConnStr, fetcherBackendVersion, enricherBackendVersion string, fetch bool, enrich bool, eSUrl string, esUser string, esPassword string, esIndex string, fromDate *time.Time, project string, fetchSize int, enrichSize int, affBaseURL, esCacheURL, esCacheUsername, esCachePassword, authGrantType, authClientID, authClientSecret, authAudience, auth0URL, env, webHookURL string) (*Manager, error) {
 	mng := &Manager{
 		Endpoint:               endPoint,
 		Slug:                   slug,
-		GroupName:              groupName,
 		SHConnString:           shConnStr,
 		FetcherBackendVersion:  fetcherBackendVersion,
 		EnricherBackendVersion: enricherBackendVersion,
@@ -120,9 +121,15 @@ func NewManager(endPoint, slug, groupName, shConnStr, fetcherBackendVersion, enr
 		return nil, err
 	}
 
+	groupName, err := getGroupName(endPoint)
+	if err != nil {
+		return nil, err
+	}
+
 	mng.fetcher = fetcher
 	mng.enricher = enricher
 	mng.esClientProvider = esClientProvider
+	mng.GroupName = groupName
 
 	return mng, nil
 }
@@ -189,7 +196,7 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 		from := timeLib.GetOldestDate(fromDate, lastFetch)
 
 		data := make([]elastic.BulkData, 0)
-		raw, err := fetcher.FetchItem(m.Slug, m.GroupName, m.Project, m.Endpoint, *from, m.FetchSize, now)
+		raw, err := fetcher.FetchItem(m.Slug, m.GroupName, m.Endpoint, *from, m.FetchSize, now)
 		if err != nil {
 			ch <- err
 			return
@@ -303,7 +310,7 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 		err := m.esClientProvider.Get(fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), query, val)
 
 		query = map[string]interface{}{
-			"size": 100000,
+			"size": 10000,
 			"query": map[string]interface{}{
 				"bool": map[string]interface{}{
 					"must": []map[string]interface{}{},
@@ -382,8 +389,8 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 
 			if len(data) > 0 {
 				// Update changed at in elastic cache index
-				cacheDoc, _ := data[len(data)-1].Data.(*EnrichMessage)
-				updateChan := HitSource{ID: enrichID, ChangedAt: cacheDoc.ChangedDate}
+				cacheDoc, _ := data[len(data)-1].Data.(*EnrichedMessage)
+				updateChan := HitSource{ID: enrichID, ChangedAt: cacheDoc.ChangedAt}
 				data = append(data, elastic.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: enrichID, Data: updateChan})
 
 				// Insert enriched data to elasticsearch
@@ -447,4 +454,13 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 	enricher := NewEnricher(m.EnricherBackendVersion, esClientProvider, affiliationsClientProvider)
 
 	return fetcher, enricher, esClientProvider, err
+}
+
+// getGroupName extracts a pipermail group name from the given mailing list url
+func getGroupName(targetURL string) (string, error) {
+	parsedURL, err := url.Parse(targetURL)
+	if err != nil {
+		return "", err
+	}
+	return path.Base(parsedURL.Path), nil
 }

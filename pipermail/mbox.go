@@ -1,9 +1,11 @@
-package mbox
+package pipermail
 
 import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"log"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -14,10 +16,6 @@ import (
 )
 
 const (
-	// MessageDateField ...
-	MessageDateField = "date"
-	// MessageIDField ...
-	MessageIDField = "Message-ID"
 	// MessageReceivedField ...
 	MessageReceivedField = "received"
 	// MaxMessageBodyLength ...
@@ -33,7 +31,7 @@ const (
 )
 
 var (
-	// LowerDayNames - downcased 3 letter US day names
+	// LowerDayNames - lower case 3 letter US day names
 	LowerDayNames = map[string]struct{}{
 		"mon": {},
 		"tue": {},
@@ -71,12 +69,12 @@ var (
 		"september": "Sep",
 		"october":   "Oct",
 		"november":  "Nov",
-		"decdember": "Dec",
+		"december":  "Dec",
 	}
 	// SpacesRE - match 1 or more space characters
 	SpacesRE = regexp.MustCompile(`\s+`)
 	// TZOffsetRE - time zone offset that comes after +0... +1... -0... -1...
-	// Can be 3 disgits or 3 digits then whitespace and then anything
+	// Can be 3 or 3 digits then whitespace and then anything
 	TZOffsetRE = regexp.MustCompile(`^(\d{3})(\s+.*$|$)`)
 	// MessageLineSeparator - message line separator
 	MessageLineSeparator = []byte("\n")
@@ -93,8 +91,14 @@ func ParseMBoxMsg(Debug int, groupName string, msg []byte) (item map[string]inte
 	item["MBox-Bytes-Length"] = len(msg)
 	item["MBox-Project-Name"] = groupName
 	dumpMBox := func() {
-		fn := groupName + "_" + strconv.Itoa(len(msg)) + ".mbox"
-		_ = ioutil.WriteFile(fn, msg, 0644)
+		if _, err := os.Stat(DumpsPath); os.IsNotExist(err) {
+			err := os.MkdirAll(DumpsPath, os.ModePerm)
+			if err != nil {
+				log.Println(err)
+			}
+		}
+		fn := DumpsPath + groupName + "_" + strconv.Itoa(len(msg)) + ".mbox"
+		_ = ioutil.WriteFile(fn, msg, os.ModePerm)
 	}
 	addRaw := func(k string, v []byte, replace int) {
 		// replace: 0-add new item, 1-replace current, 2-replace all
@@ -155,7 +159,7 @@ func ParseMBoxMsg(Debug int, groupName string, msg []byte) (item map[string]inte
 		if len(key) > 160 {
 			return
 		}
-		match := keyRE.MatchString(string(key))
+		match := keyRE.MatchString(key)
 		if !match {
 			return
 		}
@@ -182,13 +186,13 @@ func ParseMBoxMsg(Debug int, groupName string, msg []byte) (item map[string]inte
 		Properties  map[string][][]byte
 		Data        []byte
 	}
-	bodies := []Body{}
-	currContentType := []byte{}
+	var bodies []Body
+	var currContentType []byte
 	currProperties := make(map[string][][]byte)
-	currData := []byte{}
+	var currData []byte
 	propertiesString := func(props map[string][][]byte) (s string) {
 		s = "{"
-		ks := []string{}
+		var ks []string
 		for k := range props {
 			ks = append(ks, k)
 		}
@@ -233,9 +237,9 @@ func ParseMBoxMsg(Debug int, groupName string, msg []byte) (item map[string]inte
 		added = true
 		return
 	}
-	savedBoundary := [][]byte{}
-	savedContentType := [][]byte{}
-	savedProperties := []map[string][][]byte{}
+	var savedBoundary [][]byte
+	var savedContentType [][]byte
+	var savedProperties []map[string][][]byte
 	push := func(newBoundary []byte) {
 		savedBoundary = append(savedBoundary, boundary)
 		savedContentType = append(savedContentType, currContentType)
@@ -502,7 +506,7 @@ func ParseMBoxMsg(Debug int, groupName string, msg []byte) (item map[string]inte
 		}
 		return
 	}
-	ks := []string{}
+	var ks []string
 	for k := range raw {
 		lk := strings.ToLower(k)
 		sv := string(mustGetRaw(k))
@@ -634,7 +638,7 @@ func ParseMBoxMsg(Debug int, groupName string, msg []byte) (item map[string]inte
 			if len(v) == 1 {
 				m["headers"].(map[string]interface{})[k] = string(v[0])
 			} else {
-				a := []string{}
+				var a []string
 				for _, vi := range v {
 					a = append(a, string(vi))
 				}
@@ -658,7 +662,7 @@ func ParseMBoxMsg(Debug int, groupName string, msg []byte) (item map[string]inte
 		lib.Printf("#%d: %s %s %d\n", i, string(body.ContentType), propertiesString(body.Properties), len(body.Data))
 	}
 	if DropXFields {
-		ks := []string{}
+		var ks []string
 		for k := range item {
 			lk := strings.ToLower(k)
 			if strings.HasPrefix(lk, "x-") {
