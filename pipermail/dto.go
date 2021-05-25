@@ -87,6 +87,7 @@ type EnrichedMessage struct {
 	ProjectSlug         string    `json:"project_slug"`
 	ChangedAt           time.Time `json:"changed_at"`
 	GroupName           string    `json:"group_name"`
+	Slug                string    `json:"slug"`
 }
 
 // RawHits result

@@ -310,7 +310,7 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 		err := m.esClientProvider.Get(fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), query, val)
 
 		query = map[string]interface{}{
-			"size": 100000,
+			"size": 10000,
 			"query": map[string]interface{}{
 				"bool": map[string]interface{}{
 					"must": []map[string]interface{}{},

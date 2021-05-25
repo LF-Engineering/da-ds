@@ -73,6 +73,7 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 		MetadataUpdatedOn:   rawMessage.MetadataUpdatedOn,
 		MetadataEnrichedOn:  now,
 		ChangedAt:           rawMessage.ChangedAt,
+		Slug:                rawMessage.ProjectSlug,
 	}
 
 	if rawMessage.Data.InReplyTo != "" {
