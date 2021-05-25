@@ -419,16 +419,15 @@ func cleanupFrom(rawMailString string) (newFrom string) {
 
 		newFrom = fmt.Sprintf("%s%s <%s", username, viaCommunity, trimBraces[1])
 		return
-	} else {
-		if strings.HasPrefix(rawMailString, "<") {
-			username = strings.Replace(rawMailString, "<", " <", -1)
-		} else {
-			username = trimBraces[0]
-		}
-
-		newFrom = username
-
 	}
+
+	if strings.HasPrefix(rawMailString, "<") {
+		username = strings.Replace(rawMailString, "<", " <", -1)
+	} else {
+		username = trimBraces[0]
+	}
+
+	newFrom = username
 
 	return
 
