@@ -151,7 +151,7 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 					ID:           authorUUID,
 				}
 
-				if ok := e.affiliationsClientProvider.AddIdentity(&userIdentity); !ok {
+				if ok := e.ensureAddIdentity(&userIdentity); !ok {
 					log.Printf("failed to add identity for [%+v]", userAffiliationsEmail)
 				}
 
@@ -164,6 +164,16 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 	}
 
 	return &enrichedMessage, nil
+}
+
+// ensureAddIdentity function used to make sure an identity is added before writing to es
+func (e *Enricher) ensureAddIdentity(userIdentity *affiliation.Identity) bool {
+	ok := e.affiliationsClientProvider.AddIdentity(userIdentity)
+	if !ok {
+		time.Sleep(5 * time.Minute)
+		e.ensureAddIdentity(userIdentity)
+	}
+	return ok
 }
 
 // GetEmailAddress ...
