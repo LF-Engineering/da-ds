@@ -369,10 +369,6 @@ func (m *Manager) enrich(lastActionCachePostfix string) <-chan error {
 				data = append(data, elastic.BulkData{IndexName: m.ESIndex, ID: enrichedItem.UUID, Data: enrichedItem})
 			}
 
-			results = len(data)
-			offset += results
-
-			// setting mapping and create index if not exists
 			if offset == 0 {
 				_, err := m.EsClientProvider.CreateIndex(m.ESIndex, BugzillaRestEnrichMapping)
 				if err != nil {
@@ -381,6 +377,9 @@ func (m *Manager) enrich(lastActionCachePostfix string) <-chan error {
 					return
 				}
 			}
+
+			results = len(data)
+			offset += results
 
 			if len(data) > 0 {
 				// Update changed at in elastic cache index
