@@ -67,6 +67,7 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 	enriched.CreationDate = rawItem.CreationTS
 
 	enriched.ResolutionDays = math.Round(timeLib.GetDaysBetweenDates(enriched.DeltaTs, enriched.CreationDate)*100) / 100
+	enriched.TimeOpenDays = math.Round(timeLib.GetDaysBetweenDates(enriched.MetadataEnrichedOn, enriched.CreationDate)*100) / 100
 	if rawItem.StatusWhiteboard != "" {
 		enriched.Whiteboard = rawItem.StatusWhiteboard
 	}
@@ -86,13 +87,13 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 			assignedToFieldName = "email"
 		}
 		assignedTo, err := e.affiliationsClient.GetIdentityByUser(assignedToFieldName, rawItem.Assignee.Username)
-		if err == nil {
+		if err == nil && assignedTo != nil {
 			enriched.AssignedToID = *assignedTo.ID
 			enriched.AssignedToUUID = *assignedTo.UUID
 			enriched.AssignedToName = assignedTo.Name
 			enriched.AssignedToUserName = assignedTo.Username
 			enriched.AssignedToDomain = assignedTo.Domain
-			if *assignedTo.IsBot != 0 {
+			if assignedTo.IsBot != nil && *assignedTo.IsBot != 0 {
 				enriched.AssignedToBot = true
 			}
 
@@ -164,7 +165,7 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 		}
 
 		reporter, err := e.affiliationsClient.GetIdentityByUser(reporterFieldName, enriched.ReporterUserName)
-		if err == nil {
+		if err == nil && reporter != nil {
 			enriched.ReporterID = *reporter.ID
 			enriched.ReporterUUID = *reporter.UUID
 			enriched.ReporterName = reporter.Name

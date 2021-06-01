@@ -82,7 +82,7 @@ func TestEnrichItem(t *testing.T) {
           "op_sys" : "Multiple",
           "platform" : "PC",
           "uuid" : "5d61b34bcdf735a83d8b1c6762890b79f053c491",
-          "timeopen_days" : 0,
+          "timeopen_days" : 33.49,
           "main_description" : "If u-boot defconfig is incomplete, 'bitbake u-boot -c configure' hangs and eats all memory",
           "main_description_analyzed" : "If u-boot defconfig is incomplete, 'bitbake u-boot -c configure' hangs and eats all memory",
 		  "is_bugzilla_bug" : 1,

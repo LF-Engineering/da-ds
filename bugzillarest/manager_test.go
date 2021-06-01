@@ -72,13 +72,32 @@ func TestSync(t *testing.T) {
 	rawQuery := map[string]interface{}{"from": 0, "query": map[string]interface{}{"bool": map[string]interface{}{"must": map[string]interface{}{"range": map[string]interface{}{"data.last_change_time": map[string]interface{}{"gte": "1970-01-01T00:00:00Z"}}}}}, "size": 1000, "sort": []map[string]interface{}{{"data.last_change_time": map[string]string{"order": "asc"}}}}
 	rawVal := &RawHits{Hits: NHits{Hits: []NestedRawHits(nil)}}
 
-	fakeMapping := `{"mappings":
+	fakeMapping := `{
+  "mappings": 
+{"dynamic":true,
+"properties":{
+"metadata__updated_on":{"type":"date"},
+"metadata__timestamp":{"type":"date"},
+"updated_on":{"type":"date"},
+"timestamp":{"type":"date"},
+"short_description":{"type":"text","index":true},
+"backend_version":{"type":"keyword"},
+"backend_name":{"type":"keyword"},
+"status":{"type":"keyword"},
+"priority":{"type":"keyword"},
+"severity":{"type":"keyword"},
+"uuid":{"type": "keyword"},
+"origin":{"type":"keyword"},
+"tag":{"type":"keyword"}
+}}
+}`
+
+	fakeMapping2 := `{"mappings":
 {"properties":
 {
   "metadata__updated_on":{"type":"date"},
   "metadata__timestamp":{"type":"date"},
   "metadata__enriched_on":{"type":"date"},
-  "metadata__backend_name":{"type":"date"},
   "creation_date":{"type":"date"},
   "creation_ts":{"type":"date"},
   "delta_ts":{"type":"date"},
@@ -100,10 +119,24 @@ func TestSync(t *testing.T) {
   "product":{"type":"keyword"},
   "origin":{"type":"keyword"},
   "metadata__backend_version":{"type":"keyword"},
-  "id": {"type":"keyword"}
+  "id": {"type":"keyword"},
+  "component": {"type":"keyword"},
+  "assigned_to": {"type":"keyword"},
+  "creator_detail_org_name": {"type":"keyword"},
+  "author_org_name": {"type":"keyword"},
+  "assigned_to_org_name": {"type":"keyword"},
+  "creator": {"type":"keyword"},
+  "metadata__backend_name": {"type":"keyword"},
+  "assigned_to_detail_org_name": {"type":"keyword"},
+  "author_name": {"type":"keyword"},
+  "url": {"type":"keyword"}
 }}}`
 
 	esClientMock.On("CreateIndex", "sds-data-plane-development-kit-dpdk-bugzillarest", []byte(fakeMapping)).Run(func(args mock.Arguments) {
+
+	}).Return(nil, nil)
+
+	esClientMock.On("CreateIndex", "sds-data-plane-development-kit-dpdk-bugzillarest", []byte(fakeMapping2)).Run(func(args mock.Arguments) {
 
 	}).Return(nil, nil)
 
