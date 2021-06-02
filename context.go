@@ -448,6 +448,10 @@ func (ctx *Ctx) Validate() (err error) {
 	if strings.HasSuffix(ctx.ESURL, "/") {
 		ctx.ESURL = ctx.ESURL[:len(ctx.ESURL)-1]
 	}
+	// Warning when running for foundation-f project slug.
+	if strings.HasSuffix(ctx.ProjectSlug, "-f") && !strings.Contains(ctx.ProjectSlug, "/") {
+		Printf("%s: running on foundation-f level detected: project slug is %s\n", DadsWarning, ctx.ProjectSlug)
+	}
 	return
 }
 

@@ -143,3 +143,6 @@ const HistoricalContent = "historical content"
 
 // ProjectSlug - common constant string
 const ProjectSlug = "project_slug"
+
+// DadsWarning - common constant string
+const DadsWarning = "da-ds WARNING"
