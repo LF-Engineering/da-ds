@@ -108,7 +108,7 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 			enriched.AssignedToDetailUserName = assignedTo.Username
 			enriched.AssignedToDetailDomain = assignedTo.Domain
 
-			if *assignedTo.IsBot != 0 {
+			if assignedTo.IsBot != nil && *assignedTo.IsBot != 0 {
 				enriched.AssignedToDetailBot = true
 			}
 
@@ -216,8 +216,7 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 				enriched.CreatorDetailOrgName = unknown
 				enriched.AuthorOrgName = unknown
 			}
-
-			if *creator.IsBot != 0 {
+			if creator.IsBot != nil && *creator.IsBot != 0 {
 				enriched.CreatorDetailBot = true
 				enriched.AuthorBot = true
 			}

@@ -417,16 +417,12 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 				data = append(data, elastic.BulkData{IndexName: m.ESIndex, ID: enrichedItem.UUID, Data: enrichedItem})
 			}
 
-			results = len(data)
-			offset += results
-
 			if len(data) > 0 {
 				// Update changed at in elastic cache index
 				cacheDoc, _ := data[len(data)-1].Data.(*BugEnrich)
 				updateChan := HitSource{ID: enrichID, ChangedAt: cacheDoc.ChangedDate}
 				data = append(data, elastic.BulkData{IndexName: fmt.Sprintf("%s%s", m.ESIndex, lastActionCachePostfix), ID: enrichID, Data: updateChan})
 
-				// setting mapping and create index if not exists
 				if offset == 0 {
 					_, err := m.esClientProvider.CreateIndex(m.ESIndex, BugzillaEnrichMapping)
 					if err != nil {
@@ -436,7 +432,6 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 					}
 				}
 
-				// Insert enriched data to elasticsearch
 				esRes, err := m.esClientProvider.BulkInsert(data)
 				if err != nil {
 					ch <- err
@@ -449,6 +444,8 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 					err = util.HandleGapData(m.GapURL, m.fetcher.HTTPClientProvider, failedData, m.Auth0, m.Environment)
 				}
 			}
+			results = len(data)
+			offset += results
 
 		}
 
