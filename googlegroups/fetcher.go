@@ -77,7 +77,10 @@ func (f *Fetcher) Fetch(fromDate, now *time.Time) ([]*RawMessage, error) {
 
 	user := "me"
 	messageIDS := make([]string, 0)
-	messages, err := srv.Users.Messages.List(user).Do()
+	sender := fmt.Sprintf("list:%+v", f.GroupName)
+	fetchStartDate := fmt.Sprintf("after:%+v", fromDate.Format("2006/01/02"))
+	fetchQuery := fmt.Sprintf("%s %s", sender, fetchStartDate)
+	messages, err := srv.Users.Messages.List(user).MaxResults(MaxNumberOfMessages).IncludeSpamTrash(false).Q(fetchQuery).Do()
 	if err != nil {
 		log.Fatalf("Error: %v", err)
 	}
@@ -86,50 +89,54 @@ func (f *Fetcher) Fetch(fromDate, now *time.Time) ([]*RawMessage, error) {
 	}
 	rawMessages := make([]*RawMessage, 0)
 
-	for _, messageID := range messageIDS {
-		type result struct {
-			path    string
-			message *gmail.Message
-			err     error
-		}
-		results := make(chan result, 1024)
+	type result struct {
+		path    string
+		message *gmail.Message
+		err     error
+	}
+	results := make(chan result)
+	var wgFiles, wgProcess sync.WaitGroup
 
-		var wgFiles, wgProcess sync.WaitGroup
+	for _, messageID := range messageIDS {
 		wgFiles.Add(1)
-		go func() {
+		go func(messageID string) {
 			defer wgFiles.Done()
 			wgFiles.Add(1)
-			go func(messageId string) {
+			go func(messageID string) {
 				defer wgFiles.Done()
-				msg, err := srv.Users.Messages.Get(user, messageId).Do()
-				results <- result{messageId, msg, err}
+				msg, err := srv.Users.Messages.Get(user, messageID).Do()
+				// rate limiting
+				time.Sleep(time.Second * 10)
+				results <- result{messageID, msg, err}
 			}(messageID)
-		}()
-
-		var nEnvs, nErr int
-		wgProcess.Add(1)
-		go func() {
-			defer wgProcess.Done()
-			for res := range results {
-				if res.err != nil {
-					log.Printf("processing %s: %v", res.path, res.err)
-					nErr++
-					continue
-				}
-				msg, err := f.getMessage(res.message, fromDate, now)
-				if err != nil {
-					return
-				}
-				if msg != nil {
-					rawMessages = append(rawMessages, msg)
-				}
-				nEnvs++
-			}
-		}()
-		wgFiles.Wait()
-		close(results)
-		wgProcess.Wait()
+		}(messageID)
 	}
+
+	var nEnvs, nErr int
+	wgProcess.Add(1)
+	go func() {
+		defer wgProcess.Done()
+		for res := range results {
+			if res.err != nil {
+				log.Printf("processing %v: %v", res.path, res.err)
+				nErr++
+				continue
+			}
+			msg, err := f.getMessage(res.message, fromDate, now)
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			if msg != nil {
+				rawMessages = append(rawMessages, msg)
+			}
+			nEnvs++
+		}
+	}()
+	wgFiles.Wait()
+	close(results)
+	wgProcess.Wait()
+
 	return rawMessages, err
 }
 
@@ -142,19 +149,14 @@ func (f *Fetcher) getMessage(msg *gmail.Message, fromDate, now *time.Time) (rawM
 		log.Println(err)
 		return nil, err
 	}
-	//now := time.Now()
-	from := headers.From
+
+	from := cleanupFrom(headers.From)
 	to := headers.To
-	sender := headers.Sender
 	messageID := headers.MessageID
 	inReplyTo := headers.InReplyTo
 	references := headers.References
 	subject := headers.Subject
 	messageBody := msg.Snippet
-
-	if sender != f.GroupName {
-		return nil, err
-	}
 
 	if fromDate.After(date) {
 		fmt.Println(fromDate, " > ", date)
@@ -295,6 +297,10 @@ func getHeadersData(msg *gmail.Message) *HeadersData {
 			data.To = append(data.To, v.Value)
 		case "Delivered-To":
 			data.DeliveredTo = append(data.DeliveredTo, v.Value)
+		case "Mailing-list":
+			mlList := strings.Split(v.Value, ";")
+			mlValue := strings.Split(mlList[0], "list ")
+			data.MailingList = strings.TrimSpace(mlValue[1])
 		}
 	}
 	return data
@@ -389,4 +395,40 @@ func updateTokenInSSM(ssmKey string, token *oauth2.Token) error {
 	}
 	log.Println(message)
 	return nil
+}
+
+//cleanup from name
+func cleanupFrom(rawMailString string) (newFrom string) {
+	trimBraces := strings.Split(rawMailString, " <")
+	username := ""
+	viaCommunity := ""
+
+	if len(trimBraces) > 1 {
+		username = strings.TrimSpace(trimBraces[0])
+
+		if strings.Contains(username, " via ") {
+			name := strings.Split(username, " via ")[0]
+			viaCommunity = strings.Replace(fmt.Sprintf(" %s %s", "via", strings.Split(username, " via ")[1]), "\"", "", -1)
+			username = name
+		}
+
+		username = strings.Trim(username, "\"")
+		username = strings.Replace(username, "'", "", -1)
+		username = strings.Replace(username, ",", "", -1)
+		username = strings.Replace(username, "<", " <", -1)
+
+		newFrom = fmt.Sprintf("%s%s <%s", username, viaCommunity, trimBraces[1])
+		return
+	}
+
+	if strings.HasPrefix(rawMailString, "<") {
+		username = strings.Replace(rawMailString, "<", " <", -1)
+	} else {
+		username = trimBraces[0]
+	}
+
+	newFrom = username
+
+	return
+
 }

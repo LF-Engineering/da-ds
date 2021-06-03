@@ -16,6 +16,8 @@ const (
 	CredentialsSSMParamName = "insights_googlegroups_credentials"
 	// TokenSSMParamName from ssm
 	TokenSSMParamName = "insights_googlegroups_token"
+	// MaxNumberOfMessages from gmail
+	MaxNumberOfMessages = 10000000
 )
 
 var (

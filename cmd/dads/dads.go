@@ -266,7 +266,6 @@ func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 func buildPipermailManager(ctx *lib.Ctx) (*pipermail.Manager, error) {
 	origin := ctx.PiperMail.Origin.String()
 	slug := ctx.PiperMail.ProjectSlug.String()
-	groupName := ctx.PiperMail.GroupName.String()
 	fetcherBackendVersion := "0.0.1"
 	enricherBackendVersion := "0.0.1"
 	doFetch := ctx.PiperMail.DoFetch.Bool()
@@ -287,7 +286,7 @@ func buildPipermailManager(ctx *lib.Ctx) (*pipermail.Manager, error) {
 	authURL := ctx.Env("AUTH0_URL")
 	env := os.Getenv("ENVIRONMENT")
 
-	mgr, err := pipermail.NewManager(origin, slug, groupName, ctx.DBConn, fetcherBackendVersion, enricherBackendVersion,
+	mgr, err := pipermail.NewManager(origin, slug, ctx.DBConn, fetcherBackendVersion, enricherBackendVersion,
 		doFetch, doEnrich, ctx.ESURL, "", "", esIndex, fromDate, project,
 		fetchSize, enrichSize, affBaseURL, esCacheURL, esCacheUsername, esCachePassword, authGrantType, authClientID, authClientSecret, authAudience, authURL, env, ctx.SlackWebHookURL)
 

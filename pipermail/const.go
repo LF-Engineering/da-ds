@@ -44,4 +44,6 @@ var (
 	EmailObfuscationPatterns = []string{" at ", "_at_", " en "}
 	// ArchiveDownloadsPath ...
 	ArchiveDownloadsPath = strings.TrimSpace(os.Getenv("HOME") + "/.perceval/mailinglists/")
+	// DumpsPath ...
+	DumpsPath = strings.TrimSpace(os.Getenv("HOME") + "/.perceval/dumps/")
 )
