@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
 	"math/rand"
 	"os"
@@ -28,6 +29,7 @@ import (
 
 	"github.com/LF-Engineering/da-ds/dockerhub"
 
+	dads "github.com/LF-Engineering/da-ds"
 	lib "github.com/LF-Engineering/da-ds"
 )
 
@@ -211,8 +213,8 @@ func buildJenkinsManager(ctx *lib.Ctx) (*jenkins.Manager, error) {
 func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 	var params bugzilla.Param
 	params.EndPoint = ctx.BugZilla.Origin.String()
-	params.FetcherBackendVersion = "0.1.1"
-	params.EnricherBackendVersion = "0.1.1"
+	params.FetcherBackendVersion = "0.1.2"
+	params.EnricherBackendVersion = "0.1.2"
 	params.ESUrl = ctx.ESURL
 	params.EsUser = ""
 	params.EsPassword = ""
@@ -234,21 +236,24 @@ func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 		params.Delay = ctx.Delay
 
 	}
-
+	authData, err := getAuthData()
+	if err != nil {
+		return nil, err
+	}
 	params.GapURL = ctx.GapURL
 
-	params.AffBaseURL = ctx.Env("AFFILIATION_API_URL") + "/v1"
-	params.ESCacheURL = ctx.Env("ES_CACHE_URL")
-	params.ESCacheUsername = ctx.Env("ES_CACHE_USERNAME")
-	params.ESCachePassword = ctx.Env("ES_CACHE_PASSWORD")
-	params.AuthGrantType = ctx.Env("AUTH0_GRANT_TYPE")
+	params.AffBaseURL = os.Getenv("AFFILIATION_API_URL") + "/v1"
+	params.ESCacheURL = authData["es_url"]
+	params.ESCacheUsername = authData["es_user"]
+	params.ESCachePassword = authData["es_pass"]
+	params.AuthGrantType = authData["grant_type"]
 
-	params.AuthClientID = ctx.Env("AUTH0_CLIENT_ID")
-	params.AuthClientSecret = ctx.Env("AUTH0_CLIENT_SECRET")
-	params.AuthAudience = ctx.Env("AUTH0_AUDIENCE")
+	params.AuthClientID = authData["client_id"]
+	params.AuthClientSecret = authData["client_secret"]
+	params.AuthAudience = authData["audience"]
 
-	params.Auth0URL = ctx.Env("AUTH0_URL")
-	params.Environment = ctx.Env("BRANCH")
+	params.Auth0URL = authData["url"]
+	params.Environment = authData["env"]
 
 	mgr, err := bugzilla.NewManager(params)
 	if err != nil {
@@ -292,8 +297,8 @@ func buildPipermailManager(ctx *lib.Ctx) (*pipermail.Manager, error) {
 func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
 	params := &bugzillarest.MgrParams{}
 	params.EndPoint = ctx.BugZilla.Origin.String()
-	params.FetcherBackendVersion = "0.1.1"
-	params.EnricherBackendVersion = "0.1.1"
+	params.FetcherBackendVersion = "0.1.2"
+	params.EnricherBackendVersion = "0.1.2"
 	params.ESUrl = ctx.ESURL
 	params.EsUser = ""
 	params.EsPassword = ""
@@ -318,17 +323,20 @@ func buildBugzillaRestManager(ctx *lib.Ctx) (*bugzillarest.Manager, error) {
 
 	params.GapURL = ctx.GapURL
 	params.Slug = ctx.BugZilla.ProjectSlug.String()
-
-	params.AffBaseURL = ctx.Env("AFFILIATION_API_URL") + "/v1"
-	params.ESCacheURL = ctx.Env("ES_CACHE_URL")
-	params.ESCacheUsername = ctx.Env("ES_CACHE_USERNAME")
-	params.ESCachePassword = ctx.Env("ES_CACHE_PASSWORD")
-	params.AuthGrantType = ctx.Env("AUTH0_GRANT_TYPE")
-	params.AuthClientID = ctx.Env("AUTH0_CLIENT_ID")
-	params.AuthClientSecret = ctx.Env("AUTH0_CLIENT_SECRET")
-	params.AuthAudience = ctx.Env("AUTH0_AUDIENCE")
-	params.Auth0URL = ctx.Env("AUTH0_URL")
-	params.Environment = ctx.Env("BRANCH")
+	authData, err := getAuthData()
+	if err != nil {
+		return nil, err
+	}
+	params.AffBaseURL = os.Getenv("AFFILIATION_API_URL") + "/v1"
+	params.ESCacheURL = authData["es_url"]
+	params.ESCacheUsername = authData["es_user"]
+	params.ESCachePassword = authData["es_pass"]
+	params.AuthGrantType = authData["grant_type"]
+	params.AuthClientID = authData["client_id"]
+	params.AuthClientSecret = authData["client_secret"]
+	params.AuthAudience = authData["audience"]
+	params.Auth0URL = authData["url"]
+	params.Environment = authData["env"]
 
 	fetcher, enricher, esClientProvider, auth0ClientProvider, httpClientProvider, err := buildBugzillaRestMgrServices(params)
 	if err != nil {
@@ -429,4 +437,34 @@ func buildGoogleGroupsManager(ctx *lib.Ctx) (*googlegroups.Manager, error) {
 		fetchSize, enrichSize, affBaseURL, esCacheURL, esCacheUsername, esCachePassword, authGrantType, authClientID, authClientSecret, authAudience, authURL, env)
 
 	return mgr, err
+}
+
+func getAuthData() (map[string]string, error) {
+	var data map[string]string
+
+	auth0DataB64 := os.Getenv("AUTH0_DATA")
+	if auth0DataB64 == "" {
+		return data, fmt.Errorf("you must specify AUTH0_DATA (so the program can generate an API token) or specify token with JWT_TOKEN")
+	}
+	var auth0Data []byte
+	auth0Data, err := base64.StdEncoding.DecodeString(auth0DataB64)
+	if err != nil {
+		dads.Printf("decode base64 error: %+v\n", err)
+		return data, err
+	}
+	err = jsoniter.Unmarshal([]byte(auth0Data), &data)
+	if err != nil {
+		dads.Printf("unmarshal error: %+v\n", err)
+		return data, err
+	}
+	dads.AddRedacted(data["es_url"], true)
+	dads.AddRedacted(data["es_user"], true)
+	dads.AddRedacted(data["es_pass"], true)
+	dads.AddRedacted(data["client_id"], true)
+	dads.AddRedacted(data["client_secret"], true)
+	dads.AddRedacted(data["audience"], true)
+	dads.AddRedacted(data["url"], true)
+	dads.AddRedacted(data["slack_webhook_url"], true)
+
+	return data, nil
 }

@@ -2,10 +2,11 @@ package bugzilla
 
 import (
 	"fmt"
-	"log"
 	"math"
 	"strings"
 	"time"
+
+	dads "github.com/LF-Engineering/da-ds"
 
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 
@@ -125,7 +126,7 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 			source := Bugzilla
 			authorUUID, err := uuid.GenerateIdentity(&source, &assignee.Username, &assignee.Name, nil)
 			if err != nil {
-				fmt.Println(err)
+				dads.Printf("[dads-bugzilla] EnrichItem GenerateIdentity error : %+v\n", err)
 				return nil, err
 			}
 
@@ -139,17 +140,14 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 
 			ok := e.affiliationsClient.AddIdentity(&userIdentity)
 			if !ok {
-				log.Printf("failed to add identity for [%+v]", assignee.Username)
+				dads.Printf("[dads-bugzilla] EnrichItem AddIdentity failed to add identity for: %+v\n", assignee.Username)
 			} else {
-				log.Printf("added identity for [%+v]", assignee.Username)
-				// add enriched data
 				enriched.AssignedToID = authorUUID
 				enriched.AssignedToUUID = authorUUID
 				enriched.AssignedToName = assignee.Name
 				enriched.AssignedToUserName = assignee.Username
 				enriched.AssignedToOrgName = unknown
 				enriched.AssignedToMultiOrgName = multiOrgs
-
 			}
 		}
 	}
@@ -217,6 +215,7 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 			source := Bugzilla
 			authorUUID, err := uuid.GenerateIdentity(&source, &reporter.Name, &reporter.Username, nil)
 			if err != nil {
+				dads.Printf("[dads-bugzilla] EnrichItem GenerateIdentity failed to generate identity for: %+v\n", err)
 				return nil, err
 			}
 
@@ -230,10 +229,8 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 
 			ok := e.affiliationsClient.AddIdentity(&userIdentity)
 			if !ok {
-				log.Printf("failed to add identity for [%+v]", reporter.Username)
+				dads.Printf("[dads-bugzilla] EnrichItem AddIdentity failed to add identity for: %+v\n", reporter.Username)
 			} else {
-				log.Printf("added identity for [%+v]", reporter.Name)
-				// add enriched data
 				enriched.ReporterID = authorUUID
 				enriched.ReporterUUID = authorUUID
 				enriched.ReporterName = reporter.Name
