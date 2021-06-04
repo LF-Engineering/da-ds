@@ -2,10 +2,11 @@ package bugzillarest
 
 import (
 	"fmt"
-	"log"
 	"math"
 	"strings"
 	"time"
+
+	dads "github.com/LF-Engineering/da-ds"
 
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 
@@ -143,7 +144,7 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 			source := BugzillaRest
 			authorUUID, err := uuid.GenerateIdentity(&source, &assignedToDetail.Name, &assignedToDetail.RealName, nil)
 			if err != nil {
-				fmt.Println(err)
+				dads.Printf("[dads-bugzillarest] EnrichItem GenerateIdentity error : %+v\n", err)
 				return nil, err
 			}
 
@@ -157,10 +158,8 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 			// Todo: add identity should be updates to return UniqueIdentityNestedDataOutput and error instead of bool
 			ok := e.affiliationsClient.AddIdentity(&userIdentity)
 			if !ok {
-				log.Printf("failed to add identity for [%+v]", assignedToDetail.Name)
+				dads.Printf("[dads-bugzilla] EnrichItem AddIdentity failed to add identity for: %+v\n", assignedToDetail.Name)
 			} else {
-				log.Printf("added identity for [%+v]", assignedToDetail.RealName)
-				// add enriched data
 				enriched.AssignedToDetailID = authorUUID
 				enriched.AssignedToDetailUUID = authorUUID
 				enriched.AssignedToDetailName = assignedToDetail.RealName
@@ -233,6 +232,7 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 			source := BugzillaRest
 			authorUUID, err := uuid.GenerateIdentity(&source, &creatorDetail.Name, &creatorDetail.RealName, nil)
 			if err != nil {
+				dads.Printf("[dads-bugzillarest] EnrichItem GenerateIdentity failed to generate identity for: %+v\n", err)
 				return nil, err
 			}
 
@@ -246,10 +246,8 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 
 			ok := e.affiliationsClient.AddIdentity(&userIdentity)
 			if !ok {
-				log.Printf("failed to add identity for [%+v]", creatorDetail.Name)
+				dads.Printf("[dads-bugzilla] EnrichItem AddIdentity failed to add identity for: %+v\n", creatorDetail.Name)
 			} else {
-				log.Printf("added identity for [%+v]", creatorDetail.RealName)
-				// add enriched data
 				enriched.CreatorDetailID = authorUUID
 				enriched.CreatorDetailUUID = authorUUID
 				enriched.CreatorDetailName = creatorDetail.RealName
