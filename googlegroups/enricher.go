@@ -3,6 +3,7 @@ package googlegroups
 import (
 	"fmt"
 	"log"
+	"regexp"
 	"strings"
 	"time"
 
@@ -10,6 +11,8 @@ import (
 	"github.com/LF-Engineering/dev-analytics-libraries/elastic"
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 )
+
+var emailRegex = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
 
 // AffiliationClient manages user identity
 type AffiliationClient interface {
@@ -162,6 +165,27 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 			log.Println(err)
 		}
 	}
+
+	name := enrichedMessage.AuthorName
+	// trim leading space
+	name = strings.TrimLeft(name, " ")
+	// trim trailing space
+	name = strings.TrimRight(name, " ")
+	// trim angle braces
+	name = strings.Trim(name, "<>")
+	// trim square braces
+	name = strings.Trim(name, "[]")
+	// trim brackets
+	name = strings.Trim(name, "()")
+	// remove all comas from name
+	name = strings.ReplaceAll(name, ",", "")
+
+	// trim domain name from author name if its an email address
+	if ok := emailRegex.MatchString(name); ok {
+		trimDomainName := strings.Split(name, "@")
+		name = trimDomainName[0]
+	}
+	enrichedMessage.AuthorName = name
 
 	return &enrichedMessage, nil
 }
