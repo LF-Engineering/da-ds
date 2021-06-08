@@ -2166,6 +2166,7 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 		err = fmt.Errorf("cannot parse author date from %v", iAuthorDate)
 		return
 	}
+	rich["orphaned"] = false
 	rich["tz"] = authorTz
 	rich["author_date"] = authorDateTz
 	rich["author_date_weekday"] = int(authorDateTz.Weekday())
