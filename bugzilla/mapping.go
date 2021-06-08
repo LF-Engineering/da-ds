@@ -50,6 +50,7 @@ var (
   "metadata__backend_name":{"type":"keyword"},
   "assigned_to_org_name":{"type":"keyword"},
   "author_name":{"type":"keyword"},
-  "url":{"type":"keyword"}
+  "url":{"type":"keyword"},
+  "project":{"type":"keyword"}
   }}}`)
 )
