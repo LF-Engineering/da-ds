@@ -1,6 +1,7 @@
 package dads
 
 import (
+	"encoding/base64"
 	"fmt"
 	neturl "net/url"
 	"os"
@@ -39,6 +40,8 @@ type DSConfluence struct {
 	NoSSLVerify bool   // From DA_CONFLUENCE_NO_SSL_VERIFY
 	MultiOrigin bool   // From DA_CONFLUENCE_MULTI_ORIGIN - allow multiple groups in a single index
 	MaxContents int    // From DA_CONFLUENCE_MAX_CONTENTS, defaults to ConfluenceDefaultMaxContents (200)
+	User        string // From DA_CONFLUENCE_USER - if user is provided then we assume that we don't have base64 encoded user:token yet
+	Token       string // From DA_CONFLUENCE_TOKEN - if user is not specified we assume that token already contains "<username>:<your-api-token>"
 }
 
 // ParseArgs - parse confluence specific environment variables
@@ -59,6 +62,15 @@ func (j *DSConfluence) ParseArgs(ctx *Ctx) (err error) {
 		}
 	} else {
 		j.MaxContents = ConfluenceDefaultMaxContents
+	}
+	j.Token = os.Getenv(prefix + "TOKEN")
+	AddRedacted(j.Token, false)
+	j.User = os.Getenv(prefix + "USER")
+	AddRedacted(j.User, false)
+	if j.User != "" {
+		// If user is specified, then we must calculate base64(user:token) to get a real token
+		j.Token = base64.StdEncoding.EncodeToString([]byte(j.User + ":" + j.Token))
+		AddRedacted(j.Token, false)
 	}
 	return
 }
@@ -136,6 +148,10 @@ func (j *DSConfluence) GetHistoricalContents(ctx *Ctx, content map[string]interf
 		return
 	}
 	method := Get
+	var headers map[string]string
+	if j.Token != "" {
+		headers = map[string]string{"Authorization": "Basic " + j.Token}
+	}
 	cacheDur := time.Duration(24) * time.Hour
 	version := 1
 	var (
@@ -152,7 +168,7 @@ func (j *DSConfluence) GetHistoricalContents(ctx *Ctx, content map[string]interf
 			ctx,
 			url,
 			method,
-			nil,
+			headers,
 			nil,
 			nil,
 			map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses: 200
@@ -235,6 +251,10 @@ func (j *DSConfluence) GetConfluenceContents(ctx *Ctx, fromDate, next string) (c
 		return
 	}
 	method := Get
+	var headers map[string]string
+	if j.Token != "" {
+		headers = map[string]string{"Authorization": "Basic " + j.Token}
+	}
 	cacheDur := time.Duration(24) * time.Hour
 	var url string
 	// Init state
@@ -251,7 +271,7 @@ func (j *DSConfluence) GetConfluenceContents(ctx *Ctx, fromDate, next string) (c
 		ctx,
 		url,
 		method,
-		nil,
+		headers,
 		nil,
 		nil,
 		map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses: 200

@@ -1,6 +1,7 @@
 package dads
 
 import (
+	"encoding/base64"
 	"fmt"
 	neturl "net/url"
 	"os"
@@ -66,7 +67,8 @@ type DSJira struct {
 	DS          string
 	URL         string // From DA_JIRA_URL - Jira URL
 	NoSSLVerify bool   // From DA_JIRA_NO_SSL_VERIFY
-	Token       string // From DA_JIRA_TOKEN
+	User        string // From DA_JIRA_USER - if user is provided then we assume that we don't have base64 encoded user:token yet
+	Token       string // From DA_JIRA_TOKEN - if user is not specified we assume that token already contains "<username>:<your-api-token>"
 	PageSize    int    // From DA_JIRA_PAGE_SIZE
 	MultiOrigin bool   // From DA_JIRA_MULTI_ORIGIN
 }
@@ -87,6 +89,13 @@ func (j *DSJira) ParseArgs(ctx *Ctx) (err error) {
 	j.NoSSLVerify = StringToBool(os.Getenv(prefix + "NO_SSL_VERIFY"))
 	j.Token = os.Getenv(prefix + "TOKEN")
 	AddRedacted(j.Token, false)
+	j.User = os.Getenv(prefix + "USER")
+	AddRedacted(j.User, false)
+	if j.User != "" {
+		// If user is specified, then we must calculate base64(user:token) to get a real token
+		j.Token = base64.StdEncoding.EncodeToString([]byte(j.User + ":" + j.Token))
+		AddRedacted(j.Token, false)
+	}
 	if os.Getenv(prefix+"PAGE_SIZE") == "" {
 		j.PageSize = 500
 	} else {
@@ -895,6 +904,7 @@ func EnrichComments(ctx *Ctx, ds DS, comments []interface{}, item map[string]int
 		for _, field := range fields {
 			richComment[field] = item[field]
 		}
+		richComment["project"] = item["project_key"]
 		richComment["issue_key"] = item["key"]
 		richComment["issue_url"] = item["url"]
 
@@ -1173,6 +1183,7 @@ func (j *DSJira) EnrichItem(ctx *Ctx, item map[string]interface{}, author string
 	rich["project_id"], _ = Dig(fields, []string{"project", "id"}, true, false)
 	rich["project_key"], _ = Dig(fields, []string{"project", "key"}, true, false)
 	rich["project_name"], _ = Dig(fields, []string{"project", "name"}, true, false)
+	rich["project"] = rich["project_key"]
 	resolution, ok := fields["resolution"]
 	if ok && resolution != nil {
 		rich["resolution_id"], _ = Dig(resolution, []string{"id"}, true, false)
