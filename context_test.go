@@ -53,6 +53,7 @@ func copyContext(in *Ctx) *Ctx {
 		AllowFail:         in.AllowFail,
 		Project:           in.Project,
 		ProjectSlug:       in.ProjectSlug,
+		Groups:            in.Groups,
 		Category:          in.Category,
 		DateFrom:          in.DateFrom,
 		DateTo:            in.DateTo,
@@ -239,6 +240,7 @@ func TestInit(t *testing.T) {
 		AllowFail:         0,
 		Project:           "",
 		ProjectSlug:       "",
+		Groups:            []string{""},
 		Category:          "",
 		DateFrom:          nil,
 		DateTo:            nil,
@@ -491,11 +493,12 @@ func TestInit(t *testing.T) {
 			),
 		},
 		{
-			"Setting project, project slug, category",
+			"Setting project, project slug, category, groups",
 			map[string]string{
 				"DA_DS_PROJECT":      "ONAP",
 				"DA_DS_PROJECT_SLUG": "lfn/onap",
 				"DA_DS_CATEGORY":     "issue",
+				"GROUPS":             "a;b ; c ",
 			},
 			dynamicSetFields(
 				t,
@@ -504,6 +507,7 @@ func TestInit(t *testing.T) {
 					"Project":     "ONAP",
 					"ProjectSlug": "lfn/onap",
 					"Category":    "issue",
+					"Groups":      []string{"a", "b", "c", "lfn/onap"},
 				},
 			),
 		},
@@ -517,6 +521,7 @@ func TestInit(t *testing.T) {
 				copyContext(&defaultContext),
 				map[string]interface{}{
 					"ProjectSlug": "lfn/onap",
+					"Groups":      []string{"lfn/onap"},
 				},
 			),
 		},

@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -50,6 +51,7 @@ type Ctx struct {
 	Project            string     // From DA_DS_PROJECT - set project can be for example "ONAP"
 	ProjectSlug        string     // From DA_DS_PROJECT_SLUG - set project slug - fixture slug, for example "lfn/onap"
 	Category           string     // From DA_DS_CATEGORY - set category (some DS support this), for example "issue" (github/issue, github/pull_request etc.)
+	Groups             []string   // From GROUPS, always contain ProjectSlug at the minimum
 	DateFrom           *time.Time // From DA_DS_DATE_FROM
 	DateTo             *time.Time // From DA_DS_DATE_TO
 	OffsetFrom         float64    // From DA_DS_OFFSET_FROM
@@ -355,13 +357,29 @@ func (ctx *Ctx) Init() {
 		}
 	}
 
-	// Project, Project slug, Category
+	// Project, Project slug, Category, Groups
 	ctx.Project = ctx.Env("PROJECT")
 	ctx.ProjectSlug = ctx.Env("PROJECT_SLUG")
 	if ctx.ProjectSlug == "" {
 		ctx.ProjectSlug = os.Getenv("PROJECT_SLUG")
 	}
 	ctx.Category = ctx.Env("CATEGORY")
+	groups := os.Getenv("GROUPS")
+	if groups != "" {
+		ary := strings.Split(groups, ";")
+		m := map[string]struct{}{ctx.ProjectSlug: {}}
+		for _, group := range ary {
+			m[strings.TrimSpace(group)] = struct{}{}
+		}
+		for group := range m {
+			ctx.Groups = append(ctx.Groups, group)
+		}
+		if len(ctx.Groups) > 1 {
+			sort.Strings(ctx.Groups)
+		}
+	} else {
+		ctx.Groups = []string{ctx.ProjectSlug}
+	}
 
 	// Date from/to (optional)
 	if ctx.Env("DATE_FROM") != "" {

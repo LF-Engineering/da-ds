@@ -623,6 +623,7 @@ func ItemsRefreshIdentitiesFunc(ctx *Ctx, ds DS, thrN int, richItems []interface
 		for prop, val := range values {
 			rich[prop] = val
 		}
+		rich["groups"] = ctx.Groups
 		if thrN > 1 {
 			mtx.Lock()
 		}
@@ -1305,6 +1306,7 @@ func Enrich(ctx *Ctx, ds DS) (err error) {
 func EnrichItem(ctx *Ctx, ds DS, richItem map[string]interface{}) (err error) {
 	richItem[DefaultEnrichDateField] = time.Now()
 	richItem[ProjectSlug] = ctx.ProjectSlug
+	richItem["groups"] = ctx.Groups
 	return
 }
 
