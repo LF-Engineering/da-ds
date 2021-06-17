@@ -122,15 +122,17 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 			enrichedMessage.AuthorUUID = *userData.UUID
 		}
 
-		enrollments := e.affiliationsClientProvider.GetOrganizations(*userData.UUID, rawMessage.ProjectSlug)
-		if enrollments != nil {
-			organizations := make([]string, 0)
-			for _, enrollment := range *enrollments {
-				organizations = append(organizations, enrollment.Organization.Name)
-			}
+		if userData.UUID != nil {
+			enrollments := e.affiliationsClientProvider.GetOrganizations(*userData.UUID, rawMessage.ProjectSlug)
+			if enrollments != nil {
+				organizations := make([]string, 0)
+				for _, enrollment := range *enrollments {
+					organizations = append(organizations, enrollment.Organization.Name)
+				}
 
-			if len(organizations) != 0 {
-				enrichedMessage.AuthorMultiOrgNames = organizations
+				if len(organizations) != 0 {
+					enrichedMessage.AuthorMultiOrgNames = organizations
+				}
 			}
 		}
 
