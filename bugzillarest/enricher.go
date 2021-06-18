@@ -290,6 +290,7 @@ func getCont(con *PersonDetail) (string, string) {
 
 	if con.Name != "" {
 		val = con.Name
+		key = "name"
 		if strings.Contains(con.Name, "@") {
 			key = "email"
 		}
