@@ -78,7 +78,7 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 	enrichedMessage.From = e.GetUserName(rawMessage.From)
 	enrichedMessage.AuthorName = e.GetUserName(rawMessage.From)
 
-	var userData *affiliation.AffIdentity
+	userData := new(affiliation.AffIdentity)
 	var err error
 	if strings.Contains(enrichedMessage.AuthorName, " via ") {
 		enrichedMessage.AuthorName = strings.Split(enrichedMessage.AuthorName, " via ")[0]
@@ -96,13 +96,15 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 		authorUUID, _ := uuid.GenerateIdentity(&source, &userAffiliationsEmail, &name, nil)
 		userData, err = e.affiliationsClientProvider.GetIdentityByUser("id", authorUUID)
 		if err != nil {
-			log.Println(err)
+			errMessage := fmt.Sprintf("%+v : %+v", userAffiliationsEmail, err)
+			log.Println(errMessage)
 		}
 
 	} else {
 		userData, err = e.affiliationsClientProvider.GetIdentityByUser("email", userAffiliationsEmail)
 		if err != nil {
-			log.Println(err)
+			errMessage := fmt.Sprintf("%+v : %+v", userAffiliationsEmail, err)
+			log.Println(errMessage)
 		}
 	}
 
@@ -164,7 +166,6 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 				enrichedMessage.AuthorUUID = authorUUID
 				enrichedMessage.AuthorName = name
 			}
-			log.Println(err)
 		}
 	}
 
