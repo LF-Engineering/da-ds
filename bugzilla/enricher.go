@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/LF-Engineering/da-ds/util"
+
 	dads "github.com/LF-Engineering/da-ds"
 
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
@@ -272,7 +274,7 @@ func getCont(con *Person) (string, string) {
 	if con.Name != "" {
 		val = con.Name
 		key = "name"
-		if strings.Contains(con.Name, "@") {
+		if strings.Contains(con.Name, "@") && util.IsEmailValid(con.Name) {
 			key = "email"
 		}
 		return key, val
