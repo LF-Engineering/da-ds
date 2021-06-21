@@ -301,7 +301,7 @@ func getCont(con *PersonDetail) (string, string) {
 
 	if con.RealName != "" {
 		val = con.RealName
-		if strings.Contains(con.RealName, "@") {
+		if strings.Contains(con.RealName, "@") && util.IsEmailValid(con.RealName) {
 			key = "email"
 		}
 	}

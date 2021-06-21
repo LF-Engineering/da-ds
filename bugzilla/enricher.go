@@ -282,7 +282,7 @@ func getCont(con *Person) (string, string) {
 
 	if con.Username != "" {
 		val = con.Username
-		if strings.Contains(con.Username, "@") {
+		if strings.Contains(con.Username, "@") && util.IsEmailValid(con.Username) {
 			key = "email"
 		}
 	}
