@@ -163,8 +163,8 @@ func TestEnrichItem(t *testing.T) {
 			Domain: "gmail.com", OrgName: &dd, Username: "", GenderACC: &zero,
 			MultiOrgNames: []string{"MontaVista Software, LLC"}, Gender: &unknown,
 		}
-		affProviderMock.On("GetIdentityByUser", "username", "vvavrychuk").Return(fakeAff1, nil)
-		affProviderMock.On("GetIdentityByUser", "username", "akuster808").Return(fakeAff2, nil)
+		affProviderMock.On("GetIdentityByUser", "name", "vvavrychuk").Return(fakeAff1, nil)
+		affProviderMock.On("GetIdentityByUser", "name", "akuster").Return(fakeAff2, nil)
 
 		// Act
 		srv := NewEnricher("0.18", "yocto", affProviderMock)

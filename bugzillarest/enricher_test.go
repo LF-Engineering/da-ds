@@ -334,7 +334,7 @@ func TestEnrichItem(t *testing.T) {
 			Domain: "", OrgName: &dd, Username: "", GenderACC: &zero,
 			MultiOrgNames: []string{"MontaVista Software, LLC"}, Gender: &unknown,
 		}
-		affProviderMock.On("GetIdentityByUser", "username", "qian.q.xu").Return(fakeAff1, nil)
+		affProviderMock.On("GetIdentityByUser", "name", "qian.q.xu").Return(fakeAff1, nil)
 		affProviderMock.On("GetIdentityByUser", "username", "akuster808").Return(fakeAff2, nil)
 		affProviderMock.On("GetIdentityByUser", "email", "qian.q.xu@intel.com").Return(fakeAff3, nil)
 

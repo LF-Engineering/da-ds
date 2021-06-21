@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/LF-Engineering/da-ds/util"
+
 	dads "github.com/LF-Engineering/da-ds"
 
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
@@ -82,12 +84,8 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 	if rawItem.Assignee.Username != "" && rawItem.Assignee.Name != "" {
 		enriched.Assigned = rawItem.Assignee.Username
 
-		// Enrich assigned to
-		assignedToFieldName := "username"
-		if strings.Contains(rawItem.AssignedTo, "@") {
-			assignedToFieldName = "email"
-		}
-		assignedTo, err := e.affiliationsClient.GetIdentityByUser(assignedToFieldName, rawItem.Assignee.Username)
+		key, value := getCont(&rawItem.Assignee)
+		assignedTo, err := e.affiliationsClient.GetIdentityByUser(key, value)
 		if err == nil && assignedTo != nil {
 			enriched.AssignedToID = *assignedTo.ID
 			enriched.AssignedToUUID = *assignedTo.UUID
@@ -156,13 +154,8 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 		enriched.ReporterUserName = rawItem.Reporter.Username
 		enriched.AuthorName = rawItem.Reporter.Username
 
-		// Enrich reporter
-		reporterFieldName := "username"
-		if strings.Contains(enriched.ReporterUserName, "@") {
-			reporterFieldName = "email"
-		}
-
-		reporter, err := e.affiliationsClient.GetIdentityByUser(reporterFieldName, enriched.ReporterUserName)
+		key, value := getCont(&rawItem.Reporter)
+		reporter, err := e.affiliationsClient.GetIdentityByUser(key, value)
 		if err == nil && reporter != nil {
 			enriched.ReporterID = *reporter.ID
 			enriched.ReporterUUID = *reporter.UUID
@@ -272,4 +265,27 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 	enriched.RepositoryLabels = nil
 
 	return enriched, nil
+}
+
+func getCont(con *Person) (string, string) {
+	key := "username"
+	val := ""
+
+	if con.Name != "" {
+		val = con.Name
+		key = "name"
+		if strings.Contains(con.Name, "@") && util.IsEmailValid(con.Name) {
+			key = "email"
+		}
+		return key, val
+	}
+
+	if con.Username != "" {
+		val = con.Username
+		if strings.Contains(con.Username, "@") && util.IsEmailValid(con.Username) {
+			key = "email"
+		}
+	}
+
+	return key, val
 }
