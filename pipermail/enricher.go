@@ -2,13 +2,17 @@ package pipermail
 
 import (
 	"fmt"
-	log "log"
+	"log"
+	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/LF-Engineering/dev-analytics-libraries/affiliation"
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 )
+
+var emailRegex = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
 
 // AffiliationClient manages user identity
 type AffiliationClient interface {
@@ -64,7 +68,7 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 		List:                rawMessage.Origin,
 		Origin:              rawMessage.Origin,
 		Tag:                 rawMessage.Origin,
-		GroupName:           rawMessage.GroupName,
+		GroupName:           e.GetGroupName(rawMessage.Origin),
 		Size:                rawMessage.Data.MboxByteLength,
 		Subject:             rawMessage.Data.Subject,
 		EmailDate:           rawMessage.Data.Date,
@@ -140,7 +144,6 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 				Email:        userAffiliationsEmail,
 				UUID:         authorUUID,
 			}
-			fmt.Println(userIdentity)
 			if ok := e.affiliationsClientProvider.AddIdentity(&userIdentity); !ok {
 				log.Printf("failed to add identity for [%+v]", userAffiliationsEmail)
 			}
@@ -161,7 +164,21 @@ func (e *Enricher) IsValidEmail(rawMailString string) bool {
 		return false
 	}
 
+	if ok := emailRegex.MatchString(rawMailString); !ok {
+		log.Println("invalid email pattern: ", rawMailString)
+	}
+
 	return true
+}
+
+// GetGroupName parses given url string and returns the path
+func (e *Enricher) GetGroupName(s string) string {
+	u, err := url.Parse(s)
+	if err != nil {
+		log.Println(err)
+		return ""
+	}
+	return u.Path
 }
 
 // HandleMapping creates rich mapping
@@ -195,6 +212,24 @@ func (e *Enricher) GetUserName(rawMailString string) (username string) {
 	username = strings.TrimSpace(trimBraces[1])
 	username = strings.TrimSpace(strings.Replace(username, ")", "", 1))
 	return
+}
+
+// RemoveSpecialCharactersFromString ...
+func (e *Enricher) RemoveSpecialCharactersFromString(s string) (val *string) {
+	value := s
+	// trim leading space
+	value = strings.TrimLeft(value, " ")
+	// trim trailing space
+	value = strings.TrimRight(value, " ")
+	// trim angle braces
+	value = strings.Trim(value, "<>")
+	// trim square braces
+	value = strings.Trim(value, "[]")
+	// trim brackets
+	value = strings.Trim(value, "()")
+	// remove all comas from name
+	value = strings.ReplaceAll(value, ",", "")
+	return &value
 }
 
 // FormatTimestampString returns a formatted RFC 33339 Datetime string
