@@ -473,6 +473,18 @@ var (
 		"Resolved-by":    {"authors_resolved", "resolver"},
 		"Influenced-by":  {"authors_influenced", "influencer"},
 	}
+	// GitTrailerSameAsAuthor - can a given trailer be the same as the main commit's author?
+	GitTrailerSameAsAuthor = map[string]bool{
+		"Signed-off-by":  true,
+		"Co-authored-by": false,
+		"Tested-by":      true,
+		"Approved-by":    false,
+		"Reviewed-by":    false,
+		"Reported-by":    true,
+		"Informed-by":    true,
+		"Resolved-by":    true,
+		"Influenced-by":  true,
+	}
 )
 
 // RawPLS - programming language summary (all fields as strings)
@@ -1669,9 +1681,21 @@ func (j *DSGit) GetOtherPPAuthors(ctx *Ctx, doc interface{}) (othersMap map[stri
 // GetOtherTrailersAuthors - get others authors - from other trailers fields (mostly for korg)
 // This works on a raw document
 func (j *DSGit) GetOtherTrailersAuthors(ctx *Ctx, doc interface{}) (othersMap map[string]map[[2]string]struct{}) {
+	// "Signed-off-by":  {"authors_signed", "signer"},
+	commitAuthor := ""
 	for otherKey, otherRichKey := range GitTrailerOtherAuthors {
 		iothers, ok := Dig(doc, []string{"data", otherKey}, false, true)
 		if ok {
+			sameAsAuthorAllowed, _ := GitTrailerSameAsAuthor[otherKey]
+			if !sameAsAuthorAllowed {
+				if commitAuthor == "" {
+					iCommitAuthor, _ := Dig(doc, []string{"data", "Author"}, true, false)
+					commitAuthor = strings.TrimSpace(iCommitAuthor.(string))
+					if ctx.Debug > 1 {
+						Printf("trailers type %s cannot have the same authors as commit's author %s, checking this\n", otherKey, commitAuthor)
+					}
+				}
+			}
 			others, _ := iothers.([]interface{})
 			if ctx.Debug > 1 {
 				Printf("other trailers %s -> %s: %s\n", otherKey, otherRichKey, others)
@@ -1681,6 +1705,12 @@ func (j *DSGit) GetOtherTrailersAuthors(ctx *Ctx, doc interface{}) (othersMap ma
 			}
 			for _, iOther := range others {
 				other := strings.TrimSpace(iOther.(string))
+				if !sameAsAuthorAllowed && other == commitAuthor {
+					if ctx.Debug > 1 {
+						Printf("trailer %s is the same as commit's author, and this isn't allowed for %s trailers, skipping\n", other, otherKey)
+					}
+					continue
+				}
 				_, ok := othersMap[other]
 				if !ok {
 					othersMap[other] = map[[2]string]struct{}{}
@@ -2159,6 +2189,8 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 		return
 	}
 	rich[GitUUID] = rich[UUID]
+	// iAuthor, _ := Dig(commit, []string{"Author"}, true, false)
+	// rich["raw_author"] = strings.TrimSpace(iAuthor.(string))
 	iAuthorDate, _ := Dig(commit, []string{"AuthorDate"}, true, false)
 	sAuthorDate, _ := iAuthorDate.(string)
 	authorDate, authorDateTz, authorTz, ok := ParseDateWithTz(sAuthorDate)
