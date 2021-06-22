@@ -375,8 +375,6 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 			}
 
 			log.Println("LEN ENRICH DATA : ", len(data))
-			results = len(data)
-			offset += results
 
 			// setting mapping and create index if not exists
 			if offset == 0 {
@@ -400,6 +398,8 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 					return
 				}
 			}
+			results = len(data)
+			offset += results
 		}
 		log.Println("DONE WITH RICH ENRICHMENT")
 		ch <- nil

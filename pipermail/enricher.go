@@ -2,7 +2,7 @@ package pipermail
 
 import (
 	"fmt"
-	"log"
+	log "log"
 	"strings"
 	"time"
 
@@ -83,8 +83,8 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 	userAffiliationsEmail := e.HandleObfuscatedEmail(rawMessage.Data.From)
 	userData, err := e.affiliationsClientProvider.GetIdentityByUser("email", userAffiliationsEmail)
 	if err != nil {
-		fmt.Println(err)
-		return nil, err
+		errMessage := fmt.Sprintf("%+v : %+v", userAffiliationsEmail, err)
+		log.Println(errMessage)
 	}
 	enriched.MboxAuthorDomain = e.GetEmailDomain(userAffiliationsEmail)
 	// if user is already affiliated
@@ -102,15 +102,17 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 			enriched.AuthorUUID = *userData.UUID
 		}
 
-		enrollments := e.affiliationsClientProvider.GetOrganizations(*userData.UUID, rawMessage.ProjectSlug)
-		if enrollments != nil {
-			organizations := make([]string, 0)
-			for _, enrollment := range *enrollments {
-				organizations = append(organizations, enrollment.Organization.Name)
-			}
+		if userData.UUID != nil {
+			enrollments := e.affiliationsClientProvider.GetOrganizations(*userData.UUID, rawMessage.ProjectSlug)
+			if enrollments != nil {
+				organizations := make([]string, 0)
+				for _, enrollment := range *enrollments {
+					organizations = append(organizations, enrollment.Organization.Name)
+				}
 
-			if len(organizations) != 0 {
-				enriched.AuthorMultiOrgNames = organizations
+				if len(organizations) != 0 {
+					enriched.AuthorMultiOrgNames = organizations
+				}
 			}
 		}
 
@@ -126,7 +128,8 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 			source := Pipermail
 			authorUUID, err := uuid.GenerateIdentity(&source, &userAffiliationsEmail, &name, nil)
 			if err != nil {
-				fmt.Println(err)
+				errMessage := fmt.Sprintf("%+v : %+v", authorUUID, err)
+				log.Println(errMessage)
 				return nil, err
 			}
 
@@ -146,7 +149,6 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 			enriched.AuthorName = name
 			enriched.AuthorUUID = authorUUID
 		}
-		log.Println(err)
 	}
 
 	return &enriched, nil
