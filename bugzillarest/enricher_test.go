@@ -3,6 +3,8 @@ package bugzillarest
 import (
 	"testing"
 
+	"github.com/stretchr/testify/mock"
+
 	libAffiliations "github.com/LF-Engineering/dev-analytics-libraries/affiliation"
 
 	"github.com/LF-Engineering/da-ds/bugzilla/mocks"
@@ -311,9 +313,11 @@ func TestEnrichItem(t *testing.T) {
 			t.Error(err)
 		}
 
-		affProviderMock := &mocks.Affiliation{}
+		affProviderMock := &mocks.AffiliationClient{}
 		unknown := "Unknown"
 		zero := int64(0)
+		httpClientMock := &mocks.HTTPClientProvider{}
+		auth0ClientMock := &mocks.Auth0Client{}
 
 		aff1UUID := "756be8209f265138d271a6223fa0d85085e308db"
 		fakeAff1 := &libAffiliations.AffIdentity{ID: &aff1UUID,
@@ -332,18 +336,24 @@ func TestEnrichItem(t *testing.T) {
 		fakeAff2 := &libAffiliations.AffIdentity{ID: &aff2UUID,
 			UUID: &aff2ID, Name: "akuster808", IsBot: &zero,
 			Domain: "", OrgName: &dd, Username: "", GenderACC: &zero,
-			MultiOrgNames: []string{"MontaVista Software, LLC"}, Gender: &unknown,
+			MultiOrgNames: []string{"MontaVista Software, LLC"},
 		}
 		affProviderMock.On("GetIdentityByUser", "name", "qian.q.xu").Return(fakeAff1, nil)
 		affProviderMock.On("GetIdentityByUser", "username", "akuster808").Return(fakeAff2, nil)
 		affProviderMock.On("GetIdentityByUser", "email", "qian.q.xu@intel.com").Return(fakeAff3, nil)
 
+		auth0ClientMock.On("GetToken").Return("token", nil)
+		headers := make(map[string]string)
+		headers["Authorization"] = "Bearer " + "token"
+		resBody := `{"org": "", "orgs":[]}`
+		requestURL := "/affiliation//both/756be8209f265138d271a6223fa0d85085e308db/2017-09-14 09:46:38 +0000 UTC"
+		httpClientMock.On("Request", requestURL, "GET", headers, mock.Anything, mock.Anything).Return(200, []byte(resBody), nil)
 		params := &EnricherParams{
 			Project:        "dpdk-common",
 			BackendVersion: "0.18",
 		}
 		// Act
-		srv := NewEnricher(params, affProviderMock)
+		srv := NewEnricher(params, affProviderMock, auth0ClientMock, httpClientMock, "", "")
 
 		enrich, err := srv.EnrichItem(raw, expectedEnrich.MetadataEnrichedOn.UTC())
 		if err != nil {

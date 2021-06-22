@@ -214,7 +214,7 @@ func TestSync(t *testing.T) {
 	affiliationsClientMock.On("AddIdentity", mock.Anything).Run(func(args mock.Arguments) {
 
 	}).Return(false)
-	enricher := NewEnricher(&EnricherParams{BackendVersion: params.EnricherBackendVersion, Project: params.Project}, affiliationsClientMock)
+	enricher := NewEnricher(&EnricherParams{BackendVersion: params.EnricherBackendVersion, Project: params.Project}, affiliationsClientMock, nil, nil, "", "")
 
 	params.Enricher = enricher
 

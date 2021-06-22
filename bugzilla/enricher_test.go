@@ -167,7 +167,7 @@ func TestEnrichItem(t *testing.T) {
 		affProviderMock.On("GetIdentityByUser", "name", "akuster").Return(fakeAff2, nil)
 
 		// Act
-		srv := NewEnricher("0.18", "yocto", affProviderMock)
+		srv := NewEnricher("0.18", "yocto", affProviderMock, nil, nil, "", "")
 
 		enrich, err := srv.EnrichItem(raw, expectedEnrich.MetadataEnrichedOn.UTC())
 		if err != nil {

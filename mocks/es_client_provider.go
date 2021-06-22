@@ -4,6 +4,7 @@ package mocks
 
 import (
 	elastic "github.com/LF-Engineering/dev-analytics-libraries/elastic"
+
 	mock "github.com/stretchr/testify/mock"
 
 	time "time"
@@ -106,20 +107,6 @@ func (_m *ESClientProvider) CreateIndex(index string, body []byte) ([]byte, erro
 	return r0, r1
 }
 
-// DelayOfCreateIndex provides a mock function with given fields: ex, uin, du, index, data
-func (_m *ESClientProvider) DelayOfCreateIndex(ex func(string, []byte) ([]byte, error), uin uint, du time.Duration, index string, data []byte) error {
-	ret := _m.Called(ex, uin, du, index, data)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(func(string, []byte) ([]byte, error), uint, time.Duration, string, []byte) error); ok {
-		r0 = rf(ex, uin, du, index, data)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // Get provides a mock function with given fields: index, query, result
 func (_m *ESClientProvider) Get(index string, query map[string]interface{}, result interface{}) error {
 	ret := _m.Called(index, query, result)
@@ -153,4 +140,18 @@ func (_m *ESClientProvider) GetStat(index string, field string, aggType string, 
 	}
 
 	return r0, r1
+}
+
+// ReadWithScroll provides a mock function with given fields: index, query, result, scrollID
+func (_m *ESClientProvider) ReadWithScroll(index string, query map[string]interface{}, result interface{}, scrollID string) error {
+	ret := _m.Called(index, query, result, scrollID)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, map[string]interface{}, interface{}, string) error); ok {
+		r0 = rf(index, query, result, scrollID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
