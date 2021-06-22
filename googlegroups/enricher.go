@@ -1,6 +1,7 @@
 package googlegroups
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"regexp"
@@ -73,7 +74,13 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 		enrichedMessage.Root = true
 	}
 
-	userAffiliationsEmail := e.GetEmailAddress(rawMessage.From)
+	affsEmail := e.GetEmailAddress(rawMessage.From)
+	if affsEmail == nil {
+		str := fmt.Sprintf("missing email address: messageID in raw doc: [%+v]", rawMessage.MessageID)
+		log.Println(str)
+		return nil, errors.New(str)
+	}
+	userAffiliationsEmail := *affsEmail
 	enrichedMessage.MboxAuthorDomain = e.GetEmailDomain(userAffiliationsEmail)
 	enrichedMessage.From = e.GetUserName(rawMessage.From)
 	enrichedMessage.AuthorName = e.GetUserName(rawMessage.From)
@@ -169,37 +176,21 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 		}
 	}
 
-	name := enrichedMessage.AuthorName
-	// trim leading space
-	name = strings.TrimLeft(name, " ")
-	// trim trailing space
-	name = strings.TrimRight(name, " ")
-	// trim angle braces
-	name = strings.Trim(name, "<>")
-	// trim square braces
-	name = strings.Trim(name, "[]")
-	// trim brackets
-	name = strings.Trim(name, "()")
-	// remove all comas from name
-	name = strings.ReplaceAll(name, ",", "")
-
-	// trim domain name from author name if its an email address
-	if ok := emailRegex.MatchString(name); ok {
-		trimDomainName := strings.Split(name, "@")
-		name = trimDomainName[0]
-	}
-	enrichedMessage.AuthorName = name
-
 	return &enrichedMessage, nil
 }
 
 // GetEmailAddress ...
-func (e *Enricher) GetEmailAddress(rawMailString string) (email string) {
+func (e *Enricher) GetEmailAddress(rawMailString string) (mail *string) {
 	trimBraces := strings.Split(rawMailString, " <")
 	if len(trimBraces) > 1 {
-		email = strings.TrimSpace(trimBraces[1])
+		email := strings.TrimSpace(trimBraces[1])
 		email = strings.TrimSpace(strings.Replace(email, ">", "", 1))
+		mail = e.RemoveSpecialCharactersFromString(email)
 		return
+	}
+
+	if ok := emailRegex.MatchString(trimBraces[0]); ok {
+		return e.RemoveSpecialCharactersFromString(trimBraces[0])
 	}
 	return
 }
@@ -230,11 +221,33 @@ func (e *Enricher) GetUserName(rawMailString string) (username string) {
 	return trimBraces[0]
 }
 
+// RemoveSpecialCharactersFromString ...
+func (e *Enricher) RemoveSpecialCharactersFromString(s string) (val *string) {
+	value := s
+	// trim leading space
+	value = strings.TrimLeft(value, " ")
+	// trim trailing space
+	value = strings.TrimRight(value, " ")
+	// trim angle braces
+	value = strings.Trim(value, "<>")
+	// trim square braces
+	value = strings.Trim(value, "[]")
+	// trim brackets
+	value = strings.Trim(value, "()")
+	// remove all comas from name
+	value = strings.ReplaceAll(value, ",", "")
+	return &value
+}
+
 // IsValidEmail validates email string
 func (e *Enricher) IsValidEmail(rawMailString string) bool {
 	if strings.Contains(rawMailString, "...") {
 		log.Println("email contains ellipsis")
 		return false
+	}
+
+	if ok := emailRegex.MatchString(rawMailString); !ok {
+		log.Println("invalid email pattern: ", rawMailString)
 	}
 
 	return true
