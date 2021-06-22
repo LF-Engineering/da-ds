@@ -248,7 +248,7 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, Auth0Clie
 	affiliationsClientProvider, err := libAffiliations.NewAffiliationsClient(m.AffBaseURL, m.Project, httpClientProvider, esCacheClientProvider, auth0Client, &slackProvider)
 
 	// Initialize enrich object to enrich raw data
-	enricher := NewEnricher(m.EnricherBackendVersion, m.Project, affiliationsClientProvider)
+	enricher := NewEnricher(m.EnricherBackendVersion, m.Project, affiliationsClientProvider, auth0Client, httpClientProvider, m.AffBaseURL, m.ProjectSlug)
 
 	if err != nil {
 		return nil, nil, nil, nil, err

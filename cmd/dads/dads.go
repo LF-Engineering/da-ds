@@ -400,7 +400,7 @@ func buildBugzillaRestMgrServices(p *bugzillarest.MgrParams) (*bugzillarest.Fetc
 	}
 
 	// Initialize enrich object to enrich raw data
-	enricher := bugzillarest.NewEnricher(&bugzillarest.EnricherParams{BackendVersion: p.EnricherBackendVersion, Project: p.Project}, affiliationsClientProvider)
+	enricher := bugzillarest.NewEnricher(&bugzillarest.EnricherParams{BackendVersion: p.EnricherBackendVersion, Project: p.Project}, affiliationsClientProvider, auth0Client, httpClientProvider, p.AffBaseURL, p.ProjectSlug)
 
 	if err != nil {
 		return nil, nil, nil, nil, nil, err

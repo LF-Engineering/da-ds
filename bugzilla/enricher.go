@@ -22,6 +22,10 @@ type Enricher struct {
 	BackendVersion     string
 	Project            string
 	affiliationsClient AffiliationClient
+	auth0Client        Auth0Client
+	httpClientProvider HTTPClientProvider
+	affBaseURL         string
+	projectSlug        string
 }
 
 // AffiliationClient manages user identity
@@ -31,12 +35,16 @@ type AffiliationClient interface {
 }
 
 // NewEnricher intiate a new enricher instance
-func NewEnricher(backendVersion string, project string, affiliationsClient AffiliationClient) *Enricher {
+func NewEnricher(backendVersion string, project string, affiliationsClient AffiliationClient, auth0Client Auth0Client, httpClientProvider HTTPClientProvider, affBaseURL string, projectSlug string) *Enricher {
 	return &Enricher{
 		DSName:             Bugzilla,
 		BackendVersion:     backendVersion,
 		Project:            project,
 		affiliationsClient: affiliationsClient,
+		auth0Client:        auth0Client,
+		httpClientProvider: httpClientProvider,
+		affBaseURL:         affBaseURL,
+		projectSlug:        projectSlug,
 	}
 }
 
@@ -96,29 +104,21 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 				enriched.AssignedToBot = true
 			}
 
-			if assignedTo.Gender != nil {
-				enriched.AssignedToGender = *assignedTo.Gender
-			} else {
-				enriched.AssignedToGender = unknown
+			org, orgs, err := util.GetEnrollments(e.auth0Client, e.httpClientProvider, e.affBaseURL, e.projectSlug, *assignedTo.UUID, rawItem.MetadataUpdatedOn)
+			if err != nil {
+				dads.Printf("[dads-bugzilla] EnrichItem GetEnrollments error : %+v\n", err)
 			}
 
-			if assignedTo.GenderACC != nil {
-				enriched.AssignedToGenderAcc = int(*assignedTo.GenderACC)
-			} else {
-				enriched.AssignedToGenderAcc = 0
-			}
-
-			if assignedTo.OrgName != nil {
-				enriched.AssignedToOrgName = *assignedTo.OrgName
-			} else {
-				enriched.AssignedToOrgName = unknown
+			enriched.AssignedToOrgName = unknown
+			if org != "" {
+				enriched.AssignedToOrgName = org
 			}
 
 			enriched.AssignedToMultiOrgName = multiOrgs
-
-			if len(assignedTo.MultiOrgNames) != 0 {
-				enriched.AssignedToMultiOrgName = assignedTo.MultiOrgNames
+			if len(orgs) != 0 {
+				enriched.AssignedToMultiOrgName = orgs
 			}
+
 		} else {
 			assignee := rawItem.Assignee
 			source := Bugzilla
@@ -169,26 +169,16 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 			enriched.AuthorUserName = reporter.Username
 			enriched.AuthorDomain = reporter.Domain
 
-			if reporter.Gender != nil {
-				enriched.ReporterGender = *reporter.Gender
-				enriched.AuthorGender = *reporter.Gender
-			} else {
-				enriched.ReporterGender = unknown
-				enriched.AuthorGender = unknown
+			org, orgs, err := util.GetEnrollments(e.auth0Client, e.httpClientProvider, e.affBaseURL, e.projectSlug, *reporter.UUID, rawItem.MetadataUpdatedOn)
+			if err != nil {
+				dads.Printf("[dads-bugzilla] EnrichItem GetEnrollments error : %+v\n", err)
 			}
-			if reporter.GenderACC != nil {
-				enriched.ReporterGenderACC = int(*reporter.GenderACC)
-				enriched.AuthorGenderAcc = int(*reporter.GenderACC)
-			} else {
-				enriched.ReporterGenderACC = 0
-				enriched.AuthorGenderAcc = 0
-			}
-			if reporter.OrgName != nil {
-				enriched.ReporterOrgName = *reporter.OrgName
-				enriched.AuthorOrgName = *reporter.OrgName
-			} else {
-				enriched.ReporterOrgName = unknown
-				enriched.AuthorOrgName = unknown
+
+			enriched.ReporterOrgName = unknown
+			enriched.AuthorOrgName = unknown
+			if org != "" {
+				enriched.ReporterOrgName = org
+				enriched.AuthorOrgName = org
 			}
 
 			if reporter.IsBot != nil {
@@ -199,10 +189,11 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 			enriched.ReporterMultiOrgName = multiOrgs
 			enriched.AuthorMultiOrgName = multiOrgs
 
-			if len(reporter.MultiOrgNames) != 0 {
-				enriched.ReporterMultiOrgName = reporter.MultiOrgNames
-				enriched.AuthorMultiOrgName = reporter.MultiOrgNames
+			if len(orgs) != 0 {
+				enriched.ReporterMultiOrgName = orgs
+				enriched.AuthorMultiOrgName = orgs
 			}
+
 		} else {
 			reporter := rawItem.Reporter
 			source := Bugzilla
