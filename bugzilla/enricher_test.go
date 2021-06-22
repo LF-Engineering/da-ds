@@ -144,7 +144,7 @@ func TestEnrichItem(t *testing.T) {
 			t.Error(err)
 		}
 
-		affProviderMock := &mocks.Affiliation{}
+		affProviderMock := &mocks.AffiliationClient{}
 		unknown := "Unknown"
 		zero := int64(0)
 
