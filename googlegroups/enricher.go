@@ -84,9 +84,14 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 	enrichedMessage.MboxAuthorDomain = e.GetEmailDomain(userAffiliationsEmail)
 	enrichedMessage.From = e.GetUserName(rawMessage.From)
 	enrichedMessage.AuthorName = e.GetUserName(rawMessage.From)
+	source := GoogleGroups
+	name := enrichedMessage.AuthorName
+	authorUUID, err := uuid.GenerateIdentity(&source, &userAffiliationsEmail, &name, nil)
+	if err != nil {
+		log.Println(err)
+	}
 
 	userData := new(affiliation.AffIdentity)
-	var err error
 	if strings.Contains(enrichedMessage.AuthorName, " via ") {
 		enrichedMessage.AuthorName = strings.Split(enrichedMessage.AuthorName, " via ")[0]
 		enrichedMessage.ViaCommunityGroup = true
@@ -107,12 +112,32 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 			log.Println(errMessage)
 		}
 
-	} else {
-		userData, err = e.affiliationsClientProvider.GetIdentityByUser("email", userAffiliationsEmail)
-		if err != nil {
-			errMessage := fmt.Sprintf("%+v : %+v", userAffiliationsEmail, err)
-			log.Println(errMessage)
+	}
+
+	if ok := e.IsValidEmail(userAffiliationsEmail); ok {
+		if err == nil {
+			userIdentity := affiliation.Identity{
+				LastModified: now,
+				Name:         name,
+				Source:       source,
+				Email:        userAffiliationsEmail,
+				ID:           authorUUID,
+			}
+
+			if ok := e.affiliationsClientProvider.AddIdentity(&userIdentity); !ok {
+				log.Printf("failed to add identity for [%+v]", userAffiliationsEmail)
+			}
+
+			enrichedMessage.AuthorID = authorUUID
+			enrichedMessage.AuthorUUID = authorUUID
+			enrichedMessage.AuthorName = name
 		}
+	}
+
+	userData, err = e.affiliationsClientProvider.GetIdentityByUser("uuid", authorUUID)
+	if err != nil {
+		errMessage := fmt.Sprintf("%+v : %+v", userAffiliationsEmail, err)
+		log.Println(errMessage)
 	}
 
 	if userData != nil {
@@ -148,30 +173,6 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 		if userData.IsBot != nil {
 			if *userData.IsBot == 1 {
 				enrichedMessage.FromBot = true
-			}
-		}
-	} else {
-		// add new affiliation if email format is valid
-		if ok := e.IsValidEmail(userAffiliationsEmail); ok {
-			name := enrichedMessage.AuthorName
-			source := GoogleGroups
-			authorUUID, err := uuid.GenerateIdentity(&source, &userAffiliationsEmail, &name, nil)
-			if err == nil {
-				userIdentity := affiliation.Identity{
-					LastModified: time.Now(),
-					Name:         name,
-					Source:       source,
-					Email:        userAffiliationsEmail,
-					ID:           authorUUID,
-				}
-
-				if ok := e.affiliationsClientProvider.AddIdentity(&userIdentity); !ok {
-					log.Printf("failed to add identity for [%+v]", userAffiliationsEmail)
-				}
-
-				enrichedMessage.AuthorID = authorUUID
-				enrichedMessage.AuthorUUID = authorUUID
-				enrichedMessage.AuthorName = name
 			}
 		}
 	}
@@ -236,7 +237,18 @@ func (e *Enricher) RemoveSpecialCharactersFromString(s string) (val *string) {
 	value = strings.Trim(value, "()")
 	// remove all comas from name
 	value = strings.ReplaceAll(value, ",", "")
+	// trim quotes
+	value = e.trimQuotes(value)
 	return &value
+}
+
+func (e *Enricher) trimQuotes(s string) string {
+	if len(s) >= 2 {
+		if c := s[len(s)-1]; s[0] == c && (c == '"' || c == '\'') {
+			return s[1 : len(s)-1]
+		}
+	}
+	return s
 }
 
 // IsValidEmail validates email string
