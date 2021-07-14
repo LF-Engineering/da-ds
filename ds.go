@@ -244,6 +244,7 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				name := ident[0]
 				username := ident[1]
 				email := ident[2]
+				name, username = PostprocessNameUsername(name, username, email)
 				var (
 					pname     *string
 					pemail    *string
@@ -361,6 +362,7 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				name := ident[0]
 				username := ident[1]
 				email := ident[2]
+				name, username = PostprocessNameUsername(name, username, email)
 				var (
 					pname     *string
 					pemail    *string

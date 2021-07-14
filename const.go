@@ -146,3 +146,9 @@ const ProjectSlug = "project_slug"
 
 // DadsWarning - common constant string
 const DadsWarning = "da-ds WARNING"
+
+// MissingName - common constant string
+const MissingName = "-MISSING-NAME"
+
+// RedactedEmail - common constant string
+const RedactedEmail = "-REDACTED-EMAIL"

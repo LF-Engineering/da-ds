@@ -1601,7 +1601,11 @@ func (j *DSGit) IdentityFromGitAuthor(ctx *Ctx, author string) (identity [3]stri
 	}
 	if name == "" && email != Nil {
 		fields2 := strings.Split(email, "@")
-		name = strings.TrimSpace(fields2[0]) + "-MISSING-NAME"
+		n := len(fields2)
+		if n > 1 {
+			n--
+		}
+		name = strings.TrimSpace(strings.Join(fields2[:n], "@")) + MissingName
 	}
 	identity = [3]string{name, Nil, email}
 	return
