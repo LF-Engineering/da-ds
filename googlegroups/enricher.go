@@ -157,7 +157,11 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 		}
 
 		if userData.UUID != nil {
-			enrollments := e.affiliationsClientProvider.GetOrganizations(*userData.UUID, rawMessage.ProjectSlug)
+			slug := rawMessage.ProjectSlug
+			if strings.Contains(slug, "finos"){
+				slug = "finos-f"
+			}
+			enrollments := e.affiliationsClientProvider.GetOrganizations(*userData.UUID, slug)
 			if enrollments != nil {
 				organizations := make([]string, 0)
 				for _, enrollment := range *enrollments {
