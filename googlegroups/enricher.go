@@ -172,7 +172,7 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 					enrichedMessage.AuthorMultiOrgNames = organizations
 				}
 
-				if userData.OrgName == nil {
+				if userData.OrgName == nil && len(organizations) >= 1 {
 					enrichedMessage.AuthorOrgName = organizations[0]
 				}
 			}
