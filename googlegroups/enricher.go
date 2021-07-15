@@ -115,26 +115,26 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 	}
 
 	if ok := e.IsValidEmail(userAffiliationsEmail); ok {
-		if err == nil {
-			userIdentity := affiliation.Identity{
-				LastModified: now,
-				Name:         name,
-				Source:       source,
-				Email:        userAffiliationsEmail,
-				ID:           authorUUID,
-			}
-
-			if ok := e.affiliationsClientProvider.AddIdentity(&userIdentity); !ok {
-				log.Printf("failed to add identity for [%+v]", userAffiliationsEmail)
-			}
-
-			enrichedMessage.AuthorID = authorUUID
-			enrichedMessage.AuthorUUID = authorUUID
-			enrichedMessage.AuthorName = name
+		userIdentity := affiliation.Identity{
+			LastModified: now,
+			Name:         name,
+			Source:       source,
+			Email:        userAffiliationsEmail,
+			ID:           authorUUID,
 		}
+
+		if ok := e.affiliationsClientProvider.AddIdentity(&userIdentity); !ok {
+			log.Printf("failed to add identity for [%+v]", userAffiliationsEmail)
+		}
+
+		enrichedMessage.AuthorID = authorUUID
+		enrichedMessage.AuthorUUID = authorUUID
+		enrichedMessage.AuthorName = name
 	}
 
-	userData, err = e.affiliationsClientProvider.GetIdentityByUser("uuid", authorUUID)
+	// get user by id instead of uuid because when a user is merged to a profile, they get
+	// the uuid of the profile and it might not match with the user id
+	userData, err = e.affiliationsClientProvider.GetIdentityByUser("id", authorUUID)
 	if err != nil {
 		errMessage := fmt.Sprintf("%+v : %+v", userAffiliationsEmail, err)
 		log.Println(errMessage)
@@ -205,6 +205,15 @@ func (e *Enricher) GetEmailDomain(email string) string {
 	return ""
 }
 
+// GetEmailUsername ...
+func (e *Enricher) GetEmailUsername(email string) string {
+	username := strings.Split(email, "@")
+	if len(username) > 1 {
+		return username[0]
+	}
+	return ""
+}
+
 // GetUserName ...
 func (e *Enricher) GetUserName(rawMailString string) (username string) {
 	trimBraces := strings.Split(rawMailString, " <")
@@ -215,11 +224,13 @@ func (e *Enricher) GetUserName(rawMailString string) (username string) {
 		if strings.Contains(username, "[") {
 			trimSquareBraces := strings.Split(username, " [")
 			username = strings.TrimSpace(trimSquareBraces[0])
-			return
 		}
-		return
 	}
-	return trimBraces[0]
+	if strings.TrimSpace(username) != "" {
+		return username
+	}
+
+	return e.GetEmailUsername(trimBraces[1])
 }
 
 // RemoveSpecialCharactersFromString ...
@@ -260,6 +271,7 @@ func (e *Enricher) IsValidEmail(rawMailString string) bool {
 
 	if ok := emailRegex.MatchString(rawMailString); !ok {
 		log.Println("invalid email pattern: ", rawMailString)
+		return false
 	}
 
 	return true

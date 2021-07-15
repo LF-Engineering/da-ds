@@ -91,7 +91,7 @@ func TestEnrichMessage(t *testing.T) {
 				ID:     "894b751382341e2d958ba48f235c37b75690b194",
 			}
 			affProviderMock := &mocks.AffiliationClient{}
-			affProviderMock.On("GetIdentityByUser", "uuid", "894b751382341e2d958ba48f235c37b75690b194").Return(fakeAff1, nil)
+			affProviderMock.On("GetIdentityByUser", "id", "894b751382341e2d958ba48f235c37b75690b194").Return(fakeAff1, nil)
 			affProviderMock.On("GetOrganizations", "20328dba9d970328af607179cd21b25039d85340", "project1").Return(fakeOrganizations1, nil)
 			affProviderMock.On("AddIdentity", &userIdentity).Return(true)
 
