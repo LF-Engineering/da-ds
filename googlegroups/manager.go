@@ -377,7 +377,6 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 			totalItemsEnriched := 0
 			for id, hit := range topHits.Hits.Hits {
 				nHitSource := hit.Source
-				fmt.Println(nHitSource.UUID)
 				if lastEnrich.Before(hit.Source.ChangedAt) {
 					m.AddTask(func() {
 						log.Printf("[main] starting task %d", id)
