@@ -162,16 +162,26 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 			}
 			enrollments := e.affiliationsClientProvider.GetOrganizations(*userData.UUID, slug)
 			if enrollments != nil {
+				metaDataEpochMills := enrichedMessage.MetadataUpdatedOn.UnixNano() / 1000000
 				organizations := make([]string, 0)
 				for _, enrollment := range *enrollments {
 					organizations = append(organizations, enrollment.Organization.Name)
+				}
+
+				for _, enrollment := range *enrollments {
+					affStartEpoch := enrollment.Start.UnixNano() / 1000000
+					affEndEpoch := enrollment.End.UnixNano() / 1000000
+					if affStartEpoch <= metaDataEpochMills && affEndEpoch >= metaDataEpochMills {
+						enrichedMessage.AuthorOrgName = enrollment.Organization.Name
+						break
+					}
 				}
 
 				if len(organizations) != 0 {
 					enrichedMessage.AuthorMultiOrgNames = organizations
 				}
 
-				if userData.OrgName == nil && len(organizations) >= 1 {
+				if enrichedMessage.AuthorName == Unknown && len(organizations) >= 1 {
 					enrichedMessage.AuthorOrgName = organizations[0]
 				}
 			}
