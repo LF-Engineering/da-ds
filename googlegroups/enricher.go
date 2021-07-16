@@ -40,7 +40,6 @@ func NewEnricher(esClientProvider *elastic.ClientProvider, affiliationsClientPro
 
 // EnrichMessage enriches raw message
 func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*EnrichedMessage, error) {
-	log.Println("In EnrichMessage")
 	enrichedMessage := EnrichedMessage{
 		From:                 rawMessage.From,
 		Date:                 rawMessage.Date,
@@ -158,7 +157,7 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 
 		if userData.UUID != nil {
 			slug := rawMessage.ProjectSlug
-			if strings.Contains(slug, "finos"){
+			if strings.Contains(slug, "finos") {
 				slug = "finos-f"
 			}
 			enrollments := e.affiliationsClientProvider.GetOrganizations(*userData.UUID, slug)
@@ -172,7 +171,7 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 					enrichedMessage.AuthorMultiOrgNames = organizations
 				}
 
-				if userData.OrgName == nil {
+				if userData.OrgName == nil && len(organizations) >= 1 {
 					enrichedMessage.AuthorOrgName = organizations[0]
 				}
 			}
@@ -219,7 +218,7 @@ func (e *Enricher) GetEmailUsername(email string) string {
 	if len(username) > 1 {
 		return username[0]
 	}
-	return ""
+	return email
 }
 
 // GetUserName ...
@@ -235,7 +234,7 @@ func (e *Enricher) GetUserName(rawMailString string) (username string) {
 		}
 	}
 	if strings.TrimSpace(username) != "" {
-		return username
+		return e.GetEmailUsername(username)
 	}
 
 	return e.GetEmailUsername(trimBraces[1])

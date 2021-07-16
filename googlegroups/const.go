@@ -18,6 +18,8 @@ const (
 	TokenSSMParamName = "insights_googlegroups_token"
 	// MaxNumberOfMessages from gmail
 	MaxNumberOfMessages = 10000000
+	// MaxConcurrentRequests ...
+	MaxConcurrentRequests = 10000
 )
 
 var (

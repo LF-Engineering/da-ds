@@ -134,7 +134,7 @@ func NewManager(slug, groupName, shConnStr, fetcherBackendVersion, enricherBacke
 	mng.enricher = enricher
 	mng.esClientProvider = esClientProvider
 	mng.workerPool = &workerPool{
-		MaxWorker:   5, // initialize to 5
+		MaxWorker:   MaxConcurrentRequests,
 		queuedTaskC: make(chan func()),
 	}
 
@@ -301,8 +301,6 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 
 func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-chan error {
 	ch := make(chan error)
-	// set max concurrent requests
-	m.workerPool.MaxWorker = 60
 	m.run()
 	resultC := make(chan result, 0)
 	go func() {
@@ -449,7 +447,7 @@ func (m *Manager) GetTotalQueuedTask() int {
 func (m *Manager) run() {
 	for i := 0; i < m.workerPool.MaxWorker; i++ {
 		wID := i + 1
-		log.Printf("[workerPool] worker %d spawned", wID)
+		//log.Printf("[workerPool] worker %d spawned", wID)
 		go func(workerID int) {
 			for task := range m.workerPool.queuedTaskC {
 				log.Printf("[workerPool] worker %d is processing task", wID)
