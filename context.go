@@ -50,6 +50,7 @@ type Ctx struct {
 	ForceFull          bool       // From DA_DS_FORCE_FULL - force running full data source enrichment, do not attempt to detect where to start from
 	Project            string     // From DA_DS_PROJECT - set project can be for example "ONAP"
 	ProjectSlug        string     // From DA_DS_PROJECT_SLUG - set project slug - fixture slug, for example "lfn/onap"
+	ProjectFilter      bool       // From DA_DS_PROJECT_FILTER - set project filter (if this is set for example via 'p2o: true' fixture flag, this says that DS should internally filter by project, otherwise it means that no internal project filtering is needed and this is only used to set project on ES documents)
 	Category           string     // From DA_DS_CATEGORY - set category (some DS support this), for example "issue" (github/issue, github/pull_request etc.)
 	Groups             []string   // From GROUPS, always contain ProjectSlug at the minimum
 	DateFrom           *time.Time // From DA_DS_DATE_FROM
@@ -359,6 +360,7 @@ func (ctx *Ctx) Init() {
 
 	// Project, Project slug, Category, Groups
 	ctx.Project = ctx.Env("PROJECT")
+	ctx.ProjectFilter = ctx.BoolEnv("PROJECT_FILTER")
 	ctx.ProjectSlug = ctx.Env("PROJECT_SLUG")
 	if ctx.ProjectSlug == "" {
 		ctx.ProjectSlug = os.Getenv("PROJECT_SLUG")

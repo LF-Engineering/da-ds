@@ -263,13 +263,13 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 		if JiraFilterByProjectInComments {
 			if to != nil {
 				epochToMS := (*to).UnixNano() / 1e6
-				if ctx.Project != "" {
+				if ctx.ProjectFilter && ctx.Project != "" {
 					jql = fmt.Sprintf(`project = %s AND updated > %d AND updated < %d order by updated asc`, ctx.Project, epochMS, epochToMS)
 				} else {
 					jql = fmt.Sprintf(`updated > %d AND updated < %d order by updated asc`, epochMS, epochToMS)
 				}
 			} else {
-				if ctx.Project != "" {
+				if ctx.ProjectFilter && ctx.Project != "" {
 					jql = fmt.Sprintf(`project = %s AND updated > %d order by updated asc`, ctx.Project, epochMS)
 				} else {
 					jql = fmt.Sprintf(`updated > %d order by updated asc`, epochMS)
@@ -539,13 +539,13 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 	epochMS := from.UnixNano() / 1e6
 	if to != nil {
 		epochToMS := (*to).UnixNano() / 1e6
-		if ctx.Project != "" {
+		if ctx.ProjectFilter && ctx.Project != "" {
 			jql = fmt.Sprintf(`"jql":"project = %s AND updated > %d AND updated < %d order by updated asc"`, ctx.Project, epochMS, epochToMS)
 		} else {
 			jql = fmt.Sprintf(`"jql":"updated > %d AND updated < %d order by updated asc"`, epochMS, epochToMS)
 		}
 	} else {
-		if ctx.Project != "" {
+		if ctx.ProjectFilter && ctx.Project != "" {
 			jql = fmt.Sprintf(`"jql":"project = %s AND updated > %d order by updated asc"`, ctx.Project, epochMS)
 		} else {
 			jql = fmt.Sprintf(`"jql":"updated > %d order by updated asc"`, epochMS)
