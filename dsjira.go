@@ -210,7 +210,7 @@ func (j *DSJira) AddMetadata(ctx *Ctx, issue interface{}) (mItem map[string]inte
 	if tag == "" {
 		tag = origin
 		if ctx.Project != "" {
-			tag += ":" + ctx.Project
+			tag += ":::" + ctx.Project
 		}
 	}
 	issueID := j.ItemID(issue)
@@ -773,7 +773,7 @@ func (j *DSJira) Origin(ctx *Ctx) string {
 	if ctx.Project == "" {
 		return j.URL
 	}
-	return j.URL + ":" + ctx.Project
+	return j.URL + ":::" + ctx.Project
 }
 
 // ItemID - return unique identifier for an item
