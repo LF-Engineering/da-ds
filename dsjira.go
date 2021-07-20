@@ -770,7 +770,10 @@ func (j *DSJira) Origin(ctx *Ctx) string {
 	if ctx.Tag != "" {
 		return ctx.Tag
 	}
-	return j.URL
+	if ctx.Project == "" {
+		return j.URL
+	}
+	return j.URL + ":" + ctx.Project
 }
 
 // ItemID - return unique identifier for an item
