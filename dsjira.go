@@ -908,7 +908,9 @@ func EnrichComments(ctx *Ctx, ds DS, comments []interface{}, item map[string]int
 			richComment[field] = item[field]
 		}
 		// This overwrites project passed from outside, but this was requested, we can comment this out if needed
-		richComment["project"] = item["project_key"]
+		if ctx.Project == "" {
+			richComment["project"] = item["project_key"]
+		}
 		richComment["issue_key"] = item["key"]
 		richComment["issue_url"] = item["url"]
 
@@ -1188,7 +1190,9 @@ func (j *DSJira) EnrichItem(ctx *Ctx, item map[string]interface{}, author string
 	rich["project_key"], _ = Dig(fields, []string{"project", "key"}, true, false)
 	rich["project_name"], _ = Dig(fields, []string{"project", "name"}, true, false)
 	// This overwrites project passed from outside, but this was requested, we can comment this out if needed
-	rich["project"] = rich["project_key"]
+	if ctx.Project == "" {
+		rich["project"] = rich["project_key"]
+	}
 	resolution, ok := fields["resolution"]
 	if ok && resolution != nil {
 		rich["resolution_id"], _ = Dig(resolution, []string{"id"}, true, false)
