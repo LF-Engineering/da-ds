@@ -209,6 +209,9 @@ func (j *DSJira) AddMetadata(ctx *Ctx, issue interface{}) (mItem map[string]inte
 	tag := ctx.Tag
 	if tag == "" {
 		tag = origin
+		if ctx.Project != "" {
+			tag += ":" + ctx.Project
+		}
 	}
 	issueID := j.ItemID(issue)
 	updatedOn := j.ItemUpdatedOn(issue)
@@ -744,10 +747,7 @@ func (j *DSJira) Categories() map[string]struct{} {
 
 // OriginField - return origin field used to detect where to restart from
 func (j *DSJira) OriginField(ctx *Ctx) string {
-	if ctx.Tag != "" {
-		return DefaultTagField
-	}
-	return DefaultOriginField
+	return DefaultTagField
 }
 
 // ResumeNeedsOrigin - is origin field needed when resuming
