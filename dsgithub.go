@@ -5256,9 +5256,13 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 	}
 	rich["n_reactions"] = reactions
 	rich["time_to_merge_request_response"] = nil
-	if nReviewComments > 0 {
-		firstReviewDate := j.GetFirstPullRequestReviewDate(pull)
+	if nComments > 0 {
+		firstReviewDate := j.GetFirstPullRequestReviewDate(pull, false)
 		rich["time_to_merge_request_response"] = float64(firstReviewDate.Sub(createdAt).Seconds()) / 86400.0
+	}
+	if nReviewComments > 0 || nComments > 0 {
+		firstAttentionDate := j.GetFirstPullRequestReviewDate(pull, true)
+		rich["time_to_first_attention"] = float64(firstAttentionDate.Sub(createdAt).Seconds()) / 86400.0
 	}
 	rich[j.DateField(ctx)] = createdAt
 	if affs {
@@ -5287,7 +5291,7 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 }
 
 // GetFirstPullRequestReviewDate - get first review date on a pull request
-func (j *DSGitHub) GetFirstPullRequestReviewDate(pull map[string]interface{}) (dt time.Time) {
+func (j *DSGitHub) GetFirstPullRequestReviewDate(pull map[string]interface{}, commsAndReviews bool) (dt time.Time) {
 	iUserLogin, _ := Dig(pull, []string{"user", "login"}, false, true)
 	userLogin, _ := iUserLogin.(string)
 	dts := []time.Time{}
@@ -5306,6 +5310,24 @@ func (j *DSGitHub) GetFirstPullRequestReviewDate(pull map[string]interface{}) (d
 				continue
 			}
 			dts = append(dts, createdAt)
+		}
+	}
+	if commsAndReviews {
+		iReviews, ok := pull["reviews_data"]
+		if ok && iReviews != nil {
+			ary, _ := iReviews.([]interface{})
+			for _, iReview := range ary {
+				review, _ := iReview.(map[string]interface{})
+				iReviewLogin, _ := Dig(review, []string{"user", "login"}, false, true)
+				reviewLogin, _ := iReviewLogin.(string)
+				iSubmittedAt, _ := review["submitted_at"]
+				submittedAt, _ := TimeParseInterfaceString(iSubmittedAt)
+				if userLogin == reviewLogin {
+					udts = append(udts, submittedAt)
+					continue
+				}
+				dts = append(dts, submittedAt)
+			}
 		}
 	}
 	nDts := len(dts)
