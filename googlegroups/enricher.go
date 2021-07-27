@@ -190,6 +190,7 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 		if userData.IsBot != nil {
 			if *userData.IsBot == 1 {
 				enrichedMessage.FromBot = true
+				enrichedMessage.AuthorBot = true
 			}
 		}
 	}
