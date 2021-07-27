@@ -248,7 +248,12 @@ func (e *Enricher) GetUserName(rawMailString string) (username string) {
 		return e.GetEmailUsername(username)
 	}
 
-	return e.GetEmailUsername(trimBraces[1])
+	if len(trimBraces) > 1 {
+		username = trimBraces[1]
+	} else {
+		username = trimBraces[0]
+	}
+	return e.GetEmailUsername(username)
 }
 
 // RemoveSpecialCharactersFromString ...
