@@ -485,6 +485,8 @@ var (
 		"Resolved-by":    true,
 		"Influenced-by":  true,
 	}
+	// slice of commit hashes for each repo
+	CommitsHash = map[string][]string{}
 )
 
 // RawPLS - programming language summary (all fields as strings)
@@ -1985,6 +1987,12 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 			if e != nil {
 				return
 			}
+			mtx.Lock()
+			e = EnrichPairProgrammingItem(rich.(map[string]interface{}))
+			if e != nil {
+				return
+			}
+			mtx.Unlock()
 		}
 		if thrN > 1 {
 			mtx.Lock()
@@ -2025,6 +2033,40 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 		}
 	}
 	return
+}
+
+// EnrichPairProgrammingItem - additional operations on already enriched item for pair programming
+func EnrichPairProgrammingItem(richItem map[string]interface{}) (err error) {
+	var repoCommits []string
+	var repoString string
+	if repo, ok := richItem["repo_name"]; ok {
+		repoString = fmt.Sprintf("%+v", repo)
+		repoCommits = CommitsHash[repoString]
+	}
+
+	if commit, ok := richItem["hash"]; ok {
+		commitString := fmt.Sprintf("%+v", commit)
+		if ok := Find(repoCommits, commitString); ok {
+			// do nothing because the hash exists in the commits list
+			richItem["is_parent_commit"] = 0
+			return
+		}
+		repoCommits = append(repoCommits, commitString)
+		CommitsHash[repoString] = repoCommits
+		richItem["is_parent_commit"] = 1
+	}
+	return
+}
+
+// Find takes a slice and finds an element in it. If found it will
+// return it's true, otherwise it will return false.
+func Find(slice []string, val string) bool {
+	for _, item := range slice {
+		if item == val {
+			return true
+		}
+	}
+	return false
 }
 
 // EnrichItems - perform the enrichment
