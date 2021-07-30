@@ -405,7 +405,7 @@ func CopyAffsRoleData(dst, src map[string]interface{}, dstRole, srcRole string) 
 // If in contains @, replace part after last "@" with suff
 // If in doesn't contain "@" then return it or (if forceSuff is set) return in + suff
 func RedactEmail(in, suff string, forceSuff bool) string {
-	ary := strings.Split(in, "@")
+	ary := strings.Split(strings.TrimLeft(strings.TrimSpace(in), "@"), "@")
 	n := len(ary)
 	if n <= 1 {
 		if forceSuff {
