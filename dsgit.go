@@ -2463,7 +2463,7 @@ func (j *DSGit) PairProgrammingMetrics(ctx *Ctx, rich, commit map[string]interfa
 		if !ok {
 			continue
 		}
-		rich[flag] = flag
+		rich[flag] = 1
 		iAuthors, _ := Dig(commit, []string{authorsKey}, true, false)
 		rich[authorsKey] = iAuthors
 		authors, _ := iAuthors.([]string)
