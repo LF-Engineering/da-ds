@@ -2496,6 +2496,7 @@ func (j *DSGit) PairProgrammingMetrics(ctx *Ctx, rich, commit map[string]interfa
 	rich["pair_programming_lines_added"] = ppLinesAdded
 	rich["pair_programming_lines_removed"] = ppLinesRemoved
 	rich["pair_programming_lines_changed"] = ppLinesChanged
+	rich["is_pair_programming_commit"] = 1
 	if ctx.Debug > 2 {
 		Printf("(%d,%d,%d,%d,%f,%f,%f,%f,%f)\n", files, linesAdded, linesRemoved, linesChanged, ppCount, ppFiles, ppLinesAdded, ppLinesRemoved, ppLinesChanged)
 	}
