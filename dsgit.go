@@ -485,7 +485,7 @@ var (
 		"Resolved-by":    true,
 		"Influenced-by":  true,
 	}
-	// CommitsHash is a slice of commit hashes for each repo
+	// CommitsHash is a map of commit hashes for each repo
 	CommitsHash = make(map[string]map[string]struct{})
 )
 
