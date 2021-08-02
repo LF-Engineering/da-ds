@@ -2039,17 +2039,20 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 // EnrichPairProgrammingItem - additional operations on already enriched item for pair programming
 func EnrichPairProgrammingItem(richItem map[string]interface{}) (err error) {
 	var repoString string
-	var emptyStruct struct{}
 	if repo, ok := richItem["repo_name"]; ok {
 		repoString = fmt.Sprintf("%+v", repo)
 		if commit, ok := richItem["hash"]; ok {
 			commitString := fmt.Sprintf("%+v", commit)
+			if innerMap := CommitsHash[repoString]; innerMap == nil {
+				CommitsHash[repoString] = make(map[string]struct{})
+			}
+
 			if _, ok := CommitsHash[repoString][commitString]; ok {
 				// do nothing because the hash exists in the commits map
 				richItem["is_parent_commit"] = 0
 				return
 			}
-			CommitsHash[repoString] = map[string]struct{}{commitString: emptyStruct}
+			CommitsHash[repoString][commitString] = struct{}{}
 			richItem["is_parent_commit"] = 1
 		}
 	}
