@@ -486,7 +486,7 @@ var (
 		"Influenced-by":  true,
 	}
 	// CommitsHash is a slice of commit hashes for each repo
-	CommitsHash = map[string][]string{}
+	CommitsHash = make(map[string]map[string]struct{})
 )
 
 // RawPLS - programming language summary (all fields as strings)
@@ -1990,6 +1990,7 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 			mtx.Lock()
 			e = EnrichPairProgrammingItem(rich.(map[string]interface{}))
 			if e != nil {
+				mtx.Unlock()
 				return
 			}
 			mtx.Unlock()
@@ -2037,36 +2038,22 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 
 // EnrichPairProgrammingItem - additional operations on already enriched item for pair programming
 func EnrichPairProgrammingItem(richItem map[string]interface{}) (err error) {
-	var repoCommits []string
 	var repoString string
+	var emptyStruct struct{}
 	if repo, ok := richItem["repo_name"]; ok {
 		repoString = fmt.Sprintf("%+v", repo)
-		repoCommits = CommitsHash[repoString]
-	}
-
-	if commit, ok := richItem["hash"]; ok {
-		commitString := fmt.Sprintf("%+v", commit)
-		if ok := Find(repoCommits, commitString); ok {
-			// do nothing because the hash exists in the commits list
-			richItem["is_parent_commit"] = 0
-			return
+		if commit, ok := richItem["hash"]; ok {
+			commitString := fmt.Sprintf("%+v", commit)
+			if _, ok := CommitsHash[repoString][commitString]; ok {
+				// do nothing because the hash exists in the commits map
+				richItem["is_parent_commit"] = 0
+				return
+			}
+			CommitsHash[repoString] = map[string]struct{}{commitString: emptyStruct}
+			richItem["is_parent_commit"] = 1
 		}
-		repoCommits = append(repoCommits, commitString)
-		CommitsHash[repoString] = repoCommits
-		richItem["is_parent_commit"] = 1
 	}
 	return
-}
-
-// Find takes a slice and finds an element in it. If found it will
-// return it's true, otherwise it will return false.
-func Find(slice []string, val string) bool {
-	for _, item := range slice {
-		if item == val {
-			return true
-		}
-	}
-	return false
 }
 
 // EnrichItems - perform the enrichment
