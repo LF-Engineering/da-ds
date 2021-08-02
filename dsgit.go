@@ -485,6 +485,8 @@ var (
 		"Resolved-by":    true,
 		"Influenced-by":  true,
 	}
+	// CommitsHash is a map of commit hashes for each repo
+	CommitsHash = make(map[string]map[string]struct{})
 )
 
 // RawPLS - programming language summary (all fields as strings)
@@ -1985,6 +1987,13 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 			if e != nil {
 				return
 			}
+			mtx.Lock()
+			e = EnrichPairProgrammingItem(rich.(map[string]interface{}))
+			if e != nil {
+				mtx.Unlock()
+				return
+			}
+			mtx.Unlock()
 		}
 		if thrN > 1 {
 			mtx.Lock()
@@ -2022,6 +2031,29 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 		err = procItem(nil, i)
 		if err != nil {
 			return
+		}
+	}
+	return
+}
+
+// EnrichPairProgrammingItem - additional operations on already enriched item for pair programming
+func EnrichPairProgrammingItem(richItem map[string]interface{}) (err error) {
+	var repoString string
+	if repo, ok := richItem["repo_name"]; ok {
+		repoString = fmt.Sprintf("%+v", repo)
+		if commit, ok := richItem["hash"]; ok {
+			commitString := fmt.Sprintf("%+v", commit)
+			if innerMap := CommitsHash[repoString]; innerMap == nil {
+				CommitsHash[repoString] = make(map[string]struct{})
+			}
+
+			if _, ok := CommitsHash[repoString][commitString]; ok {
+				// do nothing because the hash exists in the commits map
+				richItem["is_parent_commit"] = 0
+				return
+			}
+			CommitsHash[repoString][commitString] = struct{}{}
+			richItem["is_parent_commit"] = 1
 		}
 	}
 	return
