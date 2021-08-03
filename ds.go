@@ -310,6 +310,9 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 					errs = append(errs, er)
 					continue
 				}
+				if ctx.Debug > 0 && uuid != mergedUUID {
+					Printf("one-by-one: merged profile detected: %s -> %s\n", uuid, mergedUUID)
+				}
 				queryU += fmt.Sprintf("(?,now())")
 				queryI += fmt.Sprintf("(?,?,?,?,?,?,now())")
 				queryP += fmt.Sprintf("(?,?,?)")
@@ -470,6 +473,9 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				mergedUUID, ok := id2uuid[uuid]
 				if !ok {
 					mergedUUID = uuid
+				}
+				if ctx.Debug > 0 && uuid != mergedUUID {
+					Printf("mass: merged profile detected: %s -> %s\n", uuid, mergedUUID)
 				}
 				source := data[1]
 				pname := data[2]
