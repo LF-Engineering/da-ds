@@ -437,7 +437,7 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 			}
 			queryS = queryS[:len(queryS)-1] + ")"
 			var rows *sql.Rows
-			rows, err = QuerySQL(ctx, nil, queryS, argsS)
+			rows, err = QuerySQL(ctx, nil, queryS, argsS...)
 			if err != nil {
 				return
 			}
