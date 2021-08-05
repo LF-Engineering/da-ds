@@ -3832,6 +3832,8 @@ func (j *DSGitHub) EnrichIssueComments(ctx *Ctx, issue map[string]interface{}, c
 			user, _ := iCommenterData.(map[string]interface{})
 			rich["author_login"], _ = user["login"]
 			rich["author_name"], _ = user["name"]
+			rich["author_avatar_url"], _ = user["avatar_url"]
+			rich["commenter_avatar_url"] = rich["author_avatar_url"]
 			rich["commenter_name"], _ = user["name"]
 			rich["commenter_domain"] = nil
 			iEmail, ok := user["email"]
@@ -3848,6 +3850,8 @@ func (j *DSGitHub) EnrichIssueComments(ctx *Ctx, issue map[string]interface{}, c
 		} else {
 			rich["author_login"] = nil
 			rich["author_name"] = nil
+			rich["author_avatar_url"] = nil
+			rich["commenter_avatar_url"] = nil
 			rich["commenter_name"] = nil
 			rich["commenter_domain"] = nil
 			rich["commenter_org"] = nil
@@ -3931,6 +3935,8 @@ func (j *DSGitHub) EnrichIssueAssignees(ctx *Ctx, issue map[string]interface{}, 
 		rich["url_id"] = fmt.Sprintf("%s/issues/%d/assignees/%s", githubRepo, iNumber, login)
 		rich["author_login"] = login
 		rich["author_name"], _ = assignee["name"]
+		rich["author_avatar_url"], _ = assignee["avatar_url"]
+		rich["assignee_avatar_url"] = rich["author_avatar_url"]
 		rich["assignee_login"] = login
 		rich["assignee_name"], _ = assignee["name"]
 		rich["assignee_domain"] = nil
@@ -4063,6 +4069,8 @@ func (j *DSGitHub) EnrichIssueReactions(ctx *Ctx, issue map[string]interface{}, 
 			rich["author_login"], _ = user["login"]
 			rich["actor_login"], _ = user["login"]
 			rich["author_name"], _ = user["name"]
+			rich["author_avatar_url"], _ = user["avatar_url"]
+			rich["actor_avatar_url"] = rich["author_avatar_url"]
 			rich["actor_name"], _ = user["name"]
 			rich["actor_domain"] = nil
 			iEmail, ok := user["email"]
@@ -4079,6 +4087,8 @@ func (j *DSGitHub) EnrichIssueReactions(ctx *Ctx, issue map[string]interface{}, 
 		} else {
 			rich["author_login"] = nil
 			rich["author_name"] = nil
+			rich["author_avatar_url"] = nil
+			rich["actor_avatar_url"] = nil
 			rich["actor_login"] = nil
 			rich["actor_name"] = nil
 			rich["actor_domain"] = nil
@@ -4179,6 +4189,8 @@ func (j *DSGitHub) EnrichPullRequestComments(ctx *Ctx, pull map[string]interface
 			user, _ := iCommenterData.(map[string]interface{})
 			rich["author_login"], _ = user["login"]
 			rich["author_name"], _ = user["name"]
+			rich["author_avatar_url"], _ = user["avatar_url"]
+			rich["commenter_avatar_url"] = rich["author_avatar_url"]
 			rich["commenter_name"], _ = user["name"]
 			rich["commenter_domain"] = nil
 			iEmail, ok := user["email"]
@@ -4195,6 +4207,8 @@ func (j *DSGitHub) EnrichPullRequestComments(ctx *Ctx, pull map[string]interface
 		} else {
 			rich["author_login"] = nil
 			rich["author_name"] = nil
+			rich["author_avatar_url"] = nil
+			rich["commenter_avatar_url"] = nil
 			rich["commenter_name"] = nil
 			rich["commenter_domain"] = nil
 			rich["commenter_org"] = nil
@@ -4324,6 +4338,8 @@ func (j *DSGitHub) EnrichPullRequestReviews(ctx *Ctx, pull map[string]interface{
 			user, _ := iReviewerData.(map[string]interface{})
 			rich["author_login"], _ = user["login"]
 			rich["author_name"], _ = user["name"]
+			rich["author_avatar_url"], _ = user["avatar_url"]
+			rich["reviewer_avatar_url"] = rich["author_avatar_url"]
 			rich["reviewer_name"], _ = user["name"]
 			rich["reviewer_domain"] = nil
 			iEmail, ok := user["email"]
@@ -4340,6 +4356,8 @@ func (j *DSGitHub) EnrichPullRequestReviews(ctx *Ctx, pull map[string]interface{
 		} else {
 			rich["author_login"] = nil
 			rich["author_name"] = nil
+			rich["author_avatar_url"] = nil
+			rich["reviewer_avatar_url"] = nil
 			rich["reviewer_name"] = nil
 			rich["reviewer_domain"] = nil
 			rich["reviewer_org"] = nil
@@ -4424,6 +4442,8 @@ func (j *DSGitHub) EnrichPullRequestAssignees(ctx *Ctx, pull map[string]interfac
 		rich["url_id"] = fmt.Sprintf("%s/pulls/%d/assignees/%s", githubRepo, iNumber, login)
 		rich["author_login"] = login
 		rich["author_name"], _ = assignee["name"]
+		rich["author_avatar_url"], _ = assignee["avatar_url"]
+		rich["assignee_avatar_url"] = rich["author_avatar_url"]
 		rich["assignee_login"] = login
 		rich["assignee_name"], _ = assignee["name"]
 		rich["assignee_domain"] = nil
@@ -4531,6 +4551,8 @@ func (j *DSGitHub) EnrichPullRequestReactions(ctx *Ctx, pull map[string]interfac
 			rich["author_login"], _ = user["login"]
 			rich["actor_login"], _ = user["login"]
 			rich["author_name"], _ = user["name"]
+			rich["author_avatar_url"], _ = user["avatar_url"]
+			rich["actor_avatar_url"] = rich["author_avatar_url"]
 			rich["actor_name"], _ = user["name"]
 			rich["actor_domain"] = nil
 			iEmail, ok := user["email"]
@@ -4547,6 +4569,8 @@ func (j *DSGitHub) EnrichPullRequestReactions(ctx *Ctx, pull map[string]interfac
 		} else {
 			rich["author_login"] = nil
 			rich["author_name"] = nil
+			rich["author_avatar_url"] = nil
+			rich["actor_avatar_url"] = nil
 			rich["actor_login"] = nil
 			rich["actor_name"] = nil
 			rich["actor_domain"] = nil
@@ -4632,6 +4656,8 @@ func (j *DSGitHub) EnrichPullRequestRequestedReviewers(ctx *Ctx, pull map[string
 		rich["url_id"] = fmt.Sprintf("%s/pulls/%d/requested_reviewers/%s", githubRepo, iNumber, login)
 		rich["author_login"] = login
 		rich["author_name"], _ = reviewer["name"]
+		rich["author_avatar_url"], _ = reviewer["avatar_url"]
+		rich["requested_reviewer_avatar_url"] = rich["author_avatar_url"]
 		rich["requested_reviewer_login"] = login
 		rich["requested_reviewer_name"], _ = reviewer["name"]
 		rich["requested_reviewer_domain"] = nil
@@ -4750,6 +4776,8 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 		user, _ := iUserData.(map[string]interface{})
 		rich["author_login"], _ = user["login"]
 		rich["author_name"], _ = user["name"]
+		rich["author_avatar_url"], _ = user["avatar_url"]
+		rich["user_avatar_url"] = rich["author_avatar_url"]
 		rich["user_name"], _ = user["name"]
 		rich["user_domain"] = nil
 		iEmail, ok := user["email"]
@@ -4766,6 +4794,8 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 	} else {
 		rich["author_login"] = nil
 		rich["author_name"] = nil
+		rich["author_avatar_url"] = nil
+		rich["user_avatar_url"] = nil
 		rich["user_name"] = nil
 		rich["user_domain"] = nil
 		rich["user_org"] = nil
@@ -4777,6 +4807,7 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 		assignee, _ := iAssigneeData.(map[string]interface{})
 		rich["assignee_login"], _ = assignee["login"]
 		rich["assignee_name"], _ = assignee["name"]
+		rich["assignee_avatar_url"], _ = assignee["avatar_url"]
 		rich["assignee_domain"] = nil
 		iEmail, ok := assignee["email"]
 		if ok {
@@ -4792,6 +4823,7 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 	} else {
 		rich["assignee_login"] = nil
 		rich["assignee_name"] = nil
+		rich["assignee_avatar_url"] = nil
 		rich["assignee_domain"] = nil
 		rich["assignee_org"] = nil
 		rich["assignee_location"] = nil
@@ -5046,6 +5078,8 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 		user, _ := iUserData.(map[string]interface{})
 		rich["author_login"], _ = user["login"]
 		rich["author_name"], _ = user["name"]
+		rich["author_avatar_url"], _ = user["avatar_url"]
+		rich["user_avatar_url"] = rich["author_avatar_url"]
 		rich["user_name"], _ = user["name"]
 		rich["user_domain"] = nil
 		iEmail, ok := user["email"]
@@ -5062,6 +5096,8 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 	} else {
 		rich["author_login"] = nil
 		rich["author_name"] = nil
+		rich["author_avatar_url"] = nil
+		rich["user_avatar_url"] = nil
 		rich["user_name"] = nil
 		rich["user_domain"] = nil
 		rich["user_org"] = nil
@@ -5073,6 +5109,7 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 		assignee, _ := iAssigneeData.(map[string]interface{})
 		rich["assignee_login"], _ = assignee["login"]
 		rich["assignee_name"], _ = assignee["name"]
+		rich["assignee_avatar_url"], _ = assignee["avatar_url"]
 		rich["assignee_domain"] = nil
 		iEmail, ok := assignee["email"]
 		if ok {
@@ -5088,6 +5125,7 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 	} else {
 		rich["assignee_login"] = nil
 		rich["assignee_name"] = nil
+		rich["assignee_avatar_url"] = nil
 		rich["assignee_domain"] = nil
 		rich["assignee_org"] = nil
 		rich["assignee_location"] = nil
@@ -5098,6 +5136,7 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 		mergedBy, _ := iMergedByData.(map[string]interface{})
 		rich["merge_author_login"], _ = mergedBy["login"]
 		rich["merge_author_name"], _ = mergedBy["name"]
+		rich["merge_author_avatar_url"], _ = mergedBy["avatar_url"]
 		rich["merge_author_domain"] = nil
 		iEmail, ok := mergedBy["email"]
 		if ok {
@@ -5113,6 +5152,7 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 	} else {
 		rich["merge_author_login"] = nil
 		rich["merge_author_name"] = nil
+		rich["merge_author_avatar_url"] = nil
 		rich["merge_author_domain"] = nil
 		rich["merge_author_org"] = nil
 		rich["merge_author_location"] = nil
