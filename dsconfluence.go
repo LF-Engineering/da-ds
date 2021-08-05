@@ -132,7 +132,6 @@ func (j *DSConfluence) GetHistoricalContents(ctx *Ctx, content map[string]interf
 	content["ancestors"] = ancestors
 	iVersionNumber, _ := Dig(content, []string{"version", "number"}, true, false)
 	lastVersion := int(iVersionNumber.(float64))
-	////
 	if lastVersion == 1 {
 		contents = append(contents, content)
 		return
@@ -227,7 +226,6 @@ func (j *DSConfluence) GetHistoricalContents(ctx *Ctx, content map[string]interf
 			break
 		}
 		version++
-		////
 		if version == lastVersion {
 			break
 		}
