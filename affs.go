@@ -139,6 +139,16 @@ func AffsIdentityIDs(ctx *Ctx, ds DS, identity map[string]interface{}) (ids [2]i
 	email, _ := identity["email"]
 	name, _ := identity["name"]
 	username, _ := identity["username"]
+	sEmail, _ := email.(string)
+	sName, _ := name.(string)
+	sUsername, _ := username.(string)
+	sName, sUsername = PostprocessNameUsername(sName, sUsername, sEmail)
+	if sName != Nil && sName != "" && sName != name {
+		name = sName
+	}
+	if sUsername != Nil && sUsername != "" && sUsername != username {
+		username = sUsername
+	}
 	if email == nil && name == nil && username == nil {
 		return
 	}
