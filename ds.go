@@ -260,9 +260,6 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				}
 				if username != Nil {
 					pusername = &username
-					if profname == nil {
-						profname = &username
-					}
 				}
 				if pname == nil && pemail == nil && pusername == nil {
 					continue
@@ -407,9 +404,6 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				}
 				if username != Nil {
 					pusername = &username
-					if profname == nil {
-						profname = &username
-					}
 				}
 				if pname == nil && pemail == nil && pusername == nil {
 					continue
