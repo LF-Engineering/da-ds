@@ -237,7 +237,7 @@ func (j *DSGerrit) GetGerritReviews(ctx *Ctx, after string, afterEpoch float64, 
 	// For unknown reasons , gerrit is not returning data if number of seconds is not equal to 00 - so I'm updating query string to set seconds to ":00"
 	after = after[:len(after)-3] + ":00"
 	cmdLine = append(cmdLine, "query")
-	if ctx.Project != "" {
+	if ctx.ProjectFilter && ctx.Project != "" {
 		cmdLine = append(cmdLine, "project:", ctx.Project)
 	}
 	cmdLine = append(cmdLine, `after:"`+after+`"`, "limit:", strconv.Itoa(j.MaxReviews), "(status:open OR status:closed)", "--all-approvals", "--all-reviewers", "--comments", "--format=JSON")
