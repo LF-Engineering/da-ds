@@ -2524,6 +2524,7 @@ func (j *DSGitHub) ProcessPull(ctx *Ctx, inPull map[string]interface{}) (pull ma
 		if err != nil {
 			return
 		}
+		// TODO: commits
 		// That would fetch the full commit data
 		//pull["commits_data"], err = j.githubPullCommits(ctx, j.Org, j.Repo, iNumber, true)
 		var commitsData []map[string]interface{}
@@ -3207,6 +3208,7 @@ func (j *DSGitHub) GetItemIdentities(ctx *Ctx, doc interface{}) (identities map[
 				}
 			}
 		}
+		// TODO: commits
 		// We don't process commits_data - we only hold array of commits SHAs here
 		// Code to process this is commented out because p2o is not doing this neither
 	}
