@@ -4864,6 +4864,7 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 	rich["n_assignees"] = nAssignees
 	nCommenters := 0
 	nComments := 0
+	reactions := 0
 	iComments, ok := issue["comments_data"]
 	if ok && iComments != nil {
 		ary, _ := iComments.([]interface{})
@@ -4875,6 +4876,11 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 			commenter, _ := iCommenter.(string)
 			if commenter != "" {
 				commenters[commenter] = struct{}{}
+			}
+			iReactions, ok := Dig(comment, []string{"reactions", "total_count"}, false, true)
+			if ok {
+				reacts := int(iReactions.(float64))
+				reactions += reacts
 			}
 		}
 		nCommenters = len(commenters)
@@ -4920,10 +4926,10 @@ func (j *DSGitHub) EnrichIssueItem(ctx *Ctx, item map[string]interface{}, author
 		commentsVal = int(iCommentsVal.(float64))
 	}
 	rich["n_total_comments"] = commentsVal
-	reactions := 0
 	iReactions, ok := Dig(issue, []string{"reactions", "total_count"}, false, true)
 	if ok {
-		reactions = int(iReactions.(float64))
+		reacts := int(iReactions.(float64))
+		reactions += reacts
 	}
 	rich["n_reactions"] = reactions
 	// if comments+reactions > 0 {
@@ -5210,6 +5216,7 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 	rich["n_requested_reviewers"] = nRequestedReviewers
 	nCommenters := 0
 	nComments := 0
+	reactions := 0
 	iComments, ok := pull["review_comments_data"]
 	if ok && iComments != nil {
 		ary, _ := iComments.([]interface{})
@@ -5221,6 +5228,11 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 			commenter, _ := iCommenter.(string)
 			if commenter != "" {
 				commenters[commenter] = struct{}{}
+			}
+			iReactions, ok := Dig(comment, []string{"reactions", "total_count"}, false, true)
+			if ok {
+				reacts := int(iReactions.(float64))
+				reactions += reacts
 			}
 		}
 		nCommenters = len(commenters)
@@ -5291,10 +5303,11 @@ func (j *DSGitHub) EnrichPullRequestItem(ctx *Ctx, item map[string]interface{}, 
 		commentsVal = int(iCommentsVal.(float64))
 	}
 	rich["n_total_comments"] = commentsVal
-	reactions := 0
+	// There is probably no value for "reactions", "total_count" on the top level of "pull" object, but we can attempt to get this
 	iReactions, ok := Dig(pull, []string{"reactions", "total_count"}, false, true)
 	if ok {
-		reactions = int(iReactions.(float64))
+		reacts := int(iReactions.(float64))
+		reactions += reacts
 	}
 	rich["n_reactions"] = reactions
 	rich["time_to_merge_request_response"] = nil
