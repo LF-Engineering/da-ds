@@ -90,9 +90,9 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 	userData := new(affiliation.AffIdentity)
 	userAffiliationsEmail := e.HandleObfuscatedEmail(rawMessage.Data.From)
 	enrichedMessage.MboxAuthorDomain = e.GetEmailDomain(userAffiliationsEmail)
-	name := e.GetUserName(rawMessage.Data.From)
+	name := e.RemoveSpecialCharactersFromString(e.GetUserName(rawMessage.Data.From))
 	source := Pipermail
-	authorUUID, err := uuid.GenerateIdentity(&source, &userAffiliationsEmail, &name, nil)
+	authorUUID, err := uuid.GenerateIdentity(&source, &userAffiliationsEmail, name, nil)
 	if err != nil {
 		log.Println(err)
 	}
@@ -100,7 +100,7 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 	if ok := e.IsValidEmail(userAffiliationsEmail); ok {
 		userIdentity := affiliation.Identity{
 			LastModified: now,
-			Name:         name,
+			Name:         *name,
 			Source:       source,
 			Email:        userAffiliationsEmail,
 			ID:           authorUUID,
@@ -112,7 +112,7 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 
 		enrichedMessage.AuthorID = authorUUID
 		enrichedMessage.AuthorUUID = authorUUID
-		enrichedMessage.AuthorName = name
+		enrichedMessage.AuthorName = *name
 	}
 
 	userData, err = e.affiliationsClientProvider.GetIdentityByUser("id", authorUUID)
@@ -227,4 +227,34 @@ func (e *Enricher) FormatTimestampString(str string) (*time.Time, error) {
 		return nil, err
 	}
 	return &t, nil
+}
+
+// RemoveSpecialCharactersFromString ...
+func (e *Enricher) RemoveSpecialCharactersFromString(s string) (val *string) {
+	value := s
+	// trim leading space
+	value = strings.TrimLeft(value, " ")
+	// trim trailing space
+	value = strings.TrimRight(value, " ")
+	// trim angle braces
+	value = strings.Trim(value, "<>")
+	// trim square braces
+	value = strings.Trim(value, "[]")
+	// trim brackets
+	value = strings.Trim(value, "()")
+	// remove all comas from name
+	value = strings.ReplaceAll(value, ",", "")
+	// trim quotes
+	value = e.trimQuotes(value)
+
+	return &value
+}
+
+func (e *Enricher) trimQuotes(s string) string {
+	if len(s) >= 2 {
+		if c := s[len(s)-1]; s[0] == c && (c == '"' || c == '\'') {
+			return s[1 : len(s)-1]
+		}
+	}
+	return s
 }
