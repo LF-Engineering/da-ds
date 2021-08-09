@@ -264,6 +264,10 @@ func buildBugzillaManager(ctx *lib.Ctx) (*bugzilla.Manager, error) {
 }
 
 func buildPipermailManager(ctx *lib.Ctx) (*pipermail.Manager, error) {
+	authData, err := getAuthData()
+	if err != nil {
+		return nil, err
+	}
 	origin := ctx.PiperMail.Origin.String()
 	slug := ctx.PiperMail.ProjectSlug.String()
 	fetcherBackendVersion := "0.0.1"
@@ -275,16 +279,16 @@ func buildPipermailManager(ctx *lib.Ctx) (*pipermail.Manager, error) {
 	enrichSize := ctx.PiperMail.EnrichSize.Int()
 	project := ctx.PiperMail.Project.String()
 	esIndex := ctx.Env("RICH_INDEX")
-	affBaseURL := ctx.Env("AFFILIATIONS_API_BASE_URL")
-	esCacheURL := ctx.Env("ES_CACHE_URL")
-	esCacheUsername := ctx.Env("ES_CACHE_USERNAME")
-	esCachePassword := ctx.Env("ES_CACHE_PASSWORD")
-	authGrantType := ctx.Env("AUTH0_GRANT_TYPE")
-	authClientID := ctx.Env("AUTH0_CLIENT_ID")
-	authClientSecret := ctx.Env("AUTH0_CLIENT_SECRET")
-	authAudience := ctx.Env("AUTH0_AUDIENCE")
-	authURL := ctx.Env("AUTH0_URL")
-	env := os.Getenv("ENVIRONMENT")
+	affBaseURL := os.Getenv("AFFILIATION_API_URL") + "/v1"
+	esCacheURL := authData["es_url"]
+	esCacheUsername := authData["es_user"]
+	esCachePassword := authData["es_pass"]
+	authGrantType := authData["grant_type"]
+	authClientID := authData["client_id"]
+	authClientSecret := authData["client_secret"]
+	authAudience := authData["audience"]
+	authURL := authData["url"]
+	env := authData["env"]
 
 	mgr, err := pipermail.NewManager(origin, slug, ctx.DBConn, fetcherBackendVersion, enricherBackendVersion,
 		doFetch, doEnrich, ctx.ESURL, "", "", esIndex, fromDate, project,

@@ -69,7 +69,7 @@ type EnrichedMessage struct {
 	SubjectAnalyzed     string    `json:"subject_analyzed"`
 	Project             string    `json:"project"`
 	MboxAuthorDomain    string    `json:"mbox_author_domain"`
-	Date                string    `json:"date"`
+	Date                time.Time `json:"date"`
 	IsPipermailMessage  int       `json:"is_pipermail_message"`
 	List                string    `json:"list"`
 	AuthorUUID          string    `json:"author_uuid"`
@@ -79,7 +79,7 @@ type EnrichedMessage struct {
 	Tag                 string    `json:"tag"`
 	Subject             string    `json:"subject"`
 	FromID              string    `json:"from_id"`
-	EmailDate           string    `json:"email_date"`
+	EmailDate           time.Time `json:"email_date"`
 	MetadataTimestamp   time.Time `json:"metadata__timestamp"`
 	MetadataBackendName string    `json:"metadata__backend_name"`
 	MetadataUpdatedOn   time.Time `json:"metadata__updated_on"`
@@ -88,6 +88,7 @@ type EnrichedMessage struct {
 	ChangedAt           time.Time `json:"changed_at"`
 	GroupName           string    `json:"group_name"`
 	Slug                string    `json:"slug"`
+	References          string    `json:"references"`
 }
 
 // RawHits result

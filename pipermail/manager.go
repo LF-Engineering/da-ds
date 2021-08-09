@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/url"
-	"path"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/LF-Engineering/da-ds/build"
@@ -79,6 +79,19 @@ type Manager struct {
 	esClientProvider ESClientProvider
 	fetcher          *Fetcher
 	enricher         *Enricher
+	workerPool       *workerPool
+}
+
+// workerPool ...
+type workerPool struct {
+	MaxWorker   int
+	queuedTaskC chan func()
+}
+
+// result worker pool result struct
+type result struct {
+	id           int
+	enrichedItem *EnrichedMessage
 }
 
 // NewManager initiates piper mail manager instance
@@ -130,6 +143,10 @@ func NewManager(endPoint, slug, shConnStr, fetcherBackendVersion, enricherBacken
 	mng.enricher = enricher
 	mng.esClientProvider = esClientProvider
 	mng.GroupName = groupName
+	mng.workerPool = &workerPool{
+		MaxWorker:   MaxConcurrentRequests,
+		queuedTaskC: make(chan func()),
+	}
 
 	return mng, nil
 }
@@ -293,6 +310,8 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 
 func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-chan error {
 	ch := make(chan error)
+	m.run()
+	resultC := make(chan result, 0)
 
 	go func() {
 		enrichID := "enrich"
@@ -363,20 +382,33 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 			}
 
 			data := make([]elastic.BulkData, 0)
-			for _, hit := range topHits.Hits.Hits {
+			totalItemsEnriched := 0
+			for id, hit := range topHits.Hits.Hits {
+				nHitSource := hit.Source
+				pID := id
 				if lastEnrich.Before(hit.Source.ChangedAt) {
-					enrichedItem, err := enricher.EnrichMessage(&hit.Source, time.Now().UTC())
-					if err != nil {
-						ch <- err
+					m.AddTask(func() {
+						log.Printf("[main] starting task %d", pID)
+						time.Sleep(2 * time.Second)
+						enrichedItem, err := enricher.EnrichMessage(&nHitSource, time.Now().UTC())
+						if err != nil {
+							ch <- err
+							return
+						}
+						resultC <- result{id: pID, enrichedItem: enrichedItem}
 						return
-					}
-					data = append(data, elastic.BulkData{IndexName: m.ESIndex, ID: enrichedItem.UUID, Data: enrichedItem})
+					})
+					totalItemsEnriched++
 				}
 			}
 
+			for i := 0; i < totalItemsEnriched; i++ {
+				res := <-resultC
+				log.Printf("[main] task %d has been finished with result author_uuid %+v", res.id, res.enrichedItem.AuthorUUID)
+				data = append(data, elastic.BulkData{IndexName: m.ESIndex, ID: res.enrichedItem.UUID, Data: res.enrichedItem})
+			}
 			log.Println("LEN ENRICH DATA : ", len(data))
 			results = len(data)
-			offset += results
 
 			// setting mapping and create index if not exists
 			if offset == 0 {
@@ -400,12 +432,34 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 					return
 				}
 			}
+			results = len(data)
+			offset += results
 		}
 		log.Println("DONE WITH RICH ENRICHMENT")
 		ch <- nil
 	}()
 
 	return ch
+}
+
+// AddTask adds task to worker pool
+func (m *Manager) AddTask(task func()) {
+	m.workerPool.queuedTaskC <- task
+}
+
+// run starts the tasks in the worker pool queue
+func (m *Manager) run() {
+	for i := 0; i < m.workerPool.MaxWorker; i++ {
+		wID := i + 1
+		//log.Printf("[workerPool] worker %d spawned", wID)
+		go func(workerID int) {
+			for task := range m.workerPool.queuedTaskC {
+				log.Printf("[workerPool] worker %d is processing task", wID)
+				task()
+				log.Printf("[workerPool] worker %d has finished processing task", wID)
+			}
+		}(wID)
+	}
 }
 
 func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
@@ -458,9 +512,18 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 
 // getGroupName extracts a pipermail group name from the given mailing list url
 func getGroupName(targetURL string) (string, error) {
-	parsedURL, err := url.Parse(targetURL)
+	u, err := url.Parse(targetURL)
 	if err != nil {
 		return "", err
 	}
-	return path.Base(parsedURL.Path), nil
+
+	path := u.Path
+	if strings.HasPrefix(path, "/") {
+		path = strings.TrimPrefix(path, "/")
+	}
+	if strings.HasSuffix(path, "/") {
+		path = strings.TrimSuffix(path, "/")
+	}
+	path = strings.ReplaceAll(path, "/", "-")
+	return path, nil
 }

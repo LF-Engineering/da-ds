@@ -352,7 +352,7 @@ func (f *Fetcher) AddMetadata(msg interface{}, endpoint, slug, groupName string)
 	rawMessage.Data = &mData
 
 	// generate UUID
-	uuID, err := uuid.Generate(Pipermail, rawMessage.Data.MessageID)
+	uuID, err := uuid.Generate(Pipermail, rawMessage.Data.MessageID, groupName)
 	if err != nil {
 		fmt.Println(err)
 	}
