@@ -78,7 +78,7 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 		MetadataBackendName: fmt.Sprintf("%sEnrich", strings.Title(e.DSName)),
 		MetadataUpdatedOn:   date,
 		MetadataEnrichedOn:  now,
-		ChangedAt:           rawMessage.ChangedAt,
+		ChangedAt:           date,
 		Slug:                rawMessage.ProjectSlug,
 		References:          rawMessage.Data.References,
 	}
