@@ -51,6 +51,7 @@ var (
   "assigned_to_org_name":{"type":"keyword"},
   "author_name":{"type":"keyword"},
   "url":{"type":"keyword"},
-  "project":{"type":"keyword"}
+  "project":{"type":"keyword"},
+  "product":{"type":"keyword"}
   }}}`)
 )
