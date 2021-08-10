@@ -113,7 +113,6 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 			if c.Added == resolved && !isAssigned {
 				isAssigned = true
 				assignedAt = history.When
-				continue
 			}
 			if c.Added == resolved && isAssigned {
 				isResolved = true

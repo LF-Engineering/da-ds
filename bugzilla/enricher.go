@@ -95,8 +95,7 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 	var resolvedAt time.Time
 
 	for _, history := range rawItem.Activities {
-		actiDate, err := time.Parse("2006-01-02T15:04:05", history.When)
-
+		actiDate, err := time.Parse("2006-01-02 15:04:05 MST", history.When)
 		if history.Added == status && !isAssigned {
 			isAssigned = true
 			assignedAt = actiDate
@@ -118,15 +117,10 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 	if isAssigned {
 		enriched.TimeOpenDays = math.Abs(math.Round(timeLib.GetDaysBetweenDates(assignedAt, rawItem.CreationTS)*100) / 100)
 		enriched.TimeToClose = math.Abs(math.Round(timeLib.GetDaysBetweenDates(now, assignedAt)*100) / 100)
-		dads.Printf("isAssigned")
-		dads.Printf("===%v", assignedAt)
 	}
 
 	if isResolved {
 		enriched.TimeToClose = math.Abs(math.Round(timeLib.GetDaysBetweenDates(resolvedAt, assignedAt)*100) / 100)
-		dads.Printf("isResolved")
-		dads.Printf("===%v", resolvedAt)
-		dads.Printf("===%v", assignedAt)
 	}
 
 	unknown := "Unknown"
