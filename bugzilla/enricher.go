@@ -16,6 +16,12 @@ import (
 	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
 )
 
+const (
+	status     = "Status"
+	resolved   = "RESOLVED"
+	inProgress = "IN PROGRESS REVIEW"
+)
+
 // Enricher enrich Bugzilla raw
 type Enricher struct {
 	DSName             string
@@ -82,6 +88,43 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 	if rawItem.StatusWhiteboard != "" {
 		enriched.Whiteboard = rawItem.StatusWhiteboard
 	}
+
+	isAssigned := false
+	isResolved := false
+	var assignedAt time.Time
+	var resolvedAt time.Time
+
+	for _, history := range rawItem.Activities {
+		actiDate, err := time.Parse("2006-01-02T15:04:05", history.When)
+
+		if history.Added == status && !isAssigned {
+			isAssigned = true
+			assignedAt = actiDate
+			if err != nil {
+				continue
+			}
+			continue
+		}
+		if history.Added == resolved && !isAssigned {
+			isAssigned = true
+			assignedAt = actiDate
+			continue
+		}
+		if history.Added == resolved && isAssigned {
+			isResolved = true
+			resolvedAt = actiDate
+		}
+	}
+
+	if isAssigned {
+		enriched.TimeOpenDays = math.Abs(math.Round(timeLib.GetDaysBetweenDates(assignedAt, rawItem.CreationTS)*100) / 100)
+		enriched.TimeToClose = math.Abs(math.Round(timeLib.GetDaysBetweenDates(now, assignedAt)*100) / 100)
+	}
+
+	if isResolved {
+		enriched.TimeToClose = math.Abs(math.Round(timeLib.GetDaysBetweenDates(resolvedAt, assignedAt)*100) / 100)
+	}
+
 	unknown := "Unknown"
 	multiOrgs := []string{unknown}
 

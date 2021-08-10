@@ -106,6 +106,7 @@ type BugRaw struct {
 	Reporter          Person        `json:"reporter"`
 	AssignedTo        string        `json:"assigned_to"`
 	Summary           string        `json:"summary"`
+	Activities        []Activity    `json:"activities"`
 }
 
 // BugEnrich ...
@@ -176,6 +177,7 @@ type BugEnrich struct {
 	MetadataFilterRaw      *string   `json:"metadata__filter_raw"`
 	MetadataBackendName    string    `json:"metadata__backend_name"`
 	MetadataBackendVersion string    `json:"metadata__backend_version"`
+	TimeToClose            float64   `json:"time_to_close"`
 }
 
 // RawHits result
@@ -192,4 +194,12 @@ type NHits struct {
 type NestedRawHits struct {
 	ID     string `json:"_id"`
 	Source BugRaw `json:"_source"`
+}
+
+type Activity struct {
+	Who     string
+	When    string
+	What    string
+	Removed string
+	Added   string
 }

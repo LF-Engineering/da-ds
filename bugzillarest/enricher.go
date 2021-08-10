@@ -16,6 +16,11 @@ import (
 	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
 )
 
+const (
+	inProgress = "IN_PROGRESS"
+	resolved   = "RESOLVED"
+)
+
 // Enricher enrich Bugzilla raw
 type Enricher struct {
 	DSName              string
@@ -83,19 +88,47 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 	enriched.ISOpen = rawItem.Data.IsOpen
 	enriched.TimeToLastUpdateDays = math.Abs(math.Round(timeLib.GetDaysBetweenDates(enriched.DeltaTs, rawItem.Data.CreationTime)*100) / 100)
 	enriched.TimeOpenDays = math.Abs(math.Round(timeLib.GetDaysBetweenDates(now, rawItem.Data.CreationTime)*100) / 100)
-	if !rawItem.Data.IsOpen {
-		enriched.TimeOpenDays = enriched.TimeToLastUpdateDays
-	}
+	enriched.TimeToClose = enriched.TimeOpenDays
+
 	if rawItem.Data.Whiteboard != "" {
 		enriched.Whiteboard = &rawItem.Data.Whiteboard
 	}
 
-	// count history changes
 	enriched.Changes = 0
+	isAssigned := false
+	isResolved := false
+	var assignedAt time.Time
+	var resolvedAt time.Time
 	for _, history := range *rawItem.Data.History {
 		if len(history.Changes) > 0 {
 			enriched.Changes += len(history.Changes)
 		}
+
+		for _, c := range history.Changes {
+			if c.Added == inProgress && !isAssigned {
+				isAssigned = true
+				assignedAt = history.When
+				continue
+			}
+			if c.Added == resolved && !isAssigned {
+				isAssigned = true
+				assignedAt = history.When
+				continue
+			}
+			if c.Added == resolved && isAssigned {
+				isResolved = true
+				resolvedAt = history.When
+			}
+		}
+	}
+
+	if isAssigned {
+		enriched.TimeOpenDays = math.Abs(math.Round(timeLib.GetDaysBetweenDates(assignedAt, rawItem.Data.CreationTime)*100) / 100)
+		enriched.TimeToClose = math.Abs(math.Round(timeLib.GetDaysBetweenDates(now, assignedAt)*100) / 100)
+	}
+
+	if isResolved {
+		enriched.TimeToClose = math.Abs(math.Round(timeLib.GetDaysBetweenDates(resolvedAt, assignedAt)*100) / 100)
 	}
 
 	enriched.NumberOfComments = 0

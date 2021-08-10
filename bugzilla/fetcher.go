@@ -124,12 +124,12 @@ func (f *Fetcher) FetchItem(fromDate time.Time, limit int, now time.Time) ([]*Bu
 		raw.Summary = detail.Bug.Summary
 		raw.LongDesc = detail.Bug.LongDesc
 
-		count, err := f.fetchActivitiesCount(bug.ID)
+		count, activities, err := f.fetchActivitiesCount(bug.ID)
 		if err != nil {
 			return nil, err
 		}
 		raw.ActivityCount = count
-
+		raw.Activities = activities
 		raw.MetadataUpdatedOn = now
 		raw.MetadataTimestamp = now
 		raw.Timestamp = timeLib.ConvertTimeToFloat(now)
@@ -213,15 +213,15 @@ func (f *Fetcher) fetchDetails(bugID int) (*BugDetailResponse, error) {
 	return result, nil
 }
 
-func (f *Fetcher) fetchActivitiesCount(bugID int) (int, error) {
+func (f *Fetcher) fetchActivitiesCount(bugID int) (int, []Activity, error) {
 	url := fmt.Sprintf("%s/show_activity.cgi?id=%v", f.Endpoint, bugID)
 	status, res, err := f.HTTPClientProvider.Request(url, "GET", nil, nil, nil)
 	if err != nil {
-		return 0, err
+		return 0, []Activity{}, err
 	}
 
 	if status != http.StatusOK {
-		return 0, fmt.Errorf("status error: %v", status)
+		return 0, []Activity{}, fmt.Errorf("status error: %v", status)
 	}
 
 	return GetActivityLen("#bugzilla-body tr", res)
