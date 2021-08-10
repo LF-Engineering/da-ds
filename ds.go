@@ -244,6 +244,7 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				name := ident[0]
 				username := ident[1]
 				email := ident[2]
+				name, username = PostprocessNameUsername(name, username, email)
 				var (
 					pname     *string
 					pemail    *string
@@ -259,9 +260,6 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				}
 				if username != Nil {
 					pusername = &username
-					if profname == nil {
-						profname = &username
-					}
 				}
 				if pname == nil && pemail == nil && pusername == nil {
 					continue
@@ -284,12 +282,40 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 					errs = append(errs, er)
 					continue
 				}
+				var rows *sql.Rows
+				rows, er = QuerySQL(ctx, nil, "select uuid from identities where id = ?", uuid)
+				if er != nil {
+					errs = append(errs, er)
+					continue
+				}
+				mergedUUID := uuid
+				for rows.Next() {
+					er = rows.Scan(&mergedUUID)
+					break
+				}
+				if er != nil {
+					errs = append(errs, er)
+					continue
+				}
+				er = rows.Err()
+				if er != nil {
+					errs = append(errs, er)
+					continue
+				}
+				er = rows.Close()
+				if er != nil {
+					errs = append(errs, er)
+					continue
+				}
+				if ctx.Debug > 0 && uuid != mergedUUID {
+					Printf("one-by-one: merged profile detected: %s -> %s\n", uuid, mergedUUID)
+				}
 				queryU += fmt.Sprintf("(?,now())")
 				queryI += fmt.Sprintf("(?,?,?,?,?,?,now())")
 				queryP += fmt.Sprintf("(?,?,?)")
-				argsU = append(argsU, uuid)
-				argsI = append(argsI, uuid, source, pname, pemail, pusername, uuid)
-				argsP = append(argsP, uuid, profname, pemail)
+				argsU = append(argsU, mergedUUID)
+				argsI = append(argsI, uuid, source, pname, pemail, pusername, mergedUUID)
+				argsP = append(argsP, mergedUUID, profname, pemail)
 				itx, err = ctx.DB.Begin()
 				if err != nil {
 					return
@@ -356,11 +382,13 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 			if ctx.Debug > 0 {
 				Printf("DB bulk upload: bulk adding idents pack #%d %d-%d (%d/%d)\n", i+1, from, to, to-from, nIdents)
 			}
+			uuids := map[int][]interface{}{}
 			for j := from; j < to; j++ {
 				ident := identsAry[j]
 				name := ident[0]
 				username := ident[1]
 				email := ident[2]
+				name, username = PostprocessNameUsername(name, username, email)
 				var (
 					pname     *string
 					pemail    *string
@@ -376,9 +404,6 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				}
 				if username != Nil {
 					pusername = &username
-					if profname == nil {
-						profname = &username
-					}
 				}
 				if pname == nil && pemail == nil && pusername == nil {
 					continue
@@ -399,12 +424,64 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 					Printf("error: uploadToDb(bulk): failed to generate uuid for (%s,%s,%s,%s), skipping this one\n", source, email, name, username)
 					continue
 				}
+				uuids[j] = []interface{}{uuid, source, pname, pemail, pusername, profname}
+			}
+			queryS := "select id, uuid from identities where id in("
+			argsS := []interface{}{}
+			for _, data := range uuids {
+				queryS += "?,"
+				argsS = append(argsS, data[0])
+			}
+			queryS = queryS[:len(queryS)-1] + ")"
+			var rows *sql.Rows
+			rows, err = QuerySQL(ctx, nil, queryS, argsS...)
+			if err != nil {
+				return
+			}
+			var (
+				id   string
+				uuid string
+			)
+			id2uuid := map[string]string{}
+			for rows.Next() {
+				err = rows.Scan(&id, &uuid)
+				if err != nil {
+					return
+				}
+				id2uuid[id] = uuid
+			}
+			err = rows.Err()
+			if err != nil {
+				return
+			}
+			err = rows.Close()
+			if err != nil {
+				return
+			}
+			for j := from; j < to; j++ {
+				data, ok := uuids[j]
+				if !ok {
+					continue
+				}
+				uuid, _ := data[0].(string)
+				mergedUUID, ok := id2uuid[uuid]
+				if !ok {
+					mergedUUID = uuid
+				}
+				if ctx.Debug > 0 && uuid != mergedUUID {
+					Printf("mass: merged profile detected: %s -> %s\n", uuid, mergedUUID)
+				}
+				source := data[1]
+				pname := data[2]
+				pemail := data[3]
+				pusername := data[4]
+				profname := data[5]
 				queryU += fmt.Sprintf("(?,now()),")
 				queryI += fmt.Sprintf("(?,?,?,?,?,?,now()),")
 				queryP += fmt.Sprintf("(?,?,?),")
-				argsU = append(argsU, uuid)
-				argsI = append(argsI, uuid, source, pname, pemail, pusername, uuid)
-				argsP = append(argsP, uuid, profname, pemail)
+				argsU = append(argsU, mergedUUID)
+				argsI = append(argsI, uuid, source, pname, pemail, pusername, mergedUUID)
+				argsP = append(argsP, mergedUUID, profname, pemail)
 			}
 			queryU = queryU[:len(queryU)-1]
 			queryI = queryI[:len(queryI)-1]
@@ -623,6 +700,7 @@ func ItemsRefreshIdentitiesFunc(ctx *Ctx, ds DS, thrN int, richItems []interface
 		for prop, val := range values {
 			rich[prop] = val
 		}
+		rich["groups"] = ctx.Groups
 		if thrN > 1 {
 			mtx.Lock()
 		}
@@ -1305,6 +1383,7 @@ func Enrich(ctx *Ctx, ds DS) (err error) {
 func EnrichItem(ctx *Ctx, ds DS, richItem map[string]interface{}) (err error) {
 	richItem[DefaultEnrichDateField] = time.Now()
 	richItem[ProjectSlug] = ctx.ProjectSlug
+	richItem["groups"] = ctx.Groups
 	return
 }
 

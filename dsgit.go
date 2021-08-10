@@ -473,6 +473,20 @@ var (
 		"Resolved-by":    {"authors_resolved", "resolver"},
 		"Influenced-by":  {"authors_influenced", "influencer"},
 	}
+	// GitTrailerSameAsAuthor - can a given trailer be the same as the main commit's author?
+	GitTrailerSameAsAuthor = map[string]bool{
+		"Signed-off-by":  true,
+		"Co-authored-by": false,
+		"Tested-by":      true,
+		"Approved-by":    false,
+		"Reviewed-by":    false,
+		"Reported-by":    true,
+		"Informed-by":    true,
+		"Resolved-by":    true,
+		"Influenced-by":  true,
+	}
+	// CommitsHash is a map of commit hashes for each repo
+	CommitsHash = make(map[string]map[string]struct{})
 )
 
 // RawPLS - programming language summary (all fields as strings)
@@ -1584,11 +1598,16 @@ func (j *DSGit) IdentityFromGitAuthor(ctx *Ctx, author string) (identity [3]stri
 	name := strings.TrimSpace(fields[0])
 	email := Nil
 	if len(fields) > 1 {
-		email = fields[1]
-		lEmail := len(email)
-		if lEmail > 1 {
-			email = email[:lEmail-1]
+		fields2 := strings.Split(fields[1], ">")
+		email = strings.TrimSpace(fields2[0])
+	}
+	if name == "" && email != Nil {
+		fields2 := strings.Split(email, "@")
+		n := len(fields2)
+		if n > 1 {
+			n--
 		}
+		name = strings.TrimSpace(strings.Join(fields2[:n], "@")) + MissingName
 	}
 	identity = [3]string{name, Nil, email}
 	return
@@ -1669,9 +1688,21 @@ func (j *DSGit) GetOtherPPAuthors(ctx *Ctx, doc interface{}) (othersMap map[stri
 // GetOtherTrailersAuthors - get others authors - from other trailers fields (mostly for korg)
 // This works on a raw document
 func (j *DSGit) GetOtherTrailersAuthors(ctx *Ctx, doc interface{}) (othersMap map[string]map[[2]string]struct{}) {
+	// "Signed-off-by":  {"authors_signed", "signer"},
+	commitAuthor := ""
 	for otherKey, otherRichKey := range GitTrailerOtherAuthors {
 		iothers, ok := Dig(doc, []string{"data", otherKey}, false, true)
 		if ok {
+			sameAsAuthorAllowed, _ := GitTrailerSameAsAuthor[otherKey]
+			if !sameAsAuthorAllowed {
+				if commitAuthor == "" {
+					iCommitAuthor, _ := Dig(doc, []string{"data", "Author"}, true, false)
+					commitAuthor = strings.TrimSpace(iCommitAuthor.(string))
+					if ctx.Debug > 1 {
+						Printf("trailers type %s cannot have the same authors as commit's author %s, checking this\n", otherKey, commitAuthor)
+					}
+				}
+			}
 			others, _ := iothers.([]interface{})
 			if ctx.Debug > 1 {
 				Printf("other trailers %s -> %s: %s\n", otherKey, otherRichKey, others)
@@ -1681,6 +1712,12 @@ func (j *DSGit) GetOtherTrailersAuthors(ctx *Ctx, doc interface{}) (othersMap ma
 			}
 			for _, iOther := range others {
 				other := strings.TrimSpace(iOther.(string))
+				if !sameAsAuthorAllowed && other == commitAuthor {
+					if ctx.Debug > 1 {
+						Printf("trailer %s is the same as commit's author, and this isn't allowed for %s trailers, skipping\n", other, otherKey)
+					}
+					continue
+				}
 				_, ok := othersMap[other]
 				if !ok {
 					othersMap[other] = map[[2]string]struct{}{}
@@ -1950,6 +1987,13 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 			if e != nil {
 				return
 			}
+			mtx.Lock()
+			e = EnrichPairProgrammingItem(rich.(map[string]interface{}))
+			if e != nil {
+				mtx.Unlock()
+				return
+			}
+			mtx.Unlock()
 		}
 		if thrN > 1 {
 			mtx.Lock()
@@ -1987,6 +2031,29 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 		err = procItem(nil, i)
 		if err != nil {
 			return
+		}
+	}
+	return
+}
+
+// EnrichPairProgrammingItem - additional operations on already enriched item for pair programming
+func EnrichPairProgrammingItem(richItem map[string]interface{}) (err error) {
+	var repoString string
+	if repo, ok := richItem["repo_name"]; ok {
+		repoString = fmt.Sprintf("%+v", repo)
+		if commit, ok := richItem["hash"]; ok {
+			commitString := fmt.Sprintf("%+v", commit)
+			if innerMap := CommitsHash[repoString]; innerMap == nil {
+				CommitsHash[repoString] = make(map[string]struct{})
+			}
+
+			if _, ok := CommitsHash[repoString][commitString]; ok {
+				// do nothing because the hash exists in the commits map
+				richItem["is_parent_commit"] = 0
+				return
+			}
+			CommitsHash[repoString][commitString] = struct{}{}
+			richItem["is_parent_commit"] = 1
 		}
 	}
 	return
@@ -2159,6 +2226,8 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 		return
 	}
 	rich[GitUUID] = rich[UUID]
+	// iAuthor, _ := Dig(commit, []string{"Author"}, true, false)
+	// rich["raw_author"] = strings.TrimSpace(iAuthor.(string))
 	iAuthorDate, _ := Dig(commit, []string{"AuthorDate"}, true, false)
 	sAuthorDate, _ := iAuthorDate.(string)
 	authorDate, authorDateTz, authorTz, ok := ParseDateWithTz(sAuthorDate)
@@ -2426,7 +2495,7 @@ func (j *DSGit) PairProgrammingMetrics(ctx *Ctx, rich, commit map[string]interfa
 		if !ok {
 			continue
 		}
-		rich[flag] = flag
+		rich[flag] = 1
 		iAuthors, _ := Dig(commit, []string{authorsKey}, true, false)
 		rich[authorsKey] = iAuthors
 		authors, _ := iAuthors.([]string)
@@ -2459,6 +2528,7 @@ func (j *DSGit) PairProgrammingMetrics(ctx *Ctx, rich, commit map[string]interfa
 	rich["pair_programming_lines_added"] = ppLinesAdded
 	rich["pair_programming_lines_removed"] = ppLinesRemoved
 	rich["pair_programming_lines_changed"] = ppLinesChanged
+	rich["is_pair_programming_commit"] = 1
 	if ctx.Debug > 2 {
 		Printf("(%d,%d,%d,%d,%f,%f,%f,%f,%f)\n", files, linesAdded, linesRemoved, linesChanged, ppCount, ppFiles, ppLinesAdded, ppLinesRemoved, ppLinesChanged)
 	}

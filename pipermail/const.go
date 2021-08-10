@@ -21,6 +21,8 @@ const (
 	MessageIDField = "Message-ID"
 	// Unknown ...
 	Unknown = "Unknown"
+	// MaxConcurrentRequests ...
+	MaxConcurrentRequests = 100000
 )
 
 var (

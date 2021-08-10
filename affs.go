@@ -50,12 +50,13 @@ func EmptyAffsItem(role string, undef bool) map[string]interface{} {
 }
 
 // IdentityAffsDomain -return domain for given identity using email if specified
-func IdentityAffsDomain(identity map[string]interface{}) (domain interface{}) {
-	email, ok := identity["email"].(string)
+func IdentityAffsDomain(identity map[string]interface{}) (domain interface{}, email string) {
+	var ok bool
+	email, ok = identity["email"].(string)
 	if ok {
 		ary := strings.Split(email, "@")
 		if len(ary) > 1 {
-			domain = ary[1]
+			domain = strings.TrimSpace(strings.Join(ary[1:], "@"))
 		}
 	}
 	return
@@ -138,6 +139,16 @@ func AffsIdentityIDs(ctx *Ctx, ds DS, identity map[string]interface{}) (ids [2]i
 	email, _ := identity["email"]
 	name, _ := identity["name"]
 	username, _ := identity["username"]
+	sEmail, _ := email.(string)
+	sName, _ := name.(string)
+	sUsername, _ := username.(string)
+	sName, sUsername = PostprocessNameUsername(sName, sUsername, sEmail)
+	if sName != Nil && sName != "" && sName != name {
+		name = sName
+	}
+	if sUsername != Nil && sUsername != "" && sUsername != username {
+		username = sUsername
+	}
 	if email == nil && name == nil && username == nil {
 		return
 	}
@@ -400,6 +411,58 @@ func CopyAffsRoleData(dst, src map[string]interface{}, dstRole, srcRole string) 
 	dst[dstRole+MultiOrgNames], _ = Dig(src, []string{srcRole + MultiOrgNames}, false, true)
 }
 
+// RedactEmail - possibly redact email from "in"
+// If in contains @, replace part after last "@" with suff
+// If in doesn't contain "@" then return it or (if forceSuff is set) return in + suff
+func RedactEmail(in, suff string, forceSuff bool) string {
+	ary := strings.Split(strings.Trim(strings.TrimSpace(in), "@"), "@")
+	n := len(ary)
+	if n <= 1 {
+		if forceSuff {
+			return in + suff
+		}
+		return in
+	}
+	return strings.TrimSpace(strings.Join(ary[:n-1], "@")) + suff
+}
+
+// PostprocessNameUsername - check name field, if it is empty then copy from email (if not empty) or username (if not empty)
+// Then check name and username - it cannot contain email addess, if it does - replace a@domain with a-MISSING-NAME
+func PostprocessNameUsername(name, username, email string) (outName, outUsername string) {
+	defer func() {
+		outName = name
+		outUsername = username
+	}()
+	copiedName := false
+	if name == "" || name == Nil {
+		if email != "" && email != Nil {
+			name = RedactEmail(email, MissingName, true)
+			copiedName = true
+		}
+	}
+	if name == "" || name == Nil {
+		if username != "" && username != Nil {
+			name = RedactEmail(username, MissingName, true)
+			copiedName = true
+		}
+	}
+	if !copiedName && name != "" && name != Nil {
+		name = RedactEmail(name, RedactedEmail, false)
+	}
+	if username != "" && username != Nil {
+		username = RedactEmail(username, RedactedEmail, false)
+	}
+	return
+}
+
+// PostprocessFields - check name field, if it is empty then copy from email (if not empty) or username (if not empty)
+// Then check name and username - it cannot contain email addess, if it does - replace a@domain with a-MISSING-NAME
+func PostprocessFields(outItem map[string]interface{}, role, email string) {
+	name, _ := outItem[role+"_name"].(string)
+	username, _ := outItem[role+"_user_name"].(string)
+	outItem[role+"_name"], outItem[role+"_user_name"] = PostprocessNameUsername(name, username, email)
+}
+
 // IdentityAffsData - add affiliations related data
 // identity - full identity
 // aid identity ID value (which is uuid), for example from "author_id", "creator_id" etc.
@@ -410,7 +473,10 @@ func IdentityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, aid inte
 		empty = true
 		return
 	}
-	var uuid interface{}
+	var (
+		uuid  interface{}
+		email string
+	)
 	if identity != nil {
 		ids := AffsIdentityIDs(ctx, ds, identity)
 		outItem[role+"_id"] = ids[0]
@@ -429,7 +495,7 @@ func IdentityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, aid inte
 		} else {
 			outItem[role+"_user_name"] = username
 		}
-		outItem[role+"_domain"] = IdentityAffsDomain(identity)
+		outItem[role+"_domain"], email = IdentityAffsDomain(identity)
 		uuid = ids[1]
 	}
 	if aid != nil {
@@ -454,11 +520,12 @@ func IdentityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, aid inte
 		if pName != nil {
 			outItem[role+"_name"] = pName
 		}
-		email, _ := profile["email"]
-		if email != nil {
-			ary := strings.Split(email.(string), "@")
+		iEmail, _ := profile["email"]
+		if iEmail != nil {
+			email, _ = iEmail.(string)
+			ary := strings.Split(email, "@")
 			if len(ary) > 1 {
-				outItem[role+"_domain"] = ary[1]
+				outItem[role+"_domain"] = strings.TrimSpace(strings.Join(ary[1:], "@"))
 			}
 		}
 		/*
@@ -501,6 +568,7 @@ func IdentityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, aid inte
 	//outItem[role+"_org_name"], e = GetEnrollmentsSingle(ctx, ds, suuid, dt)
 	//outItem[role+MultiOrgNames], e = GetEnrollmentsMulti(ctx, ds, suuid, dt)
 	outItem[role+"_org_name"], outItem[role+MultiOrgNames], e = GetEnrollmentsBoth(ctx, ds, suuid, dt)
+	PostprocessFields(outItem, role, email)
 	return
 }
 

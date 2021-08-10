@@ -18,11 +18,13 @@ const (
 	TokenSSMParamName = "insights_googlegroups_token"
 	// MaxNumberOfMessages from gmail
 	MaxNumberOfMessages = 10000000
+	// MaxConcurrentRequests ...
+	MaxConcurrentRequests = 10000
 )
 
 var (
 	// GoogleGroupRichMapping ...
-	GoogleGroupRichMapping = []byte(`{"mappings":{"properties":{"author_bot":{"type":"boolean"},"author_id":{"type":"keyword"},"author_multi_org_names":{"type":"keyword"},"author_name":{"type":"keyword"},"author_org_name":{"type":"keyword"},"author_user_name":{"type":"keyword"},"author_uuid":{"type":"keyword"},"backend_name":{"type":"keyword"},"backend_version":{"type":"keyword"},"changed_at":{"type":"date"},"date":{"type":"date"},"from":{"type":"keyword"},"from_bot":{"type":"boolean"},"group_name":{"type":"keyword"},"in_reply_to":{"type":"keyword"},"is_google_group_message":{"type":"long"},"mbox_author_domain":{"type":"keyword"},"message_body":{"type":"keyword"},"message_id":{"type":"keyword"},"metadata__enriched_on":{"type":"date"},"metadata__timestamp":{"type":"date"},"metadata__updated_on":{"type":"date"},"origin":{"type":"keyword"},"project":{"type":"keyword"},"project_slug":{"type":"keyword"},"references":{"type":"keyword"},"root":{"type":"boolean"},"subject":{"type":"keyword"},"timezone":{"type":"long"},"to":{"type":"keyword"},"topic":{"type":"keyword"},"topic_id":{"type":"keyword"},"uuid":{"type":"keyword"}}}}`)
+	GoogleGroupRichMapping = []byte(`{"mappings":{"dynamic_templates":[{"notanalyzed":{"match":"*","match_mapping_type":"string","mapping":{"type":"keyword"}}},{"int_to_float":{"match":"*","match_mapping_type":"long","mapping":{"type":"float"}}},{"formatdate":{"match":"*","match_mapping_type":"date","mapping":{"format":"strict_date_optional_time||epoch_millis","type":"date"}}}]}}`)
 	// GoogleGroupRawMapping ...
 	GoogleGroupRawMapping = []byte(`{"mappings":{"dynamic":true,"properties":{"metadata__updated_on":{"type":"date"},"data":{"properties":{"body":{"dynamic":false,"properties":{}}}}}}}`)
 	// base64RE ...

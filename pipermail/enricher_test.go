@@ -45,7 +45,7 @@ func TestEnrichMessage(t *testing.T) {
 		{
 			name: "Test Case #1",
 			fields: fields{
-				DSName:                "Pipermail",
+				DSName:                Pipermail,
 				ElasticSearchProvider: nil,
 				BackendVersion:        "0.0.1",
 			},
@@ -84,9 +84,16 @@ func TestEnrichMessage(t *testing.T) {
 				},
 			}
 
+			userIdentity := affiliation.Identity{
+				Name:   "Jon Doe",
+				Source: Pipermail,
+				Email:  "jon.doe@gmail.com",
+				ID:     "7d1d57e8a95807aaa369a4b2a3e7247320f1f80c",
+			}
 			affProviderMock := &mocks.AffiliationClient{}
-			affProviderMock.On("GetIdentityByUser", "email", "jon.doe@gmail.com").Return(fakeAff1, nil)
+			affProviderMock.On("GetIdentityByUser", "id", "7d1d57e8a95807aaa369a4b2a3e7247320f1f80c").Return(fakeAff1, nil)
 			affProviderMock.On("GetOrganizations", "7d1d57e8a95807aaa369a4b2a3e7247320f1f80c", "yocto").Return(fakeOrganizations1, nil)
+			affProviderMock.On("AddIdentity", &userIdentity).Return(true)
 
 			e := &Enricher{
 				DSName:                     tt.fields.DSName,

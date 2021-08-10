@@ -76,6 +76,19 @@ type Manager struct {
 	esClientProvider *elastic.ClientProvider
 	fetcher          *Fetcher
 	enricher         *Enricher
+	workerPool       *workerPool
+}
+
+// workerPool ...
+type workerPool struct {
+	MaxWorker   int
+	queuedTaskC chan func()
+}
+
+// result worker pool result struct
+type result struct {
+	id           int
+	enrichedItem *EnrichedMessage
 }
 
 // NewManager initiates google groups manager instance
@@ -120,6 +133,10 @@ func NewManager(slug, groupName, shConnStr, fetcherBackendVersion, enricherBacke
 	mng.fetcher = fetcher
 	mng.enricher = enricher
 	mng.esClientProvider = esClientProvider
+	mng.workerPool = &workerPool{
+		MaxWorker:   MaxConcurrentRequests,
+		queuedTaskC: make(chan func()),
+	}
 
 	return mng, nil
 }
@@ -284,7 +301,8 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 
 func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-chan error {
 	ch := make(chan error)
-
+	m.run()
+	resultC := make(chan result, 0)
 	go func() {
 		enrichID := "enrich"
 
@@ -339,7 +357,6 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 		query["size"] = m.EnrichSize
 
 		for results == m.EnrichSize {
-
 			// make pagination to get the specified size of documents with offset
 			query["from"] = offset
 			bites, err := m.fetcher.ElasticSearchProvider.Search(fmt.Sprintf("%s-raw", m.ESIndex), query)
@@ -355,20 +372,32 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 			}
 
 			data := make([]elastic.BulkData, 0)
-			for _, hit := range topHits.Hits.Hits {
+			totalItemsEnriched := 0
+			for id, hit := range topHits.Hits.Hits {
+				nHitSource := hit.Source
 				if lastEnrich.Before(hit.Source.ChangedAt) {
-					enrichedItem, err := enricher.EnrichMessage(&hit.Source, time.Now().UTC())
-					if err != nil {
-						ch <- err
+					m.AddTask(func() {
+						log.Printf("[main] starting task %d", id)
+						time.Sleep(2 * time.Second)
+						enrichedItem, err := enricher.EnrichMessage(&nHitSource, time.Now().UTC())
+						if err != nil {
+							ch <- err
+							return
+						}
+						resultC <- result{id: id, enrichedItem: enrichedItem}
 						return
-					}
-					data = append(data, elastic.BulkData{IndexName: m.ESIndex, ID: enrichedItem.UUID, Data: enrichedItem})
+					})
+					totalItemsEnriched++
 				}
 			}
 
+			for i := 0; i < totalItemsEnriched; i++ {
+				res := <-resultC
+				log.Printf("[main] task %d has been finished with result author_uuid %+v", res.id, res.enrichedItem.AuthorUUID)
+				data = append(data, elastic.BulkData{IndexName: m.ESIndex, ID: res.enrichedItem.UUID, Data: res.enrichedItem})
+			}
 			log.Println("LEN ENRICH DATA : ", len(data))
 			results = len(data)
-			offset += results
 
 			// setting mapping and create index if not exists
 			if offset == 0 {
@@ -392,6 +421,8 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 					return
 				}
 			}
+			results = len(data)
+			offset += results
 
 		}
 		log.Println("DONE WITH RICH ENRICHMENT")
@@ -400,6 +431,31 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 	}()
 
 	return ch
+}
+
+// AddTask adds task to worker pool
+func (m *Manager) AddTask(task func()) {
+	m.workerPool.queuedTaskC <- task
+}
+
+// GetTotalQueuedTask get total number of queued tasks
+func (m *Manager) GetTotalQueuedTask() int {
+	return len(m.workerPool.queuedTaskC)
+}
+
+// run starts the tasks in the worker pool queue
+func (m *Manager) run() {
+	for i := 0; i < m.workerPool.MaxWorker; i++ {
+		wID := i + 1
+		//log.Printf("[workerPool] worker %d spawned", wID)
+		go func(workerID int) {
+			for task := range m.workerPool.queuedTaskC {
+				log.Printf("[workerPool] worker %d is processing task", wID)
+				task()
+				log.Printf("[workerPool] worker %d has finished processing task", wID)
+			}
+		}(wID)
+	}
 }
 
 func buildServices(m *Manager) (*Fetcher, *Enricher, *elastic.ClientProvider, error) {

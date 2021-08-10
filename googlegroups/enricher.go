@@ -1,6 +1,7 @@
 package googlegroups
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"regexp"
@@ -39,7 +40,6 @@ func NewEnricher(esClientProvider *elastic.ClientProvider, affiliationsClientPro
 
 // EnrichMessage enriches raw message
 func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*EnrichedMessage, error) {
-	log.Println("In EnrichMessage")
 	enrichedMessage := EnrichedMessage{
 		From:                 rawMessage.From,
 		Date:                 rawMessage.Date,
@@ -73,13 +73,24 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 		enrichedMessage.Root = true
 	}
 
-	userAffiliationsEmail := e.GetEmailAddress(rawMessage.From)
+	affsEmail := e.GetEmailAddress(rawMessage.From)
+	if affsEmail == nil {
+		str := fmt.Sprintf("missing email address: messageID in raw doc: [%+v]", rawMessage.MessageID)
+		log.Println(str)
+		return nil, errors.New(str)
+	}
+	userAffiliationsEmail := *affsEmail
 	enrichedMessage.MboxAuthorDomain = e.GetEmailDomain(userAffiliationsEmail)
 	enrichedMessage.From = e.GetUserName(rawMessage.From)
 	enrichedMessage.AuthorName = e.GetUserName(rawMessage.From)
+	source := GoogleGroups
+	name := enrichedMessage.AuthorName
+	authorUUID, err := uuid.GenerateIdentity(&source, &userAffiliationsEmail, &name, nil)
+	if err != nil {
+		log.Println(err)
+	}
 
-	var userData *affiliation.AffIdentity
-	var err error
+	userData := new(affiliation.AffIdentity)
 	if strings.Contains(enrichedMessage.AuthorName, " via ") {
 		enrichedMessage.AuthorName = strings.Split(enrichedMessage.AuthorName, " via ")[0]
 		enrichedMessage.ViaCommunityGroup = true
@@ -96,14 +107,36 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 		authorUUID, _ := uuid.GenerateIdentity(&source, &userAffiliationsEmail, &name, nil)
 		userData, err = e.affiliationsClientProvider.GetIdentityByUser("id", authorUUID)
 		if err != nil {
-			log.Println(err)
+			errMessage := fmt.Sprintf("%+v : %+v", userAffiliationsEmail, err)
+			log.Println(errMessage)
 		}
 
-	} else {
-		userData, err = e.affiliationsClientProvider.GetIdentityByUser("email", userAffiliationsEmail)
-		if err != nil {
-			log.Println(err)
+	}
+
+	if ok := e.IsValidEmail(userAffiliationsEmail); ok {
+		userIdentity := affiliation.Identity{
+			LastModified: now,
+			Name:         name,
+			Source:       source,
+			Email:        userAffiliationsEmail,
+			ID:           authorUUID,
 		}
+
+		if ok := e.affiliationsClientProvider.AddIdentity(&userIdentity); !ok {
+			log.Printf("failed to add identity for [%+v]", userAffiliationsEmail)
+		}
+
+		enrichedMessage.AuthorID = authorUUID
+		enrichedMessage.AuthorUUID = authorUUID
+		enrichedMessage.AuthorName = name
+	}
+
+	// get user by id instead of uuid because when a user is merged to a profile, they get
+	// the uuid of the profile and it might not match with the user id
+	userData, err = e.affiliationsClientProvider.GetIdentityByUser("id", authorUUID)
+	if err != nil {
+		errMessage := fmt.Sprintf("%+v : %+v", userAffiliationsEmail, err)
+		log.Println(errMessage)
 	}
 
 	if userData != nil {
@@ -122,81 +155,61 @@ func (e *Enricher) EnrichMessage(rawMessage *RawMessage, now time.Time) (*Enrich
 			enrichedMessage.AuthorUUID = *userData.UUID
 		}
 
-		enrollments := e.affiliationsClientProvider.GetOrganizations(*userData.UUID, rawMessage.ProjectSlug)
-		if enrollments != nil {
-			organizations := make([]string, 0)
-			for _, enrollment := range *enrollments {
-				organizations = append(organizations, enrollment.Organization.Name)
+		if userData.UUID != nil {
+			slug := rawMessage.ProjectSlug
+			if strings.Contains(slug, "finos") {
+				slug = "finos-f"
 			}
+			enrollments := e.affiliationsClientProvider.GetOrganizations(*userData.UUID, slug)
+			if enrollments != nil {
+				metaDataEpochMills := enrichedMessage.MetadataUpdatedOn.UnixNano() / 1000000
+				organizations := make([]string, 0)
+				for _, enrollment := range *enrollments {
+					organizations = append(organizations, enrollment.Organization.Name)
+				}
 
-			if len(organizations) != 0 {
-				enrichedMessage.AuthorMultiOrgNames = organizations
+				for _, enrollment := range *enrollments {
+					affStartEpoch := enrollment.Start.UnixNano() / 1000000
+					affEndEpoch := enrollment.End.UnixNano() / 1000000
+					if affStartEpoch <= metaDataEpochMills && affEndEpoch >= metaDataEpochMills {
+						enrichedMessage.AuthorOrgName = enrollment.Organization.Name
+						break
+					}
+				}
+
+				if len(organizations) != 0 {
+					enrichedMessage.AuthorMultiOrgNames = organizations
+				}
+
+				if enrichedMessage.AuthorName == Unknown && len(organizations) >= 1 {
+					enrichedMessage.AuthorOrgName = organizations[0]
+				}
 			}
 		}
 
 		if userData.IsBot != nil {
 			if *userData.IsBot == 1 {
 				enrichedMessage.FromBot = true
+				enrichedMessage.AuthorBot = true
 			}
 		}
-	} else {
-		// add new affiliation if email format is valid
-		if ok := e.IsValidEmail(userAffiliationsEmail); ok {
-			name := enrichedMessage.AuthorName
-			source := GoogleGroups
-			authorUUID, err := uuid.GenerateIdentity(&source, &userAffiliationsEmail, &name, nil)
-			if err == nil {
-				userIdentity := affiliation.Identity{
-					LastModified: time.Now(),
-					Name:         name,
-					Source:       source,
-					Email:        userAffiliationsEmail,
-					ID:           authorUUID,
-				}
-
-				if ok := e.affiliationsClientProvider.AddIdentity(&userIdentity); !ok {
-					log.Printf("failed to add identity for [%+v]", userAffiliationsEmail)
-				}
-
-				enrichedMessage.AuthorID = authorUUID
-				enrichedMessage.AuthorUUID = authorUUID
-				enrichedMessage.AuthorName = name
-			}
-			log.Println(err)
-		}
 	}
-
-	name := enrichedMessage.AuthorName
-	// trim leading space
-	name = strings.TrimLeft(name, " ")
-	// trim trailing space
-	name = strings.TrimRight(name, " ")
-	// trim angle braces
-	name = strings.Trim(name, "<>")
-	// trim square braces
-	name = strings.Trim(name, "[]")
-	// trim brackets
-	name = strings.Trim(name, "()")
-	// remove all comas from name
-	name = strings.ReplaceAll(name, ",", "")
-
-	// trim domain name from author name if its an email address
-	if ok := emailRegex.MatchString(name); ok {
-		trimDomainName := strings.Split(name, "@")
-		name = trimDomainName[0]
-	}
-	enrichedMessage.AuthorName = name
 
 	return &enrichedMessage, nil
 }
 
 // GetEmailAddress ...
-func (e *Enricher) GetEmailAddress(rawMailString string) (email string) {
+func (e *Enricher) GetEmailAddress(rawMailString string) (mail *string) {
 	trimBraces := strings.Split(rawMailString, " <")
 	if len(trimBraces) > 1 {
-		email = strings.TrimSpace(trimBraces[1])
+		email := strings.TrimSpace(trimBraces[1])
 		email = strings.TrimSpace(strings.Replace(email, ">", "", 1))
+		mail = e.RemoveSpecialCharactersFromString(email)
 		return
+	}
+
+	if ok := emailRegex.MatchString(trimBraces[0]); ok {
+		return e.RemoveSpecialCharactersFromString(trimBraces[0])
 	}
 	return
 }
@@ -210,6 +223,15 @@ func (e *Enricher) GetEmailDomain(email string) string {
 	return ""
 }
 
+// GetEmailUsername ...
+func (e *Enricher) GetEmailUsername(email string) string {
+	username := strings.Split(email, "@")
+	if len(username) > 1 {
+		return username[0]
+	}
+	return email
+}
+
 // GetUserName ...
 func (e *Enricher) GetUserName(rawMailString string) (username string) {
 	trimBraces := strings.Split(rawMailString, " <")
@@ -220,17 +242,58 @@ func (e *Enricher) GetUserName(rawMailString string) (username string) {
 		if strings.Contains(username, "[") {
 			trimSquareBraces := strings.Split(username, " [")
 			username = strings.TrimSpace(trimSquareBraces[0])
-			return
 		}
-		return
 	}
-	return trimBraces[0]
+	if strings.TrimSpace(username) != "" {
+		return e.GetEmailUsername(username)
+	}
+
+	if len(trimBraces) > 1 {
+		username = trimBraces[1]
+	} else {
+		username = trimBraces[0]
+	}
+	return e.GetEmailUsername(username)
+}
+
+// RemoveSpecialCharactersFromString ...
+func (e *Enricher) RemoveSpecialCharactersFromString(s string) (val *string) {
+	value := s
+	// trim leading space
+	value = strings.TrimLeft(value, " ")
+	// trim trailing space
+	value = strings.TrimRight(value, " ")
+	// trim angle braces
+	value = strings.Trim(value, "<>")
+	// trim square braces
+	value = strings.Trim(value, "[]")
+	// trim brackets
+	value = strings.Trim(value, "()")
+	// remove all comas from name
+	value = strings.ReplaceAll(value, ",", "")
+	// trim quotes
+	value = e.trimQuotes(value)
+	return &value
+}
+
+func (e *Enricher) trimQuotes(s string) string {
+	if len(s) >= 2 {
+		if c := s[len(s)-1]; s[0] == c && (c == '"' || c == '\'') {
+			return s[1 : len(s)-1]
+		}
+	}
+	return s
 }
 
 // IsValidEmail validates email string
 func (e *Enricher) IsValidEmail(rawMailString string) bool {
 	if strings.Contains(rawMailString, "...") {
 		log.Println("email contains ellipsis")
+		return false
+	}
+
+	if ok := emailRegex.MatchString(rawMailString); !ok {
+		log.Println("invalid email pattern: ", rawMailString)
 		return false
 	}
 

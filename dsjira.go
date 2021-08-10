@@ -1,6 +1,7 @@
 package dads
 
 import (
+	"encoding/base64"
 	"fmt"
 	neturl "net/url"
 	"os"
@@ -66,7 +67,8 @@ type DSJira struct {
 	DS          string
 	URL         string // From DA_JIRA_URL - Jira URL
 	NoSSLVerify bool   // From DA_JIRA_NO_SSL_VERIFY
-	Token       string // From DA_JIRA_TOKEN
+	User        string // From DA_JIRA_USER - if user is provided then we assume that we don't have base64 encoded user:token yet
+	Token       string // From DA_JIRA_TOKEN - if user is not specified we assume that token already contains "<username>:<your-api-token>"
 	PageSize    int    // From DA_JIRA_PAGE_SIZE
 	MultiOrigin bool   // From DA_JIRA_MULTI_ORIGIN
 }
@@ -87,6 +89,13 @@ func (j *DSJira) ParseArgs(ctx *Ctx) (err error) {
 	j.NoSSLVerify = StringToBool(os.Getenv(prefix + "NO_SSL_VERIFY"))
 	j.Token = os.Getenv(prefix + "TOKEN")
 	AddRedacted(j.Token, false)
+	j.User = os.Getenv(prefix + "USER")
+	AddRedacted(j.User, false)
+	if j.User != "" {
+		// If user is specified, then we must calculate base64(user:token) to get a real token
+		j.Token = base64.StdEncoding.EncodeToString([]byte(j.User + ":" + j.Token))
+		AddRedacted(j.Token, false)
+	}
 	if os.Getenv(prefix+"PAGE_SIZE") == "" {
 		j.PageSize = 500
 	} else {
@@ -200,6 +209,9 @@ func (j *DSJira) AddMetadata(ctx *Ctx, issue interface{}) (mItem map[string]inte
 	tag := ctx.Tag
 	if tag == "" {
 		tag = origin
+		if ctx.Project != "" {
+			tag += ":::" + ctx.Project
+		}
 	}
 	issueID := j.ItemID(issue)
 	updatedOn := j.ItemUpdatedOn(issue)
@@ -254,13 +266,13 @@ func (j *DSJira) ProcessIssue(ctx *Ctx, allIssues *[]interface{}, allIssuesMtx *
 		if JiraFilterByProjectInComments {
 			if to != nil {
 				epochToMS := (*to).UnixNano() / 1e6
-				if ctx.Project != "" {
+				if ctx.ProjectFilter && ctx.Project != "" {
 					jql = fmt.Sprintf(`project = %s AND updated > %d AND updated < %d order by updated asc`, ctx.Project, epochMS, epochToMS)
 				} else {
 					jql = fmt.Sprintf(`updated > %d AND updated < %d order by updated asc`, epochMS, epochToMS)
 				}
 			} else {
-				if ctx.Project != "" {
+				if ctx.ProjectFilter && ctx.Project != "" {
 					jql = fmt.Sprintf(`project = %s AND updated > %d order by updated asc`, ctx.Project, epochMS)
 				} else {
 					jql = fmt.Sprintf(`updated > %d order by updated asc`, epochMS)
@@ -530,13 +542,13 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 	epochMS := from.UnixNano() / 1e6
 	if to != nil {
 		epochToMS := (*to).UnixNano() / 1e6
-		if ctx.Project != "" {
+		if ctx.ProjectFilter && ctx.Project != "" {
 			jql = fmt.Sprintf(`"jql":"project = %s AND updated > %d AND updated < %d order by updated asc"`, ctx.Project, epochMS, epochToMS)
 		} else {
 			jql = fmt.Sprintf(`"jql":"updated > %d AND updated < %d order by updated asc"`, epochMS, epochToMS)
 		}
 	} else {
-		if ctx.Project != "" {
+		if ctx.ProjectFilter && ctx.Project != "" {
 			jql = fmt.Sprintf(`"jql":"project = %s AND updated > %d order by updated asc"`, ctx.Project, epochMS)
 		} else {
 			jql = fmt.Sprintf(`"jql":"updated > %d order by updated asc"`, epochMS)
@@ -735,10 +747,7 @@ func (j *DSJira) Categories() map[string]struct{} {
 
 // OriginField - return origin field used to detect where to restart from
 func (j *DSJira) OriginField(ctx *Ctx) string {
-	if ctx.Tag != "" {
-		return DefaultTagField
-	}
-	return DefaultOriginField
+	return DefaultTagField
 }
 
 // ResumeNeedsOrigin - is origin field needed when resuming
@@ -761,7 +770,10 @@ func (j *DSJira) Origin(ctx *Ctx) string {
 	if ctx.Tag != "" {
 		return ctx.Tag
 	}
-	return j.URL
+	if ctx.Project == "" {
+		return j.URL
+	}
+	return j.URL + ":::" + ctx.Project
 }
 
 // ItemID - return unique identifier for an item
@@ -894,6 +906,12 @@ func EnrichComments(ctx *Ctx, ds DS, comments []interface{}, item map[string]int
 		fields := []string{"project_id", "project_key", "project_name", "issue_type", "issue_description"}
 		for _, field := range fields {
 			richComment[field] = item[field]
+		}
+		// This overwrites project passed from outside, but this was requested, we can comment this out if needed
+		if ctx.Project == "" {
+			richComment["project"] = item["project_key"]
+		} else {
+			richComment["project"] = ctx.Project
 		}
 		richComment["issue_key"] = item["key"]
 		richComment["issue_url"] = item["url"]
@@ -1173,6 +1191,12 @@ func (j *DSJira) EnrichItem(ctx *Ctx, item map[string]interface{}, author string
 	rich["project_id"], _ = Dig(fields, []string{"project", "id"}, true, false)
 	rich["project_key"], _ = Dig(fields, []string{"project", "key"}, true, false)
 	rich["project_name"], _ = Dig(fields, []string{"project", "name"}, true, false)
+	// This overwrites project passed from outside, but this was requested, we can comment this out if needed
+	if ctx.Project == "" {
+		rich["project"] = rich["project_key"]
+	} else {
+		rich["project"] = ctx.Project
+	}
 	resolution, ok := fields["resolution"]
 	if ok && resolution != nil {
 		rich["resolution_id"], _ = Dig(resolution, []string{"id"}, true, false)

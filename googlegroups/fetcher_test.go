@@ -16,6 +16,7 @@ func TestFetchMessage(t *testing.T) {
 		DSName                string
 		ElasticSearchProvider *elastic.ClientProvider
 		BackendVersion        string
+		GroupName             string
 	}
 	type args struct {
 		gmailMessage *gmail.Message
@@ -48,6 +49,7 @@ func TestFetchMessage(t *testing.T) {
 				DSName:                "GoogleGroups",
 				ElasticSearchProvider: nil,
 				BackendVersion:        "0.0.1",
+				GroupName:             "google-apps-manager@googlegroups.com",
 			},
 			args: args{
 				gmailMessage: gmailMessage1,
@@ -66,6 +68,7 @@ func TestFetchMessage(t *testing.T) {
 				HTTPClientProvider:    nil,
 				ElasticSearchProvider: tt.fields.ElasticSearchProvider,
 				BackendVersion:        tt.fields.BackendVersion,
+				GroupName:             tt.fields.GroupName,
 			}
 			now := time.Now()
 			defaultDate := time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)

@@ -169,13 +169,12 @@ func (f *Fetcher) getMessage(msg *gmail.Message, fromDate, now *time.Time) (rawM
 		return nil, err
 	}
 
-	uuID, err := uuid.Generate(GoogleGroups, messageID)
+	groupName := getGroupName(f.GroupName)
+	uuID, err := uuid.Generate(GoogleGroups, messageID, groupName)
 	if err != nil {
 		log.Println(err)
 		return nil, err
 	}
-
-	groupName := getGroupName(f.GroupName)
 	rawMessage.From = from
 	rawMessage.Date = date
 	rawMessage.To = to

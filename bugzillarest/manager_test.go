@@ -72,25 +72,7 @@ func TestSync(t *testing.T) {
 	rawQuery := map[string]interface{}{"from": 0, "query": map[string]interface{}{"bool": map[string]interface{}{"must": map[string]interface{}{"range": map[string]interface{}{"data.last_change_time": map[string]interface{}{"gte": "1970-01-01T00:00:00Z"}}}}}, "size": 1000, "sort": []map[string]interface{}{{"data.last_change_time": map[string]string{"order": "asc"}}}}
 	rawVal := &RawHits{Hits: NHits{Hits: []NestedRawHits(nil)}}
 
-	fakeMapping := `{
-  "mappings": 
-{"dynamic":true,
-"properties":{
-"metadata__updated_on":{"type":"date"},
-"metadata__timestamp":{"type":"date"},
-"updated_on":{"type":"date"},
-"timestamp":{"type":"date"},
-"short_description":{"type":"text","index":true},
-"backend_version":{"type":"keyword"},
-"backend_name":{"type":"keyword"},
-"status":{"type":"keyword"},
-"priority":{"type":"keyword"},
-"severity":{"type":"keyword"},
-"uuid":{"type": "keyword"},
-"origin":{"type":"keyword"},
-"tag":{"type":"keyword"}
-}}
-}`
+	fakeMapping := `{"mappings":{"dynamic_templates":[{"notanalyzed":{"match":"*","match_mapping_type":"string","mapping":{"type":"keyword"}}},{"int_to_float":{"match":"*","match_mapping_type":"long","mapping":{"type":"float"}}},{"formatdate":{"match":"*","match_mapping_type":"date","mapping":{"format":"strict_date_optional_time||epoch_millis","type":"date"}}}]}}`
 
 	fakeMapping2 := `{"mappings":
 {"properties":
