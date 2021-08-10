@@ -196,6 +196,7 @@ type NestedRawHits struct {
 	Source BugRaw `json:"_source"`
 }
 
+// Activity ...
 type Activity struct {
 	Who     string
 	When    string
