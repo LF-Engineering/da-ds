@@ -12,7 +12,7 @@ func TestGetActivityLen(t *testing.T) {
 	body, err := ioutil.ReadFile("./mocks/activity.html")
 
 	// Act
-	count, err := GetActivityLen("#bugzilla-body tr", body)
+	count, _, err := GetActivityLen("#bugzilla-body tr", body)
 
 	// Assert
 	assert.NoError(t, err)

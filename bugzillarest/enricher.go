@@ -16,12 +16,21 @@ import (
 	timeLib "github.com/LF-Engineering/dev-analytics-libraries/time"
 )
 
+const (
+	inProgress = "IN_PROGRESS"
+	resolved   = "RESOLVED"
+)
+
 // Enricher enrich Bugzilla raw
 type Enricher struct {
-	DSName             string
-	BackendVersion     string
-	Project            string
-	affiliationsClient AffiliationClient
+	DSName              string
+	BackendVersion      string
+	Project             string
+	affiliationsClient  AffiliationClient
+	auth0ClientProvider Auth0ClientProvider
+	httpClientProvider  HTTPClientProvider
+	affBaseURL          string
+	projectSlug         string
 }
 
 // AffiliationClient manages user identity
@@ -37,12 +46,16 @@ type EnricherParams struct {
 }
 
 // NewEnricher initiate a new enricher instance
-func NewEnricher(params *EnricherParams, affiliationsClient AffiliationClient) *Enricher {
+func NewEnricher(params *EnricherParams, affiliationsClient AffiliationClient, auth0ClientProvider Auth0ClientProvider, httpClientProvider HTTPClientProvider, affBaseURL string, projectSlug string) *Enricher {
 	return &Enricher{
-		DSName:             BugzillaRest,
-		BackendVersion:     params.BackendVersion,
-		Project:            params.Project,
-		affiliationsClient: affiliationsClient,
+		DSName:              BugzillaRest,
+		BackendVersion:      params.BackendVersion,
+		Project:             params.Project,
+		affiliationsClient:  affiliationsClient,
+		auth0ClientProvider: auth0ClientProvider,
+		httpClientProvider:  httpClientProvider,
+		affBaseURL:          affBaseURL,
+		projectSlug:         projectSlug,
 	}
 }
 
@@ -75,19 +88,46 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 	enriched.ISOpen = rawItem.Data.IsOpen
 	enriched.TimeToLastUpdateDays = math.Abs(math.Round(timeLib.GetDaysBetweenDates(enriched.DeltaTs, rawItem.Data.CreationTime)*100) / 100)
 	enriched.TimeOpenDays = math.Abs(math.Round(timeLib.GetDaysBetweenDates(now, rawItem.Data.CreationTime)*100) / 100)
-	if !rawItem.Data.IsOpen {
-		enriched.TimeOpenDays = enriched.TimeToLastUpdateDays
-	}
+	enriched.TimeToClose = enriched.TimeOpenDays
+
 	if rawItem.Data.Whiteboard != "" {
 		enriched.Whiteboard = &rawItem.Data.Whiteboard
 	}
 
-	// count history changes
 	enriched.Changes = 0
+	isAssigned := false
+	isResolved := false
+	var assignedAt time.Time
+	var resolvedAt time.Time
 	for _, history := range *rawItem.Data.History {
 		if len(history.Changes) > 0 {
 			enriched.Changes += len(history.Changes)
 		}
+
+		for _, c := range history.Changes {
+			if c.Added == inProgress && !isAssigned {
+				isAssigned = true
+				assignedAt = history.When
+				continue
+			}
+			if c.Added == resolved && !isAssigned {
+				isAssigned = true
+				assignedAt = history.When
+			}
+			if c.Added == resolved && isAssigned {
+				isResolved = true
+				resolvedAt = history.When
+			}
+		}
+	}
+
+	if isAssigned {
+		enriched.TimeOpenDays = math.Abs(math.Round(timeLib.GetDaysBetweenDates(assignedAt, rawItem.Data.CreationTime)*100) / 100)
+		enriched.TimeToClose = math.Abs(math.Round(timeLib.GetDaysBetweenDates(now, assignedAt)*100) / 100)
+	}
+
+	if isResolved {
+		enriched.TimeToClose = math.Abs(math.Round(timeLib.GetDaysBetweenDates(resolvedAt, assignedAt)*100) / 100)
 	}
 
 	enriched.NumberOfComments = 0
@@ -117,29 +157,21 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 
 			enriched.AssignedToUUID = *assignedTo.UUID
 
-			if assignedTo.Gender != nil {
-				enriched.AssignedToDetailGender = *assignedTo.Gender
-			} else {
-				enriched.AssignedToDetailGender = unknown
+			org, orgs, err := util.GetEnrollments(e.auth0ClientProvider, e.httpClientProvider, e.affBaseURL, e.projectSlug, *assignedTo.UUID, rawItem.MetadataUpdatedOn)
+			if err != nil {
+				dads.Printf("[dads-bugzilla] EnrichItem GetEnrollments error : %+v\n", err)
 			}
 
-			if assignedTo.GenderACC != nil {
-				enriched.AssignedToDetailGenderAcc = int(*assignedTo.GenderACC)
-			} else {
-				enriched.AssignedToDetailGenderAcc = 0
-			}
-			if assignedTo.OrgName != nil {
+			enriched.AssignedToDetailOrgName = unknown
+			enriched.AssignedToOrgName = unknown
+			if org != "" {
 				enriched.AssignedToDetailOrgName = *assignedTo.OrgName
 				enriched.AssignedToOrgName = *assignedTo.OrgName
-			} else {
-				enriched.AssignedToDetailOrgName = unknown
-				enriched.AssignedToOrgName = unknown
 			}
 
 			enriched.AssignedToDetailMultiOrgName = multiOrgs
-
-			if len(assignedTo.MultiOrgNames) != 0 {
-				enriched.AssignedToDetailMultiOrgName = assignedTo.MultiOrgNames
+			if len(orgs) != 0 {
+				enriched.AssignedToDetailMultiOrgName = orgs
 			}
 		} else {
 			assignedToDetail := rawItem.Data.AssignedToDetail
@@ -194,29 +226,18 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 			enriched.AuthorUserName = creator.Username
 			enriched.AuthorDomain = creator.Domain
 
-			if creator.Gender != nil {
-				enriched.CreatorDetailGender = *creator.Gender
-				enriched.AuthorGender = *creator.Gender
-			} else {
-				enriched.CreatorDetailGender = unknown
-				enriched.AuthorGender = unknown
+			org, orgs, err := util.GetEnrollments(e.auth0ClientProvider, e.httpClientProvider, e.affBaseURL, e.projectSlug, *creator.UUID, rawItem.MetadataUpdatedOn)
+			if err != nil {
+				dads.Printf("[dads-bugzilla] EnrichItem GetEnrollments error : %+v\n", err)
 			}
 
-			if creator.GenderACC != nil {
-				enriched.CreatorDetailGenderACC = int(*creator.GenderACC)
-				enriched.AuthorGenderAcc = int(*creator.GenderACC)
-			} else {
-				enriched.CreatorDetailGenderACC = 0
-				enriched.AuthorGenderAcc = 0
-			}
-
-			if creator.OrgName != nil {
+			enriched.CreatorDetailOrgName = unknown
+			enriched.AuthorOrgName = unknown
+			if org != "" {
 				enriched.CreatorDetailOrgName = *creator.OrgName
 				enriched.AuthorOrgName = *creator.OrgName
-			} else {
-				enriched.CreatorDetailOrgName = unknown
-				enriched.AuthorOrgName = unknown
 			}
+
 			if creator.IsBot != nil && *creator.IsBot != 0 {
 				enriched.CreatorDetailBot = true
 				enriched.AuthorBot = true
@@ -224,11 +245,11 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 
 			enriched.CreatorDetailMultiOrgName = multiOrgs
 			enriched.AuthorMultiOrgNames = multiOrgs
-
-			if len(creator.MultiOrgNames) != 0 {
-				enriched.CreatorDetailMultiOrgName = creator.MultiOrgNames
-				enriched.AuthorMultiOrgNames = creator.MultiOrgNames
+			if len(orgs) != 0 {
+				enriched.CreatorDetailMultiOrgName = orgs
+				enriched.AuthorMultiOrgNames = orgs
 			}
+
 		} else {
 			creatorDetail := rawItem.Data.CreatorDetail
 			source := BugzillaRest

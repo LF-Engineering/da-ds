@@ -122,8 +122,6 @@ type BugRestEnrich struct {
 	CreatorDetailName         string   `json:"creator_detail_name"`
 	CreatorDetailUserName     string   `json:"creator_detail_user_name"`
 	CreatorDetailDomain       string   `json:"creator_detail_domain"`
-	CreatorDetailGender       string   `json:"creator_detail_gender"`
-	CreatorDetailGenderACC    int      `json:"creator_detail_gender_acc"`
 	CreatorDetailOrgName      string   `json:"creator_detail_org_name"`
 	CreatorDetailMultiOrgName []string `json:"creator_detail_multi_org_names"`
 	CreatorDetailBot          bool     `json:"creator_detail_bot"`
@@ -133,8 +131,6 @@ type BugRestEnrich struct {
 	AuthorName          string   `json:"author_name"`
 	AuthorUserName      string   `json:"author_user_name"`
 	AuthorDomain        string   `json:"author_domain"`
-	AuthorGender        string   `json:"author_gender"`
-	AuthorGenderAcc     int      `json:"author_gender_acc"`
 	AuthorOrgName       string   `json:"author_org_name"`
 	AuthorMultiOrgNames []string `json:"author_multi_org_names"`
 	AuthorBot           bool     `json:"author_bot"`
@@ -147,8 +143,6 @@ type BugRestEnrich struct {
 	AssignedToDetailName         string   `json:"assigned_to_detail_name"`
 	AssignedToDetailUserName     string   `json:"assigned_to_detail_user_name"`
 	AssignedToDetailDomain       string   `json:"assigned_to_detail_domain"`
-	AssignedToDetailGender       string   `json:"assigned_to_detail_gender"`
-	AssignedToDetailGenderAcc    int      `json:"assigned_to_detail_gender_acc"`
 	AssignedToDetailOrgName      string   `json:"assigned_to_detail_org_name"`
 	AssignedToDetailMultiOrgName []string `json:"assigned_to_detail_multi_org_names"`
 	AssignedToDetailBot          bool     `json:"assigned_to_detail_bot"`
@@ -177,6 +171,7 @@ type BugRestEnrich struct {
 	ISOpen                bool    `json:"is_open"`
 	ID                    int     `json:"id"`
 	TimeToLastUpdateDays  float64 `json:"time_to_last_update_days"`
+	TimeToClose           float64 `json:"time_to_close"`
 }
 
 // Comment describe comment details

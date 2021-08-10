@@ -3,6 +3,8 @@ package bugzilla
 import (
 	"testing"
 
+	"github.com/stretchr/testify/mock"
+
 	"github.com/LF-Engineering/da-ds/bugzilla/mocks"
 
 	libAffiliations "github.com/LF-Engineering/dev-analytics-libraries/affiliation"
@@ -94,7 +96,7 @@ func TestEnrichItem(t *testing.T) {
           "comments" : 0,
          "assigned_to_uuid" : "5d408e590365763c3927084d746071fa84dc8e52",
           "reporter_multi_org_names" : [
-            "Unknown"
+            "MontaVista Software, LLC"
           ],
           "assigned_to_name" : "akuster",
           "author_domain" : "gmail.com",
@@ -112,7 +114,7 @@ func TestEnrichItem(t *testing.T) {
           "assigned_to_gender_acc" : 0,
           "author_user_name" : "",
           "assigned_to_multi_org_names" : [
-            "MontaVista Software, LLC"
+            "Unknown"
           ],
           "assigned_to_id" : "a89364af9818412b8c59193ca83b30dd67b20e35",
           "author_name" : "Vasyl",
@@ -123,9 +125,9 @@ func TestEnrichItem(t *testing.T) {
           "reporter_id" : "50ffba4dfbedc6dc4390fc8bde7aeec0a7191056",
           "reporter_gender" : "Unknown",
           "author_multi_org_names" : [
-            "Unknown"
+            "MontaVista Software, LLC"
           ],
-          "assigned_to_org_name" : "MontaVista Software, LLC",
+          "assigned_to_org_name" : "Unknown",
           "author_gender" : "Unknown",
           "reporter_user_name" : ""
 
@@ -144,7 +146,9 @@ func TestEnrichItem(t *testing.T) {
 			t.Error(err)
 		}
 
-		affProviderMock := &mocks.Affiliation{}
+		affProviderMock := &mocks.AffiliationClient{}
+		httpClientMock := &mocks.HTTPClientProvider{}
+		auth0ClientMock := &mocks.Auth0Client{}
 		unknown := "Unknown"
 		zero := int64(0)
 
@@ -166,8 +170,19 @@ func TestEnrichItem(t *testing.T) {
 		affProviderMock.On("GetIdentityByUser", "name", "vvavrychuk").Return(fakeAff1, nil)
 		affProviderMock.On("GetIdentityByUser", "name", "akuster").Return(fakeAff2, nil)
 
+		auth0ClientMock.On("GetToken").Return("token", nil)
+		headers := make(map[string]string)
+		headers["Authorization"] = "Bearer " + "token"
+		resBody := `{"org": "", "orgs":[]}`
+		resBody2 := `{"org": "", "orgs":["MontaVista Software, LLC"]}`
+
+		requestURL := "/affiliation//both/5d408e590365763c3927084d746071fa84dc8e52/2020-12-07 14:38:23.895437 +0000 UTC"
+		requestURL2 := "/affiliation//both/50ffba4dfbedc6dc4390fc8bde7aeec0a7191056/2020-12-07 14:38:23.895437 +0000 UTC"
+		httpClientMock.On("Request", requestURL, "GET", headers, mock.Anything, mock.Anything).Return(200, []byte(resBody), nil)
+		httpClientMock.On("Request", requestURL2, "GET", headers, mock.Anything, mock.Anything).Return(200, []byte(resBody2), nil)
+
 		// Act
-		srv := NewEnricher("0.18", "yocto", affProviderMock)
+		srv := NewEnricher("0.18", "yocto", affProviderMock, auth0ClientMock, httpClientMock, "", "")
 
 		enrich, err := srv.EnrichItem(raw, expectedEnrich.MetadataEnrichedOn.UTC())
 		if err != nil {
