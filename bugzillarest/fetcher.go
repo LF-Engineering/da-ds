@@ -156,7 +156,7 @@ func (f *Fetcher) FetchItem(origin string, bugID int, fetchedBug BugData, now ti
 	bugRaw.Data.Version = fetchedBug.Version
 	bugRaw.Data.Duplicates = fetchedBug.Duplicates
 
-	bugRaw.MetadataUpdatedOn = fetchedBug.LastChangeTime
+	bugRaw.MetadataUpdatedOn = fetchedBug.CreationTime
 	bugRaw.ClassifiedFieldsFiltered = nil
 	bugRaw.UpdatedOn = timeLib.ConvertTimeToFloat(fetchedBug.LastChangeTime)
 	bugRaw.Category = Category
