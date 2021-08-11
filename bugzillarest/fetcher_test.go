@@ -41,7 +41,7 @@ func TestFetchAll(t *testing.T) {
           "tag" : "https://bugs.dpdk.org/",
           "origin" : "https://bugs.dpdk.org/",
           "classified_fields_filtered" : null,
-          "metadata__updated_on" : "2020-12-17T14:07:28Z",
+          "metadata__updated_on" : "2020-07-20T13:17:11Z",
           "updated_on" : 1.608214048e+09,
           "backend_name" : "bugzillarest",
           "metadata__timestamp" : "2020-12-20T18:32:58.68373Z",
