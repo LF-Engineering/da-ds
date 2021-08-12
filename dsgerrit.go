@@ -1125,6 +1125,232 @@ func (j *DSGerrit) FirstReviewDatetime(ctx *Ctx, review map[string]interface{}, 
 	return
 }
 
+// FirstApprovalDatetime - return first approval date/time
+func (j *DSGerrit) FirstApprovalDatetime(ctx *Ctx, review map[string]interface{}, patchSets []interface{}) (approvalDatetime interface{}) {
+	if ctx.Debug > 2 {
+		defer func() {
+			Printf("FirstApprovalDatetime: %+v -> %+v\n", patchSets, approvalDatetime)
+		}()
+	}
+	if ctx.Debug > 2 {
+		Printf("FirstApprovalDatetime: %d patch sets\n", len(patchSets))
+	}
+	ownerUsername, okOwnerUsername := Dig(review, []string{"owner", "username"}, false, true)
+	ownerEmail, okOwnerEmail := Dig(review, []string{"owner", "email"}, false, true)
+	if ownerUsername == "" {
+		okOwnerUsername = false
+	}
+	if ownerEmail == "" {
+		okOwnerEmail = false
+	}
+	var createdOn time.Time
+	iCreatedOn, okCreatedOn := review["createdOn"]
+	if okCreatedOn {
+		createdOn, okCreatedOn = iCreatedOn.(time.Time)
+	}
+	for _, iPatchSet := range patchSets {
+		patchSet, ok := iPatchSet.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		iApprovals, ok := patchSet["approvals"]
+		if !ok {
+			if ctx.Debug > 2 {
+				Printf("FirstApprovalDatetime: no approvals\n")
+			}
+			continue
+		}
+		approvals, ok := iApprovals.([]interface{})
+		if !ok {
+			continue
+		}
+		if ctx.Debug > 2 {
+			Printf("FirstApprovalDatetime: %d approvals\n", len(approvals))
+		}
+		for _, iApproval := range approvals {
+			approval, ok := iApproval.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			iApprovalType, ok := approval["type"]
+			if !ok {
+				continue
+			}
+			approvalType, ok := iApprovalType.(string)
+			if !ok || approvalType != GerritCodeReviewApprovalType {
+				if ctx.Debug > 2 {
+					Printf("FirstApprovalDatetime: incorrect type %+v\n", iApprovalType)
+				}
+				continue
+			}
+			iGrantedOn, okGrantedOn := approval["grantedOn"]
+			var grantedOn time.Time
+			if okCreatedOn && okGrantedOn {
+				grantedOn, okGrantedOn = iGrantedOn.(time.Time)
+				if okGrantedOn && grantedOn.Before(createdOn) {
+					Printf("approval granted before patchset was created %+v < %+v, skipping\n", grantedOn, createdOn)
+					continue
+				}
+			}
+			// Printf("FirstApprovalDatetime: (%+v,%T,%v) <=> (%+v,%T,%+v)\n", createdOn, createdOn, okCreatedOn, grantedOn, grantedOn, okGrantedOn)
+			byUsername, okByUsername := Dig(approval, []string{"by", "username"}, false, true)
+			byEmail, okByEmail := Dig(approval, []string{"by", "email"}, false, true)
+			status, okStatus := approval["value"]
+			if !okStatus {
+				continue
+			}
+			if byUsername == "" {
+				okByUsername = false
+			}
+			if byEmail == "" {
+				okByEmail = false
+			}
+			approveStatus, err := strconv.Atoi(status.(string))
+			// We assume 0, +1, +2 as approvals, while -1, -2 as changes requests/rejections
+			if err != nil || approveStatus < 0 {
+				// Printf("FirstApprovalDatetime: rejection: %T,%v,%v,%d,%v\n", status, status, okStatus, approveStatus, nil)
+				continue
+			}
+			var okApprovalDatetime bool
+			if okByUsername && okOwnerUsername {
+				// Printf("FirstApprovalDatetime: usernames set\n")
+				byUName, _ := byUsername.(string)
+				ownerUName, _ := ownerUsername.(string)
+				if byUName != ownerUName {
+					approvalDatetime, okApprovalDatetime = grantedOn, okGrantedOn
+				}
+			} else if okByEmail && okOwnerEmail {
+				// Printf("FirstApprovalDatetime: emails set\n")
+				byMail, _ := byEmail.(string)
+				ownerMail, _ := ownerEmail.(string)
+				if byMail != ownerMail {
+					approvalDatetime, okApprovalDatetime = grantedOn, okGrantedOn
+				}
+			} else {
+				// Printf("FirstApprovalDatetime: else case\n")
+				approvalDatetime, okApprovalDatetime = grantedOn, okGrantedOn
+			}
+			if ctx.Debug > 2 {
+				Printf("FirstApprovalDatetime: final (%+v,%+v)\n", approvalDatetime, okApprovalDatetime)
+			}
+			if okApprovalDatetime && approvalDatetime != nil {
+				// Printf("ApprovalDatetime: %+v\n", approvalDatetime)
+				return
+			}
+		}
+	}
+	return
+}
+
+// FirstPatchsetApprovalDatetime - return first patchset review date/time
+func (j *DSGerrit) FirstPatchsetApprovalDatetime(ctx *Ctx, patchSet map[string]interface{}) (approvalDatetime interface{}) {
+	if ctx.Debug > 2 {
+		defer func() {
+			Printf("FirstPatchsetApprovalDatetime: %+v -> %+v\n", patchSet, approvalDatetime)
+		}()
+	}
+	patchsetUsername, okPatchsetUsername := Dig(patchSet, []string{"author", "username"}, false, true)
+	patchsetEmail, okPatchsetEmail := Dig(patchSet, []string{"author", "email"}, false, true)
+	if patchsetUsername == "" {
+		okPatchsetUsername = false
+	}
+	if patchsetEmail == "" {
+		okPatchsetEmail = false
+	}
+	var createdOn time.Time
+	iCreatedOn, okCreatedOn := patchSet["createdOn"]
+	if okCreatedOn {
+		createdOn, okCreatedOn = iCreatedOn.(time.Time)
+	}
+	iApprovals, ok := patchSet["approvals"]
+	if !ok {
+		if ctx.Debug > 2 {
+			Printf("FirstPatchsetApprovalDatetime: no approvals\n")
+		}
+		return
+	}
+	approvals, ok := iApprovals.([]interface{})
+	if !ok {
+		return
+	}
+	if ctx.Debug > 2 {
+		Printf("FirstPatchsetApprovalDatetime: %d approvals\n", len(approvals))
+	}
+	for _, iApproval := range approvals {
+		approval, ok := iApproval.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		iApprovalType, ok := approval["type"]
+		if !ok {
+			continue
+		}
+		approvalType, ok := iApprovalType.(string)
+		if !ok || approvalType != GerritCodeReviewApprovalType {
+			if ctx.Debug > 2 {
+				Printf("FirstPatchsetApprovalDatetime: incorrect type %+v\n", iApprovalType)
+			}
+			continue
+		}
+		iGrantedOn, okGrantedOn := approval["grantedOn"]
+		var grantedOn time.Time
+		if okCreatedOn && okGrantedOn {
+			grantedOn, okGrantedOn = iGrantedOn.(time.Time)
+			if okGrantedOn && grantedOn.Before(createdOn) {
+				Printf("approval granted before patchset was created %+v < %+v, skipping\n", grantedOn, createdOn)
+				continue
+			}
+		}
+		// Printf("FirstPatchsetApprovalDatetime: (%+v,%T,%v) <=> (%+v,%T,%+v)\n", createdOn, createdOn, okCreatedOn, grantedOn, grantedOn, okGrantedOn)
+		byUsername, okByUsername := Dig(approval, []string{"by", "username"}, false, true)
+		byEmail, okByEmail := Dig(approval, []string{"by", "email"}, false, true)
+		status, okStatus := approval["value"]
+		if !okStatus {
+			continue
+		}
+		if byUsername == "" {
+			okByUsername = false
+		}
+		if byEmail == "" {
+			okByEmail = false
+		}
+		approveStatus, err := strconv.Atoi(status.(string))
+		// We assume 0, +1, +2 as approvals, while -1, -2 as changes requests/rejections
+		if err != nil || approveStatus < 0 {
+			// Printf("FirstPatchsetApprovalDatetime: rejection: %T,%v,%v,%d,%v\n", status, status, okStatus, approveStatus, nil)
+			continue
+		}
+		// Printf("FirstPatchesReviewDatetime: (%s,%s,%s,%s) (%v,%v,%v,%v)\n", patchsetUsername, patchsetEmail, byUsername, byEmail, okPatchsetUsername, okPatchsetEmail, okByUsername, okByEmail)
+		var okApprovalDatetime bool
+		if okByUsername && okPatchsetUsername {
+			//Printf("FirstPatchsetApprovalDatetime: usernames set\n")
+			byUName, _ := byUsername.(string)
+			patchsetUName, _ := patchsetUsername.(string)
+			if byUName != patchsetUName {
+				approvalDatetime, okApprovalDatetime = grantedOn, okGrantedOn
+			}
+		} else if okByEmail && okPatchsetEmail {
+			// Printf("FirstPatchsetApprovalDatetime: emails set\n")
+			byMail, _ := byEmail.(string)
+			patchsetMail, _ := patchsetEmail.(string)
+			if byMail != patchsetMail {
+				approvalDatetime, okApprovalDatetime = grantedOn, okGrantedOn
+			}
+		} else {
+			// Printf("FirstPatchsetApprovalDatetime: else case\n")
+			approvalDatetime, okApprovalDatetime = grantedOn, okGrantedOn
+		}
+		if ctx.Debug > 2 {
+			Printf("FirstPatchsetApprovalDatetime: final (%+v,%+v)\n", approvalDatetime, okApprovalDatetime)
+		}
+		if okApprovalDatetime && approvalDatetime != nil {
+			// Printf("FirstPatchsetApprovalDatetime: hit (%+v,%+v)\n%+v\n", approvalDatetime, okApprovalDatetime, patchSet)
+			return
+		}
+	}
+	return
+}
+
 // FirstPatchsetReviewDatetime - return first patchset review date/time
 func (j *DSGerrit) FirstPatchsetReviewDatetime(ctx *Ctx, patchSet map[string]interface{}) (reviewDatetime interface{}) {
 	if ctx.Debug > 2 {
@@ -1417,6 +1643,15 @@ func (j *DSGerrit) EnrichItem(ctx *Ctx, item map[string]interface{}, author stri
 			rich["time_to_first_review"] = float64(firstReviewDt.Sub(createdOn).Seconds()) / 86400.0
 		}
 	}
+	iFirstApprovalDt := j.FirstApprovalDatetime(ctx, review, patchSets)
+	rich["first_approval_date"] = iFirstApprovalDt
+	rich["time_to_first_approval"] = nil
+	if iFirstApprovalDt != nil {
+		firstApprovalDt, ok := iFirstApprovalDt.(time.Time)
+		if ok {
+			rich["time_to_first_approval"] = float64(firstApprovalDt.Sub(createdOn).Seconds()) / 86400.0
+		}
+	}
 	var lastUpdatedOn time.Time
 	iLastUpdatedOn, ok := review["lastUpdated"]
 	if ok {
@@ -1548,6 +1783,15 @@ func (j *DSGerrit) EnrichPatchsets(ctx *Ctx, review map[string]interface{}, patc
 			firstReviewDt, ok := iFirstReviewDt.(time.Time)
 			if ok {
 				rich["patchset_time_to_first_review"] = float64(firstReviewDt.Sub(created).Seconds()) / 86400.0
+			}
+		}
+		iFirstApprovalDt := j.FirstPatchsetApprovalDatetime(ctx, patchSet)
+		rich["patchset_first_approval_date"] = iFirstApprovalDt
+		rich["patchset_time_to_first_approval"] = nil
+		if iFirstApprovalDt != nil {
+			firstApprovalDt, ok := iFirstApprovalDt.(time.Time)
+			if ok {
+				rich["patchset_time_to_first_approval"] = float64(firstApprovalDt.Sub(created).Seconds()) / 86400.0
 			}
 		}
 		rich["type"] = Patchset
