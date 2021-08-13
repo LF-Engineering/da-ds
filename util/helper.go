@@ -31,9 +31,11 @@ func IsEmailValid(e string) bool {
 }
 
 // GetEnrollments get identity single and multi organization
-func GetEnrollments(auth0ClientProvider Auth0Client, httpClientProvider HTTPClientProvider, AffBaseURL string, projectSlug string, uuid string, sdt time.Time) (string, []string, error) {
-	s := sdt.Format("2006-02-01 15:04:05")
-	URL := fmt.Sprintf("%s/affiliation/ /both/%s/%s", AffBaseURL, uuid, s)
+func GetEnrollments(auth0ClientProvider Auth0Client, httpClientProvider HTTPClientProvider, AffBaseURL string, projectSlug string, uuid string, date time.Time) (string, []string, error) {
+	if projectSlug == "" {
+		projectSlug = " "
+	}
+	URL := fmt.Sprintf("%s/affiliation/%s/both/%s/%s", AffBaseURL, projectSlug, uuid, date.Format("2006-02-01 15:04:05"))
 	token, err := auth0ClientProvider.GetToken()
 	if err != nil {
 		return "", []string{}, err
