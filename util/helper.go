@@ -7,8 +7,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-
-	dads "github.com/LF-Engineering/da-ds"
 )
 
 var emailRegex = regexp.MustCompile(`^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,4}$`)
@@ -54,7 +52,6 @@ func GetEnrollments(auth0ClientProvider Auth0Client, httpClientProvider HTTPClie
 	if err != nil {
 		return "", []string{}, err
 	}
-	dads.Printf(res.Org, res.Orgs)
 	return res.Org, res.Orgs, nil
 
 }
