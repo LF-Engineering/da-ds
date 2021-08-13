@@ -54,10 +54,6 @@ func GetEnrollments(auth0ClientProvider Auth0Client, httpClientProvider HTTPClie
 	if err != nil {
 		return "", []string{}, err
 	}
-	dads.Printf("xxxxx")
-	fmt.Println(" ")
-	dads.Printf(URL)
-	fmt.Println(" ")
 	dads.Printf(res.Org, res.Orgs)
 	return res.Org, res.Orgs, nil
 
