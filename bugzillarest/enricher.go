@@ -164,13 +164,12 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 
 			enriched.AssignedToDetailOrgName = unknown
 			enriched.AssignedToOrgName = unknown
-			if org != "" {
+			if org != "" && org != unknown {
 				enriched.AssignedToDetailOrgName = *assignedTo.OrgName
 				enriched.AssignedToOrgName = *assignedTo.OrgName
 			}
 
-			enriched.AssignedToDetailMultiOrgName = multiOrgs
-			if len(orgs) != 0 {
+			if len(orgs) != 0 && orgs[0] != unknown {
 				enriched.AssignedToDetailMultiOrgName = orgs
 			}
 		} else {
@@ -233,7 +232,7 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 
 			enriched.CreatorDetailOrgName = unknown
 			enriched.AuthorOrgName = unknown
-			if org != "" {
+			if org != "" && org != unknown {
 				enriched.CreatorDetailOrgName = *creator.OrgName
 				enriched.AuthorOrgName = *creator.OrgName
 			}
@@ -243,9 +242,7 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 				enriched.AuthorBot = true
 			}
 
-			enriched.CreatorDetailMultiOrgName = multiOrgs
-			enriched.AuthorMultiOrgNames = multiOrgs
-			if len(orgs) != 0 {
+			if len(orgs) != 0 && orgs[0] != unknown {
 				enriched.CreatorDetailMultiOrgName = orgs
 				enriched.AuthorMultiOrgNames = orgs
 			}

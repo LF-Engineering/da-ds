@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	dads "github.com/LF-Engineering/da-ds"
 )
 
 var emailRegex = regexp.MustCompile(`^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,4}$`)
@@ -32,7 +34,8 @@ func IsEmailValid(e string) bool {
 
 // GetEnrollments get identity single and multi organization
 func GetEnrollments(auth0ClientProvider Auth0Client, httpClientProvider HTTPClientProvider, AffBaseURL string, projectSlug string, uuid string, sdt time.Time) (string, []string, error) {
-	URL := fmt.Sprintf("%s/affiliation/%s/both/%s/%s", AffBaseURL, projectSlug, uuid, sdt)
+	s := sdt.Format("2006-02-01 15:04:05")
+	URL := fmt.Sprintf("%s/affiliation/ /both/%s/%s", AffBaseURL, uuid, s)
 	token, err := auth0ClientProvider.GetToken()
 	if err != nil {
 		return "", []string{}, err
@@ -51,7 +54,11 @@ func GetEnrollments(auth0ClientProvider Auth0Client, httpClientProvider HTTPClie
 	if err != nil {
 		return "", []string{}, err
 	}
-
+	dads.Printf("xxxxx")
+	fmt.Println(" ")
+	dads.Printf(URL)
+	fmt.Println(" ")
+	dads.Printf(res.Org, res.Orgs)
 	return res.Org, res.Orgs, nil
 
 }
