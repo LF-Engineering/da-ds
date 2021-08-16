@@ -1173,6 +1173,35 @@ func (j *DSGit) ParseNextCommit(ctx *Ctx) (commit map[string]interface{}, ok boo
 	return
 }
 
+// SetTLOC - set total_lines_of_code everywhere in rich index for a current origin
+func (j *DSGit) SetTLOC(ctx *Ctx) (err error) {
+	url := ctx.ESURL + "/" + ctx.RichIndex + "/_update_by_query?conflicts=proceed&refresh=true&timeout=20m"
+	method := Post
+	payload := []byte(fmt.Sprintf(`{"script":{"inline":"ctx._source.total_lines_of_code=%d;"},"query":{"bool":{"must":{"term":{"origin":"%s"}}}}}`, j.Loc, j.URL))
+	var resp interface{}
+	resp, _, _, _, err = Request(
+		ctx,
+		url,
+		method,
+		map[string]string{"Content-Type": "application/json"}, // headers
+		payload,                             // payload
+		[]string{},                          // cookies
+		map[[2]int]struct{}{{200, 200}: {}}, // JSON statuses: 200
+		nil,                                 // Error statuses
+		map[[2]int]struct{}{{200, 200}: {}}, // OK statuses: 200
+		nil,                                 // Cache statuses
+		true,                                // retry
+		nil,                                 // cache for
+		true,                                // skip in dry-run mode
+	)
+	if err != nil {
+		return
+	}
+	updated, _ := Dig(resp, []string{"updated"}, true, false)
+	Printf("Set total_lines_of_code %d on %d documents\n", j.Loc, updated)
+	return
+}
+
 // FetchItems - implement enrich data for git datasource
 func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 	var (
@@ -1185,6 +1214,20 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 		occh          chan error
 		waitLOCMtx    *sync.Mutex
 	)
+	_, gitOpsOnly := os.LookupEnv("DA_GIT_GITOPS_ONLY")
+	if gitOpsOnly {
+		defer os.Exit(0)
+		_, err = j.GetGitOps(ctx, thrN)
+		if err != nil {
+			Printf("%s gitops failed: %+v\n", j.URL, err)
+			return
+		}
+		err = j.SetTLOC(ctx)
+		if err != nil {
+			Printf("%s setting total_lines_of_code failed: %+v\n", j.URL, err)
+			return
+		}
+	}
 	thrN := GetThreadsNum(ctx)
 	if thrN > 1 {
 		ch = make(chan error)
