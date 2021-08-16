@@ -1228,8 +1228,8 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 // FetchRaw - implement fetch raw data (generic)
 func FetchRaw(ctx *Ctx, ds DS) (err error) {
 	// FIXME
-	_, gitOpsOnly := os.LookupEnv("DA_GIT_GITOPS_ONLY")
-	if gitOpsOnly {
+	_, directFetch := os.LookupEnv("DIRECT_FETCH_ITEMS")
+	if directFetch {
 		return ds.FetchItems(ctx)
 	}
 	err = HandleMapping(ctx, ds, true)
