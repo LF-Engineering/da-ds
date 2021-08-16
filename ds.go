@@ -3,6 +3,7 @@ package dads
 import (
 	"database/sql"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -1226,6 +1227,11 @@ func HandleMapping(ctx *Ctx, ds DS, raw bool) (err error) {
 
 // FetchRaw - implement fetch raw data (generic)
 func FetchRaw(ctx *Ctx, ds DS) (err error) {
+	// FIXME
+	_, gitOpsOnly := os.LookupEnv("DA_GIT_GITOPS_ONLY")
+	if gitOpsOnly {
+		return ds.FetchItems(ctx)
+	}
 	err = HandleMapping(ctx, ds, true)
 	if err != nil {
 		Fatalf(ds.Name()+": HandleMapping error: %+v\n", err)

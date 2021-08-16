@@ -1214,12 +1214,13 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 		occh          chan error
 		waitLOCMtx    *sync.Mutex
 	)
+	thrN := GetThreadsNum(ctx)
 	_, gitOpsOnly := os.LookupEnv("DA_GIT_GITOPS_ONLY")
 	if gitOpsOnly {
 		defer func() {
 			os.Exit(0)
 		}()
-		_, err = j.GetGitOps(ctx, thrN)
+		_, err = j.GetGitOps(ctx, 1)
 		if err != nil {
 			Printf("%s gitops failed: %+v\n", j.URL, err)
 			return
@@ -1231,7 +1232,6 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 		}
 		return
 	}
-	thrN := GetThreadsNum(ctx)
 	if thrN > 1 {
 		ch = make(chan error)
 		allCommitsMtx = &sync.Mutex{}
