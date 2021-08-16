@@ -10,5 +10,7 @@ do
   then
     result=$(curl -s -XPOST -H 'Content-Type: application/json' "${ES}/${i}/_update_by_query?pretty" -d"{\"script\":{\"inline\":\"ctx._source.total_lines_of_code=\\\"${mx}\\\";\"},\"query\":{\"term\":{\"total_lines_of_code\":\"0\"}}}" | jq -rS --compact-output '.updated')
     echo "$i set $mx LOC result: $result"
+  else
+    echo "$i $mi - $mx skipped"
   fi
 done
