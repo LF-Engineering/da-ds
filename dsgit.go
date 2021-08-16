@@ -1198,7 +1198,7 @@ func (j *DSGit) SetTLOC(ctx *Ctx) (err error) {
 		return
 	}
 	updated, _ := Dig(resp, []string{"updated"}, true, false)
-	Printf("Set total_lines_of_code %d on %d documents\n", j.Loc, updated)
+	Printf("Set total_lines_of_code %d on %.0f documents\n", j.Loc, updated)
 	return
 }
 
@@ -1216,7 +1216,9 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 	)
 	_, gitOpsOnly := os.LookupEnv("DA_GIT_GITOPS_ONLY")
 	if gitOpsOnly {
-		defer os.Exit(0)
+		defer func() {
+			os.Exit(0)
+		}()
 		_, err = j.GetGitOps(ctx, thrN)
 		if err != nil {
 			Printf("%s gitops failed: %+v\n", j.URL, err)
@@ -1227,6 +1229,7 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 			Printf("%s setting total_lines_of_code failed: %+v\n", j.URL, err)
 			return
 		}
+		return
 	}
 	thrN := GetThreadsNum(ctx)
 	if thrN > 1 {
