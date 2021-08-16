@@ -6,7 +6,7 @@ do
   data=$(curl -s -XPOST -H 'Content-Type: application/json' "${ES}/_sql?format=json" -d"{\"query\":\"select min(total_lines_of_code), max(total_lines_of_code) from \\\"${i}\\\"\"}" | jq --compact-output -r ".rows[0]")
   mi=$(echo "$data" | jq --compact-output -r '.[0]')
   ma=$(echo "$data" | jq --compact-output -r '.[1]')
-  if ( [ "$mi" = "0" ] && [ ! "$ma" = "0" ] )
+  if ( [ "$mi" = "0" ] && [ ! "$ma" = "0" ] && [ ! -z "$ma" ] )
   then
     result=$(curl -s -XPOST -H 'Content-Type: application/json' "${ES}/${i}/_update_by_query?pretty" -d"{\"script\":{\"inline\":\"ctx._source.total_lines_of_code=\\\"${ma}\\\";\"},\"query\":{\"term\":{\"total_lines_of_code\":\"0\"}}}" | jq -rS --compact-output '.updated')
     echo "$i set $ma LOC result: $result"
