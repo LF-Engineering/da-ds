@@ -1409,11 +1409,20 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 			}
 		}
 	}
+	if eschaMtx != nil {
+		eschaMtx.Lock()
+	}
 	for _, esch := range escha {
 		err = <-esch
 		if err != nil {
+			if eschaMtx != nil {
+				eschaMtx.Unlock()
+			}
 			return
 		}
+	}
+	if eschaMtx != nil {
+		eschaMtx.Unlock()
 	}
 	err = cmd.Wait()
 	if err != nil {
@@ -2033,13 +2042,19 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 			if e != nil {
 				return
 			}
-			mtx.Lock()
+			if thrN > 1 {
+				mtx.Lock()
+			}
 			e = EnrichPairProgrammingItem(rich.(map[string]interface{}))
 			if e != nil {
-				mtx.Unlock()
+				if thrN > 1 {
+					mtx.Unlock()
+				}
 				return
 			}
-			mtx.Unlock()
+			if thrN > 1 {
+				mtx.Unlock()
+			}
 		}
 		if thrN > 1 {
 			mtx.Lock()
