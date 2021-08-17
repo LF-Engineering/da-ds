@@ -690,11 +690,20 @@ func (j *DSJira) FetchItems(ctx *Ctx) (err error) {
 			return
 		}
 	}
+	if eschaMtx != nil {
+		eschaMtx.Lock()
+	}
 	for _, esch := range escha {
 		err = <-esch
 		if err != nil {
+			if eschaMtx != nil {
+				eschaMtx.Unlock()
+			}
 			return
 		}
+	}
+	if eschaMtx != nil {
+		eschaMtx.Unlock()
 	}
 	nIssues := len(allIssues)
 	if ctx.Debug > 0 {

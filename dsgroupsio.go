@@ -521,11 +521,20 @@ func (j *DSGroupsio) FetchItems(ctx *Ctx) (err error) {
 	if ctx.Debug > 0 {
 		Printf("%d wait channels\n", len(escha))
 	}
+	if eschaMtx != nil {
+		eschaMtx.Lock()
+	}
 	for _, esch := range escha {
 		err = <-esch
 		if err != nil {
+			if eschaMtx != nil {
+				eschaMtx.Unlock()
+			}
 			return
 		}
+	}
+	if eschaMtx != nil {
+		eschaMtx.Unlock()
 	}
 	nMsgs := len(allMsgs)
 	if ctx.Debug > 0 {

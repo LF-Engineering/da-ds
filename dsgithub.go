@@ -2708,11 +2708,20 @@ func (j *DSGitHub) FetchItemsIssue(ctx *Ctx) (err error) {
 			issProcessed++
 		}
 	}
+	if eschaMtx != nil {
+		eschaMtx.Lock()
+	}
 	for _, esch := range escha {
 		err = <-esch
 		if err != nil {
+			if eschaMtx != nil {
+				eschaMtx.Unlock()
+			}
 			return
 		}
+	}
+	if eschaMtx != nil {
+		eschaMtx.Unlock()
 	}
 	nIssues := len(allIssues)
 	if ctx.Debug > 0 {

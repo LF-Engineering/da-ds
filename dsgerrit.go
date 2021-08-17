@@ -471,11 +471,20 @@ func (j *DSGerrit) FetchItems(ctx *Ctx) (err error) {
 			}
 		}
 	}
+	if eschaMtx != nil {
+		eschaMtx.Lock()
+	}
 	for _, esch := range escha {
 		err = <-esch
 		if err != nil {
+			if eschaMtx != nil {
+				eschaMtx.Unlock()
+			}
 			return
 		}
+	}
+	if eschaMtx != nil {
+		eschaMtx.Unlock()
 	}
 	nReviews := len(allReviews)
 	if ctx.Debug > 0 {

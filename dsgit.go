@@ -1267,7 +1267,8 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 	nThreads := 0
 	locFinished := false
 	waitForLOC := func() (e error) {
-		if thrN == 1 {
+		if thrN <= 1 {
+			locFinished = true
 			return
 		}
 		waitLOCMtx.Lock()
@@ -1450,7 +1451,7 @@ func (j *DSGit) FetchItems(ctx *Ctx) (err error) {
 			}
 		}()
 	}
-	if thrN > 0 {
+	if thrN > 1 {
 		err = <-occh
 	}
 	return
