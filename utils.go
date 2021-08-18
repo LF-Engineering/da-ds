@@ -60,15 +60,15 @@ func MemCacheDeleteExpired(ctx *Ctx) {
 func MaybeMemCacheCleanup(ctx *Ctx) {
 	// chance for cache cleanup
 	if rand.Intn(100) < CacheCleanupProb {
-		go func() {
-			if MT {
+		if MT {
+			go func() {
 				memCacheMtx.Lock()
-			}
-			MemCacheDeleteExpired(ctx)
-			if MT {
+				MemCacheDeleteExpired(ctx)
 				memCacheMtx.Unlock()
-			}
-		}()
+			}()
+			return
+		}
+		MemCacheDeleteExpired(ctx)
 	}
 }
 

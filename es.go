@@ -368,18 +368,18 @@ func SetL2Cache(ctx *Ctx, k, tg string, b []byte, expires time.Duration) {
 func MaybeESCacheCleanup(ctx *Ctx) {
 	// chance for cache cleanup
 	if rand.Intn(100) < CacheCleanupProb {
-		go func() {
-			if MT {
+		if MT {
+			go func() {
 				esCacheMtx.Lock()
-			}
-			ESCacheDeleteExpired(ctx)
-			if MT {
+				ESCacheDeleteExpired(ctx)
 				esCacheMtx.Unlock()
-			}
-			if ctx.Debug > 2 {
-				Printf("ContributorsCache: deleted expired items\n")
-			}
-		}()
+				if ctx.Debug > 2 {
+					Printf("ContributorsCache: deleted expired items\n")
+				}
+			}()
+			return
+		}
+		ESCacheDeleteExpired(ctx)
 	}
 }
 
