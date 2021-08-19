@@ -32,6 +32,7 @@ func IsEmailValid(e string) bool {
 
 // GetEnrollments get identity single and multi organization
 func GetEnrollments(auth0ClientProvider Auth0Client, httpClientProvider HTTPClientProvider, AffBaseURL string, projectSlug string, uuid string, date time.Time) (string, []string, error) {
+	// space in projectSlug is to handle empty slug which encounter invalid url, it is optional and whatever you send it will return the same enrollment result
 	if projectSlug == "" {
 		projectSlug = " "
 	}
