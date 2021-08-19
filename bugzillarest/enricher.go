@@ -200,8 +200,6 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 				enriched.AssignedToUUID = authorUUID
 				enriched.AssignedToDetailOrgName = unknown
 				enriched.AssignedToOrgName = unknown
-				enriched.AssignedToDetailMultiOrgName = multiOrgs
-
 			}
 		}
 	}
@@ -242,7 +240,7 @@ func (e *Enricher) EnrichItem(rawItem Raw, now time.Time) (*BugRestEnrich, error
 				enriched.AuthorBot = true
 			}
 
-			if len(orgs) != 0 && orgs[0] != unknown {
+			if len(orgs) != 0 && orgs[0] != "unknown" {
 				enriched.CreatorDetailMultiOrgName = orgs
 				enriched.AuthorMultiOrgNames = orgs
 			}

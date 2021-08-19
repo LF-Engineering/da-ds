@@ -241,9 +241,6 @@ func TestEnrichItem(t *testing.T) {
           "author_org_name" : "Unknown",
           "timeopen_days" : 0,
           "creator_detail_user_name" : "",
-          "assigned_to_detail_multi_org_names" : [
-            "Unknown"
-          ],
           "main_description_analyzed" : "Test bug",
           "creator_detail_org_name" : "Unknown",
           "assigned_to_detail_domain" : "",
@@ -259,9 +256,6 @@ func TestEnrichItem(t *testing.T) {
           "summary_analyzed" : "Test bug",
           "author_name" : "qian.q.xu@intel.com",
           "metadata__updated_on" : "2017-09-14T09:46:38Z",
-          "author_multi_org_names" : [
-            "Unknown"
-          ],
           "creator_detail_uuid" : "756be8209f265138d271a6223fa0d85085e308db",
           "author_gender" : "Unknown",
           "metadata__filter_raw" : null,
@@ -279,9 +273,6 @@ func TestEnrichItem(t *testing.T) {
           "metadata__enriched_on" : "2020-07-22T07:49:33.800387Z",
           "project_ts" : 1.595404173800387e+09,
           "project" : "dpdk-common",
-          "creator_detail_multi_org_names" : [
-            "Unknown"
-          ],
           "assigned_to_detail_org_name" : "Unknown",
           "metadata__timestamp" : "2020-06-30T06:28:54.892008Z",
           "tag" : "https://bugs.dpdk.org/",
@@ -346,7 +337,7 @@ func TestEnrichItem(t *testing.T) {
 		headers := make(map[string]string)
 		headers["Authorization"] = "Bearer " + "token"
 		resBody := `{"org": "", "orgs":[]}`
-		requestURL := "/affiliation//both/756be8209f265138d271a6223fa0d85085e308db/2017-09-14 09:46:38 +0000 UTC"
+		requestURL := "/affiliation/ /both/756be8209f265138d271a6223fa0d85085e308db/2017-14-09 09:46:38"
 		httpClientMock.On("Request", requestURL, "GET", headers, mock.Anything, mock.Anything).Return(200, []byte(resBody), nil)
 		params := &EnricherParams{
 			Project:        "dpdk-common",
