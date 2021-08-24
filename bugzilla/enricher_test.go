@@ -113,9 +113,6 @@ func TestEnrichItem(t *testing.T) {
           "reporter_gender_acc" : 0,
           "assigned_to_gender_acc" : 0,
           "author_user_name" : "",
-          "assigned_to_multi_org_names" : [
-            "Unknown"
-          ],
           "assigned_to_id" : "a89364af9818412b8c59193ca83b30dd67b20e35",
           "author_name" : "Vasyl",
           "assigned_to_domain" : "gmail.com",
@@ -176,8 +173,8 @@ func TestEnrichItem(t *testing.T) {
 		resBody := `{"org": "", "orgs":[]}`
 		resBody2 := `{"org": "", "orgs":["MontaVista Software, LLC"]}`
 
-		requestURL := "/affiliation//both/5d408e590365763c3927084d746071fa84dc8e52/2020-12-07 14:38:23.895437 +0000 UTC"
-		requestURL2 := "/affiliation//both/50ffba4dfbedc6dc4390fc8bde7aeec0a7191056/2020-12-07 14:38:23.895437 +0000 UTC"
+		requestURL := "/affiliation/ /both/5d408e590365763c3927084d746071fa84dc8e52/2020-07-12 14:38:23"
+		requestURL2 := "/affiliation/ /both/50ffba4dfbedc6dc4390fc8bde7aeec0a7191056/2020-07-12 14:38:23"
 		httpClientMock.On("Request", requestURL, "GET", headers, mock.Anything, mock.Anything).Return(200, []byte(resBody), nil)
 		httpClientMock.On("Request", requestURL2, "GET", headers, mock.Anything, mock.Anything).Return(200, []byte(resBody2), nil)
 
