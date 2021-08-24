@@ -118,16 +118,15 @@ func (e *Enricher) EnrichItem(rawItem RepositoryRaw, project string, now time.Ti
 
 	enriched.MetadataBackendName = fmt.Sprintf("%sEnrich", strings.Title(e.DSName))
 	enriched.BackendVersion = e.BackendVersion
-	now = now.UTC()
-	enriched.MetadataEnrichedOn = now
 
 	enriched.MetadataTimestamp = rawItem.MetadataTimestamp
 	if rawItem.MetadataTimestamp.IsZero() {
 		enriched.MetadataTimestamp = rawItem.MetadataUpdatedOn.UTC()
 	}
 
-	enriched.MetadataUpdatedOn = rawItem.MetadataUpdatedOn.UTC()
-	enriched.CreationDate = rawItem.MetadataUpdatedOn
+	enriched.MetadataUpdatedOn = rawItem.Data.LastUpdated
+	enriched.MetadataEnrichedOn = rawItem.MetadataUpdatedOn.UTC()
+	enriched.CreationDate = rawItem.Data.LastUpdated
 
 	// todo: the 3 following fields filling is vague
 	enriched.RepositoryLabels = nil
