@@ -112,9 +112,14 @@ func (f *Fetcher) FetchItem(owner string, repository string, now time.Time) (*Re
 	}
 
 	statusCode, resBody, err := f.HTTPClientProvider.Request(requestURL, "GET", headers, nil, nil)
-	if err != nil || statusCode != http.StatusOK {
-		dads.Printf("[dads-dockerhub] FetchItem get repository error : %+v, status code : %v, response body : %s\n", err, statusCode, resBody)
+	if err != nil {
+		dads.Printf("[dads-dockerhub] FetchItem get repository error : %+v\n", err, statusCode, resBody)
 		return nil, err
+	}
+
+	if statusCode != http.StatusOK {
+		dads.Printf("[dads-dockerhub] FetchItem get repository error, status code : %v, response body : %s\n", statusCode, resBody)
+		return nil, fmt.Errorf("status code error %+v", statusCode)
 	}
 
 	repoRes := &RepositoryResponse{}
