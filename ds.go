@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -35,6 +36,8 @@ var (
 	RawFields = []string{DefaultDateField, DefaultTimestampField, DefaultOriginField, DefaultTagField, UUID, Offset}
 	// DefaultDateFrom - default date from
 	DefaultDateFrom = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
+ 	// emailRegex ...
+	emailRegex = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
 )
 
 // DS - interface for all data source types
@@ -1390,7 +1393,21 @@ func EnrichItem(ctx *Ctx, ds DS, richItem map[string]interface{}) (err error) {
 	richItem[DefaultEnrichDateField] = time.Now()
 	richItem[ProjectSlug] = ctx.ProjectSlug
 	richItem["groups"] = ctx.Groups
+	// cleanup author name in case it's an email address
+	richItem["author_name"] = GetEmailUsername(richItem["author_name"].(string))
 	return
+}
+
+// GetEmailUsername returns username from email address
+func GetEmailUsername(probableEmailString string) string {
+	probableEmailString = strings.TrimSpace(probableEmailString)
+	if IsValidEmail(probableEmailString) {
+		usernameAndDomain := strings.Split(probableEmailString, "@")
+		if len(usernameAndDomain) > 1 {
+			return usernameAndDomain[0]
+		}
+	}
+	return probableEmailString
 }
 
 // UpdateRateLimit - generic function to get rate limit data from header
