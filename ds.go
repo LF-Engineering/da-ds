@@ -245,12 +245,18 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				name := ident[0]
 				username := ident[1]
 				email := ident[2]
+				// DA-4366: starts
+				origname := name
+				origusername := username
+				// DA-4366: ends
 				name, username = PostprocessNameUsername(name, username, email)
 				var (
-					pname     *string
-					pemail    *string
-					pusername *string
-					profname  *string
+					pname         *string
+					pemail        *string
+					pusername     *string
+					profname      *string
+					porigname     *string
+					porigusername *string
 				)
 				if name != Nil {
 					pname = &name
@@ -261,6 +267,12 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				}
 				if username != Nil {
 					pusername = &username
+				}
+				if origname != Nil {
+					porigname = &origname
+				}
+				if origusername != Nil {
+					porigusername = &origusername
 				}
 				if pname == nil && pemail == nil && pusername == nil {
 					continue
@@ -276,6 +288,9 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 					email = name
 				}
 				// uuid(source, email, name, username)
+				// DA-4366: starts
+				origuuid := UUIDAffs(ctx, source, email, origname, origusername)
+				// DA-4366: ends
 				uuid := UUIDAffs(ctx, source, email, name, username)
 				if uuid == "" {
 					er := fmt.Errorf("error: uploadToDB: failed to generate uuid for (%s,%s,%s,%s)", source, email, name, username)
@@ -284,14 +299,18 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 					continue
 				}
 				var rows *sql.Rows
-				rows, er = QuerySQL(ctx, nil, "select uuid from identities where id = ?", uuid)
+				rows, er = QuerySQL(ctx, nil, "select uuid from identities where id in (?, ?)", uuid, origuuid)
 				if er != nil {
 					errs = append(errs, er)
 					continue
 				}
 				mergedUUID := uuid
+				// DA-4366: starts
+				isMerged := false
+				// DA-4366: ends
 				for rows.Next() {
 					er = rows.Scan(&mergedUUID)
+					isMerged = true
 					break
 				}
 				if er != nil {
@@ -311,11 +330,48 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				if ctx.Debug > 0 && uuid != mergedUUID {
 					Printf("one-by-one: merged profile detected: %s -> %s\n", uuid, mergedUUID)
 				}
+				// DA-4366: starts
+				// skip adding identity/profile/uidentity if identity already exists
+				if isMerged {
+					continue
+				}
+				rows, er = QuerySQL(ctx, nil, "select 1 from profiles where uuid in (?, ?)", uuid, origuuid)
+				if er != nil {
+					errs = append(errs, er)
+					continue
+				}
+				dummy := 0
+				for rows.Next() {
+					er = rows.Scan(&dummy)
+					break
+				}
+				if er != nil {
+					errs = append(errs, er)
+					continue
+				}
+				er = rows.Err()
+				if er != nil {
+					errs = append(errs, er)
+					continue
+				}
+				er = rows.Close()
+				if er != nil {
+					errs = append(errs, er)
+					continue
+				}
+				// skip adding identity/profile/uidentity if identity already exists
+				if dummy != 0 {
+					continue
+				}
+				// DA-4366: ends
 				queryU += fmt.Sprintf("(?,now())")
 				queryI += fmt.Sprintf("(?,?,?,?,?,?,now())")
 				queryP += fmt.Sprintf("(?,?,?)")
 				argsU = append(argsU, mergedUUID)
-				argsI = append(argsI, uuid, source, pname, pemail, pusername, mergedUUID)
+				// DA-4366: starts
+				// argsI = append(argsI, uuid, source, pname, pemail, pusername, mergedUUID)
+				argsI = append(argsI, uuid, source, porigname, pemail, porigusername, mergedUUID)
+				// DA-4366: ends
 				argsP = append(argsP, mergedUUID, profname, pemail)
 				itx, err = ctx.DB.Begin()
 				if err != nil {
@@ -350,20 +406,27 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 			}
 			return
 		}
-		defer func() {
-			if tx != nil {
-				if ctx.DryRun {
-					Printf("DB bulk upload: dry-run: rolling back %d identities insert (possibly due to dry-run mode)\n", nIdents)
-				} else {
-					Printf("DB bulk upload: rolling back %d identities insert\n", nIdents)
-				}
-				_ = tx.Rollback()
-				err = runOneByOne()
-			}
-		}()
 		if ctx.Debug > 0 {
 			Printf("DB bulk upload: bulk adding %d (%d unique) idents\n", nNonUni, nIdents)
 		}
+		// NOTE: For normal bulk mode operation, uncomment the deferred function
+		/*
+			defer func() {
+				if tx != nil {
+					if ctx.DryRun {
+						Printf("DB bulk upload: dry-run: rolling back %d identities insert (possibly due to dry-run mode)\n", nIdents)
+					} else {
+						Printf("DB bulk upload: rolling back %d identities insert\n", nIdents)
+					}
+					_ = tx.Rollback()
+					err = runOneByOne()
+				}
+			}()
+		*/
+		// NOTE: now because new specs were added - and they prevent nulk mode, because we need to check the DB state first, before any insert
+		// Comment out manually called runOneByOne() and uncomment deferred
+		err = runOneByOne()
+		// End note.
 		nPacks := nIdents / bulkSize
 		if nIdents%bulkSize != 0 {
 			nPacks++
