@@ -355,7 +355,7 @@ func (m *Manager) enrich(lastActionCachePostfix string) <-chan error {
 			query["from"] = offset
 			topHits, err = m.Fetcher.Query(fmt.Sprintf("%s-raw", m.ESIndex), query)
 			if err != nil {
-				ch <- nil
+				ch <- err
 				return
 			}
 
