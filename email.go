@@ -27,7 +27,7 @@ var (
 
 // IsValidEmail - is email correct: len, regexp, MX domain
 // uses internal cache
-func IsValidEmail(email string) (valid bool) {
+func IsValidEmail(email string, validateDomain bool) (valid bool) {
 	l := len(email)
 	if l < 3 && l > 254 {
 		return
@@ -57,10 +57,12 @@ func IsValidEmail(email string) (valid bool) {
 	if !EmailRegex.MatchString(email) {
 		return
 	}
-	parts := strings.Split(email, "@")
-	mx, err := net.LookupMX(parts[1])
-	if err != nil || len(mx) == 0 {
-		return
+	if validateDomain {
+		parts := strings.Split(email, "@")
+		mx, err := net.LookupMX(parts[1])
+		if err != nil || len(mx) == 0 {
+			return
+		}
 	}
 	valid = true
 	return

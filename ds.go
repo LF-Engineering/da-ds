@@ -247,7 +247,7 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				email := ident[2]
 				// DA-4391 - future
 				/*
-					if !IsValidEmail(email) {
+					if !IsValidEmail(email, true) {
 						email = ""
 					}
 				*/
@@ -284,12 +284,12 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 					continue
 				}
 				// if username matches a real email and there is no email set, assume email=username
-				if pemail == nil && pusername != nil && IsValidEmail(username) {
+				if pemail == nil && pusername != nil && IsValidEmail(username, true) {
 					pemail = &username
 					email = username
 				}
 				// if name matches a real email and there is no email set, assume email=name
-				if pemail == nil && pname != nil && IsValidEmail(name) {
+				if pemail == nil && pname != nil && IsValidEmail(name, true) {
 					pemail = &name
 					email = name
 				}
@@ -479,12 +479,12 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 					continue
 				}
 				// if username matches a real email and there is no email set, assume email=username
-				if pemail == nil && pusername != nil && IsValidEmail(username) {
+				if pemail == nil && pusername != nil && IsValidEmail(username, true) {
 					pemail = &username
 					email = username
 				}
 				// if name matches a real email and there is no email set, assume email=name
-				if pemail == nil && pname != nil && IsValidEmail(name) {
+				if pemail == nil && pname != nil && IsValidEmail(name, true) {
 					pemail = &name
 					email = name
 				}
