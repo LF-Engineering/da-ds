@@ -246,9 +246,9 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				username := ident[1]
 				email := ident[2]
 				// DA-4391 - future
-				if !IsValidEmail(email, true) {
-					email = ""
-				}
+				// returns (valid, newEmail), if email is invalid "" is returned this is why we can skip testing for valid
+				// params: (email, validateDomain, guess), guess means that we do some replaces like " at " -> "@" etc.
+				_, email = IsValidEmail(email, true, true)
 				// DA-4366: starts
 				origname := name
 				origusername := username
@@ -282,14 +282,22 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 					continue
 				}
 				// if username matches a real email and there is no email set, assume email=username
-				if pemail == nil && pusername != nil && IsValidEmail(username, true) {
-					pemail = &username
-					email = username
+				if pemail == nil && pusername != nil {
+					valid, em := IsValidEmail(username, true, true)
+					if valid {
+						username = em
+						pemail = &username
+						email = username
+					}
 				}
 				// if name matches a real email and there is no email set, assume email=name
-				if pemail == nil && pname != nil && IsValidEmail(name, true) {
-					pemail = &name
-					email = name
+				if pemail == nil && pname != nil {
+					valid, em := IsValidEmail(name, true, true)
+					if valid {
+						name = em
+						pemail = &name
+						email = name
+					}
 				}
 				// uuid(source, email, name, username)
 				// DA-4366: starts
@@ -477,14 +485,22 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 					continue
 				}
 				// if username matches a real email and there is no email set, assume email=username
-				if pemail == nil && pusername != nil && IsValidEmail(username, true) {
-					pemail = &username
-					email = username
+				if pemail == nil && pusername != nil {
+					valid, em := IsValidEmail(username, true, true)
+					if valid {
+						username = em
+						pemail = &username
+						email = username
+					}
 				}
 				// if name matches a real email and there is no email set, assume email=name
-				if pemail == nil && pname != nil && IsValidEmail(name, true) {
-					pemail = &name
-					email = name
+				if pemail == nil && pname != nil {
+					valid, em := IsValidEmail(name, true, true)
+					if valid {
+						name = em
+						pemail = &name
+						email = name
+					}
 				}
 				// uuid(source, email, name, username)
 				uuid := UUIDAffs(ctx, source, email, name, username)

@@ -12,9 +12,9 @@ var (
 	// EmailRegex - regexp to match email address
 	EmailRegex = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
 	// EmailReplacer - replacer for some email buggy characters
-	EmailReplacer = strings.NewReplacer(" at ", "@", " AT ", "@", " At ", "@", " dot ", ".", " DOT ", ".", " Dot ", ".", "<", "", ">", "")
+	EmailReplacer = strings.NewReplacer(" at ", "@", " AT ", "@", " At ", "@", " dot ", ".", " DOT ", ".", " Dot ", ".", "<", "", ">", "", "`", "")
 	// emailsCache validation cache
-	emailsCache = map[string]bool{}
+	emailsCache = map[string]string{}
 	// emailsCacheMtx - emails validation cache mutex
 	emailsCacheMtx *sync.RWMutex
 	// OpenAddrRE - '<...' -> '<' (... = whitespace)
@@ -35,19 +35,24 @@ func IsValidDomain(domain string) (valid bool) {
 	if MT {
 		emailsCacheMtx.RLock()
 	}
-	valid, ok := emailsCache[domain]
+	dom, ok := emailsCache[domain]
 	if MT {
 		emailsCacheMtx.RUnlock()
 	}
+	valid = dom != ""
 	if ok {
 		// fmt.Printf("domain cache hit: '%s' -> %v\n", domain, valid)
 		return
 	}
 	defer func() {
+		var dom string
+		if valid {
+			dom = domain
+		}
 		if MT {
 			emailsCacheMtx.Lock()
 		}
-		emailsCache[domain] = valid
+		emailsCache[domain] = dom
 		if MT {
 			emailsCacheMtx.Unlock()
 		}
@@ -62,7 +67,7 @@ func IsValidDomain(domain string) (valid bool) {
 
 // IsValidEmail - is email correct: len, regexp, MX domain
 // uses internal cache
-func IsValidEmail(email string, validateDomain bool) (valid bool) {
+func IsValidEmail(email string, validateDomain, guess bool) (valid bool, newEmail string) {
 	l := len(email)
 	if l < 6 && l > 254 {
 		return
@@ -70,25 +75,29 @@ func IsValidEmail(email string, validateDomain bool) (valid bool) {
 	if MT {
 		emailsCacheMtx.RLock()
 	}
-	valid, ok := emailsCache[email]
+	nEmail, ok := emailsCache[email]
 	if MT {
 		emailsCacheMtx.RUnlock()
 	}
 	if ok {
+		newEmail = nEmail
+		valid = newEmail != ""
 		return
 	}
 	defer func() {
 		if MT {
 			emailsCacheMtx.Lock()
 		}
-		emailsCache[email] = valid
+		emailsCache[email] = newEmail
 		if MT {
 			emailsCacheMtx.Unlock()
 		}
 	}()
-	email = WhiteSpace.ReplaceAllString(email, " ")
-	email = strings.TrimSpace(EmailReplacer.Replace(email))
-	email = strings.Split(email, " ")[0]
+	if guess {
+		email = WhiteSpace.ReplaceAllString(email, " ")
+		email = strings.TrimSpace(EmailReplacer.Replace(email))
+		email = strings.Split(email, " ")[0]
+	}
 	if !EmailRegex.MatchString(email) {
 		return
 	}
@@ -98,6 +107,7 @@ func IsValidEmail(email string, validateDomain bool) (valid bool) {
 			return
 		}
 	}
+	newEmail = email
 	valid = true
 	return
 }
