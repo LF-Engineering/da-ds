@@ -25,11 +25,46 @@ var (
 	WhiteSpace = regexp.MustCompile(`\s+`)
 )
 
+// IsValidDomain - is MX domain valid?
+// uses internal cache
+func IsValidDomain(domain string) (valid bool) {
+	l := len(domain)
+	if l < 4 && l > 254 {
+		return
+	}
+	if MT {
+		emailsCacheMtx.RLock()
+	}
+	valid, ok := emailsCache[domain]
+	if MT {
+		emailsCacheMtx.RUnlock()
+	}
+	if ok {
+		// fmt.Printf("domain cache hit: '%s' -> %v\n", domain, valid)
+		return
+	}
+	defer func() {
+		if MT {
+			emailsCacheMtx.Lock()
+		}
+		emailsCache[domain] = valid
+		if MT {
+			emailsCacheMtx.Unlock()
+		}
+	}()
+	mx, err := net.LookupMX(domain)
+	if err != nil || len(mx) == 0 {
+		return
+	}
+	valid = true
+	return
+}
+
 // IsValidEmail - is email correct: len, regexp, MX domain
 // uses internal cache
 func IsValidEmail(email string, validateDomain bool) (valid bool) {
 	l := len(email)
-	if l < 3 && l > 254 {
+	if l < 6 && l > 254 {
 		return
 	}
 	if MT {
@@ -59,8 +94,7 @@ func IsValidEmail(email string, validateDomain bool) (valid bool) {
 	}
 	if validateDomain {
 		parts := strings.Split(email, "@")
-		mx, err := net.LookupMX(parts[1])
-		if err != nil || len(mx) == 0 {
+		if len(parts) <= 1 || !IsValidDomain(parts[1]) {
 			return
 		}
 	}
