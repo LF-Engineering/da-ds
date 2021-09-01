@@ -124,7 +124,6 @@ func runDS(ctx *lib.Ctx) (err error) {
 
 func main() {
 	var ctx lib.Ctx
-
 	rand.Seed(time.Now().UnixNano())
 	dtStart := time.Now()
 	ctx.Init()

@@ -11,6 +11,8 @@ import (
 var (
 	// EmailRegex - regexp to match email address
 	EmailRegex = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
+	// EmailReplacer - replacer for some email buggy characters
+	EmailReplacer = strings.NewReplacer(" at ", "@", " AT ", "@", " At ", "@", " dot ", ".", " DOT ", ".", " Dot ", ".", "<", "", ">", "")
 	// emailsCache validation cache
 	emailsCache = map[string]bool{}
 	// emailsCacheMtx - emails validation cache mutex
@@ -19,6 +21,8 @@ var (
 	OpenAddrRE = regexp.MustCompile(`<\s+`)
 	// CloseAddrRE - '...>' -> '>' (... = whitespace)
 	CloseAddrRE = regexp.MustCompile(`\s+>`)
+	// WhiteSpace - one or more whitespace characters
+	WhiteSpace = regexp.MustCompile(`\s+`)
 )
 
 // IsValidEmail - is email correct: len, regexp, MX domain
@@ -47,6 +51,9 @@ func IsValidEmail(email string) (valid bool) {
 			emailsCacheMtx.Unlock()
 		}
 	}()
+	email = WhiteSpace.ReplaceAllString(email, " ")
+	email = strings.TrimSpace(EmailReplacer.Replace(email))
+	email = strings.Split(email, " ")[0]
 	if !EmailRegex.MatchString(email) {
 		return
 	}

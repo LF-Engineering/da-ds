@@ -245,6 +245,12 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				name := ident[0]
 				username := ident[1]
 				email := ident[2]
+				// DA-4391 - future
+				/*
+					if !IsValidEmail(email) {
+						email = ""
+					}
+				*/
 				// DA-4366: starts
 				origname := name
 				origusername := username
