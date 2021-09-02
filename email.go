@@ -62,18 +62,16 @@ func IsValidDomain(domain string) (valid bool) {
 		mx, err := net.LookupMX(domain)
 		if err == nil && len(mx) > 0 {
 			valid = true
-			break
+			return
 		}
 	}
-	if !valid {
-		for i := 1; i <= 3; i++ {
-			mx, err := net.LookupMX(domain)
-			if err == nil && len(mx) > 0 {
-				valid = true
-				break
-			}
-			time.Sleep(time.Duration(i) * time.Second)
+	for i := 1; i <= 3; i++ {
+		mx, err := net.LookupMX(domain)
+		if err == nil && len(mx) > 0 {
+			valid = true
+			return
 		}
+		time.Sleep(time.Duration(i) * time.Second)
 	}
 	return
 }
