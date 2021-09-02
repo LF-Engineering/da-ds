@@ -3,6 +3,7 @@ package pipermail
 import (
 	"archive/zip"
 	"bytes"
+	"compress/bzip2"
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
@@ -151,27 +152,56 @@ func (f *Fetcher) FetchItem(slug, groupName, endpoint string, fromDate time.Time
 		baseExtension := filepath.Ext(filePath)
 		filename = strings.TrimSuffix(filename, filepath.Ext(filename))
 
-		var decompressedFileContentReader *gzip.Reader
+		var decompressedFileContentReaderGzip *gzip.Reader
+		var decompressedFileContentReaderZip io.Reader
+		var decompressedFileContentReaderBzip io.Reader
 		var content []byte
 		var byts []byte
 
 		// Create new reader to decompress gzip.
 		if baseExtension == ".gz" {
-			decompressedFileContentReader, err = gzip.NewReader(fl)
+			decompressedFileContentReaderGzip, err = gzip.NewReader(fl)
 			if err != nil {
 				return nil, err
+			}
+		} else if baseExtension == ".bzip2" {
+			decompressedFileContentReaderBzip = bzip2.NewReader(fl)
+			if err != nil {
+				return nil, err
+			}
+		} else if baseExtension == ".zip" {
+			fz, err := zip.OpenReader(filePath)
+			if err != nil {
+				return nil, err
+			}
+			//buf := new(bytes.Buffer)
+			decompressedFileContentReaderZip, err = fz.File[0].Open()
+			if err != nil {
+				fmt.Printf("failed to open mbox archive %+v, because %+v", filePath, err)
 			}
 		} else {
 			content, err = ioutil.ReadFile(filePath)
 			if err != nil {
+				fmt.Printf("failed to open mbox archive %+v, because %+v", filePath, err)
 				continue
 			}
-
 		}
 
-		if decompressedFileContentReader != nil {
+		if decompressedFileContentReaderGzip != nil {
 			// Read in data.
-			byts, err = ioutil.ReadAll(decompressedFileContentReader)
+			byts, err = ioutil.ReadAll(decompressedFileContentReaderGzip)
+			if err != nil {
+				return nil, err
+			}
+		} else if decompressedFileContentReaderBzip != nil {
+			// Read in data.
+			byts, err = ioutil.ReadAll(decompressedFileContentReaderBzip)
+			if err != nil {
+				return nil, err
+			}
+		} else if decompressedFileContentReaderZip != nil {
+			// Read in data.
+			byts, err = ioutil.ReadAll(decompressedFileContentReaderZip)
 			if err != nil {
 				return nil, err
 			}
