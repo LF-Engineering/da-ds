@@ -315,9 +315,7 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 
 func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-chan error {
 	ch := make(chan error)
-	//m.run()
 	resultC := make(chan result, 0)
-	numJobs := m.NumberOfRawMessages
 	jobs := make(chan *RawMessage, m.NumberOfRawMessages)
 
 	go func() {
@@ -401,7 +399,7 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 			}
 			close(jobs)
 
-			for a := 1; a <= numJobs; a++ {
+			for a := 1; a <= len(topHits.Hits.Hits); a++ {
 				res := <-resultC
 				log.Printf("[main] task %d has been finished with result message id %+v", res.id, res.enrichedItem.MessageID)
 				data = append(data, elastic.BulkData{IndexName: m.ESIndex, ID: res.enrichedItem.UUID, Data: res.enrichedItem})
