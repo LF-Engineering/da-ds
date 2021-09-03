@@ -3,6 +3,7 @@ package pipermail
 import (
 	"fmt"
 	"log"
+	"regexp"
 	"strings"
 	"time"
 
@@ -10,6 +11,9 @@ import (
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 	"github.com/araddon/dateparse"
 )
+
+var emailRegex = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
+
 
 // AffiliationClient manages user identity
 type AffiliationClient interface {
@@ -183,6 +187,11 @@ func (e *Enricher) IsValidEmail(rawMailString string) bool {
 		return false
 	}
 
+	if ok := emailRegex.MatchString(rawMailString); !ok {
+		log.Println("invalid email pattern: ", rawMailString)
+		return false
+	}
+
 	return true
 }
 
@@ -216,7 +225,16 @@ func (e *Enricher) GetUserName(rawMailString string) (username string) {
 	trimBraces := strings.Split(rawMailString, " (")
 	username = strings.TrimSpace(trimBraces[1])
 	username = strings.TrimSpace(strings.Replace(username, ")", "", 1))
-	return
+	return e.GetEmailUsername(username)
+}
+
+// GetEmailUsername ...
+func (e *Enricher) GetEmailUsername(email string) string {
+	username := strings.Split(email, "@")
+	if len(username) > 1 {
+		return username[0]
+	}
+	return email
 }
 
 // FormatTimestampString returns a formatted RFC 33339 Datetime string

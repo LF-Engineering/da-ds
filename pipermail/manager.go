@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -75,6 +76,8 @@ type Manager struct {
 	Auth0URL               string
 	Environment            string
 	WebHookURL             string
+	MaxWorkers             int
+	NumberOfRawMessages    int
 
 	esClientProvider ESClientProvider
 	fetcher          *Fetcher
@@ -127,6 +130,7 @@ func NewManager(endPoint, slug, shConnStr, fetcherBackendVersion, enricherBacken
 		fetcher:                nil,
 		enricher:               nil,
 		WebHookURL:             webHookURL,
+		MaxWorkers:             1000,
 	}
 
 	fetcher, enricher, esClientProvider, err := buildServices(mng)
@@ -300,6 +304,7 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 					}
 				}
 			}
+			m.NumberOfRawMessages = sizeOfData
 			log.Println("DONE WITH RAW ENRICHMENT")
 		}
 		ch <- nil
@@ -310,8 +315,8 @@ func (m *Manager) fetch(fetcher *Fetcher, lastActionCachePostfix string) <-chan 
 
 func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-chan error {
 	ch := make(chan error)
-	m.run()
 	resultC := make(chan result, 0)
+	jobs := make(chan *RawMessage, m.NumberOfRawMessages)
 
 	go func() {
 		enrichID := "enrich"
@@ -382,29 +387,21 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 			}
 
 			data := make([]elastic.BulkData, 0)
-			totalItemsEnriched := 0
-			for id, hit := range topHits.Hits.Hits {
-				nHitSource := hit.Source
-				pID := id
-				if lastEnrich.Before(hit.Source.ChangedAt) {
-					m.AddTask(func() {
-						log.Printf("[main] starting task %d", pID)
-						time.Sleep(2 * time.Second)
-						enrichedItem, err := enricher.EnrichMessage(&nHitSource, time.Now().UTC())
-						if err != nil {
-							ch <- err
-							return
-						}
-						resultC <- result{id: pID, enrichedItem: enrichedItem}
-						return
-					})
-					totalItemsEnriched++
-				}
+			for w := 1; w <= m.MaxWorkers; w++ {
+				go m.enrichWorker(w, jobs, resultC)
 			}
 
-			for i := 0; i < totalItemsEnriched; i++ {
+			for _, hit := range topHits.Hits.Hits {
+				nHitSource := hit.Source
+				if lastEnrich.Before(hit.Source.ChangedAt) {
+					jobs <- &nHitSource
+				}
+			}
+			close(jobs)
+
+			for a := 1; a <= len(topHits.Hits.Hits); a++ {
 				res := <-resultC
-				log.Printf("[main] task %d has been finished with result author_uuid %+v", res.id, res.enrichedItem.AuthorUUID)
+				log.Printf("[main] task %d has been finished with result message id %+v", res.id, res.enrichedItem.MessageID)
 				data = append(data, elastic.BulkData{IndexName: m.ESIndex, ID: res.enrichedItem.UUID, Data: res.enrichedItem})
 			}
 			log.Println("LEN ENRICH DATA : ", len(data))
@@ -440,6 +437,21 @@ func (m *Manager) enrich(enricher *Enricher, lastActionCachePostfix string) <-ch
 	}()
 
 	return ch
+}
+
+// enrichWorker spins up workers to enrich messages
+func (m *Manager) enrichWorker(workerID int, jobs <-chan *RawMessage, results chan<- result) {
+	for j := range jobs {
+		log.Printf("worker %+v started job %+v", workerID, j.UUID)
+		enrichedItem, err := m.enricher.EnrichMessage(j, time.Now().UTC())
+		// quit app if error isn't nil
+		if err != nil {
+			os.Exit(1)
+		}
+		time.Sleep(time.Second)
+		log.Printf("worker %+v finished job %+v", workerID, j.UUID)
+		results <- result{id: workerID, enrichedItem: enrichedItem}
+	}
 }
 
 // AddTask adds task to worker pool
