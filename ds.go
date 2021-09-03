@@ -435,9 +435,12 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				}
 			}()
 		*/
-		// NOTE: now because new specs were added - and they prevent nulk mode, because we need to check the DB state first, before any insert
+		// NOTE: now because new specs were added - and they prevent bulk mode, because we need to check the DB state first, before any insert
 		// Comment out manually called runOneByOne() and uncomment deferred
 		err = runOneByOne()
+		if 1 == 1 {
+			return
+		}
 		// End note.
 		nPacks := nIdents / bulkSize
 		if nIdents%bulkSize != 0 {
