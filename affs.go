@@ -191,6 +191,8 @@ func AffsIdentityIDs(ctx *Ctx, ds DS, identity map[string]interface{}) (ids [2]i
 	}
 	identityFound, err := FindObject(ctx, "identities", "id", id, []string{"id", "uuid"})
 	if err != nil || identityFound == nil {
+		ids[0] = id
+		ids[1] = id
 		return
 	}
 	ids[0] = identityFound["id"]
