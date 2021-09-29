@@ -24,6 +24,7 @@ import (
 	"github.com/LF-Engineering/da-ds/pipermail"
 
 	"github.com/LF-Engineering/da-ds/bugzilla"
+	"github.com/LF-Engineering/da-ds/gitlab"
 
 	jsoniter "github.com/json-iterator/go"
 
@@ -85,6 +86,13 @@ func runDS(ctx *lib.Ctx) (err error) {
 		return manager.Sync()
 	case googlegroups.GoogleGroups:
 		manager, err := buildGoogleGroupsManager(ctx)
+		if err != nil {
+			fmt.Println(err)
+			return err
+		}
+		return manager.Sync()
+	case gitlab.Gitlab:
+		manager, err := buildGitlabManager(ctx)
 		if err != nil {
 			fmt.Println(err)
 			return err
@@ -443,6 +451,51 @@ func buildGoogleGroupsManager(ctx *lib.Ctx) (*googlegroups.Manager, error) {
 		fetchSize, enrichSize, affBaseURL, esCacheURL, esCacheUsername, esCachePassword, authGrantType, authClientID, authClientSecret, authAudience, authURL, env)
 
 	return mgr, err
+}
+
+func buildGitlabManager(ctx *lib.Ctx) (*gitlab.Manager, error) {
+
+	params := &gitlab.MgrParams{}
+	authData, err := getAuthData()
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	params.Fetch = ctx.BoolEnv("DOFETCH")
+	params.Enrich = ctx.BoolEnv("DOENRICH")
+	params.ESBulkSize, _ = strconv.Atoi(ctx.Env("ES_BULK_SIZE"))
+	params.ESIndex = ctx.Env("RICH_INDEX")
+	params.ESUrl = ctx.ESURL
+	params.ESPassword = ""
+	params.ESUsername = ""
+	params.ProjectSlug = ctx.Env("PROJECT_SLUG")
+	params.Project = ctx.Env("PROJECT")
+	params.ESCacheUrl = authData["es_url"]
+	params.ESCachePassword = authData["es_pass"]
+	params.ESCacheUsername = authData["es_user"]
+	params.AuthGrantType = authData["grant_type"]
+	params.AuthClientID = authData["client_id"]
+	params.AuthClientSecret = authData["client_secret"]
+	params.AuthAudience = authData["audience"]
+	params.Auth0URL = authData["url"]
+	params.Environment = authData["env"]
+	params.AffBaseURL = ctx.Env("AFFILIATION_API_URL") + "/v1"
+	params.Repo = ctx.Env("REPO")
+	params.Token = ctx.Env("TOKEN")
+
+	timeout, err := time.ParseDuration("60s")
+	if err != nil {
+		fmt.Println(err)
+	}
+	params.HTTPTimeout = timeout
+
+	mgr, err := gitlab.NewManager(params)
+	if err != nil {
+		fmt.Println("manager error:", mgr)
+	}
+
+	return mgr, err
+
 }
 
 func getAuthData() (map[string]string, error) {

@@ -3,15 +3,16 @@ module github.com/LF-Engineering/da-ds
 go 1.15
 
 require (
-	github.com/LF-Engineering/dev-analytics-libraries v1.1.17
+	github.com/LF-Engineering/dev-analytics-libraries v1.1.21
 	github.com/PuerkitoBio/goquery v1.6.0
 	github.com/andybalholm/cascadia v1.2.0 // indirect
 	github.com/araddon/dateparse v0.0.0-20210207001429-0eec95c9db7e
+	github.com/docker/distribution v2.7.1+incompatible
 	github.com/go-sql-driver/mysql v1.5.0
-	github.com/google/go-github/v37 v37.0.0
 	github.com/google/go-github/v38 v38.1.0
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/json-iterator/go v1.1.10
+	github.com/labstack/gommon v0.3.0
 	github.com/lib/pq v1.9.0 // indirect
 	github.com/mattn/go-sqlite3 v1.14.5 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
