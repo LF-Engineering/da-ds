@@ -1,6 +1,10 @@
 #!/bin/bash
 # start=1
 start=1
+if [ ! -z "$START" ]
+then
+  start="$START"
+fi
 e=0
 end=$(curl -s 'https://wiki.anuket.io/rest/api/content/search?cql=lastModified%3E%3D%272000-01-01+00%3A00%27+order+by+lastModified&limit=1&start=1' | jq '.totalSize')
 while true
