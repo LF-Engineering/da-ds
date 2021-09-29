@@ -13,7 +13,7 @@ do
     title=$(echo "$json" | jq -rS '.title')
     link=$(echo "$json" | jq -rS '._links.self')
     e=$((e+1))
-    echo "$e) id=$id: \"$title\": $link"
+    echo "$e) index=$start, id=$id: \"$title\": $link"
   fi
   start=$((start+1))
   if [ "$start" = "$end" ]
