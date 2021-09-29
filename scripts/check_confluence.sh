@@ -14,6 +14,9 @@ do
     link=$(echo "$json" | jq -rS '._links.self')
     e=$((e+1))
     echo "$e) index=$start, id=$id: \"$title\": $link"
+  elif [ ! -z "$DBG" ]
+  then
+    echo "index $start ok"
   fi
   start=$((start+1))
   if [ "$start" = "$end" ]
