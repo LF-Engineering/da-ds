@@ -7,6 +7,7 @@ var (
 {"dynamic":true,
 "properties":{
 "metadata__updated_on":{"type":"date"},
+"grimoire_creation_date":{"type":"date"},
 "metadata__timestamp":{"type":"date"},
 "creation_ts":{"type":"date"},
 "changed_at":{"type":"date"},

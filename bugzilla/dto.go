@@ -88,6 +88,7 @@ type BugRaw struct {
 	LongDesc          []Comment     `json:"long_desc"`
 	BugStatus         string        `json:"bug_status"`
 	MetadataUpdatedOn time.Time     `json:"metadata__updated_on"`
+	GrimoireCreationDate time.Time  `json:"grimoire_creation_date"`
 	MetadataTimestamp time.Time     `json:"metadata__timestamp"`
 	Timestamp         float64       `json:"timestamp"`
 	Category          string        `json:"category"`
@@ -172,6 +173,7 @@ type BugEnrich struct {
 	RepositoryLabels        *[]string `json:"repository_labels"`
 
 	MetadataUpdatedOn      time.Time `json:"metadata__updated_on"`
+	GrimoireCreationDate   time.Time `json:"grimoire_creation_date"`
 	MetadataTimestamp      time.Time `json:"metadata__timestamp"`
 	MetadataEnrichedOn     time.Time `json:"metadata__enriched_on"`
 	MetadataFilterRaw      *string   `json:"metadata__filter_raw"`
