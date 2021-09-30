@@ -236,11 +236,15 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 			}()
 			for i := 0; i < nIdents; i++ {
 				ident := identsAry[i]
+				if ctx.DebugSQL > 0 {
+					Printf("DB bulk upload: one-by-one: ident %d/%d: %+v\n", i, nIdents, ident)
+				}
 				queryU := "insert ignore into uidentities(uuid,last_modified) values"
 				queryI := "insert ignore into identities(id,source,name,email,username,uuid,last_modified) values"
 				queryP := "insert ignore into profiles(uuid,name,email) values"
 				argsU := []interface{}{}
 				argsI := []interface{}{}
+				argsI2 := []interface{}{}
 				argsP := []interface{}{}
 				name := ident[0]
 				username := ident[1]
@@ -248,6 +252,7 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				// DA-4391 - future
 				// returns (valid, newEmail), if email is invalid "" is returned this is why we can skip testing for valid
 				// params: (email, validateDomain, guess), guess means that we do some replaces like " at " -> "@" etc.
+				origemail := email
 				_, email = IsValidEmail(email, true, true)
 				// DA-4366: starts
 				origname := name
@@ -261,6 +266,7 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 					profname      *string
 					porigname     *string
 					porigusername *string
+					porigemail    *string
 				)
 				if name != Nil {
 					pname = &name
@@ -277,6 +283,12 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				}
 				if origusername != Nil {
 					porigusername = &origusername
+				}
+				if origemail != Nil {
+					porigemail = &origemail
+				}
+				if ctx.DebugSQL > 0 {
+					Printf("DB bulk upload: one-by-one: %d/%d: ('%s','%s','%s','%s','%s','%s')\n", i, nIdents, name, username, email, origname, origusername, origemail)
 				}
 				if pname == nil && pemail == nil && pusername == nil {
 					continue
@@ -301,9 +313,18 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				}
 				// uuid(source, email, name, username)
 				// DA-4366: starts
-				origuuid := UUIDAffs(ctx, source, email, origname, origusername)
+				origuuid := UUIDAffs(ctx, source, origemail, origname, origusername)
+				if origuuid == "" {
+					er := fmt.Errorf("error: uploadToDB: failed to generate orig uuid for (%s,%s,%s,%s)", source, origemail, origname, origusername)
+					Printf("DB bulk upload: one-by-one(%d/%d): %v\n", i+1, nIdents, er)
+					errs = append(errs, er)
+					continue
+				}
 				// DA-4366: ends
 				uuid := UUIDAffs(ctx, source, email, name, username)
+				if ctx.DebugSQL > 0 {
+					Printf("DB bulk upload: one-by-one: %d/%d: ('%s','%s','%s','%s','%s','%s','%s','%s')\n", i, nIdents, name, username, email, origname, origusername, origemail, uuid, origuuid)
+				}
 				if uuid == "" {
 					er := fmt.Errorf("error: uploadToDB: failed to generate uuid for (%s,%s,%s,%s)", source, email, name, username)
 					Printf("DB bulk upload: one-by-one(%d/%d): %v\n", i+1, nIdents, er)
@@ -339,42 +360,44 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 					errs = append(errs, er)
 					continue
 				}
-				if ctx.Debug > 0 && uuid != mergedUUID {
-					Printf("one-by-one: merged profile detected: %s -> %s\n", uuid, mergedUUID)
+				if ctx.Debug > 0 && (uuid != mergedUUID || origuuid != mergedUUID) {
+					Printf("one-by-one: merged %v profile detected: %s/%s -> %s\n", isMerged, uuid, origuuid, mergedUUID)
 				}
 				// DA-4366: starts
 				// skip adding identity/profile/uidentity if identity already exists
-				if isMerged {
-					continue
-				}
-				rows, er = QuerySQL(ctx, nil, "select 1 from profiles where uuid in (?, ?)", uuid, origuuid)
-				if er != nil {
-					errs = append(errs, er)
-					continue
-				}
-				dummy := 0
-				for rows.Next() {
-					er = rows.Scan(&dummy)
-					break
-				}
-				if er != nil {
-					errs = append(errs, er)
-					continue
-				}
-				er = rows.Err()
-				if er != nil {
-					errs = append(errs, er)
-					continue
-				}
-				er = rows.Close()
-				if er != nil {
-					errs = append(errs, er)
-					continue
-				}
-				// skip adding identity/profile/uidentity if identity already exists
-				if dummy != 0 {
-					continue
-				}
+				/*
+					if isMerged {
+						continue
+					}
+					rows, er = QuerySQL(ctx, nil, "select 1 from profiles where uuid in (?, ?)", uuid, origuuid)
+					if er != nil {
+						errs = append(errs, er)
+						continue
+					}
+					dummy := 0
+					for rows.Next() {
+						er = rows.Scan(&dummy)
+						break
+					}
+					if er != nil {
+						errs = append(errs, er)
+						continue
+					}
+					er = rows.Err()
+					if er != nil {
+						errs = append(errs, er)
+						continue
+					}
+					er = rows.Close()
+					if er != nil {
+						errs = append(errs, er)
+						continue
+					}
+					// skip adding identity/profile/uidentity if identity already exists
+					if dummy != 0 {
+						continue
+					}
+				*/
 				// DA-4366: ends
 				queryU += fmt.Sprintf("(?,now())")
 				queryI += fmt.Sprintf("(?,?,?,?,?,?,now())")
@@ -382,7 +405,8 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				argsU = append(argsU, mergedUUID)
 				// DA-4366: starts
 				// argsI = append(argsI, uuid, source, pname, pemail, pusername, mergedUUID)
-				argsI = append(argsI, uuid, source, porigname, pemail, porigusername, mergedUUID)
+				argsI = append(argsI, origuuid, source, porigname, porigemail, porigusername, mergedUUID)
+				argsI2 = append(argsI2, uuid, source, pname, pemail, pusername, mergedUUID)
 				// DA-4366: ends
 				argsP = append(argsP, mergedUUID, profname, pemail)
 				itx, err = ctx.DB.Begin()
@@ -406,6 +430,13 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				_, er = ExecSQL(ctx, itx, queryI, argsI...)
 				if er != nil {
 					Printf("DB bulk upload: one-by-one(%d/%d): %s[%+v]: %v\n", i+1, nIdents, queryI, argsI, er)
+					_ = itx.Rollback()
+					errs = append(errs, er)
+					continue
+				}
+				_, er = ExecSQL(ctx, itx, queryI, argsI2...)
+				if er != nil {
+					Printf("DB bulk upload: one-by-one(%d/%d): %s[%+v]: %v\n", i+1, nIdents, queryI, argsI2, er)
 					_ = itx.Rollback()
 					errs = append(errs, er)
 					continue
