@@ -15,13 +15,14 @@ import (
 	"github.com/LF-Engineering/dev-analytics-libraries/slack"
 )
 
+// Manager ...
 type Manager struct {
 	HTTPClientProvider HTTPClientProvider
 	HTTPTimeout        time.Duration
 	ESUrl              string
 	ESUsername         string
 	ESPassword         string
-	ESCacheUrl         string
+	ESCacheURL         string
 	ESCacheUsername    string
 	ESCachePassword    string
 	ESIndex            string
@@ -42,14 +43,14 @@ type Manager struct {
 	Token              string
 }
 
-// MgrParams required for creating a new instance of Bugzillarest manager
+// MgrParams ...
 type MgrParams struct {
 	HTTPClientProvider HTTPClientProvider
 	HTTPTimeout        time.Duration
 	ESUrl              string
 	ESUsername         string
 	ESPassword         string
-	ESCacheUrl         string
+	ESCacheURL         string
 	ESCacheUsername    string
 	ESCachePassword    string
 	ESIndex            string
@@ -76,7 +77,7 @@ func NewManager(param *MgrParams) (*Manager, error) {
 		ESUrl:            param.ESUrl,
 		ESUsername:       param.ESUsername,
 		ESPassword:       param.ESPassword,
-		ESCacheUrl:       param.ESCacheUrl,
+		ESCacheURL:       param.ESCacheURL,
 		ESCacheUsername:  param.ESCacheUsername,
 		ESCachePassword:  param.ESCachePassword,
 		ESIndex:          param.ESIndex,
@@ -120,7 +121,7 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 	}
 
 	esCacheClientProvider, err := elastic.NewClientProvider(&elastic.Params{
-		URL:      m.ESCacheUrl,
+		URL:      m.ESCacheURL,
 		Username: m.ESCacheUsername,
 		Password: m.ESCachePassword,
 	})
@@ -158,6 +159,7 @@ func buildServices(m *Manager) (*Fetcher, *Enricher, ESClientProvider, error) {
 	return fetcher, enricher, esClientProvider, nil
 }
 
+// Sync ...
 func (m *Manager) Sync() error {
 	issueIndex := fmt.Sprintf("%s-issue", m.ESIndex)
 	mergeRequestIndex := fmt.Sprintf("%s-pull_request", m.ESIndex)

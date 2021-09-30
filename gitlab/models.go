@@ -2,6 +2,7 @@ package gitlab
 
 import "time"
 
+// IssueData ...
 type IssueData struct {
 	ID             int        `json:"id"`
 	IssueID        int        `json:"iid"`
@@ -23,6 +24,7 @@ type IssueData struct {
 	ProjectID      int        `json:"project_id"`
 }
 
+// MergeRequestData ...
 type MergeRequestData struct {
 	ID             int        `json:"id"`
 	MergeRequestID int        `json:"iid"`
@@ -48,6 +50,7 @@ type MergeRequestData struct {
 	Type           string     `json:"type"`
 }
 
+// Author ...
 type Author struct {
 	ID        int    `json:"id"`
 	Name      string `json:"name"`
@@ -57,11 +60,13 @@ type Author struct {
 	WebURL    string `json:"web_url"`
 }
 
+// Project ...
 type Project struct {
 	ID   int    `json:"id"`
 	Name string `json:"name"`
 }
 
+// IssueRaw ...
 type IssueRaw struct {
 	BackendName       string    `json:"backend_name"`
 	BackendVersion    string    `json:"backend_version"`
@@ -76,6 +81,7 @@ type IssueRaw struct {
 	Repo              string    `json:"repo"`
 }
 
+// MergeRequestRaw ...
 type MergeRequestRaw struct {
 	BackendName       string           `json:"backend_name"`
 	BackendVersion    string           `json:"backend_version"`
@@ -90,9 +96,10 @@ type MergeRequestRaw struct {
 	Repo              string           `json:"repo"`
 }
 
+// IssueEnrich ...
 type IssueEnrich struct {
 	AuthorName            string     `json:"author_name"`
-	AuthorAvatarUrl       string     `json:"author_avatar_url"`
+	AuthorAvatarURL       string     `json:"author_avatar_url"`
 	AuthorID              string     `json:"author_id"`
 	AuthorUUID            string     `json:"author_uuid"`
 	AuthorOrgName         string     `json:"author_org_name"`
@@ -108,8 +115,8 @@ type IssueEnrich struct {
 	CreatedAt             time.Time  `json:"created_at"`
 	ClosedAt              *time.Time `json:"closed_at"`
 	UpdatedAt             time.Time  `json:"updated_at"`
-	Url                   string     `json:"url"`
-	UrlID                 string     `json:"url_id"`
+	URL                   string     `json:"url"`
+	URLID                 string     `json:"url_id"`
 	Repository            string     `json:"repository"`
 	State                 string     `json:"state"`
 	Tag                   string     `json:"tag"`
@@ -128,7 +135,7 @@ type IssueEnrich struct {
 	ItemType              string     `json:"item_type"`
 	IssueID               int        `json:"issue_id"`
 	IsGitlabIssue         int        `json:"is_gitlab_issue"`
-	IdInRepo              int        `json:"id_in_repo"`
+	IDInRepo              int        `json:"id_in_repo"`
 	ID                    string     `json:"id"`
 	GitlabRepo            string     `json:"gitlab_repo"`
 	Reponame              string     `json:"repo_name"`
@@ -137,7 +144,7 @@ type IssueEnrich struct {
 	MetadataTimestamp     time.Time  `json:"metadata__timestamp"`
 	MetadataEnrichedOn    time.Time  `json:"metadata__enriched_on"`
 	MetadataUpdatedOn     time.Time  `json:"metadata__updated_on"`
-	UserAvatarUrl         string     `json:"user_avatar_url"`
+	UserAvatarURL         string     `json:"user_avatar_url"`
 	UserDataBot           bool       `json:"user_data_bot"`
 	UserDataDomain        string     `json:"user_data_domain"`
 	UserDataID            string     `json:"user_data_id"`
@@ -153,9 +160,10 @@ type IssueEnrich struct {
 	UserOrg               string     `json:"user_org"`
 }
 
+// MergeReqestEnrich ...
 type MergeReqestEnrich struct {
 	AuthorName             string     `json:"author_name"`
-	AuthorAvatarUrl        string     `json:"author_avatar_url"`
+	AuthorAvatarURL        string     `json:"author_avatar_url"`
 	AuthorID               string     `json:"author_id"`
 	AuthorUUID             string     `json:"author_uuid"`
 	AuthorOrgName          string     `json:"author_org_name"`
@@ -173,8 +181,8 @@ type MergeReqestEnrich struct {
 	MergedAt               time.Time  `json:"merged_at"`
 	UpdatedAt              time.Time  `json:"updated_at"`
 	Merged                 bool       `json:"merged"`
-	Url                    string     `json:"url"`
-	UrlID                  string     `json:"url_id"`
+	URL                    string     `json:"url"`
+	URLID                  string     `json:"url_id"`
 	Repository             string     `json:"repository"`
 	State                  string     `json:"state"`
 	Tag                    string     `json:"tag"`
@@ -195,7 +203,7 @@ type MergeReqestEnrich struct {
 	MergeRequestID         int        `json:"merge_request_id"`
 	IsGitlabMergeRequest   int        `json:"is_gitlab_merge_request"`
 	MergeRequest           bool       `json:"merge_request"`
-	IdInRepo               int        `json:"id_in_repo"`
+	IDInRepo               int        `json:"id_in_repo"`
 	ID                     string     `json:"id"`
 	GitlabRepo             string     `json:"gitlab_repo"`
 	Reponame               string     `json:"repo_name"`
@@ -204,7 +212,7 @@ type MergeReqestEnrich struct {
 	MetadataTimestamp      time.Time  `json:"metadata__timestamp"`
 	MetadataEnrichedOn     time.Time  `json:"metadata__enriched_on"`
 	MetadataUpdatedOn      time.Time  `json:"metadata__updated_on"`
-	UserAvatarUrl          string     `json:"user_avatar_url"`
+	UserAvatarURL          string     `json:"user_avatar_url"`
 	UserDataBot            bool       `json:"user_data_bot"`
 	UserDataDomain         string     `json:"user_data_domain"`
 	UserDataID             string     `json:"user_data_id"`

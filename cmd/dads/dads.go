@@ -461,8 +461,8 @@ func buildGitlabManager(ctx *lib.Ctx) (*gitlab.Manager, error) {
 		fmt.Println(err)
 	}
 
-	params.Fetch = ctx.BoolEnv("DOFETCH")
-	params.Enrich = ctx.BoolEnv("DOENRICH")
+	params.Fetch = true
+	params.Enrich = ctx.BoolEnv("ENRICH")
 	params.ESBulkSize, _ = strconv.Atoi(ctx.Env("ES_BULK_SIZE"))
 	params.ESIndex = ctx.Env("RICH_INDEX")
 	params.ESUrl = ctx.ESURL
@@ -470,7 +470,7 @@ func buildGitlabManager(ctx *lib.Ctx) (*gitlab.Manager, error) {
 	params.ESUsername = ""
 	params.ProjectSlug = ctx.Env("PROJECT_SLUG")
 	params.Project = ctx.Env("PROJECT")
-	params.ESCacheUrl = authData["es_url"]
+	params.ESCacheURL = authData["es_url"]
 	params.ESCachePassword = authData["es_pass"]
 	params.ESCacheUsername = authData["es_user"]
 	params.AuthGrantType = authData["grant_type"]
@@ -480,7 +480,7 @@ func buildGitlabManager(ctx *lib.Ctx) (*gitlab.Manager, error) {
 	params.Auth0URL = authData["url"]
 	params.Environment = authData["env"]
 	params.AffBaseURL = ctx.Env("AFFILIATION_API_URL") + "/v1"
-	params.Repo = ctx.Env("REPO")
+	params.Repo = ctx.Env("URL")
 	params.Token = ctx.Env("TOKEN")
 
 	timeout, err := time.ParseDuration("60s")

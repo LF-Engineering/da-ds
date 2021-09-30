@@ -14,7 +14,6 @@ import (
 
 var emailRegex = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
 
-
 // AffiliationClient manages user identity
 type AffiliationClient interface {
 	GetIdentityByUser(key string, value string) (*affiliation.AffIdentity, error)

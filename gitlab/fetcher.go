@@ -14,6 +14,7 @@ import (
 	jsoniter "github.com/json-iterator/go"
 )
 
+// ESClientProvider ...
 type ESClientProvider interface {
 	Add(index string, documentID string, body []byte) ([]byte, error)
 	CreateIndex(index string, body []byte) ([]byte, error)
@@ -24,11 +25,13 @@ type ESClientProvider interface {
 	BulkInsert(data []elastic.BulkData) ([]byte, error)
 }
 
+// HTTPClientProvider ...
 type HTTPClientProvider interface {
 	Request(url string, method string, header map[string]string, body []byte, params map[string]string) (statusCode int, resBody []byte, err error)
 	RequestWithHeaders(url string, method string, header map[string]string, body []byte, params map[string]string) (statusCode int, resBody []byte, resHeaders map[string][]string, err error)
 }
 
+// FetcherParams ...
 type FetcherParams struct {
 	BackendVersion string
 	Project        string
@@ -38,6 +41,7 @@ type FetcherParams struct {
 	Token          string
 }
 
+// Fetcher ...
 type Fetcher struct {
 	HTTPClientProvider    HTTPClientProvider
 	ElasticSearchProvider ESClientProvider
@@ -50,6 +54,7 @@ type Fetcher struct {
 	Token                 string
 }
 
+// NewFetcher ...
 func NewFetcher(params *FetcherParams, httpClientProvider HTTPClientProvider, esClientProvider ESClientProvider) *Fetcher {
 	return &Fetcher{
 		HTTPClientProvider:    httpClientProvider,
@@ -58,12 +63,13 @@ func NewFetcher(params *FetcherParams, httpClientProvider HTTPClientProvider, es
 		Project:               params.Project,
 		ProjectSlug:           params.ProjectSlug,
 		Origin:                params.Origin,
-		DSName:                DATASOURCE,
+		DSName:                Gitlab,
 		Repo:                  params.Repo,
 		Token:                 params.Token,
 	}
 }
 
+// FetchMergeRequests ...
 func (f *Fetcher) FetchMergeRequests(projectID string, lastDate time.Time) ([]MergeRequestRaw, error) {
 	var (
 		rawAry                = make([]MergeRequestRaw, 0)
@@ -71,7 +77,7 @@ func (f *Fetcher) FetchMergeRequests(projectID string, lastDate time.Time) ([]Me
 	)
 	lastDateISO := lastDate.Format(time.RFC3339)
 
-	gitlabURL := fmt.Sprintf("%s/%s/projects/%s/merge_requests?per_page=100&updated_after=%s", GITLAB_API_BASE, GITLAB_API_VERSION, projectID, lastDateISO)
+	gitlabURL := fmt.Sprintf("%s/%s/projects/%s/merge_requests?per_page=100&updated_after=%s", GitlabAPIBase, GitlabAPIVersion, projectID, lastDateISO)
 
 	headers := map[string]string{
 		"PRIVATE-TOKEN": f.Token,
@@ -115,11 +121,11 @@ func (f *Fetcher) FetchMergeRequests(projectID string, lastDate time.Time) ([]Me
 		}
 	}
 
-	for _, merge_request := range mergeRequestResponses {
+	for _, mergeRequest := range mergeRequestResponses {
 		var raw MergeRequestRaw
-		raw.Data = merge_request
+		raw.Data = mergeRequest
 		raw.Data.Type = "merge_request"
-		raw.MetadataUpdatedOn = merge_request.UpdatedAt
+		raw.MetadataUpdatedOn = mergeRequest.UpdatedAt
 		raw.MetadataTimestamp = time.Now()
 		raw.Timestamp = timeLib.ConvertTimeToFloat(raw.MetadataTimestamp)
 		raw.BackendVersion = f.BackendVersion
@@ -128,8 +134,8 @@ func (f *Fetcher) FetchMergeRequests(projectID string, lastDate time.Time) ([]Me
 		raw.ProjectSlug = f.ProjectSlug
 		raw.Repo = f.Repo
 
-		mergeRequestURL := fmt.Sprintf("%s/projects/merge_request/%s", GITLAB_API_BASE, projectID)
-		uuid, err := uuid.Generate(mergeRequestURL, strconv.Itoa(merge_request.MergeRequestID))
+		mergeRequestURL := fmt.Sprintf("%s/projects/merge_request/%s", GitlabAPIBase, projectID)
+		uuid, err := uuid.Generate(mergeRequestURL, strconv.Itoa(mergeRequest.MergeRequestID))
 		if err != nil {
 			return nil, err
 		}
@@ -141,6 +147,7 @@ func (f *Fetcher) FetchMergeRequests(projectID string, lastDate time.Time) ([]Me
 	return rawAry, nil
 }
 
+// FetchIssues ...
 func (f *Fetcher) FetchIssues(projectID string, lastDate time.Time) ([]IssueRaw, error) {
 	var (
 		rawAry         = make([]IssueRaw, 0)
@@ -148,7 +155,7 @@ func (f *Fetcher) FetchIssues(projectID string, lastDate time.Time) ([]IssueRaw,
 	)
 
 	lastDateISO := lastDate.Format(time.RFC3339)
-	gitlabURL := fmt.Sprintf("%s/%s/projects/%s/issues?per_page=100&updated_after=%s", GITLAB_API_BASE, GITLAB_API_VERSION, projectID, lastDateISO)
+	gitlabURL := fmt.Sprintf("%s/%s/projects/%s/issues?per_page=100&updated_after=%s", GitlabAPIBase, GitlabAPIVersion, projectID, lastDateISO)
 
 	headers := map[string]string{
 		"PRIVATE-TOKEN": f.Token,
@@ -204,7 +211,7 @@ func (f *Fetcher) FetchIssues(projectID string, lastDate time.Time) ([]IssueRaw,
 		raw.ProjectSlug = f.ProjectSlug
 		raw.Repo = f.Repo
 
-		issueURL := fmt.Sprintf("%s/projects/issue/%s", GITLAB_API_BASE, projectID)
+		issueURL := fmt.Sprintf("%s/projects/issue/%s", GitlabAPIBase, projectID)
 		uuid, err := uuid.Generate(issueURL, strconv.Itoa(issue.IssueID))
 		if err != nil {
 			return nil, err
@@ -239,7 +246,7 @@ func (f *Fetcher) getProjectID(repo string) (projectID string, err error) {
 	}
 
 	encodedPath := url.QueryEscape(strings.TrimLeft(u.Path, "/"))
-	projectURL := fmt.Sprintf("%s/%s/projects/%s", GITLAB_API_BASE, GITLAB_API_VERSION, encodedPath)
+	projectURL := fmt.Sprintf("%s/%s/projects/%s", GitlabAPIBase, GitlabAPIVersion, encodedPath)
 
 	headers := map[string]string{
 		"PRIVATE-TOKEN": f.Token,
@@ -261,6 +268,7 @@ func (f *Fetcher) getProjectID(repo string) (projectID string, err error) {
 	return strconv.Itoa(projectResponse.ID), nil
 }
 
+// GetLastFetchDate ...
 func (f *Fetcher) GetLastFetchDate(index string) time.Time {
 	lastDate, err := f.ElasticSearchProvider.GetStat(index, "metadata__updated_on", "max", nil, nil)
 	if err != nil {

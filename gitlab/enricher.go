@@ -13,12 +13,14 @@ import (
 	"github.com/LF-Engineering/dev-analytics-libraries/uuid"
 )
 
+// AffiliationClient ...
 type AffiliationClient interface {
 	GetIdentityByUser(key string, value string) (*affiliation.AffIdentity, error)
 	AddIdentity(identity *affiliation.Identity) bool
 	GetOrganizations(uuid string, projectSlug string) *[]affiliation.Enrollment
 }
 
+// Enricher ..
 type Enricher struct {
 	DSName                     string
 	ElasticSearchProvider      *elastic.ClientProvider
@@ -28,12 +30,13 @@ type Enricher struct {
 // NewEnricher initiates a new Enricher
 func NewEnricher(esClientProvider *elastic.ClientProvider, affiliationsClientProvider *affiliation.Affiliation) *Enricher {
 	return &Enricher{
-		DSName:                     DATASOURCE,
+		DSName:                     Gitlab,
 		ElasticSearchProvider:      esClientProvider,
 		affiliationsClientProvider: affiliationsClientProvider,
 	}
 }
 
+// EnrichIssue ...
 func (e *Enricher) EnrichIssue(rawItem IssueRaw, now time.Time) (*IssueEnrich, error) {
 
 	enrichedIssue := IssueEnrich{
@@ -52,13 +55,13 @@ func (e *Enricher) EnrichIssue(rawItem IssueRaw, now time.Time) (*IssueEnrich, e
 		ClosedAt:            rawItem.Data.ClosedAt,
 		UpdatedAt:           rawItem.Data.UpdatedAt,
 		Origin:              rawItem.Repo,
-		AuthorAvatarUrl:     rawItem.Data.Author.AvatarURL,
+		AuthorAvatarURL:     rawItem.Data.Author.AvatarURL,
 		AuthorMultiOrgNames: []string{Unknown},
 		AuthorOrgName:       Unknown,
 		AuthorLogin:         rawItem.Data.Author.Username,
 		Type:                rawItem.Data.Type,
-		Url:                 rawItem.Data.WebURL,
-		UrlID:               getIssueUrlID(rawItem.Repo, rawItem.Data.IssueID),
+		URL:                 rawItem.Data.WebURL,
+		URLID:               getIssueURLID(rawItem.Repo, rawItem.Data.IssueID),
 		Repository:          rawItem.Repo,
 		State:               rawItem.Data.State,
 		Tag:                 rawItem.Repo,
@@ -66,8 +69,8 @@ func (e *Enricher) EnrichIssue(rawItem IssueRaw, now time.Time) (*IssueEnrich, e
 		ItemType:            rawItem.Data.Type,
 		IssueID:             rawItem.Data.ID,
 		IsGitlabIssue:       1,
-		IdInRepo:            rawItem.Data.IssueID,
-		ID:                  getIssueUrlID(rawItem.Repo, rawItem.Data.IssueID),
+		IDInRepo:            rawItem.Data.IssueID,
+		ID:                  getIssueURLID(rawItem.Repo, rawItem.Data.IssueID),
 		GitlabRepo:          getIssueRepoShort(rawItem.Repo),
 		Reponame:            rawItem.Repo,
 		RepoShortname:       getProjectShortname(rawItem.Repo),
@@ -75,14 +78,14 @@ func (e *Enricher) EnrichIssue(rawItem IssueRaw, now time.Time) (*IssueEnrich, e
 		NoOfComments:        rawItem.Data.UserNotesCount,
 		NoOfReactions:       rawItem.Data.Upvotes + rawItem.Data.Downvotes,
 		NoOfTotalComments:   rawItem.Data.UserNotesCount,
-		UserAvatarUrl:       rawItem.Data.Author.AvatarURL,
+		UserAvatarURL:       rawItem.Data.Author.AvatarURL,
 		UserLogin:           rawItem.Data.Author.Username,
 		UserDataOrgName:     Unknown,
 	}
 
 	enrichedIssue.Labels = append(enrichedIssue.Labels, rawItem.Data.Labels...)
 
-	source := DATASOURCE
+	source := Gitlab
 	authorUsername := rawItem.Data.Author.Username
 	authorName := rawItem.Data.Author.Name
 	authorUUID, err := uuid.GenerateIdentity(&source, nil, &authorName, &authorUsername)
@@ -184,6 +187,7 @@ func (e *Enricher) EnrichIssue(rawItem IssueRaw, now time.Time) (*IssueEnrich, e
 
 }
 
+// EnrichMergeRequest ...
 func (e *Enricher) EnrichMergeRequest(rawItem MergeRequestRaw, now time.Time) (*MergeReqestEnrich, error) {
 
 	enrichedMergeRequest := MergeReqestEnrich{
@@ -202,13 +206,13 @@ func (e *Enricher) EnrichMergeRequest(rawItem MergeRequestRaw, now time.Time) (*
 		ClosedAt:               rawItem.Data.ClosedAt,
 		UpdatedAt:              rawItem.Data.UpdatedAt,
 		Origin:                 rawItem.Repo,
-		AuthorAvatarUrl:        rawItem.Data.Author.AvatarURL,
+		AuthorAvatarURL:        rawItem.Data.Author.AvatarURL,
 		AuthorMultiOrgNames:    []string{Unknown},
 		AuthorOrgName:          Unknown,
 		AuthorLogin:            rawItem.Data.Author.Username,
 		Type:                   rawItem.Data.Type,
-		Url:                    rawItem.Data.WebURL,
-		UrlID:                  getIssueUrlID(rawItem.Repo, rawItem.Data.MergeRequestID),
+		URL:                    rawItem.Data.WebURL,
+		URLID:                  getIssueURLID(rawItem.Repo, rawItem.Data.MergeRequestID),
 		Repository:             rawItem.Repo,
 		State:                  rawItem.Data.State,
 		Tag:                    rawItem.Repo,
@@ -216,8 +220,8 @@ func (e *Enricher) EnrichMergeRequest(rawItem MergeRequestRaw, now time.Time) (*
 		ItemType:               rawItem.Data.Type,
 		MergeRequestID:         rawItem.Data.ID,
 		IsGitlabMergeRequest:   1,
-		IdInRepo:               rawItem.Data.MergeRequestID,
-		ID:                     getIssueUrlID(rawItem.Repo, rawItem.Data.MergeRequestID),
+		IDInRepo:               rawItem.Data.MergeRequestID,
+		ID:                     getIssueURLID(rawItem.Repo, rawItem.Data.MergeRequestID),
 		GitlabRepo:             getIssueRepoShort(rawItem.Repo),
 		Reponame:               rawItem.Repo,
 		RepoShortname:          getProjectShortname(rawItem.Repo),
@@ -226,14 +230,14 @@ func (e *Enricher) EnrichMergeRequest(rawItem MergeRequestRaw, now time.Time) (*
 		NoOfComments:           rawItem.Data.UserNotesCount,
 		NoOfReactions:          rawItem.Data.Upvotes + rawItem.Data.Downvotes,
 		NoOfTotalComments:      rawItem.Data.UserNotesCount,
-		UserAvatarUrl:          rawItem.Data.Author.AvatarURL,
+		UserAvatarURL:          rawItem.Data.Author.AvatarURL,
 		UserLogin:              rawItem.Data.Author.Username,
 		UserDataOrgName:        Unknown,
 	}
 
 	enrichedMergeRequest.Labels = append(enrichedMergeRequest.Labels, rawItem.Data.Labels...)
 
-	source := DATASOURCE
+	source := Gitlab
 	authorUsername := rawItem.Data.Author.Username
 	authorName := rawItem.Data.Author.Name
 	authorUUID, err := uuid.GenerateIdentity(&source, nil, &authorName, &authorUsername)
@@ -334,13 +338,13 @@ func (e *Enricher) EnrichMergeRequest(rawItem MergeRequestRaw, now time.Time) (*
 	return &enrichedMergeRequest, nil
 }
 
-func getProjectShortname(repoUrl string) (projectURL string) {
-	repoInChunks := strings.Split(repoUrl, "/")
+func getProjectShortname(repoURL string) (projectURL string) {
+	repoInChunks := strings.Split(repoURL, "/")
 
 	return repoInChunks[len(repoInChunks)-1]
 }
 
-func getIssueUrlID(repo string, issueID int) (urlID string) {
+func getIssueURLID(repo string, issueID int) (urlID string) {
 	u, err := url.Parse(repo)
 	if err != nil {
 		fmt.Println("URL Parsing Error:", err)

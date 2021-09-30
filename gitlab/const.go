@@ -3,16 +3,20 @@ package gitlab
 import "time"
 
 const (
-	GITLAB_API_VERSION = "v4"
-	GITLAB_API_BASE    = "https://gitlab.com/api"
-	DATASOURCE         = "gitlab"
-	Gitlab             = "gitlab"
-	Unknown            = "Unknown"
+	// GitlabAPIVersion ...
+	GitlabAPIVersion = "v4"
+	//GitlabAPIBase ...
+	GitlabAPIBase = "https://gitlab.com/api"
+	//Gitlab datasource name
+	Gitlab = "gitlab"
+	//Unknown ...
+	Unknown = "Unknown"
 )
 
 var (
+	// DefaultDateTime ...
 	DefaultDateTime = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
-	// GitlabRawMapping
+	// GitlabRawMapping ...
 	GitlabRawMapping = []byte(`{"mappings":{"dynamic":true,"properties":{"metadata__updated_on":{"type":"date"},"data":{"properties":{"body":{"dynamic":false,"properties":{}}}}}}}`)
 	// GitlabRichMapping ...
 	GitlabRichMapping = []byte(`{
