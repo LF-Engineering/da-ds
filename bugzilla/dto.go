@@ -75,39 +75,39 @@ type Person struct {
 
 // BugRaw data model represents es schema
 type BugRaw struct {
-	BackendVersion    string `json:"backend_version"`
-	BackendName       string `json:"backend_name"`
-	UUID              string `json:"uuid"`
-	BugID             int    `json:"bug_id"`
-	Origin            string `json:"origin"`
-	Tag               string `json:"tag"`
-	Product           string `json:"product"`
-	Component         string `json:"component"`
-	Assignee          Person
-	ShortDescription  string        `json:"short_description"`
-	LongDesc          []Comment     `json:"long_desc"`
-	BugStatus         string        `json:"bug_status"`
-	MetadataUpdatedOn time.Time     `json:"metadata__updated_on"`
-	GrimoireCreationDate time.Time  `json:"grimoire_creation_date"`
-	MetadataTimestamp time.Time     `json:"metadata__timestamp"`
-	Timestamp         float64       `json:"timestamp"`
-	Category          string        `json:"category"`
-	CreationTS        time.Time     `json:"creation_ts"`
-	Priority          string        `json:"priority"`
-	Severity          string        `json:"severity"`
-	OpSys             string        `json:"op_sys"`
-	ChangedAt         time.Time     `json:"changed_at"`
-	ActivityCount     int           `json:"activity_count"`
-	SearchFields      *SearchFields `json:"search_fields"`
-	DeltaTs           time.Time     `json:"delta_ts"`
-	Keywords          []string      `json:"keywords"`
-	RepPlatform       string        `json:"rep_platform"`
-	StatusWhiteboard  string        `json:"status_whiteboard"`
-	Resolution        string        `json:"resolution"`
-	Reporter          Person        `json:"reporter"`
-	AssignedTo        string        `json:"assigned_to"`
-	Summary           string        `json:"summary"`
-	Activities        []Activity    `json:"activities"`
+	BackendVersion       string `json:"backend_version"`
+	BackendName          string `json:"backend_name"`
+	UUID                 string `json:"uuid"`
+	BugID                int    `json:"bug_id"`
+	Origin               string `json:"origin"`
+	Tag                  string `json:"tag"`
+	Product              string `json:"product"`
+	Component            string `json:"component"`
+	Assignee             Person
+	ShortDescription     string        `json:"short_description"`
+	LongDesc             []Comment     `json:"long_desc"`
+	BugStatus            string        `json:"bug_status"`
+	MetadataUpdatedOn    time.Time     `json:"metadata__updated_on"`
+	GrimoireCreationDate time.Time     `json:"grimoire_creation_date"`
+	MetadataTimestamp    time.Time     `json:"metadata__timestamp"`
+	Timestamp            float64       `json:"timestamp"`
+	Category             string        `json:"category"`
+	CreationTS           time.Time     `json:"creation_ts"`
+	Priority             string        `json:"priority"`
+	Severity             string        `json:"severity"`
+	OpSys                string        `json:"op_sys"`
+	ChangedAt            time.Time     `json:"changed_at"`
+	ActivityCount        int           `json:"activity_count"`
+	SearchFields         *SearchFields `json:"search_fields"`
+	DeltaTs              time.Time     `json:"delta_ts"`
+	Keywords             []string      `json:"keywords"`
+	RepPlatform          string        `json:"rep_platform"`
+	StatusWhiteboard     string        `json:"status_whiteboard"`
+	Resolution           string        `json:"resolution"`
+	Reporter             Person        `json:"reporter"`
+	AssignedTo           string        `json:"assigned_to"`
+	Summary              string        `json:"summary"`
+	Activities           []Activity    `json:"activities"`
 }
 
 // BugEnrich ...
