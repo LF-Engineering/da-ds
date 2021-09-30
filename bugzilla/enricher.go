@@ -74,6 +74,7 @@ func (e *Enricher) EnrichItem(rawItem BugRaw, now time.Time) (*BugEnrich, error)
 	enriched.Tag = rawItem.Tag
 	enriched.UUID = rawItem.UUID
 	enriched.MetadataUpdatedOn = rawItem.MetadataUpdatedOn
+	enriched.GrimoireCreationDate = rawItem.MetadataUpdatedOn
 	enriched.MetadataTimestamp = rawItem.MetadataTimestamp
 	enriched.MetadataEnrichedOn = now
 	enriched.MetadataFilterRaw = nil

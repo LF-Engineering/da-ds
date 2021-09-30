@@ -131,6 +131,7 @@ func (f *Fetcher) FetchItem(fromDate time.Time, limit int, now time.Time) ([]*Bu
 		raw.ActivityCount = count
 		raw.Activities = activities
 		raw.MetadataUpdatedOn = raw.CreationTS
+		raw.GrimoireCreationDate = raw.CreationTS
 		raw.MetadataTimestamp = now
 		raw.Timestamp = timeLib.ConvertTimeToFloat(now)
 		raw.Category = Category
