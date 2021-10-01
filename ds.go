@@ -406,7 +406,6 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				// DA-4366: starts
 				// argsI = append(argsI, uuid, source, pname, pemail, pusername, mergedUUID)
 				argsI = append(argsI, origuuid, source, porigname, porigemail, porigusername, mergedUUID)
-				argsI2 = append(argsI2, uuid, source, pname, pemail, pusername, mergedUUID)
 				// DA-4366: ends
 				argsP = append(argsP, mergedUUID, profname, pemail)
 				itx, err = ctx.DB.Begin()
@@ -434,12 +433,15 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 					errs = append(errs, er)
 					continue
 				}
-				_, er = ExecSQL(ctx, itx, queryI, argsI2...)
-				if er != nil {
-					Printf("DB bulk upload: one-by-one(%d/%d): %s[%+v]: %v\n", i+1, nIdents, queryI, argsI2, er)
-					_ = itx.Rollback()
-					errs = append(errs, er)
-					continue
+				if uuid != origuuid {
+					argsI2 = append(argsI2, uuid, source, pname, pemail, pusername, mergedUUID)
+					_, er = ExecSQL(ctx, itx, queryI, argsI2...)
+					if er != nil {
+						Printf("DB bulk upload: one-by-one(%d/%d): %s[%+v]: %v\n", i+1, nIdents, queryI, argsI2, er)
+						_ = itx.Rollback()
+						errs = append(errs, er)
+						continue
+					}
 				}
 				err = itx.Commit()
 				if err != nil {
