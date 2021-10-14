@@ -1665,6 +1665,12 @@ func (j *DSGit) IdentityFromGitAuthor(ctx *Ctx, author string) (identity [3]stri
 		}
 		name = strings.TrimSpace(strings.Join(fields2[:n], "@")) + MissingName
 	}
+	if email != Nil {
+		valid, _ := IsValidEmail(email, false, false)
+		if !valid {
+			email = Nil
+		}
+	}
 	identity = [3]string{name, Nil, email}
 	return
 }
@@ -1681,6 +1687,12 @@ func (j *DSGit) IdentitiesFromGitAuthors(ctx *Ctx, authors map[string]struct{}) 
 			lEmail := len(email)
 			if lEmail > 1 {
 				email = email[:lEmail-1]
+			}
+		}
+		if email != Nil {
+			valid, _ := IsValidEmail(email, false, false)
+			if !valid {
+				email = Nil
 			}
 		}
 		identity := [3]string{name, Nil, email}
