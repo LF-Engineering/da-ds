@@ -3057,7 +3057,7 @@ func (j *DSGitHub) IdentityForObject(ctx *Ctx, item map[string]interface{}) (ide
 		if ok {
 			val, ok := iVal.(string)
 			if ok {
-				identity[i] = val
+				identity[i] = strings.TrimSpace(val)
 			}
 		} else {
 			identity[i] = Nil
