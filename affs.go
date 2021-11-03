@@ -505,12 +505,12 @@ func IdentityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, aid inte
 		uuid = GetIdentityUUID(ctx, ds, aid.(string))
 		outItem[role+"_uuid"] = uuid
 	}
-	if uuid == nil {
+	suuid, _ := uuid.(string)
+	if uuid == nil || suuid == "" {
 		outItem = EmptyAffsItem(role, true)
 		empty = true
 		return
 	}
-	suuid, _ := uuid.(string)
 	// profile, err := FindObject(ctx, "profiles", "uuid", suuid, []string{"name", "email", "gender", "gender_acc", "is_bot"})
 	profile, err := FindObject(ctx, "profiles", "uuid", suuid, []string{"name", "email", "is_bot"})
 	isBot := 0
