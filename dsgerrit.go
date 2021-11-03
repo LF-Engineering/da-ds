@@ -2121,8 +2121,8 @@ func (j *DSGerrit) AllRoles(ctx *Ctx, rich map[string]interface{}) (roles []stri
 		possibleRoles = GerritApprovalRoles
 	}
 	for _, possibleRole := range possibleRoles {
-		_, ok := Dig(rich, []string{possibleRole + "_id"}, false, true)
-		if ok {
+		role, ok := Dig(rich, []string{possibleRole + "_id"}, false, true)
+		if ok && role != "" {
 			roles = append(roles, possibleRole)
 		}
 	}
