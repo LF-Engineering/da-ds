@@ -818,8 +818,11 @@ func GerritEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs 
 		if e != nil {
 			return
 		}
-		richItems = append(richItems, rich)
 		data, _ := Dig(doc, []string{"data"}, true, false)
+		_, authorIDOK := Dig(data, []string{"author_id"}, false, true)
+		if authorIDOK {
+			richItems = append(richItems, rich)
+		}
 		iPatchSets, ok := Dig(data, []string{"patchSets"}, false, true)
 		if ok {
 			patchSets, ok := iPatchSets.([]interface{})
@@ -838,7 +841,14 @@ func GerritEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs 
 					if e != nil {
 						return
 					}
-					richItems = append(richItems, riches...)
+					for _, rich := range riches {
+						_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
+						if !authorIDOK {
+							continue
+						}
+						richItems = append(richItems, rich)
+					}
+					//richItems = append(richItems, riches...)
 				}
 			}
 		}
@@ -860,7 +870,14 @@ func GerritEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs 
 					if e != nil {
 						return
 					}
-					richItems = append(richItems, riches...)
+					for _, rich := range riches {
+						_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
+						if !authorIDOK {
+							continue
+						}
+						richItems = append(richItems, rich)
+					}
+					//richItems = append(richItems, riches...)
 				}
 			}
 		}
