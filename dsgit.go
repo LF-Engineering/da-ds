@@ -2422,7 +2422,8 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 			}
 		}
 	}
-	rich["file_data"] = fileData
+	//rich["file_data"] = fileData
+	rich["files_changed"] = len(fileData)
 	rich["files"] = nFiles
 	rich["lines_added"] = linesAdded
 	rich["lines_removed"] = linesRemoved
