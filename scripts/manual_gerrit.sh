@@ -47,7 +47,7 @@ do
     break
   fi
   from=$(($from + $page))
-  if [ "$from" -ge "$to" ]
+  if ( [ ! -z "$to" ] && [ "$from" -ge "$to" ] )
   then
     echo "$from >= $to, finished"
     break
