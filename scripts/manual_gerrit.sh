@@ -15,11 +15,16 @@ then
   exit 3
 fi
 from=0
-page=1000
+page=500
 to=''
 if [ ! -z "$PAGE" ]
 then
   page=$PAGE
+  if [ "$page" -ge "500" ]
+  then
+    echo"setting page size to 500, it cannot be any bigger"
+    page=500
+  fi
 fi
 if [ ! -z "$FROM" ]
 then
@@ -37,9 +42,10 @@ fi
 > "${fn}"
 while true
 do
-  echo "from:$from page:$page"
+  echo -n "from:$from page:$page "
   ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "${KEY}" -p 29418 "${USR}@${GERRIT}" gerrit query after:"1970-01-01 00:00:00" "limit:$page" '(status:open OR status:closed)' --all-approvals --all-reviewers --comments --format=JSON --start="$from" 1>./out 2>/dev/null
   rows=$(cat ./out | grep '"rowCount"' | jq -rS '.rowCount')
+  echo "rows:$rows"
   cat ./out >> "${fn}"
   if ( [ "$rows" = "0" ] || [ -z "$rows" ] )
   then
