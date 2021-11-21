@@ -543,7 +543,10 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 					}
 				} else {
 					// continue normally, so next items will attempt retry too
-					err = nil
+					// err = nil
+
+					// return error
+					return
 				}
 			case 1:
 				// return error
@@ -557,8 +560,8 @@ func SendToElastic(ctx *Ctx, ds DS, raw bool, key string, items []interface{}) (
 				retry = false
 				err = nil
 			default:
-				// continue normally, so next items will attempt retry too
-				err = nil
+				// return error
+				return
 			}
 		}
 	}
