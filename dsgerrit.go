@@ -1868,7 +1868,14 @@ func (j *DSGerrit) EnrichPatchsets(ctx *Ctx, review map[string]interface{}, patc
 					if err != nil {
 						return
 					}
-					richItems = append(richItems, riches...)
+					for _, rich := range riches {
+						_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
+						if !authorIDOK {
+							continue
+						}
+						richItems = append(richItems, rich)
+					}
+					// richItems = append(richItems, riches...)
 				}
 			}
 		}
