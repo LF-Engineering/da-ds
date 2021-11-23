@@ -339,11 +339,13 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 				}
 				mergedUUID := uuid
 				// DA-4366: starts
-				isMerged := false
+				foundUUID := 0
 				// DA-4366: ends
 				for rows.Next() {
 					er = rows.Scan(&mergedUUID)
-					isMerged = true
+					if er == nil {
+						foundUUID = 1
+					}
 					break
 				}
 				if er != nil {
@@ -360,8 +362,48 @@ func DBUploadIdentitiesFunc(ctx *Ctx, ds DS, thrN int, docs, outDocs *[]interfac
 					errs = append(errs, er)
 					continue
 				}
+				if foundUUID == 0 {
+					// Try to find matching identity even it it was generated with an old UUID library
+					rows, er = QuerySQL(ctx, nil, "select id, uuid from identities where source = ? and name = ? and username = ? and email = ?", source, porigname, porigusername, porigemail)
+					if er != nil {
+						errs = append(errs, er)
+						continue
+					}
+					iid := ""
+					for rows.Next() {
+						er = rows.Scan(&iid, &mergedUUID)
+						if er == nil {
+							foundUUID = 2
+						}
+						break
+					}
+					if er != nil {
+						errs = append(errs, er)
+						continue
+					}
+					er = rows.Err()
+					if er != nil {
+						errs = append(errs, er)
+						continue
+					}
+					er = rows.Close()
+					if er != nil {
+						errs = append(errs, er)
+						continue
+					}
+					// Fix that identity's id
+					if foundUUID == 2 {
+						_, er = ExecSQL(ctx, itx, "update identities set id = ? where id = ?", origuuid, iid)
+						if er != nil {
+							Printf("DB bulk upload: one-by-one(%d/%d): failed to update identity id %s->%s: %+v\n", i+1, nIdents, origuuid, iid, er)
+							// _ = itx.Rollback()
+							// errs = append(errs, er)
+							// continue
+						}
+					}
+				}
 				if ctx.Debug > 0 && (uuid != mergedUUID || origuuid != mergedUUID) {
-					Printf("one-by-one: merged %v profile detected: %s/%s -> %s\n", isMerged, uuid, origuuid, mergedUUID)
+					Printf("one-by-one: merged profile detected: %s/%s -> %s,%d\n", uuid, origuuid, mergedUUID, foundUUID)
 				}
 				// DA-4366: starts
 				// skip adding identity/profile/uidentity if identity already exists
