@@ -571,6 +571,12 @@ func IdentityAffsData(ctx *Ctx, ds DS, identity map[string]interface{}, aid inte
 	//outItem[role+MultiOrgNames], e = GetEnrollmentsMulti(ctx, ds, suuid, dt)
 	outItem[role+"_org_name"], outItem[role+MultiOrgNames], e = GetEnrollmentsBoth(ctx, ds, suuid, dt)
 	PostprocessFields(outItem, role, email)
+	if outItem[role+"_org_name"] == "" {
+		Printf("warning empty %s_org_name for identity %+v aid %+v dt %+v err %+v outItem %+v\n", role, identity, aid, dt, e, outItem)
+	}
+	if outItem[role+"_name"] == "" {
+		Printf("warning empty %s_name for identity %+v aid %+v dt %+v err %+v outItem %+v\n", role, identity, aid, dt, e, outItem)
+	}
 	return
 }
 

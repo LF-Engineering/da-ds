@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"sync"
+	"time"
 
 	jsoniter "github.com/json-iterator/go"
 )
@@ -51,6 +52,7 @@ func ExecuteAffiliationsAPICall(ctx *Ctx, method, path string, cacheToken bool) 
 	unlock()
 	rurl := path
 	url := ctx.AffiliationAPIURL + rurl
+	trialSec := 1
 	for i := 0; i < 2; i++ {
 		req, e := http.NewRequest(method, url, nil)
 		if e != nil {
@@ -62,6 +64,17 @@ func ExecuteAffiliationsAPICall(ctx *Ctx, method, path string, cacheToken bool) 
 		if e != nil {
 			err = fmt.Errorf("do request error: %+v for %s url: %s", e, method, rurl)
 			return
+		}
+		if i == 0 && resp.StatusCode == 504 {
+			if trialSec < 5 {
+				Printf("gateway timeout 504 while trying to get a new token, sleeping for %d seconds...\n", trialSec)
+				time.Sleep(time.Duration(trialSec) * time.Second)
+				Printf("gateway timeout 504 while trying to get a new token, sleept for %d seconds, retrying...\n", trialSec)
+				trialSec++
+				i--
+				continue
+			}
+			Printf("gateway timeout 504 while trying to get a new token, giving up\n")
 		}
 		if i == 0 && resp.StatusCode == 401 {
 			_ = resp.Body.Close()
@@ -88,6 +101,9 @@ func ExecuteAffiliationsAPICall(ctx *Ctx, method, path string, cacheToken bool) 
 			}
 			err = fmt.Errorf("method:%s url:%s status:%d\n%s", method, rurl, resp.StatusCode, body)
 			return
+		}
+		if trialSec > 1 {
+			Printf("recovered after gateway timeout 504 (%d)\n", trialSec)
 		}
 		err = jsoniter.Unmarshal(body, &data)
 		if err != nil {
