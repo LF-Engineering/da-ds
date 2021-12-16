@@ -3353,7 +3353,10 @@ func (j *DSGitHub) GitHubIssueEnrichItemsFunc(ctx *Ctx, thrN int, items []interf
 		if e != nil {
 			return
 		}
-		richItems = append(richItems, rich)
+		_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
+		if authorIDOK {
+			richItems = append(richItems, rich)
+		}
 		data, _ := Dig(doc, []string{"data"}, true, false)
 		// issue: assignees_data[]
 		// issue: comments_data[].user_data
@@ -3377,7 +3380,14 @@ func (j *DSGitHub) GitHubIssueEnrichItemsFunc(ctx *Ctx, thrN int, items []interf
 					if e != nil {
 						return
 					}
-					richItems = append(richItems, riches...)
+					for _, rich := range riches {
+						_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
+						if !authorIDOK {
+							continue
+						}
+						richItems = append(richItems, rich)
+					}
+					// richItems = append(richItems, riches...)
 					if WantEnrichIssueCommentReactions {
 						var reacts []map[string]interface{}
 						for _, comment := range comms {
@@ -3403,7 +3413,14 @@ func (j *DSGitHub) GitHubIssueEnrichItemsFunc(ctx *Ctx, thrN int, items []interf
 							if e != nil {
 								return
 							}
-							richItems = append(richItems, riches...)
+							for _, rich := range riches {
+								_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
+								if !authorIDOK {
+									continue
+								}
+								richItems = append(richItems, rich)
+							}
+							// richItems = append(richItems, riches...)
 						}
 					}
 				}
@@ -3428,7 +3445,14 @@ func (j *DSGitHub) GitHubIssueEnrichItemsFunc(ctx *Ctx, thrN int, items []interf
 						if e != nil {
 							return
 						}
-						richItems = append(richItems, riches...)
+						for _, rich := range riches {
+							_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
+							if !authorIDOK {
+								continue
+							}
+							richItems = append(richItems, rich)
+						}
+						// richItems = append(richItems, riches...)
 					}
 				}
 			}
@@ -3452,7 +3476,14 @@ func (j *DSGitHub) GitHubIssueEnrichItemsFunc(ctx *Ctx, thrN int, items []interf
 						if e != nil {
 							return
 						}
-						richItems = append(richItems, riches...)
+						for _, rich := range riches {
+							_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
+							if !authorIDOK {
+								continue
+							}
+							richItems = append(richItems, rich)
+						}
+						// richItems = append(richItems, riches...)
 					}
 				}
 			}
@@ -3556,7 +3587,10 @@ func (j *DSGitHub) GitHubPullRequestEnrichItemsFunc(ctx *Ctx, thrN int, items []
 		if e != nil {
 			return
 		}
-		richItems = append(richItems, rich)
+		_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
+		if authorIDOK {
+			richItems = append(richItems, rich)
+		}
 		data, _ := Dig(doc, []string{"data"}, true, false)
 		// pr:    assignees_data[]
 		// pr:    reviews_data[].user_data
@@ -3582,7 +3616,14 @@ func (j *DSGitHub) GitHubPullRequestEnrichItemsFunc(ctx *Ctx, thrN int, items []
 						if e != nil {
 							return
 						}
-						richItems = append(richItems, riches...)
+						for _, rich := range riches {
+							_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
+							if !authorIDOK {
+								continue
+							}
+							richItems = append(richItems, rich)
+						}
+						// richItems = append(richItems, riches...)
 					}
 				}
 			}
@@ -3605,7 +3646,14 @@ func (j *DSGitHub) GitHubPullRequestEnrichItemsFunc(ctx *Ctx, thrN int, items []
 					if e != nil {
 						return
 					}
-					richItems = append(richItems, riches...)
+					for _, rich := range riches {
+						_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
+						if !authorIDOK {
+							continue
+						}
+						richItems = append(richItems, rich)
+					}
+					// richItems = append(richItems, riches...)
 				}
 			}
 		}
@@ -3627,7 +3675,14 @@ func (j *DSGitHub) GitHubPullRequestEnrichItemsFunc(ctx *Ctx, thrN int, items []
 					if e != nil {
 						return
 					}
-					richItems = append(richItems, riches...)
+					for _, rich := range riches {
+						_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
+						if !authorIDOK {
+							continue
+						}
+						richItems = append(richItems, rich)
+					}
+					// richItems = append(richItems, riches...)
 					if WantEnrichPullRequestCommentReactions {
 						var reacts []map[string]interface{}
 						for _, comment := range comms {
@@ -3652,7 +3707,14 @@ func (j *DSGitHub) GitHubPullRequestEnrichItemsFunc(ctx *Ctx, thrN int, items []
 							if e != nil {
 								return
 							}
-							richItems = append(richItems, riches...)
+							for _, rich := range riches {
+								_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
+								if !authorIDOK {
+									continue
+								}
+								richItems = append(richItems, rich)
+							}
+							// richItems = append(richItems, riches...)
 						}
 					}
 				}
@@ -3677,7 +3739,14 @@ func (j *DSGitHub) GitHubPullRequestEnrichItemsFunc(ctx *Ctx, thrN int, items []
 						if e != nil {
 							return
 						}
-						richItems = append(richItems, riches...)
+						for _, rich := range riches {
+							_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
+							if !authorIDOK {
+								continue
+							}
+							richItems = append(richItems, rich)
+						}
+						// richItems = append(richItems, riches...)
 					}
 				}
 			}
