@@ -1967,13 +1967,20 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 			if e != nil {
 				return
 			}
-			richItems = append(richItems, rich)
+			_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
+			if authorIDOK {
+				richItems = append(richItems, rich)
+			}
 			if GitGenerateFlatDocs {
 				trailerDocs, e = git.TrailerDocs(ctx, rich)
 				if e != nil {
 					return
 				}
 				for _, trailerDoc := range trailerDocs {
+					_, authorIDOK := Dig(trailerDoc, []string{"author_id"}, false, true)
+					if !authorIDOK {
+						continue
+					}
 					richItems = append(richItems, trailerDoc)
 				}
 			}
@@ -1985,13 +1992,20 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 					return
 				}
 				rich[GitUUID] = gitUUID
-				richItems = append(richItems, rich)
+				_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
+				if authorIDOK {
+					richItems = append(richItems, rich)
+				}
 				if GitGenerateFlatDocs {
 					trailerDocs, e = git.TrailerDocs(ctx, rich)
 					if e != nil {
 						return
 					}
 					for _, trailerDoc := range trailerDocs {
+						_, authorIDOK := Dig(trailerDoc, []string{"author_id"}, false, true)
+						if !authorIDOK {
+							continue
+						}
 						richItems = append(richItems, trailerDoc)
 					}
 				}
@@ -2009,6 +2023,10 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 			if e != nil {
 				return
 			}
+			_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
+			if authorIDOK {
+				richItems = append(richItems, rich)
+			}
 			richItems = append(richItems, rich)
 			if GitGenerateFlatDocs {
 				trailerDocs, e = git.TrailerDocs(ctx, rich)
@@ -2016,6 +2034,10 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 					return
 				}
 				for _, trailerDoc := range trailerDocs {
+					_, authorIDOK := Dig(trailerDoc, []string{"author_id"}, false, true)
+					if !authorIDOK {
+						continue
+					}
 					richItems = append(richItems, trailerDoc)
 				}
 			}
