@@ -61,6 +61,7 @@ type Ctx struct {
 	DropRich           bool       // From DA_DS_DROP_RICH - drop rich index (this is to allow regenerating data), index is only dropped when it is in old (bitergia) format, so we avoid dropping it for every origin
 	DropRaw            bool       // From DA_DS_DROP_RAW - drop raw index (this is to allow regenerating data), index is only dropped when it is in old (bitergia) format, so we avoid dropping it for every origin
 	AllowFail          int        // From DA_DS_ALLOW_FAIL - allow fail uploading single documents to elastic: 0 - send to GAP handler and continue, 1 - don't allow, 2-allow fail, if failed, skip entire pack (ignore), 3-allow fail, but each next document without retries, else-allow fail and retry each individual document
+	CheckAuthorID      bool       // From DA_DS_CHECK_AID - so additional check if a rich document has author_id field, skip the document if it doesn't
 	DateFromDetected   bool
 	OffsetFromDetected bool
 	DB                 *sqlx.DB
@@ -348,6 +349,9 @@ func (ctx *Ctx) Init() {
 
 	// DropRaw
 	ctx.DropRaw = ctx.BoolEnv("DROP_RAW")
+
+	// Check author ID
+	ctx.CheckAuthorID = ctx.BoolEnv("CHECK_AID")
 
 	// Allow fail
 	if ctx.BoolEnv("ALLOW_FAIL") {

@@ -3354,7 +3354,7 @@ func (j *DSGitHub) GitHubIssueEnrichItemsFunc(ctx *Ctx, thrN int, items []interf
 			return
 		}
 		_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
-		if authorIDOK {
+		if authorIDOK || !ctx.CheckAuthorID {
 			richItems = append(richItems, rich)
 		}
 		data, _ := Dig(doc, []string{"data"}, true, false)
@@ -3382,7 +3382,7 @@ func (j *DSGitHub) GitHubIssueEnrichItemsFunc(ctx *Ctx, thrN int, items []interf
 					}
 					for _, rich := range riches {
 						_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
-						if !authorIDOK {
+						if !authorIDOK && ctx.CheckAuthorID {
 							continue
 						}
 						richItems = append(richItems, rich)
@@ -3415,7 +3415,7 @@ func (j *DSGitHub) GitHubIssueEnrichItemsFunc(ctx *Ctx, thrN int, items []interf
 							}
 							for _, rich := range riches {
 								_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
-								if !authorIDOK {
+								if !authorIDOK && ctx.CheckAuthorID {
 									continue
 								}
 								richItems = append(richItems, rich)
@@ -3447,7 +3447,7 @@ func (j *DSGitHub) GitHubIssueEnrichItemsFunc(ctx *Ctx, thrN int, items []interf
 						}
 						for _, rich := range riches {
 							_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
-							if !authorIDOK {
+							if !authorIDOK && ctx.CheckAuthorID {
 								continue
 							}
 							richItems = append(richItems, rich)
@@ -3478,7 +3478,7 @@ func (j *DSGitHub) GitHubIssueEnrichItemsFunc(ctx *Ctx, thrN int, items []interf
 						}
 						for _, rich := range riches {
 							_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
-							if !authorIDOK {
+							if !authorIDOK && ctx.CheckAuthorID {
 								continue
 							}
 							richItems = append(richItems, rich)
@@ -3588,7 +3588,7 @@ func (j *DSGitHub) GitHubPullRequestEnrichItemsFunc(ctx *Ctx, thrN int, items []
 			return
 		}
 		_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
-		if authorIDOK {
+		if authorIDOK || !ctx.CheckAuthorID {
 			richItems = append(richItems, rich)
 		}
 		data, _ := Dig(doc, []string{"data"}, true, false)
@@ -3618,7 +3618,7 @@ func (j *DSGitHub) GitHubPullRequestEnrichItemsFunc(ctx *Ctx, thrN int, items []
 						}
 						for _, rich := range riches {
 							_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
-							if !authorIDOK {
+							if !authorIDOK && ctx.CheckAuthorID {
 								continue
 							}
 							richItems = append(richItems, rich)
@@ -3648,7 +3648,7 @@ func (j *DSGitHub) GitHubPullRequestEnrichItemsFunc(ctx *Ctx, thrN int, items []
 					}
 					for _, rich := range riches {
 						_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
-						if !authorIDOK {
+						if !authorIDOK && ctx.CheckAuthorID {
 							continue
 						}
 						richItems = append(richItems, rich)
@@ -3677,7 +3677,7 @@ func (j *DSGitHub) GitHubPullRequestEnrichItemsFunc(ctx *Ctx, thrN int, items []
 					}
 					for _, rich := range riches {
 						_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
-						if !authorIDOK {
+						if !authorIDOK && ctx.CheckAuthorID {
 							continue
 						}
 						richItems = append(richItems, rich)
@@ -3709,7 +3709,7 @@ func (j *DSGitHub) GitHubPullRequestEnrichItemsFunc(ctx *Ctx, thrN int, items []
 							}
 							for _, rich := range riches {
 								_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
-								if !authorIDOK {
+								if !authorIDOK && ctx.CheckAuthorID {
 									continue
 								}
 								richItems = append(richItems, rich)
@@ -3741,7 +3741,7 @@ func (j *DSGitHub) GitHubPullRequestEnrichItemsFunc(ctx *Ctx, thrN int, items []
 						}
 						for _, rich := range riches {
 							_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
-							if !authorIDOK {
+							if !authorIDOK && ctx.CheckAuthorID {
 								continue
 							}
 							richItems = append(richItems, rich)

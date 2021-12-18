@@ -1968,7 +1968,7 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 				return
 			}
 			_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
-			if authorIDOK {
+			if authorIDOK || !ctx.CheckAuthorID {
 				richItems = append(richItems, rich)
 			}
 			if GitGenerateFlatDocs {
@@ -1978,7 +1978,7 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 				}
 				for _, trailerDoc := range trailerDocs {
 					_, authorIDOK := Dig(trailerDoc, []string{"author_id"}, false, true)
-					if !authorIDOK {
+					if !authorIDOK && ctx.CheckAuthorID {
 						continue
 					}
 					richItems = append(richItems, trailerDoc)
@@ -1993,7 +1993,7 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 				}
 				rich[GitUUID] = gitUUID
 				_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
-				if authorIDOK {
+				if authorIDOK || !ctx.CheckAuthorID {
 					richItems = append(richItems, rich)
 				}
 				if GitGenerateFlatDocs {
@@ -2003,7 +2003,7 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 					}
 					for _, trailerDoc := range trailerDocs {
 						_, authorIDOK := Dig(trailerDoc, []string{"author_id"}, false, true)
-						if !authorIDOK {
+						if !authorIDOK && ctx.CheckAuthorID {
 							continue
 						}
 						richItems = append(richItems, trailerDoc)
@@ -2024,7 +2024,7 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 				return
 			}
 			_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
-			if authorIDOK {
+			if authorIDOK || !ctx.CheckAuthorID {
 				richItems = append(richItems, rich)
 			}
 			richItems = append(richItems, rich)
@@ -2035,7 +2035,7 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 				}
 				for _, trailerDoc := range trailerDocs {
 					_, authorIDOK := Dig(trailerDoc, []string{"author_id"}, false, true)
-					if !authorIDOK {
+					if !authorIDOK && ctx.CheckAuthorID {
 						continue
 					}
 					richItems = append(richItems, trailerDoc)

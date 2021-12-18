@@ -820,7 +820,7 @@ func GerritEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs 
 			return
 		}
 		_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
-		if authorIDOK {
+		if authorIDOK || !ctx.CheckAuthorID {
 			richItems = append(richItems, rich)
 		}
 		data, _ := Dig(doc, []string{"data"}, true, false)
@@ -844,7 +844,7 @@ func GerritEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs 
 					}
 					for _, rich := range riches {
 						_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
-						if !authorIDOK {
+						if !authorIDOK && ctx.CheckAuthorID {
 							continue
 						}
 						richItems = append(richItems, rich)
@@ -873,7 +873,7 @@ func GerritEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs 
 					}
 					for _, rich := range riches {
 						_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
-						if !authorIDOK {
+						if !authorIDOK && ctx.CheckAuthorID {
 							continue
 						}
 						richItems = append(richItems, rich)
@@ -1870,7 +1870,7 @@ func (j *DSGerrit) EnrichPatchsets(ctx *Ctx, review map[string]interface{}, patc
 					}
 					for _, rich := range riches {
 						_, authorIDOK := Dig(rich, []string{"author_id"}, false, true)
-						if !authorIDOK {
+						if !authorIDOK && ctx.CheckAuthorID {
 							continue
 						}
 						richItems = append(richItems, rich)
