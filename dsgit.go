@@ -2134,6 +2134,10 @@ func GitEnrichItemsFunc(ctx *Ctx, ds DS, thrN int, items []interface{}, docs *[]
 
 // EnrichPairProgrammingItem - additional operations on already enriched item for pair programming
 func EnrichPairProgrammingItem(richItem map[string]interface{}) (err error) {
+	_, ok := richItem["is_parent_commit"]
+	if ok {
+		return
+	}
 	var repoString string
 	if repo, ok := richItem["repo_name"]; ok {
 		repoString = fmt.Sprintf("%+v", repo)
