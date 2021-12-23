@@ -191,6 +191,7 @@ func (ctx *Ctx) Init() {
 
 	// Skip blank orgs
 	ctx.SkipBlankOrgs = os.Getenv("SKIP_BLANK_ORGS") != ""
+	fmt.Printf("Skip blank orgs: %v\n", ctx.SkipBlankOrgs)
 
 	// Debug
 	if !ctx.BoolEnv("DEBUG") {
