@@ -1406,6 +1406,10 @@ func (j *DSJira) AffsItems(ctx *Ctx, item map[string]interface{}, roles []string
 		affsIdentity, empty, e := IdentityAffsData(ctx, j, identity, nil, dt, role)
 		if e != nil {
 			Printf("AffsItems/IdentityAffsData: error: %v for %v,%v,%v\n", e, identity, dt, role)
+			if ctx.SkipBlankOrgs {
+				err = e
+				return
+			}
 		}
 		if empty {
 			Printf("no identity affiliation data for identity %+v\n", identity)

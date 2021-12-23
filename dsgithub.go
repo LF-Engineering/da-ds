@@ -5529,6 +5529,10 @@ func (j *DSGitHub) AffsItems(ctx *Ctx, item map[string]interface{}, roles []stri
 		affsIdentity, empty, e := IdentityAffsData(ctx, j, identity, nil, dt, role)
 		if e != nil {
 			Printf("%s/%s: AffsItems/IdentityAffsData: error: %v for %v,%v,%v\n", j.URL, j.Category, e, identity, dt, role)
+			if ctx.SkipBlankOrgs {
+				err = e
+				return
+			}
 		}
 		if empty {
 			Printf("%s/%s: no identity affiliation data for identity %+v, role %s\n", j.URL, j.Category, identity, role)

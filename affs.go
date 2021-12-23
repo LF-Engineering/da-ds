@@ -616,9 +616,13 @@ func AffsDataForRoles(ctx *Ctx, ds DS, rich map[string]interface{}, roles []stri
 		if role == authorField {
 			idAuthor = id
 		}
-		affsIdentity, empty, e := IdentityAffsData(ctx, ds, nil, id, date, role)
-		if e != nil {
-			Printf("AffsDataForRoles: IdentityAffsData error: %v for %s id %d\n", role, id)
+		affsIdentity, empty, er := IdentityAffsData(ctx, ds, nil, id, date, role)
+		if er != nil {
+			Printf("AffsDataForRoles: IdentityAffsData error: %v for %s id %d\n", er, role, id)
+			if ctx.SkipBlankOrgs {
+				e = er
+				return
+			}
 		}
 		if empty {
 			Printf("no identity affiliation data for %s id %+v\n", role, id)
@@ -629,9 +633,13 @@ func AffsDataForRoles(ctx *Ctx, ds DS, rich map[string]interface{}, roles []stri
 		}
 	}
 	if idAuthor != nil && authorField != Author {
-		affsIdentity, empty, e := IdentityAffsData(ctx, ds, nil, idAuthor, date, Author)
-		if e != nil {
-			Printf("AffsDataForRoles: IdentityAffsData error: %v\n")
+		affsIdentity, empty, er := IdentityAffsData(ctx, ds, nil, idAuthor, date, Author)
+		if er != nil {
+			Printf("AffsDataForRoles: IdentityAffsData error: %v\n", er)
+			if ctx.SkipBlankOrgs {
+				e = er
+				return
+			}
 		}
 		if !empty {
 			for prop, value := range affsIdentity {
