@@ -5529,7 +5529,7 @@ func (j *DSGitHub) AffsItems(ctx *Ctx, item map[string]interface{}, roles []stri
 		affsIdentity, empty, e := IdentityAffsData(ctx, j, identity, nil, dt, role)
 		if e != nil {
 			Printf("%s/%s: AffsItems/IdentityAffsData: error: %v for %v,%v,%v\n", j.URL, j.Category, e, identity, dt, role)
-			if ctx.SkipBlankOrgs {
+			if ctx.AffsAPIFailFatal {
 				err = e
 				return
 			}

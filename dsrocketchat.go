@@ -921,7 +921,7 @@ func (j *DSRocketchat) AffsItems(ctx *Ctx, message map[string]interface{}, roles
 		affsIdentity, empty, e := IdentityAffsData(ctx, j, identity, nil, dt, role)
 		if e != nil {
 			Printf("AffsItems/IdentityAffsData: error: %v for %v,%v,%v\n", e, identity, dt, role)
-			if ctx.SkipBlankOrgs {
+			if ctx.AffsAPIFailFatal {
 				err = e
 				return
 			}

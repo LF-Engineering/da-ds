@@ -619,7 +619,7 @@ func AffsDataForRoles(ctx *Ctx, ds DS, rich map[string]interface{}, roles []stri
 		affsIdentity, empty, er := IdentityAffsData(ctx, ds, nil, id, date, role)
 		if er != nil {
 			Printf("AffsDataForRoles: IdentityAffsData error: %v for %s id %d\n", er, role, id)
-			if ctx.SkipBlankOrgs {
+			if ctx.AffsAPIFailFatal {
 				e = er
 				return
 			}
@@ -636,7 +636,7 @@ func AffsDataForRoles(ctx *Ctx, ds DS, rich map[string]interface{}, roles []stri
 		affsIdentity, empty, er := IdentityAffsData(ctx, ds, nil, idAuthor, date, Author)
 		if er != nil {
 			Printf("AffsDataForRoles: IdentityAffsData error: %v\n", er)
-			if ctx.SkipBlankOrgs {
+			if ctx.AffsAPIFailFatal {
 				e = er
 				return
 			}

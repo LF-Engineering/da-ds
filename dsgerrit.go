@@ -2092,7 +2092,7 @@ func (j *DSGerrit) AffsItems(ctx *Ctx, review map[string]interface{}, roles []st
 		affsIdentity, empty, e := IdentityAffsData(ctx, j, identity, nil, dt, role)
 		if e != nil {
 			Printf("AffsItems/IdentityAffsData: error: %v for %v,%v,%v\n", e, identity, dt, role)
-			if ctx.SkipBlankOrgs {
+			if ctx.AffsAPIFailFatal {
 				err = e
 				return
 			}

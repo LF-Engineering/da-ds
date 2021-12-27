@@ -2502,7 +2502,7 @@ func (j *DSGit) EnrichItem(ctx *Ctx, item map[string]interface{}, skip string, a
 		affsIdentity, empty, e := IdentityAffsData(ctx, j, identity, nil, authorDate, rolePH)
 		if e != nil {
 			Printf("AffsItems/IdentityAffsData: error: %v for %v,%v\n", e, identity, authorDate)
-			if ctx.SkipBlankOrgs {
+			if ctx.AffsAPIFailFatal {
 				err = e
 				return
 			}
@@ -2724,7 +2724,7 @@ func (j *DSGit) AffsItems(ctx *Ctx, commit map[string]interface{}, roles []strin
 		affsIdentity, empty, e := IdentityAffsData(ctx, j, identity, nil, dt, role)
 		if e != nil {
 			Printf("AffsItems/IdentityAffsData: error: %v for %v,%v,%v\n", e, identity, dt, role)
-			if ctx.SkipBlankOrgs {
+			if ctx.AffsAPIFailFatal {
 				err = e
 				return
 			}
