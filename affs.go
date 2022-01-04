@@ -618,7 +618,7 @@ func AffsDataForRoles(ctx *Ctx, ds DS, rich map[string]interface{}, roles []stri
 		}
 		affsIdentity, empty, er := IdentityAffsData(ctx, ds, nil, id, date, role)
 		if er != nil {
-			Printf("AffsDataForRoles: IdentityAffsData error: %v for %s id %d\n", er, role, id)
+			Printf("AffsDataForRoles: IdentityAffsData error: %v for %s id %v\n", er, role, id)
 			if ctx.AffsAPIFailFatal {
 				e = er
 				return
