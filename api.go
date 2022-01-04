@@ -65,16 +65,16 @@ func ExecuteAffiliationsAPICall(ctx *Ctx, method, path string, cacheToken bool) 
 			err = fmt.Errorf("do request error: %+v for %s url: %s", e, method, rurl)
 			return
 		}
-		if i == 0 && resp.StatusCode == 504 {
+		if i == 0 && (resp.StatusCode == 504 || resp.StatusCode == 408) {
 			if trialSec < 5 {
-				Printf("gateway timeout 504 while trying to get a new token, sleeping for %d seconds...\n", trialSec)
+				Printf("gateway timeout %d, sleeping for %d seconds...\n", resp.StatusCode, trialSec)
 				time.Sleep(time.Duration(trialSec) * time.Second)
-				Printf("gateway timeout 504 while trying to get a new token, sleept for %d seconds, retrying...\n", trialSec)
+				Printf("gateway timeout %d, slept for %d seconds, retrying...\n", resp.StatusCode, trialSec)
 				trialSec++
 				i--
 				continue
 			}
-			Printf("gateway timeout 504 while trying to get a new token, giving up\n")
+			Printf("gateway timeout %d, giving up\n", resp.StatusCode)
 		}
 		if i == 0 && resp.StatusCode == 401 {
 			_ = resp.Body.Close()
@@ -103,7 +103,7 @@ func ExecuteAffiliationsAPICall(ctx *Ctx, method, path string, cacheToken bool) 
 			return
 		}
 		if trialSec > 1 {
-			Printf("recovered after gateway timeout 504 (%d)\n", trialSec)
+			Printf("recovered after gateway timeout 504/408 (%d)\n", trialSec)
 		}
 		err = jsoniter.Unmarshal(body, &data)
 		if err != nil {
