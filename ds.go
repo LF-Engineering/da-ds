@@ -1460,6 +1460,7 @@ func FetchRaw(ctx *Ctx, ds DS) (err error) {
 
 // Enrich - implement fetch raw data (generic)
 func Enrich(ctx *Ctx, ds DS) (err error) {
+	defer ctx.DB.Close()
 	err = HandleMapping(ctx, ds, false)
 	if err != nil {
 		Fatalf(ds.Name()+": HandleMapping error: %+v\n", err)
