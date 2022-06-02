@@ -46,7 +46,7 @@ func ConnectAffiliationsDB(ctx *Ctx) {
 	}
 	d, err := sqlx.Connect("mysql", connStr)
 	FatalOnError(err)
-	d.SetMaxOpenConns(5)
+	d.SetMaxOpenConns(1)
 	ctx.DB = d
 	FatalOnError(SetDBSessionOrigin(ctx))
 }
