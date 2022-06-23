@@ -46,7 +46,7 @@ func ConnectAffiliationsDB(ctx *Ctx) {
 	}
 	d, err := sqlx.Connect("mysql", connStr)
 	FatalOnError(err)
-	d.SetMaxOpenConns(1)
+	d.SetMaxOpenConns(3)
 	ctx.DB = d
 	FatalOnError(SetDBSessionOrigin(ctx))
 }
@@ -58,8 +58,12 @@ func SetDBSessionOrigin(ctx *Ctx) (err error) {
 }
 
 // QueryOut - display DB query
-func QueryOut(ctx *Ctx, err error, query string, args ...interface{}) {
-	q := query + "\n"
+func QueryOut(ctx *Ctx, in bool, err error, query string, args ...interface{}) {
+	pref := "<<< "
+	if in {
+		pref = ">>> "
+	}
+	q := pref + query + "\n"
 	if (err != nil || ctx.DebugSQL > 1) && len(args) > 0 {
 		s := ""
 		for vi, vv := range args {
@@ -86,18 +90,24 @@ func QueryOut(ctx *Ctx, err error, query string, args ...interface{}) {
 
 // ExecDB - execute DB query without transaction
 func ExecDB(ctx *Ctx, query string, args ...interface{}) (res sql.Result, err error) {
+	if err != nil || ctx.DebugSQL > 0 {
+		QueryOut(ctx, true, err, query, args...)
+	}
 	res, err = ctx.DB.Exec(query, args...)
 	if err != nil || ctx.DebugSQL > 0 {
-		QueryOut(ctx, err, query, args...)
+		QueryOut(ctx, false, err, query, args...)
 	}
 	return
 }
 
 // ExecTX - execute DB query with transaction
 func ExecTX(ctx *Ctx, tx *sql.Tx, query string, args ...interface{}) (res sql.Result, err error) {
+	if err != nil || ctx.DebugSQL > 0 {
+		QueryOut(ctx, true, err, query, args...)
+	}
 	res, err = tx.Exec(query, args...)
 	if err != nil || ctx.DebugSQL > 0 {
-		QueryOut(ctx, err, query, args...)
+		QueryOut(ctx, false, err, query, args...)
 	}
 	return
 }
@@ -112,18 +122,24 @@ func ExecSQL(ctx *Ctx, tx *sql.Tx, query string, args ...interface{}) (sql.Resul
 
 // QueryDB - query database without transaction
 func QueryDB(ctx *Ctx, query string, args ...interface{}) (rows *sql.Rows, err error) {
+	if err != nil || ctx.DebugSQL > 0 {
+		QueryOut(ctx, true, err, query, args...)
+	}
 	rows, err = ctx.DB.Query(query, args...)
 	if err != nil || ctx.DebugSQL > 0 {
-		QueryOut(ctx, err, query, args...)
+		QueryOut(ctx, false, err, query, args...)
 	}
 	return
 }
 
 // QueryTX - query database with transaction
 func QueryTX(ctx *Ctx, tx *sql.Tx, query string, args ...interface{}) (rows *sql.Rows, err error) {
+	if err != nil || ctx.DebugSQL > 0 {
+		QueryOut(ctx, true, err, query, args...)
+	}
 	rows, err = tx.Query(query, args...)
 	if err != nil || ctx.DebugSQL > 0 {
-		QueryOut(ctx, err, query, args...)
+		QueryOut(ctx, false, err, query, args...)
 	}
 	return
 }
